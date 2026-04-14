@@ -1,0 +1,33 @@
+{
+  "name": "designs-crm",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Designs CRM monorepo (Next.js + NestJS + Prisma)",
+  "scripts": {
+    "dev": "npm run -w @designs-crm/api dev",
+    "dev:web": "npm run -w @designs-crm/web dev",
+    "dev:api": "npm run -w @designs-crm/api dev",
+    "build": "npm run -w @designs-crm/api build && npm run -w @designs-crm/web build",
+    "lint": "npm run -w @designs-crm/api lint && npm run -w @designs-crm/web lint",
+    "prisma:generate": "npm run -w @designs-crm/api prisma:generate",
+    "prisma:migrate:dev": "npm run -w @designs-crm/api prisma:migrate:dev",
+    "prisma:migrate:deploy": "npm run -w @designs-crm/api prisma:migrate:deploy",
+    "prisma:studio": "npm run -w @designs-crm/api prisma:studio"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BakhtiarAhmed41/Designs-CRM.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/BakhtiarAhmed41/Designs-CRM/issues"
+  },
+  "homepage": "https://github.com/BakhtiarAhmed41/Designs-CRM#readme"
+}

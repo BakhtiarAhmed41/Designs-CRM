@@ -1,0 +1,29 @@
+.DS_Store
+Thumbs.db
+
+# dependencies
+node_modules
+
+# build outputs
+.next
+dist
+coverage
+
+# local env
+.env
+.env.*
+!.env.example
+!.env.local.example
+!.env.test.example
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDE
+.vscode
+.idea
+
+node_modules
