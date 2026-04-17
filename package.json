@@ -4,7 +4,7 @@
   "private": true,
   "description": "Designs CRM monorepo (Next.js + NestJS + Prisma)",
   "scripts": {
-    "dev": "npm run -w @designs-crm/api dev",
+    "dev": "concurrently -n api,web -c magenta,cyan \"npm run dev:api\" \"npm run dev:web\"",
     "dev:web": "npm run -w @designs-crm/web dev",
     "dev:api": "npm run -w @designs-crm/api dev",
     "build": "npm run -w @designs-crm/api build && npm run -w @designs-crm/web build",
@@ -29,5 +29,8 @@
   "bugs": {
     "url": "https://github.com/BakhtiarAhmed41/Designs-CRM/issues"
   },
-  "homepage": "https://github.com/BakhtiarAhmed41/Designs-CRM#readme"
+  "homepage": "https://github.com/BakhtiarAhmed41/Designs-CRM#readme",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
 }

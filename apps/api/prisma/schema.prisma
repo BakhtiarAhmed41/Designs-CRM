@@ -11,6 +11,16 @@ enum UserRole {
   ADMIN
 }
 
+enum OrderStatus {
+  CREATED
+  IN_PROGRESS
+  REJECTED
+  COMPLETED
+  CLOSED
+  REVISION_REQUESTED
+  PENDING_PAYMENT
+}
+
 model User {
   id           String         @id @default(uuid()) @db.Uuid
   email        String         @unique
@@ -22,6 +32,8 @@ model User {
   phone     String?
 
   refreshTokens RefreshToken[]
+  orders        Order[]        @relation("ClientOrders")
+  deliveries    OrderDelivery[] @relation("AdminDeliveries")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -43,5 +55,78 @@ model RefreshToken {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+model Order {
+  id            String      @id @default(uuid()) @db.Uuid
+  clientId      String      @db.Uuid
+  status        OrderStatus @default(CREATED)
+  serviceType   String
+  instructions  String?
+  size          String?
+  preferences   Json?
+
+  rejectionReason String?
+  approvedAt      DateTime?
+  rejectedAt      DateTime?
+  completedAt     DateTime?
+  closedAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  client      User             @relation("ClientOrders", fields: [clientId], references: [id], onDelete: Cascade)
+  attachments OrderAttachment[]
+  deliveries  OrderDelivery[]
+
+  @@index([clientId])
+  @@index([status])
+}
+
+model OrderAttachment {
+  id             String   @id @default(uuid()) @db.Uuid
+  orderId        String   @db.Uuid
+  uploadedByRole UserRole
+  uploadedById   String?  @db.Uuid
+  originalName   String
+  mimeType       String?
+  byteSize       Int?
+  storageKey     String   @unique
+  createdAt      DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([uploadedById])
+}
+
+model OrderDelivery {
+  id               String   @id @default(uuid()) @db.Uuid
+  orderId          String   @db.Uuid
+  version          Int
+  createdByAdminId String   @db.Uuid
+  createdAt        DateTime @default(now())
+
+  order          Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  createdByAdmin User               @relation("AdminDeliveries", fields: [createdByAdminId], references: [id], onDelete: Restrict)
+  files          OrderDeliveryFile[]
+
+  @@unique([orderId, version])
+  @@index([orderId])
+  @@index([createdByAdminId])
+}
+
+model OrderDeliveryFile {
+  id           String   @id @default(uuid()) @db.Uuid
+  deliveryId   String   @db.Uuid
+  originalName String
+  mimeType     String?
+  byteSize     Int?
+  storageKey   String   @unique
+  createdAt    DateTime @default(now())
+
+  delivery OrderDelivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+
+  @@index([deliveryId])
 }
 

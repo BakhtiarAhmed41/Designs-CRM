@@ -62,6 +62,7 @@ function LoginInner() {
                 router.replace(next);
               } catch (e) {
                 if (e instanceof ApiError) setError(e.message);
+                else if (e instanceof Error) setError(e.message);
                 else setError("Something went wrong");
               } finally {
                 setLoading(false);
