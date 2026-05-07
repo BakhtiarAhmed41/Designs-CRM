@@ -37,42 +37,45 @@ export default function OrdersPage() {
   }, []);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+    <div className="space-y-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Orders</h1>
-          <p className="text-sm text-zinc-600">Create a new order and track its status.</p>
+          <h1 className="crm-page-title">Orders</h1>
+          <p className="crm-page-desc">Create a new order and track its status.</p>
         </div>
-        <Link
-          href="/orders/new"
-          className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-        >
+        <Link href="/orders/new" className="crm-btn-primary shrink-0 self-start sm:self-center">
           New order
         </Link>
       </div>
 
-      {loading ? <div className="text-sm text-zinc-500">Loading…</div> : null}
-      {error ? <div className="text-sm text-red-600">{error}</div> : null}
+      {loading ? <div className="text-sm font-medium text-zinc-500">Loading…</div> : null}
+      {error ? <div className="crm-alert-error">{error}</div> : null}
 
-      <div className="rounded-lg border bg-white overflow-hidden">
-        <div className="grid grid-cols-12 gap-3 px-4 py-2 text-xs font-medium text-zinc-600 bg-zinc-50">
-          <div className="col-span-5">Service</div>
+      <div className="crm-surface overflow-hidden">
+        <div className="crm-surface-header grid grid-cols-12 gap-3">
+          <div className="col-span-3">Category</div>
+          <div className="col-span-3">Sub category</div>
           <div className="col-span-3">Status</div>
-          <div className="col-span-4">Created</div>
+          <div className="col-span-3">Created</div>
         </div>
         {orders.length === 0 && !loading ? (
-          <div className="px-4 py-6 text-sm text-zinc-600">No orders yet.</div>
+          <div className="px-4 py-10 text-center text-sm text-zinc-600">
+            No orders yet. Start with <span className="font-medium text-zinc-900">New order</span>.
+          </div>
         ) : (
-          <div className="divide-y">
+          <div className="divide-y divide-zinc-100">
             {orders.map((o) => (
               <Link
                 key={o.id}
                 href={`/orders/${o.id}`}
-                className="grid grid-cols-12 gap-3 px-4 py-3 text-sm hover:bg-zinc-50"
+                className="grid grid-cols-12 gap-3 px-4 py-3.5 text-sm transition-colors hover:bg-zinc-50/80"
               >
-                <div className="col-span-5 font-medium text-zinc-900">{o.serviceType}</div>
-                <div className="col-span-3 text-zinc-700">{o.status}</div>
-                <div className="col-span-4 text-zinc-600">{formatDate(o.createdAt)}</div>
+                <div className="col-span-3 truncate text-zinc-700">{o.mainCategory ?? "—"}</div>
+                <div className="col-span-3 font-medium text-zinc-900">{o.subCategory ?? o.serviceType}</div>
+                <div className="col-span-3">
+                  <span className="crm-badge">{o.status}</span>
+                </div>
+                <div className="col-span-3 text-zinc-600">{formatDate(o.createdAt)}</div>
               </Link>
             ))}
           </div>
@@ -81,4 +84,3 @@ export default function OrdersPage() {
     </div>
   );
 }
-

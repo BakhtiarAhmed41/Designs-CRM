@@ -6,7 +6,7 @@ import { CategorySelect, type MainCategory } from "../../../../components/Catego
 import { ApiError } from "../../../../lib/api";
 import { createOrder, uploadOrderAttachments } from "../../../../lib/orders";
 
-export default function NewOrderPage() {
+export default function NewQuotationRequestPage() {
   const router = useRouter();
 
   const [mainCategory, setMainCategory] = useState<MainCategory | "">("");
@@ -30,8 +30,8 @@ export default function NewOrderPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="crm-page-title">New order</h1>
-        <p className="crm-page-desc">Provide instructions and upload reference files.</p>
+        <h1 className="crm-page-title">Request quotation</h1>
+        <p className="crm-page-desc">Choose a category, then provide details and attachments.</p>
       </div>
 
       <div className="crm-surface space-y-6 p-6 sm:p-7">
@@ -58,7 +58,7 @@ export default function NewOrderPage() {
               placeholder="e.g. 1080×1080, A4, SVG"
             />
           </div>
-          <div className="sm:col-span-1">
+          <div className="sm:col-span-2">
             <label className="crm-label" htmlFor="files">
               Attachments
             </label>
@@ -115,7 +115,7 @@ export default function NewOrderPage() {
               try {
                 const serviceType = subCategory || `${mainCategory}`.trim();
                 const created = await createOrder({
-                  type: "ORDER",
+                  type: "QUOTATION_REQUEST",
                   mainCategory: mainCategory || null,
                   subCategory: subCategory || null,
                   serviceType: serviceType.trim(),
@@ -128,13 +128,13 @@ export default function NewOrderPage() {
                 }
                 router.replace(`/orders/${created.order.id}`);
               } catch (e) {
-                setError(e instanceof ApiError ? e.message : "Failed to create order");
+                setError(e instanceof ApiError ? e.message : "Failed to request quotation");
               } finally {
                 setSaving(false);
               }
             }}
           >
-            {saving ? "Creating…" : "Create order"}
+            {saving ? "Submitting…" : "Request quotation"}
           </button>
           <button type="button" className="crm-btn-secondary" disabled={saving} onClick={() => router.back()}>
             Cancel
@@ -144,3 +144,4 @@ export default function NewOrderPage() {
     </div>
   );
 }
+

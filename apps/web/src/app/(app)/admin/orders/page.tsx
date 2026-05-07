@@ -16,7 +16,10 @@ function formatDate(s: string) {
 
 const STATUSES: Array<{ value: "" | OrderStatus; label: string }> = [
   { value: "", label: "All statuses" },
-  { value: "CREATED", label: "CREATED (new)" },
+  { value: "WAITING_FOR_QUOTATION", label: "WAITING_FOR_QUOTATION" },
+  { value: "QUOTATION_PROVIDED", label: "QUOTATION_PROVIDED" },
+  { value: "WAITING_FOR_ADMIN_QUOTATION_APPROVAL", label: "COUNTER_QUOTATION_SUBMITTED" },
+  { value: "CLIENT_REJECTED_QUOTATION", label: "QUOTATION_REJECTED" },
   { value: "IN_PROGRESS", label: "IN_PROGRESS" },
   { value: "COMPLETED", label: "COMPLETED" },
   { value: "REJECTED", label: "REJECTED" },
@@ -62,28 +65,31 @@ export default function AdminOrdersPage() {
 
   if (me && me.role !== "ADMIN") {
     return (
-      <div className="rounded-lg border bg-white p-5">
-        <div className="font-medium text-zinc-900">Admin only</div>
-        <div className="text-sm text-zinc-600 mt-1">You don’t have permission to view this page.</div>
+      <div className="crm-surface p-6">
+        <div className="font-semibold text-zinc-900">Admin only</div>
+        <p className="mt-1 text-sm leading-relaxed text-zinc-600">You don’t have permission to view this page.</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold">Admin · Orders</h1>
-        <p className="text-sm text-zinc-600">Review new orders, approve/reject, and deliver files.</p>
+        <h1 className="crm-page-title">Admin · Orders</h1>
+        <p className="crm-page-desc">Review new orders, approve or reject, and upload deliverables.</p>
       </div>
 
-      <div className="rounded-lg border bg-white p-5">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Status</label>
+      <div className="crm-surface p-6 sm:p-7">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+          <div>
+            <label className="crm-label" htmlFor="filter-status">
+              Status
+            </label>
             <select
-              className="w-full rounded-md border px-3 py-2 text-sm bg-white"
+              id="filter-status"
+              className="crm-field"
               value={status}
-              onChange={(e) => setStatus(e.target.value as any)}
+              onChange={(e) => setStatus(e.target.value as "" | OrderStatus)}
             >
               {STATUSES.map((s) => (
                 <option key={s.value} value={s.value}>
@@ -92,41 +98,46 @@ export default function AdminOrdersPage() {
               ))}
             </select>
           </div>
-          <div className="space-y-1 sm:col-span-2">
-            <label className="text-sm font-medium">Client ID (optional)</label>
+          <div className="sm:col-span-2">
+            <label className="crm-label" htmlFor="filter-client">
+              Client ID (optional)
+            </label>
             <input
-              className="w-full rounded-md border px-3 py-2 text-sm"
+              id="filter-client"
+              className="crm-field"
               value={clientId}
               onChange={(e) => setClientId(e.target.value)}
-              placeholder="Filter orders for a specific client UUID"
+              placeholder="Filter by client UUID"
             />
           </div>
         </div>
       </div>
 
-      {loading ? <div className="text-sm text-zinc-500">Loading…</div> : null}
-      {error ? <div className="text-sm text-red-600">{error}</div> : null}
+      {loading ? <div className="text-sm font-medium text-zinc-500">Loading…</div> : null}
+      {error ? <div className="crm-alert-error">{error}</div> : null}
 
-      <div className="rounded-lg border bg-white overflow-hidden">
-        <div className="grid grid-cols-12 gap-3 px-4 py-2 text-xs font-medium text-zinc-600 bg-zinc-50">
+      <div className="crm-surface overflow-hidden">
+        <div className="crm-surface-header grid grid-cols-12 gap-3">
           <div className="col-span-4">Client</div>
           <div className="col-span-4">Service</div>
           <div className="col-span-2">Status</div>
           <div className="col-span-2">Created</div>
         </div>
         {orders.length === 0 && !loading ? (
-          <div className="px-4 py-6 text-sm text-zinc-600">No matching orders.</div>
+          <div className="px-4 py-10 text-center text-sm text-zinc-600">No matching orders.</div>
         ) : (
-          <div className="divide-y">
+          <div className="divide-y divide-zinc-100">
             {orders.map((o) => (
               <Link
                 key={o.id}
                 href={`/admin/orders/${o.id}`}
-                className="grid grid-cols-12 gap-3 px-4 py-3 text-sm hover:bg-zinc-50"
+                className="grid grid-cols-12 gap-3 px-4 py-3.5 text-sm transition-colors hover:bg-zinc-50/80"
               >
                 <div className="col-span-4 truncate text-zinc-700">{o.client?.email ?? o.clientId}</div>
                 <div className="col-span-4 font-medium text-zinc-900">{o.serviceType}</div>
-                <div className="col-span-2 text-zinc-700">{o.status}</div>
+                <div className="col-span-2">
+                  <span className="crm-badge">{o.status}</span>
+                </div>
                 <div className="col-span-2 text-zinc-600">{formatDate(o.createdAt)}</div>
               </Link>
             ))}
@@ -136,4 +147,3 @@ export default function AdminOrdersPage() {
     </div>
   );
 }
-

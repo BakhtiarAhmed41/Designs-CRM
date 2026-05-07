@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Post,
+  Patch,
   UseGuards,
   UseInterceptors,
   UploadedFiles,
@@ -17,10 +18,23 @@ import type { AuthUser } from '../auth/auth.types';
 import { OrdersService } from './orders.service';
 
 const createOrderSchema = z.object({
+  type: z.enum(['ORDER', 'QUOTATION_REQUEST']).optional(),
+  mainCategory: z.string().optional().nullable(),
+  subCategory: z.string().optional().nullable(),
   serviceType: z.string().min(1),
   instructions: z.string().optional().nullable(),
   size: z.string().optional().nullable(),
   preferences: z.any().optional(),
+});
+
+const rejectQuotationSchema = z.object({
+  comment: z.string().optional().nullable(),
+});
+
+const counterQuotationSchema = z.object({
+  amountCents: z.number().int().positive().optional().nullable(),
+  currency: z.string().min(1).optional().nullable(),
+  comment: z.string().optional().nullable(),
 });
 
 @Controller('orders')
@@ -79,6 +93,34 @@ export class OrdersController {
     @Param('deliveryFileId') deliveryFileId: string,
   ) {
     return this.orders.getMyDeliveryFileSignedUrl(user, orderId, deliveryFileId);
+  }
+
+  @Patch(':id/quotations/accept')
+  async acceptQuotation(@CurrentUser() user: AuthUser | undefined, @Param('id') orderId: string) {
+    const order = await this.orders.clientAcceptQuotation(user, orderId);
+    return { order };
+  }
+
+  @Patch(':id/quotations/reject')
+  async rejectQuotation(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('id') orderId: string,
+    @Body() body: unknown,
+  ) {
+    const data = rejectQuotationSchema.parse(body);
+    const order = await this.orders.clientRejectQuotation(user, orderId, data);
+    return { order };
+  }
+
+  @Post(':id/quotations/counter')
+  async counterQuotation(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('id') orderId: string,
+    @Body() body: unknown,
+  ) {
+    const data = counterQuotationSchema.parse(body);
+    const quotation = await this.orders.clientCounterQuotation(user, orderId, data);
+    return { quotation };
   }
 }
 

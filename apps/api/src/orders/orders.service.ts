@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { OrderStatus, UserRole } from '@prisma/client';
+import { OrderStatus, OrderType, QuotationStatus, UserRole } from '@prisma/client';
 import type { AuthUser } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseStorageService } from '../storage/supabase-storage.service';
@@ -15,20 +15,38 @@ export class OrdersService {
     private storage: SupabaseStorageService,
   ) {}
 
-  async createOrder(client: AuthUser | undefined, data: { serviceType: string; instructions?: string | null; size?: string | null; preferences?: any }) {
+  async createOrder(
+    client: AuthUser | undefined,
+    data: {
+      type?: OrderType | 'ORDER' | 'QUOTATION_REQUEST';
+      mainCategory?: string | null;
+      subCategory?: string | null;
+      serviceType: string;
+      instructions?: string | null;
+      size?: string | null;
+      preferences?: any;
+    },
+  ) {
     assertAuthUser(client);
     if (client.role !== UserRole.CLIENT) throw new ForbiddenException();
+
+    const type = (data.type ?? OrderType.ORDER) as OrderType;
+    // Updated flow: every submission starts by waiting for quotation.
+    const initialStatus = OrderStatus.WAITING_FOR_QUOTATION;
 
     const order = await this.prisma.order.create({
       data: {
         clientId: client.id,
+        type,
+        mainCategory: data.mainCategory ?? null,
+        subCategory: data.subCategory ?? null,
         serviceType: data.serviceType,
         instructions: data.instructions ?? null,
         size: data.size ?? null,
         preferences: data.preferences ?? null,
-        status: OrderStatus.CREATED,
+        status: initialStatus,
       },
-      include: { attachments: true, deliveries: { include: { files: true } } },
+      include: { attachments: true, deliveries: { include: { files: true } }, quotations: { orderBy: { version: 'desc' } } },
     });
     return order;
   }
@@ -38,7 +56,7 @@ export class OrdersService {
     return this.prisma.order.findMany({
       where: { clientId: user.id },
       orderBy: { createdAt: 'desc' },
-      include: { attachments: true },
+      include: { attachments: true, quotations: { orderBy: { version: 'desc' } } },
     });
   }
 
@@ -46,7 +64,11 @@ export class OrdersService {
     assertAuthUser(user);
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, clientId: user.id },
-      include: { attachments: true, deliveries: { include: { files: true }, orderBy: { version: 'desc' } } },
+      include: {
+        attachments: true,
+        deliveries: { include: { files: true }, orderBy: { version: 'desc' } },
+        quotations: { orderBy: { version: 'desc' } },
+      },
     });
     if (!order) throw new NotFoundException('Order not found');
     return order;
@@ -59,8 +81,12 @@ export class OrdersService {
 
     const order = await this.prisma.order.findFirst({ where: { id: orderId, clientId: user.id } });
     if (!order) throw new NotFoundException('Order not found');
-    if (order.status !== OrderStatus.CREATED) {
-      throw new BadRequestException('Attachments can only be uploaded while order is in CREATED status');
+    const canUpload =
+      order.status === OrderStatus.WAITING_FOR_QUOTATION ||
+      order.status === OrderStatus.WAITING_FOR_ADMIN_QUOTATION_APPROVAL ||
+      order.status === OrderStatus.QUOTATION_PROVIDED;
+    if (!canUpload) {
+      throw new BadRequestException('Attachments can only be uploaded before the order starts (quotation / created stage).');
     }
 
     const bucket = this.storage.getOrdersBucket();
@@ -125,7 +151,7 @@ export class OrdersService {
         clientId: filters.clientId,
       },
       orderBy: { createdAt: 'desc' },
-      include: { attachments: true, client: true },
+      include: { attachments: true, client: true, quotations: { orderBy: { version: 'desc' } } },
     });
   }
 
@@ -138,10 +164,170 @@ export class OrdersService {
         client: true,
         attachments: true,
         deliveries: { include: { files: true }, orderBy: { version: 'desc' } },
+        quotations: { orderBy: { version: 'desc' } },
       },
     });
     if (!order) throw new NotFoundException('Order not found');
     return order;
+  }
+
+  async adminProposeQuotation(
+    user: AuthUser | undefined,
+    orderId: string,
+    input: { amountCents?: number | null; currency?: string | null; comment?: string | null },
+  ) {
+    assertAuthUser(user);
+    if (user.role !== UserRole.ADMIN) throw new ForbiddenException();
+
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { quotations: { orderBy: { version: 'desc' }, take: 1 } },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+
+    if (order.status !== OrderStatus.WAITING_FOR_QUOTATION && order.status !== OrderStatus.WAITING_FOR_ADMIN_QUOTATION_APPROVAL) {
+      throw new BadRequestException('Quotation can only be proposed when waiting for quotation');
+    }
+
+    const nextVersion = (order.quotations?.[0]?.version ?? 0) + 1;
+    const quote = await this.prisma.orderQuotation.create({
+      data: {
+        orderId,
+        version: nextVersion,
+        status: QuotationStatus.PROPOSED,
+        createdByRole: UserRole.ADMIN,
+        createdById: user.id,
+        amountCents: typeof input.amountCents === 'number' ? input.amountCents : null,
+        currency: (input.currency?.trim() || 'USD').toUpperCase(),
+        comment: input.comment?.trim() ? input.comment.trim() : null,
+      },
+    });
+
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.QUOTATION_PROVIDED },
+    });
+
+    return quote;
+  }
+
+  async clientAcceptQuotation(user: AuthUser | undefined, orderId: string) {
+    assertAuthUser(user);
+    if (user.role !== UserRole.CLIENT) throw new ForbiddenException();
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, clientId: user.id },
+      include: { quotations: { orderBy: { version: 'desc' }, take: 1 } },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    const latest = order.quotations?.[0];
+    if (!latest || latest.status === QuotationStatus.REJECTED) throw new BadRequestException('No active quotation to accept');
+    if (order.status !== OrderStatus.QUOTATION_PROVIDED) throw new BadRequestException('Order is not awaiting client quotation decision');
+
+    await this.prisma.orderQuotation.update({ where: { id: latest.id }, data: { status: QuotationStatus.APPROVED } });
+
+    const updatedOrder = await this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.IN_PROGRESS, approvedAt: new Date() },
+    });
+    return updatedOrder;
+  }
+
+  async clientRejectQuotation(user: AuthUser | undefined, orderId: string, input: { comment?: string | null }) {
+    assertAuthUser(user);
+    if (user.role !== UserRole.CLIENT) throw new ForbiddenException();
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, clientId: user.id },
+      include: { quotations: { orderBy: { version: 'desc' }, take: 1 } },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    const latest = order.quotations?.[0];
+    if (!latest) throw new BadRequestException('No quotation to reject');
+    if (order.status !== OrderStatus.QUOTATION_PROVIDED) throw new BadRequestException('Order is not awaiting client quotation decision');
+
+    await this.prisma.orderQuotation.update({
+      where: { id: latest.id },
+      data: { status: QuotationStatus.REJECTED, comment: input.comment?.trim() ? input.comment.trim() : latest.comment },
+    });
+
+    return this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.CLIENT_REJECTED_QUOTATION },
+    });
+  }
+
+  async clientCounterQuotation(
+    user: AuthUser | undefined,
+    orderId: string,
+    input: { amountCents?: number | null; currency?: string | null; comment?: string | null },
+  ) {
+    assertAuthUser(user);
+    if (user.role !== UserRole.CLIENT) throw new ForbiddenException();
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, clientId: user.id },
+      include: { quotations: { orderBy: { version: 'desc' }, take: 1 } },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    if (order.status !== OrderStatus.QUOTATION_PROVIDED) throw new BadRequestException('Order is not awaiting client quotation decision');
+
+    const nextVersion = (order.quotations?.[0]?.version ?? 0) + 1;
+    const quote = await this.prisma.orderQuotation.create({
+      data: {
+        orderId,
+        version: nextVersion,
+        status: QuotationStatus.COUNTERED,
+        createdByRole: UserRole.CLIENT,
+        createdById: user.id,
+        amountCents: typeof input.amountCents === 'number' ? input.amountCents : null,
+        currency: (input.currency?.trim() || 'USD').toUpperCase(),
+        comment: input.comment?.trim() ? input.comment.trim() : null,
+      },
+    });
+
+    await this.prisma.order.update({ where: { id: orderId }, data: { status: OrderStatus.WAITING_FOR_ADMIN_QUOTATION_APPROVAL } });
+    return quote;
+  }
+
+  async adminAcceptCounter(user: AuthUser | undefined, orderId: string) {
+    assertAuthUser(user);
+    if (user.role !== UserRole.ADMIN) throw new ForbiddenException();
+
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { quotations: { orderBy: { version: 'desc' }, take: 1 } },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    const latest = order.quotations?.[0];
+    if (!latest || latest.status !== QuotationStatus.COUNTERED) throw new BadRequestException('No counter quotation to approve');
+    if (order.status !== OrderStatus.WAITING_FOR_ADMIN_QUOTATION_APPROVAL) throw new BadRequestException('Order is not awaiting counter approval');
+
+    await this.prisma.orderQuotation.update({ where: { id: latest.id }, data: { status: QuotationStatus.APPROVED } });
+    return this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.IN_PROGRESS, approvedAt: new Date() },
+    });
+  }
+
+  async adminRejectCounter(user: AuthUser | undefined, orderId: string, input: { comment?: string | null }) {
+    assertAuthUser(user);
+    if (user.role !== UserRole.ADMIN) throw new ForbiddenException();
+
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: { quotations: { orderBy: { version: 'desc' }, take: 1 } },
+    });
+    if (!order) throw new NotFoundException('Order not found');
+    const latest = order.quotations?.[0];
+    if (!latest || latest.status !== QuotationStatus.COUNTERED) throw new BadRequestException('No counter quotation to reject');
+    if (order.status !== OrderStatus.WAITING_FOR_ADMIN_QUOTATION_APPROVAL) throw new BadRequestException('Order is not awaiting counter approval');
+
+    await this.prisma.orderQuotation.update({
+      where: { id: latest.id },
+      data: { status: QuotationStatus.REJECTED, comment: input.comment?.trim() ? input.comment.trim() : latest.comment },
+    });
+    return this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.CLIENT_REJECTED_QUOTATION },
+    });
   }
 
   async approveOrder(user: AuthUser | undefined, orderId: string) {

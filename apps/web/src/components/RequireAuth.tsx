@@ -45,8 +45,14 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <div className="text-sm text-zinc-500">Loading…</div>
+      <div className="flex flex-1 items-center justify-center px-4 py-16">
+        <div className="crm-surface flex items-center gap-3 px-5 py-4">
+          <span
+            className="inline-block size-4 animate-spin rounded-full border-2 border-zinc-200 border-t-emerald-600"
+            aria-hidden
+          />
+          <span className="text-sm font-medium text-zinc-600">Loading your workspace…</span>
+        </div>
       </div>
     );
   }
@@ -55,4 +61,3 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
 
   return <>{children}</>;
 }
-

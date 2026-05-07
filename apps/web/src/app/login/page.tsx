@@ -1,8 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import { ApiError } from "../../lib/api";
 import { login, register } from "../../lib/auth";
 
@@ -18,29 +17,39 @@ function LoginInner() {
   const [loading, setLoading] = useState(false);
 
   return (
-    <div className="min-h-full flex items-center justify-center bg-zinc-50 px-4 py-12">
-      <div className="w-full max-w-md rounded-xl border bg-white p-6 shadow-sm">
-        <div className="space-y-1">
-          <h1 className="text-xl font-semibold">Designs CRM</h1>
-          <p className="text-sm text-zinc-600">
-            {mode === "login" ? "Sign in to continue." : "Create your client account."}
-          </p>
+    <div className="flex min-h-full items-center justify-center px-4 py-14">
+      <div className="crm-surface w-full max-w-md p-8">
+        <div className="flex items-center gap-2">
+          <span
+            className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.55)]"
+            aria-hidden
+          />
+          <h1 className="text-lg font-semibold tracking-tight text-zinc-900">Designs CRM</h1>
         </div>
+        <p className="crm-page-desc">
+          {mode === "login" ? "Sign in to continue." : "Create your client account."}
+        </p>
 
-        <div className="mt-6 space-y-4">
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Email</label>
+        <div className="mt-8 space-y-4">
+          <div>
+            <label className="crm-label" htmlFor="email">
+              Email
+            </label>
             <input
-              className="w-full rounded-md border px-3 py-2 text-sm"
+              id="email"
+              className="crm-field"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="email"
             />
           </div>
-          <div className="space-y-1">
-            <label className="text-sm font-medium">Password</label>
+          <div>
+            <label className="crm-label" htmlFor="password">
+              Password
+            </label>
             <input
-              className="w-full rounded-md border px-3 py-2 text-sm"
+              id="password"
+              className="crm-field"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               type="password"
@@ -48,10 +57,11 @@ function LoginInner() {
             />
           </div>
 
-          {error ? <div className="text-sm text-red-600">{error}</div> : null}
+          {error ? <div className="crm-alert-error">{error}</div> : null}
 
           <button
-            className="w-full rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50"
+            type="button"
+            className="crm-btn-primary w-full py-2.5"
             disabled={loading}
             onClick={async () => {
               setError(null);
@@ -73,7 +83,8 @@ function LoginInner() {
           </button>
 
           <button
-            className="w-full rounded-md border px-3 py-2 text-sm hover:bg-zinc-50"
+            type="button"
+            className="crm-btn-secondary w-full py-2.5"
             onClick={() => setMode(mode === "login" ? "register" : "login")}
             disabled={loading}
           >
@@ -89,8 +100,8 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-full flex items-center justify-center bg-zinc-50 px-4 py-12">
-          <div className="text-sm text-zinc-500">Loading…</div>
+        <div className="flex min-h-full items-center justify-center px-4 py-14">
+          <div className="text-sm font-medium text-zinc-500">Loading…</div>
         </div>
       }
     >
@@ -98,4 +109,3 @@ export default function LoginPage() {
     </Suspense>
   );
 }
-

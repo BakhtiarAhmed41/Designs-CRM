@@ -25,6 +25,16 @@ const rejectSchema = z.object({
   reason: z.string().min(1),
 });
 
+const proposeQuotationSchema = z.object({
+  amountCents: z.number().int().positive().optional().nullable(),
+  currency: z.string().min(1).optional().nullable(),
+  comment: z.string().optional().nullable(),
+});
+
+const counterDecisionSchema = z.object({
+  comment: z.string().optional().nullable(),
+});
+
 @Controller('admin/orders')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN)
@@ -77,6 +87,26 @@ export class AdminOrdersController {
     @UploadedFiles() files: Express.Multer.File[],
   ) {
     return this.orders.deliverOrder(user, id, files);
+  }
+
+  @Post(':id/quotations')
+  async proposeQuotation(@CurrentUser() user: AuthUser | undefined, @Param('id') id: string, @Body() body: unknown) {
+    const data = proposeQuotationSchema.parse(body);
+    const quotation = await this.orders.adminProposeQuotation(user, id, data);
+    return { quotation };
+  }
+
+  @Patch(':id/quotations/counter/approve')
+  async approveCounter(@CurrentUser() user: AuthUser | undefined, @Param('id') id: string) {
+    const order = await this.orders.adminAcceptCounter(user, id);
+    return { order };
+  }
+
+  @Patch(':id/quotations/counter/reject')
+  async rejectCounter(@CurrentUser() user: AuthUser | undefined, @Param('id') id: string, @Body() body: unknown) {
+    const data = counterDecisionSchema.parse(body);
+    const order = await this.orders.adminRejectCounter(user, id, data);
+    return { order };
   }
 
   @Get(':id/attachments/:attachmentId/signed-url')

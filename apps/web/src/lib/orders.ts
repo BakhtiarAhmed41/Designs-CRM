@@ -3,12 +3,33 @@ import type { User } from "./auth";
 
 export type OrderStatus =
   | "CREATED"
+  | "WAITING_FOR_QUOTATION"
+  | "QUOTATION_PROVIDED"
+  | "CLIENT_REJECTED_QUOTATION"
+  | "WAITING_FOR_ADMIN_QUOTATION_APPROVAL"
   | "IN_PROGRESS"
   | "REJECTED"
   | "COMPLETED"
   | "CLOSED"
   | "REVISION_REQUESTED"
   | "PENDING_PAYMENT";
+
+export type OrderType = "ORDER" | "QUOTATION_REQUEST";
+
+export type QuotationStatus = "PROPOSED" | "COUNTERED" | "APPROVED" | "REJECTED";
+
+export type OrderQuotation = {
+  id: string;
+  orderId: string;
+  version: number;
+  status: QuotationStatus;
+  createdByRole: "CLIENT" | "ADMIN";
+  createdById: string;
+  amountCents: number | null;
+  currency: string;
+  comment: string | null;
+  createdAt: string;
+};
 
 export type OrderAttachment = {
   id: string;
@@ -40,7 +61,10 @@ export type Order = {
   id: string;
   clientId: string;
   status: OrderStatus;
+  type?: OrderType;
   serviceType: string;
+  mainCategory?: string | null;
+  subCategory?: string | null;
   instructions: string | null;
   size: string | null;
   preferences: any;
@@ -52,6 +76,7 @@ export type Order = {
   closedAt: string | null;
   attachments: OrderAttachment[];
   deliveries: OrderDelivery[];
+  quotations?: OrderQuotation[];
 };
 
 export type AdminOrder = Order & {
@@ -59,12 +84,57 @@ export type AdminOrder = Order & {
 };
 
 export async function createOrder(input: {
+  type?: OrderType;
+  mainCategory?: string | null;
+  subCategory?: string | null;
   serviceType: string;
   instructions?: string | null;
   size?: string | null;
   preferences?: any;
 }) {
   return apiFetch<{ order: Order }>("/orders", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function adminProposeQuotation(
+  orderId: string,
+  input: { amountCents?: number | null; currency?: string | null; comment?: string | null },
+) {
+  return apiFetch<{ quotation: OrderQuotation }>(`/admin/orders/${orderId}/quotations`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function adminApproveCounter(orderId: string) {
+  return apiFetch<{ order: AdminOrder }>(`/admin/orders/${orderId}/quotations/counter/approve`, { method: "PATCH" });
+}
+
+export async function adminRejectCounter(orderId: string, comment?: string | null) {
+  return apiFetch<{ order: AdminOrder }>(`/admin/orders/${orderId}/quotations/counter/reject`, {
+    method: "PATCH",
+    body: JSON.stringify({ comment: comment ?? null }),
+  });
+}
+
+export async function acceptQuotation(orderId: string) {
+  return apiFetch<{ order: Order }>(`/orders/${orderId}/quotations/accept`, { method: "PATCH" });
+}
+
+export async function rejectQuotation(orderId: string, comment?: string | null) {
+  return apiFetch<{ order: Order }>(`/orders/${orderId}/quotations/reject`, {
+    method: "PATCH",
+    body: JSON.stringify({ comment: comment ?? null }),
+  });
+}
+
+export async function counterQuotation(
+  orderId: string,
+  input: { amountCents?: number | null; currency?: string | null; comment?: string | null },
+) {
+  return apiFetch<{ quotation: OrderQuotation }>(`/orders/${orderId}/quotations/counter`, {
     method: "POST",
     body: JSON.stringify(input),
   });

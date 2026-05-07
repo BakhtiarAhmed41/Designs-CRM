@@ -11,14 +11,30 @@ enum UserRole {
   ADMIN
 }
 
+enum OrderType {
+  ORDER
+  QUOTATION_REQUEST
+}
+
 enum OrderStatus {
   CREATED
+  WAITING_FOR_QUOTATION
+  QUOTATION_PROVIDED
+  CLIENT_REJECTED_QUOTATION
+  WAITING_FOR_ADMIN_QUOTATION_APPROVAL
   IN_PROGRESS
   REJECTED
   COMPLETED
   CLOSED
   REVISION_REQUESTED
   PENDING_PAYMENT
+}
+
+enum QuotationStatus {
+  PROPOSED
+  COUNTERED
+  APPROVED
+  REJECTED
 }
 
 model User {
@@ -34,6 +50,7 @@ model User {
   refreshTokens RefreshToken[]
   orders        Order[]        @relation("ClientOrders")
   deliveries    OrderDelivery[] @relation("AdminDeliveries")
+  quotations    OrderQuotation[] @relation("UserQuotations")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -61,7 +78,10 @@ model Order {
   id            String      @id @default(uuid()) @db.Uuid
   clientId      String      @db.Uuid
   status        OrderStatus @default(CREATED)
+  type          OrderType   @default(ORDER)
   serviceType   String
+  mainCategory  String?
+  subCategory   String?
   instructions  String?
   size          String?
   preferences   Json?
@@ -78,8 +98,34 @@ model Order {
   client      User             @relation("ClientOrders", fields: [clientId], references: [id], onDelete: Cascade)
   attachments OrderAttachment[]
   deliveries  OrderDelivery[]
+  quotations  OrderQuotation[]
 
   @@index([clientId])
+  @@index([status])
+  @@index([type])
+}
+
+model OrderQuotation {
+  id            String         @id @default(uuid()) @db.Uuid
+  orderId       String         @db.Uuid
+  version       Int
+  status        QuotationStatus @default(PROPOSED)
+
+  createdByRole UserRole
+  createdById   String         @db.Uuid
+
+  amountCents   Int?
+  currency      String         @default("USD")
+  comment       String?
+
+  createdAt DateTime @default(now())
+
+  order     Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  createdBy User  @relation("UserQuotations", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@unique([orderId, version])
+  @@index([orderId])
+  @@index([createdById])
   @@index([status])
 }
 
