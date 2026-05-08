@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { OrderStatus, OrderType, QuotationStatus, UserRole } from '@prisma/client';
 import type { AuthUser } from '../auth/auth.types';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseStorageService } from '../storage/supabase-storage.service';
 
@@ -13,7 +14,27 @@ export class OrdersService {
   constructor(
     private prisma: PrismaService,
     private storage: SupabaseStorageService,
+    private notifications: NotificationsService,
   ) {}
+
+  private async notifyAdmins(input: { title: string; body?: string | null; link?: string | null }) {
+    const admins = await this.prisma.user.findMany({ where: { role: UserRole.ADMIN }, select: { id: true } });
+    if (admins.length === 0) return;
+    await this.prisma.notification.createMany({
+      data: admins.map((a) => ({
+        userId: a.id,
+        title: input.title,
+        body: input.body ?? null,
+        link: input.link ?? null,
+      })),
+    });
+  }
+
+  private async notifyUser(userId: string, input: { title: string; body?: string | null; link?: string | null }) {
+    await this.prisma.notification.create({
+      data: { userId, title: input.title, body: input.body ?? null, link: input.link ?? null },
+    });
+  }
 
   async createOrder(
     client: AuthUser | undefined,
@@ -48,6 +69,13 @@ export class OrdersService {
       },
       include: { attachments: true, deliveries: { include: { files: true } }, quotations: { orderBy: { version: 'desc' } } },
     });
+
+    await this.notifyAdmins({
+      title: 'New order received',
+      body: `Client is waiting for quotation · ${order.subCategory ?? order.serviceType}`,
+      link: `/admin/orders/${order.id}`,
+    });
+
     return order;
   }
 
@@ -208,6 +236,12 @@ export class OrdersService {
       data: { status: OrderStatus.QUOTATION_PROVIDED },
     });
 
+    await this.notifyUser(order.clientId, {
+      title: 'Quotation provided',
+      body: `Review and approve the quotation · ${order.subCategory ?? order.serviceType}`,
+      link: `/orders/${orderId}`,
+    });
+
     return quote;
   }
 
@@ -229,6 +263,13 @@ export class OrdersService {
       where: { id: orderId },
       data: { status: OrderStatus.IN_PROGRESS, approvedAt: new Date() },
     });
+
+    await this.notifyAdmins({
+      title: 'Quotation approved',
+      body: `Order is now IN_PROGRESS · ${order.subCategory ?? order.serviceType}`,
+      link: `/admin/orders/${orderId}`,
+    });
+
     return updatedOrder;
   }
 
@@ -284,6 +325,13 @@ export class OrdersService {
     });
 
     await this.prisma.order.update({ where: { id: orderId }, data: { status: OrderStatus.WAITING_FOR_ADMIN_QUOTATION_APPROVAL } });
+
+    await this.notifyAdmins({
+      title: 'Counter quotation submitted',
+      body: `Client submitted a counter quotation · ${order.subCategory ?? order.serviceType}`,
+      link: `/admin/orders/${orderId}`,
+    });
+
     return quote;
   }
 
@@ -301,10 +349,18 @@ export class OrdersService {
     if (order.status !== OrderStatus.WAITING_FOR_ADMIN_QUOTATION_APPROVAL) throw new BadRequestException('Order is not awaiting counter approval');
 
     await this.prisma.orderQuotation.update({ where: { id: latest.id }, data: { status: QuotationStatus.APPROVED } });
-    return this.prisma.order.update({
+    const updated = await this.prisma.order.update({
       where: { id: orderId },
       data: { status: OrderStatus.IN_PROGRESS, approvedAt: new Date() },
     });
+
+    await this.notifyUser(order.clientId, {
+      title: 'Counter quotation approved',
+      body: 'Your counter quotation was approved. The order is now IN_PROGRESS.',
+      link: `/orders/${orderId}`,
+    });
+
+    return updated;
   }
 
   async adminRejectCounter(user: AuthUser | undefined, orderId: string, input: { comment?: string | null }) {
@@ -324,10 +380,18 @@ export class OrdersService {
       where: { id: latest.id },
       data: { status: QuotationStatus.REJECTED, comment: input.comment?.trim() ? input.comment.trim() : latest.comment },
     });
-    return this.prisma.order.update({
+    const updated = await this.prisma.order.update({
       where: { id: orderId },
       data: { status: OrderStatus.CLIENT_REJECTED_QUOTATION },
     });
+
+    await this.notifyUser(order.clientId, {
+      title: 'Counter quotation rejected',
+      body: input.comment?.trim() ? input.comment.trim() : 'Admin rejected the counter quotation.',
+      link: `/orders/${orderId}`,
+    });
+
+    return updated;
   }
 
   async approveOrder(user: AuthUser | undefined, orderId: string) {
@@ -432,6 +496,12 @@ export class OrdersService {
     const updatedOrder = await this.prisma.order.update({
       where: { id: orderId },
       data: { status: OrderStatus.COMPLETED, completedAt: new Date() },
+    });
+
+    await this.notifyUser(order.clientId, {
+      title: 'Order delivered',
+      body: `Deliverables uploaded · v${nextVersion}`,
+      link: `/orders/${orderId}`,
     });
 
     return {

@@ -117,11 +117,11 @@ export default function AdminOrdersPage() {
       {error ? <div className="crm-alert-error">{error}</div> : null}
 
       <div className="crm-surface overflow-hidden">
-        <div className="crm-surface-header grid grid-cols-12 gap-3">
-          <div className="col-span-4">Client</div>
-          <div className="col-span-4">Service</div>
-          <div className="col-span-2">Status</div>
-          <div className="col-span-2">Created</div>
+        <div className="crm-surface-header grid grid-cols-[minmax(12rem,2fr)_minmax(12rem,2fr)_minmax(10rem,1fr)_minmax(9rem,auto)] gap-3">
+          <div>Client</div>
+          <div>Service</div>
+          <div>Status</div>
+          <div>Created</div>
         </div>
         {orders.length === 0 && !loading ? (
           <div className="px-4 py-10 text-center text-sm text-zinc-600">No matching orders.</div>
@@ -131,14 +131,14 @@ export default function AdminOrdersPage() {
               <Link
                 key={o.id}
                 href={`/admin/orders/${o.id}`}
-                className="grid grid-cols-12 gap-3 px-4 py-3.5 text-sm transition-colors hover:bg-zinc-50/80"
+                className="grid grid-cols-[minmax(12rem,2fr)_minmax(12rem,2fr)_minmax(10rem,1fr)_minmax(9rem,auto)] gap-3 px-4 py-3.5 text-sm transition-colors hover:bg-zinc-50/80"
               >
-                <div className="col-span-4 truncate text-zinc-700">{o.client?.email ?? o.clientId}</div>
-                <div className="col-span-4 font-medium text-zinc-900">{o.serviceType}</div>
-                <div className="col-span-2">
-                  <span className="crm-badge">{o.status}</span>
+                <div className="min-w-0 break-words text-zinc-700">{o.client?.email ?? o.clientId}</div>
+                <div className="min-w-0 break-words font-medium text-zinc-900">{o.serviceType}</div>
+                <div className="min-w-0">
+                  <span className="crm-badge whitespace-normal break-words">{o.status}</span>
                 </div>
-                <div className="col-span-2 text-zinc-600">{formatDate(o.createdAt)}</div>
+                <div className="min-w-0 whitespace-normal break-words text-zinc-600">{formatDate(o.createdAt)}</div>
               </Link>
             ))}
           </div>

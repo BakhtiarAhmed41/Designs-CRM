@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getMe, logout, type UserRole } from "../lib/auth";
+import { listNotifications, markAllNotificationsRead, markNotificationRead, type Notification } from "../lib/notifications";
 
 function Icon({
   path,
@@ -74,6 +75,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [role, setRole] = useState<UserRole | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loadingNotifs, setLoadingNotifs] = useState(false);
 
   useEffect(() => {
     getMe()
@@ -84,9 +89,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") setSidebarOpen(false);
+      if (e.key === "Escape") setNotifOpen(false);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  async function refreshNotifications() {
+    setLoadingNotifs(true);
+    try {
+      const r = await listNotifications();
+      setNotifications(r.notifications);
+      setUnreadCount(r.unreadCount);
+    } finally {
+      setLoadingNotifs(false);
+    }
+  }
+
+  useEffect(() => {
+    refreshNotifications().catch(() => {});
+    const t = window.setInterval(() => {
+      refreshNotifications().catch(() => {});
+    }, 30000);
+    return () => window.clearInterval(t);
   }, []);
 
   const links: Array<{ href: string; label: string; iconPath: string; adminOnly?: boolean }> = [
@@ -219,6 +244,101 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </div>
 
               <div className="ml-auto flex items-center gap-2">
+                <div className="relative hidden md:block">
+                  <button
+                    type="button"
+                    className="relative inline-flex items-center justify-center rounded-lg border border-zinc-200 bg-white px-2.5 py-2 text-zinc-700 shadow-sm hover:bg-zinc-50"
+                    aria-label="Notifications"
+                    onClick={async () => {
+                      const next = !notifOpen;
+                      setNotifOpen(next);
+                      if (next) await refreshNotifications().catch(() => {});
+                    }}
+                  >
+                    <Icon
+                      path="M12 22a2.2 2.2 0 0 0 2.2-2.2h-4.4A2.2 2.2 0 0 0 12 22Zm6.2-6.5V11a6.2 6.2 0 1 0-12.4 0v4.5l-1.6 1.6V18h15.6v-.9l-1.2-1.6Z"
+                      className="size-5"
+                    />
+                    {unreadCount > 0 ? (
+                      <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 text-[11px] font-semibold text-white">
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </span>
+                    ) : null}
+                  </button>
+
+                  {notifOpen ? (
+                    <div className="absolute right-0 top-12 z-30 w-[380px] overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-xl">
+                      <div className="flex items-center justify-between gap-3 border-b border-zinc-100 px-4 py-3">
+                        <div className="text-sm font-semibold text-zinc-900">Notifications</div>
+                        <button
+                          type="button"
+                          className="text-xs font-semibold text-zinc-600 hover:text-zinc-900"
+                          onClick={async () => {
+                            await markAllNotificationsRead();
+                            await refreshNotifications().catch(() => {});
+                          }}
+                        >
+                          Mark all as read
+                        </button>
+                      </div>
+
+                      <div className="max-h-[420px] overflow-auto">
+                        {loadingNotifs ? (
+                          <div className="px-4 py-6 text-sm text-zinc-500">Loading…</div>
+                        ) : notifications.length === 0 ? (
+                          <div className="px-4 py-6 text-sm text-zinc-500">No notifications yet.</div>
+                        ) : (
+                          <div className="divide-y divide-zinc-100">
+                            {notifications.map((n) => {
+                              const unread = !n.readAt;
+                              return (
+                                <div key={n.id} className="px-4 py-3">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <button
+                                      type="button"
+                                      className="min-w-0 text-left"
+                                      onClick={async () => {
+                                        if (unread) await markNotificationRead(n.id);
+                                        setNotifOpen(false);
+                                        await refreshNotifications().catch(() => {});
+                                        if (n.link) router.push(n.link);
+                                      }}
+                                    >
+                                      <div className={unread ? "text-sm font-semibold text-zinc-900" : "text-sm font-medium text-zinc-700"}>
+                                        {n.title}
+                                      </div>
+                                      {n.body ? (
+                                        <div className={unread ? "mt-0.5 text-sm text-zinc-700" : "mt-0.5 text-sm text-zinc-500"}>
+                                          {n.body}
+                                        </div>
+                                      ) : null}
+                                      <div className="mt-1 text-xs text-zinc-400">
+                                        {new Date(n.createdAt).toLocaleString()}
+                                      </div>
+                                    </button>
+
+                                    {unread ? (
+                                      <button
+                                        type="button"
+                                        className="shrink-0 text-xs font-semibold text-zinc-600 hover:text-zinc-900"
+                                        onClick={async () => {
+                                          await markNotificationRead(n.id);
+                                          await refreshNotifications().catch(() => {});
+                                        }}
+                                      >
+                                        Mark as read
+                                      </button>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
                 <button
                   type="button"
                   className="crm-btn-secondary hidden px-3 py-1.5 text-sm md:inline-flex"

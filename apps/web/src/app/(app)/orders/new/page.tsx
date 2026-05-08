@@ -1,31 +1,43 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { CategorySelect, type MainCategory } from "../../../../components/CategorySelect";
+import { PreferencesFields, type Preferences } from "../../../../components/PreferencesFields";
 import { ApiError } from "../../../../lib/api";
 import { createOrder, uploadOrderAttachments } from "../../../../lib/orders";
 
 export default function NewOrderPage() {
   const router = useRouter();
+  const sp = useSearchParams();
 
   const [mainCategory, setMainCategory] = useState<MainCategory | "">("");
   const [subCategory, setSubCategory] = useState("");
   const [instructions, setInstructions] = useState("");
   const [size, setSize] = useState("");
-  const [preferencesText, setPreferencesText] = useState("");
+  const [preferences, setPreferences] = useState<Preferences>({});
   const [files, setFiles] = useState<File[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const preferences = useMemo(() => {
-    if (!preferencesText.trim()) return undefined;
-    try {
-      return JSON.parse(preferencesText);
-    } catch {
-      return "__invalid_json__";
+  useEffect(() => {
+    const preset = sp.get("category");
+    if (!preset) return;
+    const allowed: MainCategory[] = ["Embroidery", "SVG", "Custom vector", "CNC and Laser Cut"];
+    if (allowed.includes(preset as MainCategory)) {
+      setMainCategory(preset as MainCategory);
+      setSubCategory("");
     }
-  }, [preferencesText]);
+  }, [sp]);
+
+  const preferencesPayload = useMemo(() => {
+    const out: Record<string, unknown> = {};
+    if (preferences.style) out.style = preferences.style;
+    if (preferences.outputFormat) out.outputFormat = preferences.outputFormat;
+    if (preferences.colors?.length) out.colors = preferences.colors;
+    if (preferences.notes) out.notes = preferences.notes;
+    return Object.keys(out).length ? out : undefined;
+  }, [preferences]);
 
   return (
     <div className="space-y-8">
@@ -88,19 +100,7 @@ export default function NewOrderPage() {
           />
         </div>
 
-        <div>
-          <label className="crm-label" htmlFor="preferences">
-            Preferences JSON (optional)
-          </label>
-          <textarea
-            id="preferences"
-            className="crm-field-mono min-h-24 resize-y"
-            value={preferencesText}
-            onChange={(e) => setPreferencesText(e.target.value)}
-            placeholder='{"colors":["#111827"],"style":"minimal"}'
-          />
-          {preferences === "__invalid_json__" ? <div className="mt-2 text-xs text-red-600">Invalid JSON.</div> : null}
-        </div>
+        <PreferencesFields value={preferences} onChange={setPreferences} disabled={saving} />
 
         {error ? <div className="crm-alert-error">{error}</div> : null}
 
@@ -108,7 +108,7 @@ export default function NewOrderPage() {
           <button
             type="button"
             className="crm-btn-primary"
-            disabled={saving || !mainCategory || !subCategory || preferences === "__invalid_json__"}
+            disabled={saving || !mainCategory || !subCategory}
             onClick={async () => {
               setError(null);
               setSaving(true);
@@ -121,7 +121,7 @@ export default function NewOrderPage() {
                   serviceType: serviceType.trim(),
                   instructions: instructions.trim() ? instructions.trim() : null,
                   size: size.trim() ? size.trim() : null,
-                  preferences: preferences === "__invalid_json__" ? undefined : preferences,
+                  preferences: preferencesPayload,
                 });
                 if (files.length) {
                   await uploadOrderAttachments(created.order.id, files);

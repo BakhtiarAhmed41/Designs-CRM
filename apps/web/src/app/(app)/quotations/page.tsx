@@ -57,12 +57,12 @@ export default function QuotationsPage() {
       {error ? <div className="crm-alert-error">{error}</div> : null}
 
       <div className="crm-surface overflow-hidden">
-        <div className="crm-surface-header grid grid-cols-12 gap-3">
-          <div className="col-span-3">Category</div>
-          <div className="col-span-3">Sub category</div>
-          <div className="col-span-2">Status</div>
-          <div className="col-span-2">Quotes</div>
-          <div className="col-span-2">Created</div>
+        <div className="crm-surface-header grid grid-cols-[minmax(10rem,1.5fr)_minmax(12rem,2fr)_minmax(10rem,1fr)_minmax(5rem,auto)_minmax(9rem,auto)] gap-3">
+          <div>Category</div>
+          <div>Sub category</div>
+          <div>Status</div>
+          <div>Quotes</div>
+          <div>Created</div>
         </div>
         {quotations.length === 0 && !loading ? (
           <div className="px-4 py-10 text-center text-sm text-zinc-600">No quotation requests yet.</div>
@@ -72,15 +72,15 @@ export default function QuotationsPage() {
               <Link
                 key={o.id}
                 href={`/orders/${o.id}`}
-                className="grid grid-cols-12 gap-3 px-4 py-3.5 text-sm transition-colors hover:bg-zinc-50/80"
+                className="grid grid-cols-[minmax(10rem,1.5fr)_minmax(12rem,2fr)_minmax(10rem,1fr)_minmax(5rem,auto)_minmax(9rem,auto)] gap-3 px-4 py-3.5 text-sm transition-colors hover:bg-zinc-50/80"
               >
-                <div className="col-span-3 truncate text-zinc-700">{o.mainCategory ?? "—"}</div>
-                <div className="col-span-3 font-medium text-zinc-900">{o.subCategory ?? o.serviceType}</div>
-                <div className="col-span-2">
-                  <span className="crm-badge">{o.status}</span>
+                <div className="min-w-0 break-words text-zinc-700">{o.mainCategory ?? "—"}</div>
+                <div className="min-w-0 break-words font-medium text-zinc-900">{o.subCategory ?? o.serviceType}</div>
+                <div className="min-w-0">
+                  <span className="crm-badge whitespace-normal break-words">{o.status}</span>
                 </div>
-                <div className="col-span-2 text-zinc-600">{o.quotations?.length ?? 0}</div>
-                <div className="col-span-2 text-zinc-600">{formatDate(o.createdAt)}</div>
+                <div className="min-w-0 whitespace-normal text-zinc-600">{o.quotations?.length ?? 0}</div>
+                <div className="min-w-0 whitespace-normal break-words text-zinc-600">{formatDate(o.createdAt)}</div>
               </Link>
             ))}
           </div>
