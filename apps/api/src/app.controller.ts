@@ -9,4 +9,9 @@ export class AppController {
   health(): { ok: true } {
     return this.appService.health();
   }
+
+  @Get('health/db')
+  healthDb() {
+    return this.appService.healthDb();
+  }
 }
