@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Embroidery Digitizing — Quote Request</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:14px;color:#1a1a18;}
+.wrap{max-width:700px;margin:0 auto;}
+.card{background:#fff;border:0.5px solid rgba(0,0,0,.12);border-radius:12px;overflow:hidden;margin-bottom:14px;}
+.ch{padding:12px 16px;border-bottom:0.5px solid rgba(0,0,0,.1);display:flex;align-items:center;gap:8px;}
+.ch i{font-size:17px;color:#143F65;}
+.ct{font-size:14px;font-weight:500;}
+.cb{padding:16px;}
+.sl{font-size:11px;font-weight:500;color:#888;letter-spacing:.05em;text-transform:uppercase;margin:14px 0 7px;}
+.sl:first-child{margin-top:0;}
+.fg{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:11px;}
+.ff{display:flex;flex-direction:column;gap:4px;}
+.ff label{font-size:12px;font-weight:500;color:#555;}
+.ff input,.ff select{font-size:13px;padding:7px 10px;border:0.5px solid rgba(0,0,0,.2);border-radius:8px;background:#fff;color:#1a1a18;outline:none;}
+.ff input:focus,.ff select:focus{border-color:#143F65;box-shadow:0 0 0 2px rgba(20,63,101,.15);}
+.ff textarea{font-size:13px;padding:8px 10px;border:0.5px solid rgba(0,0,0,.2);border-radius:8px;resize:vertical;min-height:70px;outline:none;font-family:inherit;}
+.lockable{transition:opacity .25s;}
+.lockable.locked{opacity:.25;pointer-events:none;user-select:none;}
+.type-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.topt{border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:13px;cursor:pointer;text-align:center;display:flex;flex-direction:column;align-items:center;gap:5px;}
+.topt i{font-size:21px;color:#888;}
+.topt .ot{font-size:13px;font-weight:500;}
+.topt .os{font-size:11px;color:#aaa;}
+.topt.sel{border:2px solid #143F65;background:#ECF1F6;}
+.topt.sel i,.topt.sel .ot{color:#143F65;}
+.upload-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+@media(max-width:520px){.upload-row{grid-template-columns:1fr;}}
+.upload-area{border:1.5px dashed rgba(0,0,0,.2);border-radius:8px;background:#f9f9f7;overflow:hidden;}
+.utrg{padding:14px;text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;}
+.utrg i{font-size:21px;color:#888;}
+.utrg p{font-size:13px;color:#555;}
+.utrg span{font-size:11px;color:#aaa;}
+.flist{padding:0 10px 8px;}
+.fitem{display:flex;align-items:center;justify-content:space-between;padding:5px 8px;background:#fff;border-radius:6px;margin-bottom:4px;font-size:12px;color:#555;border:0.5px solid rgba(0,0,0,.1);}
+.frem{background:none;border:none;cursor:pointer;color:#9A1E22;font-size:13px;}
+.other-inp{margin-top:5px;display:none;}
+.other-inp.show{display:block;}
+.size-r{display:grid;grid-template-columns:1fr 14px 1fr;align-items:center;gap:3px;}
+.sep{text-align:center;font-size:12px;color:#aaa;}
+.ibox{background:#f5f5f3;border-radius:8px;padding:8px 11px;font-size:12px;color:#666;display:flex;gap:6px;align-items:flex-start;margin-top:5px;}
+.ibox i{font-size:13px;flex-shrink:0;margin-top:1px;}
+.dcard{background:#f9f9f7;border:0.5px solid rgba(0,0,0,.1);border-radius:8px;padding:11px;margin-bottom:9px;}
+.dcard-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;}
+.dnum{font-size:12px;font-weight:500;color:#666;display:flex;align-items:center;gap:5px;}
+.dbtn{font-size:12px;color:#9A1E22;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:3px;}
+.dcols{display:grid;grid-template-columns:85px 1fr 1fr 1fr 90px 45px;gap:8px;align-items:start;}
+.dcols .ff label{font-size:11px;}
+.dcols .ff input,.dcols .ff select{font-size:12px;}
+.mini-up{border:1px dashed rgba(0,0,0,.2);border-radius:8px;background:#fff;overflow:hidden;}
+.mini-trg{padding:5px 7px;text-align:center;cursor:pointer;font-size:11px;color:#666;display:flex;align-items:center;justify-content:center;gap:4px;}
+.mini-fl{padding:0 5px 3px;}
+.mini-fi{display:flex;align-items:center;justify-content:space-between;padding:3px 5px;background:#f5f5f3;border-radius:4px;margin-bottom:2px;font-size:11px;color:#666;}
+.mst{display:flex;align-items:center;gap:8px;margin-top:9px;padding-top:9px;border-top:0.5px solid rgba(0,0,0,.1);}
+.tgl{position:relative;width:32px;height:17px;flex-shrink:0;}
+.tgl input{opacity:0;width:0;height:0;}
+.tgl .sl2{position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:17px;transition:.2s;}
+.tgl .sl2:before{position:absolute;content:"";height:11px;width:11px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.2s;}
+.tgl input:checked+.sl2{background:#143F65;}
+.tgl input:checked+.sl2:before{transform:translateX(15px);}
+.szwrap{margin-top:9px;display:none;}
+.szwrap.open{display:block;}
+.szrow{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:7px;}
+.szrow .ff label{font-size:11px;}
+.szrow .ff input{font-size:12px;}
+.add-r{width:100%;padding:7px;border:0.5px dashed rgba(0,0,0,.15);border-radius:8px;background:transparent;font-size:12px;color:#666;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;}
+.add-d{width:100%;padding:9px;border:0.5px dashed rgba(0,0,0,.15);border-radius:8px;background:transparent;font-size:13px;color:#666;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;margin-bottom:11px;}
+.rush-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.ropt{border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:9px 11px;cursor:pointer;font-size:12px;color:#555;}
+.ropt.sel-s{border-color:#3B6D11;background:#EAF3DE;color:#3B6D11;}
+.ropt.sel-w{border-color:#9A1E22;background:#F6E9EA;color:#9A1E22;}
+.adv-tgl{width:100%;padding:10px 13px;background:#f5f5f3;border:0.5px solid rgba(0,0,0,.1);border-radius:8px;font-size:13px;color:#666;cursor:pointer;display:flex;align-items:center;justify-content:space-between;}
+.adv-b{border:0.5px solid rgba(0,0,0,.1);border-radius:8px;padding:13px;margin-top:5px;display:none;}
+.adv-b.open{display:block;}
+.cbg{display:grid;grid-template-columns:1fr 1fr;gap:0;}
+.cbr{display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:0.5px solid rgba(0,0,0,.08);}
+.cbr:last-child{border-bottom:none;}
+.cbr input[type=checkbox]{margin-top:2px;flex-shrink:0;}
+.cbr label{font-size:12px;color:#1a1a18;cursor:pointer;line-height:1.4;}
+.cbr .sub{font-size:11px;color:#aaa;display:block;margin-top:1px;}
+.qdiv{border:none;border-top:0.5px dashed rgba(0,0,0,.15);margin:18px 0 14px;}
+.qtogrow{display:flex;align-items:flex-start;gap:10px;padding:12px 13px;background:#f5f5f3;border-radius:8px;margin-bottom:10px;cursor:pointer;border:0.5px solid rgba(0,0,0,.1);}
+.qtogrow input[type=checkbox]{margin-top:2px;flex-shrink:0;width:15px;height:15px;cursor:pointer;}
+.ql{font-size:13px;font-weight:500;}
+.qs{font-size:12px;color:#888;margin-top:2px;line-height:1.5;}
+.qwrap{display:none;}
+.qwrap.show{display:block;}
+.qbox{background:#fff;border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:10px 12px;margin-bottom:6px;}
+.qbox textarea{width:100%;font-size:13px;border:none;background:transparent;resize:none;min-height:80px;outline:none;font-family:inherit;}
+.row-btns{display:flex;justify-content:flex-end;gap:8px;padding-top:13px;border-top:0.5px solid rgba(0,0,0,.1);margin-top:13px;}
+.btn-p{padding:9px 20px;background:#ECF1F6;color:#143F65;border:0.5px solid #143F65;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;}
+.btn-s{padding:9px 13px;border:0.5px solid rgba(0,0,0,.15);border-radius:8px;font-size:13px;color:#666;cursor:pointer;background:transparent;}
+.sec{display:none;}
+.sec.vis{display:block;}
+.badge-info{font-size:11px;background:#ECF1F6;color:#143F65;padding:2px 8px;border-radius:10px;}
+.fmt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:7px;}
+.fmt-chip{border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:8px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;position:relative;}
+.fmt-chip i.icon{font-size:18px;color:#888;}
+.fmt-chip .fname{font-size:11px;font-weight:500;color:#555;}
+.fmt-chip .fext{font-size:10px;color:#aaa;}
+.fmt-chip .chk{display:none;position:absolute;top:4px;right:4px;width:14px;height:14px;border-radius:50%;background:#143F65;color:#fff;font-size:9px;align-items:center;justify-content:center;}
+.fmt-chip.sel{border:2px solid #143F65;background:#ECF1F6;}
+.fmt-chip.sel .icon,.fmt-chip.sel .fname{color:#143F65;}
+.fmt-chip.sel .chk{display:flex;}
+.msg-cta{display:flex;align-items:center;gap:11px;padding:12px 14px;background:#ECF1F6;border:0.5px solid rgba(20,63,101,.25);border-radius:8px;margin-top:16px;}
+.msg-cta>i{font-size:20px;color:#143F65;flex-shrink:0;}
+.mc-t{font-size:13px;font-weight:500;color:#143F65;}
+.mc-s{font-size:12px;color:#555;margin-top:2px;line-height:1.45;}
+.mc-btn{flex-shrink:0;padding:8px 14px;background:#143F65;color:#fff;border-radius:8px;font-size:12px;font-weight:500;text-decoration:none;white-space:nowrap;}
+@media(max-width:520px){.msg-cta{flex-wrap:wrap;}.mc-btn{width:100%;text-align:center;}}
+/* quick/detailed mode tabs */
+.mode-tabs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+.mtab{border:0.5px solid rgba(0,0,0,.15);border-radius:10px;padding:12px 14px;cursor:pointer;display:flex;gap:10px;align-items:flex-start;}
+.mtab i{font-size:19px;color:#888;margin-top:1px;}
+.mtab .mt-t{font-size:13px;font-weight:500;}
+.mtab .mt-s{font-size:11px;color:#aaa;margin-top:2px;line-height:1.4;}
+.mtab.sel{border:2px solid #143F65;background:#ECF1F6;}
+.mtab.sel i,.mtab.sel .mt-t{color:#143F65;}
+.mode-body{display:none;}
+.mode-body.vis{display:block;}
+.qbig{background:#fff;border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:10px 12px;}
+.qbig textarea{width:100%;font-size:13px;border:none;background:transparent;resize:none;min-height:95px;outline:none;font-family:inherit;}
+.qbig textarea::placeholder{color:#bbb;}
+
+/* Remake: stronger section grouping so Detailed reads in chunks, not a wall */
+#mode-d .sl{font-size:12px;font-weight:700;color:#143F65;letter-spacing:.06em;margin:26px 0 10px;padding-top:18px;border-top:1px solid rgba(20,63,101,.12);}
+#mode-d .sl:first-of-type{border-top:none;padding-top:0;margin-top:18px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="card">
+  <div class="ch"><i class="ti ti-needle-thread"></i><span class="ct">Embroidery digitizing — quote request</span></div>
+  <div class="cb">
+
+    <!-- MODE TABS -->
+    <div class="mode-tabs">
+      <div class="mtab sel" id="mtab-q" onclick="setMode('q')">
+        <i class="ti ti-message-2"></i>
+        <div><div class="mt-t">Quick request</div><div class="mt-s">Just describe what you need in a few words. We'll handle the rest.</div></div>
+      </div>
+      <div class="mtab" id="mtab-d" onclick="setMode('d')">
+        <i class="ti ti-list-details"></i>
+        <div><div class="mt-t">Detailed request</div><div class="mt-s">Specify placement, size, fabric and format for an exact quote.</div></div>
+      </div>
+    </div>
+
+    <div class="sl">Design name</div>
+    <div class="ff"><input type="text" placeholder="e.g. Aces cap logo"></div>
+
+    <div class="sl">Upload files</div>
+    <div class="upload-row">
+      <div>
+        <div style="font-size:12px;font-weight:500;color:#555;margin-bottom:5px;display:flex;align-items:center;gap:5px;"><i class="ti ti-file" style="font-size:14px;"></i> Your artwork</div>
+        <div class="upload-area">
+          <div class="utrg" onclick="document.getElementById('fu-main').click()">
+            <i class="ti ti-cloud-upload"></i>
+            <p>Upload artwork</p>
+            <span>JPG, PNG, PDF, AI, EPS, SVG — max 20MB each</span>
+            <input type="file" id="fu-main" multiple style="display:none" onchange="handleFiles('flist-main',this)">
+          </div>
+          <div class="flist" id="flist-main"></div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:500;color:#555;margin-bottom:5px;display:flex;align-items:center;gap:5px;"><i class="ti ti-photo" style="font-size:14px;"></i> Reference image <span style="font-size:11px;font-weight:400;color:#aaa;">(optional)</span></div>
+        <div class="upload-area" style="border-color:#EF9F27;background:#FDF6EC;">
+          <div class="utrg" onclick="document.getElementById('fu-ref').click()">
+            <i class="ti ti-photo" style="color:#BA7517;"></i>
+            <p style="color:#8a5a10;">Upload reference</p>
+            <span>"I want it stitched like this"</span>
+            <input type="file" id="fu-ref" multiple style="display:none" onchange="handleFiles('flist-ref',this)">
+          </div>
+          <div class="flist" id="flist-ref"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- QUICK MODE -->
+    <div class="mode-body vis" id="mode-q">
+      <div class="sl" style="margin-top:14px;">Tell us about your order</div>
+      <div class="qbig">
+        <textarea placeholder="e.g. 3 logos attached — the eagle for left chest 3.5&quot; AND cap 2.5&quot;, the other two just left chest. Need DST + PES. (Photos of your garment? Put them in Reference images above — we won&#39;t digitize those.)"></textarea>
+      </div>
+      <div class="fg" style="margin-top:11px;">
+        <div class="ff"><label>Sizing</label><select id="q-sizing" onchange="qSizeNote(this)"><option>Keep proportional (recommended)</option><option>Exact size — I'll mention it above</option><option>Multiple sizes — I'll describe above</option><option>Not sure — let team decide</option></select></div>
+        <div class="ff"><label>Gradient / ombre effect</label><select><option>No — solid colors only</option><option>Yes — include gradient / ombre</option><option>Not sure — let team decide</option></select></div>
+        
+      </div>
+
+      <div class="ibox" id="q-size-note" style="display:none;"><i class="ti ti-info-circle"></i> No problem — just list the sizes and placements in the box above (e.g. "logo 1: left chest 4" and hat 2.5""). Each size is digitized as a separate file.</div>
+
+      <div class="sl" style="margin-top:14px;">Turnaround</div>
+      <div class="rush-row">
+        <div class="ropt sel-s" id="rq-std" onclick="selRushQ('std')"><i class="ti ti-clock" style="font-size:13px"></i> Standard (12–24 hrs) — included</div>
+        <div class="ropt" id="rq-rush" onclick="selRushQ('rush')"><i class="ti ti-bolt" style="font-size:13px"></i> Urgent — contact us before placing an order</div>
+      </div>
+      <div class="ibox" id="rq-note" style="display:none;"><i class="ti ti-message-circle"></i> For urgent orders, please text or email us first so we can confirm the timeline before you place the order.</div>
+
+      <div class="ibox"><i class="ti ti-info-circle"></i> Don't worry about other technical details — formats and stitch settings can all be sorted after you submit. Switch to Detailed request if you already know your specs.</div>
+    </div>
+
+    <!-- DETAILED MODE -->
+    <div class="mode-body" id="mode-d">
+      <div style="display:flex;gap:9px;align-items:flex-start;background:#EAF0F5;border-radius:10px;padding:11px 14px;margin-top:14px;font-size:12.5px;color:#143F65;line-height:1.5;">
+        <i class="ti ti-heart-handshake" style="font-size:16px;margin-top:1px;"></i>
+        <span><b>Not sure about a field? Leave it blank.</b> We'll figure it out from your artwork — every field here is optional and just helps us quote faster.</span>
+      </div>
+
+      <div id="sec-m" class="sec vis">
+        <div class="sl">Designs</div>
+        <div id="mrows">
+          <div class="dcard" id="dr-1">
+            <div class="dcard-h"><span class="dnum"><i class="ti ti-file"></i> Design 1</span></div>
+            <div class="dcols">
+              <div class="ff"><label>Files</label><div class="mini-up"><div class="mini-trg" onclick="this.nextElementSibling.nextElementSibling.click()"><i class="ti ti-upload" style="font-size:12px"></i> Add files</div><div class="mini-fl" id="mfl-1"></div><input type="file" multiple style="display:none" onchange="handleMiniFiles('mfl-1',this)"></div></div>
+              <div class="ff"><label>Design name</label><input type="text" placeholder="e.g. Hat logo"></div>
+              <div class="ff"><label>Placement</label><select onchange="toggleOther('mo-1',this)"><option>Hat / cap</option><option>Left chest</option><option>Right chest</option><option>Jacket back</option><option>Sleeve</option><option>Towel</option><option>Other — specify</option><option>Not sure</option></select><div class="other-inp" id="mo-1"><input type="text" placeholder="e.g. napkin, apron..."></div></div>
+              <div class="ff"><label>Fabric</label><select><option>Cap / hat</option><option>Polo / shirt</option><option>Fleece</option><option>Jacket</option><option>T-shirt</option><option>Towel</option><option>Not sure</option></select></div>
+              <div class="ff"><label>Size (W×H in)</label><div class="size-r"><input type="number" placeholder="W" step="0.1" min="0"><span class="sep">×</span><input type="number" placeholder="H" step="0.1" min="0"></div></div>
+              <div class="ff"><label>Colors</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6+</option><option>Not sure</option></select></div>
+            </div>
+            <div class="ff" style="margin-top:8px;"><label>Notes for this design (optional)</label><input type="text" placeholder="e.g. bold outline, no gradient, match our old patch"></div>
+            <button class="add-r" onclick="toggleSizes('dsz-1',this)" style="margin-top:8px;"><i class="ti ti-plus"></i> Add another size of this design</button>
+            <div class="szwrap" id="dsz-1">
+              <div class="ibox" style="margin:7px 0;"><i class="ti ti-info-circle"></i> Each size = separate file.</div>
+              <div class="szrow"><div class="ff"><label>Label</label><input type="text" placeholder="Small"></div><div class="ff"><label>W (in)</label><input type="number" min="0" step="0.1"></div><div class="ff"><label>H (in)</label><input type="number" min="0" step="0.1"></div><div></div></div>
+              <div class="szrow"><div class="ff"><label>Label</label><input type="text" placeholder="Large"></div><div class="ff"><label>W (in)</label><input type="number" min="0" step="0.1"></div><div class="ff"><label>H (in)</label><input type="number" min="0" step="0.1"></div><div></div></div>
+              <button class="add-r" onclick="addSzIn(this)"><i class="ti ti-plus"></i> Add size</button>
+            </div>
+          </div>
+        </div>
+        <button class="add-d" onclick="addDesign()"><i class="ti ti-plus"></i> Add another design</button>
+      </div>
+
+      <div class="sl" style="margin-top:14px;">File formats <span style="font-size:11px;font-weight:400;color:#aaa;">— select all you need</span></div>
+      <div class="fmt-grid">
+        <div class="fmt-chip sel" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-needle-thread icon"></i><span class="fname">DST</span><span class="fext">Tajima</span></div><div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-needle-thread icon"></i><span class="fname">PES</span><span class="fext">Brother</span></div><div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-needle-thread icon"></i><span class="fname">EXP</span><span class="fext">Melco</span></div><div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-needle-thread icon"></i><span class="fname">XXX</span><span class="fext">Singer</span></div><div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-file-type-pdf icon"></i><span class="fname">PDF</span><span class="fext">Color chart / sheet</span></div><div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-photo icon"></i><span class="fname">PNG</span><span class="fext">Preview</span></div><div class="fmt-chip" id="fmt-other-chip" onclick="toggleFmtOther(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-pencil icon"></i><span class="fname">Other</span><span class="fext">Type it in</span></div>
+      </div>
+      <div id="fmt-other-inp" style="display:none;margin-top:8px;"><input type="text" style="width:100%;font-size:13px;padding:7px 10px;border:0.5px solid rgba(0,0,0,.2);border-radius:8px;outline:none;" placeholder="Type your format(s) — e.g. JEF, HUS, VP3, SEW, VIP, TAP, TBF, DSB, KSM..."></div>
+      <div class="ibox" style="margin-top:8px;"><i class="ti ti-info-circle"></i> Not sure? DST works with most commercial machines — or tell us your machine model in the notes and we'll pick the right format.</div>
+
+      <div class="sl" style="margin-top:14px;">Turnaround</div>
+      <div class="rush-row">
+        <div class="ropt sel-s" id="r-std" onclick="selRush('std')"><i class="ti ti-clock" style="font-size:13px"></i> Standard (12–24 hrs) — included</div>
+        <div class="ropt" id="r-rush" onclick="selRush('rush')"><i class="ti ti-bolt" style="font-size:13px"></i> Urgent — contact us before placing an order</div>
+      </div>
+      <div class="ibox" id="rush-note" style="display:none;"><i class="ti ti-message-circle"></i> For urgent orders, please text or email us first so we can confirm the timeline before you place the order.</div>
+
+      <div style="margin-top:14px;">
+        <button class="adv-tgl" onclick="toggleAdv(this)">
+          <span style="display:flex;align-items:center;gap:7px;"><i class="ti ti-settings" style="font-size:14px"></i> Advanced digitizing options <span class="badge-info">pre-set to recommended defaults</span></span>
+          <i class="ti ti-chevron-down" style="font-size:14px;transition:transform .2s" id="adv-chev"></i>
+        </button>
+        <div class="adv-b" id="adv-b">
+          <div style="font-size:12px;color:#aaa;margin-bottom:9px;">Only change if you have specific requirements.</div>
+          <div class="cbg">
+            <div style="padding-right:11px;">
+              <div class="cbr"><input type="checkbox" id="a1" checked><label for="a1">Keep proportional sizing<span class="sub">Scale without distorting</span></label></div>
+              <div class="cbr"><input type="checkbox" id="a2" checked><label for="a2">Trim all jump stitches<span class="sub">Clean finish, no floats</span></label></div>
+              <div class="cbr"><input type="checkbox" id="a3" checked><label for="a3">Reduce detail if needed<span class="sub">Simplify elements too small</span></label></div>
+              <div class="cbr"><input type="checkbox" id="a4"><label for="a4">Allow gradient stitching<span class="sub">Color fade effect (adds cost)</span></label></div>
+            </div>
+            <div style="padding-left:11px;border-left:0.5px solid rgba(0,0,0,.1);">
+              <div class="cbr"><input type="checkbox" id="a5" checked><label for="a5">Allow minor size tweaks<span class="sub">Scale-up if text too small</span></label></div>
+              <div class="cbr"><input type="checkbox" id="a6" checked><label for="a6">Allow repositioning<span class="sub">Minor spacing adjustments</span></label></div>
+              <div class="cbr"><input type="checkbox" id="a7"><label for="a7">Add knockdown stitches<span class="sub">For towel / terry fabric</span></label></div>
+              <div class="cbr"><input type="checkbox" id="a8"><label for="a8">Contact me before changes<span class="sub">We'll ask first</span></label></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    
+      <div class="sl" style="margin-top:14px;">Anything else we should know?</div>
+      <div class="qbig"><textarea style="min-height:64px;" placeholder="Deadlines, special requests, context — anything that didn&#39;t fit the fields above."></textarea></div>
+
+    </div>
+
+    <div class="msg-cta">
+      <i class="ti ti-messages"></i>
+      <div style="flex:1;">
+        <div class="mc-t">Prefer to message us directly?</div>
+        <div class="mc-s">Skip the form — chat with our team from your account, attach your image and send your details. We'll set up the order for you.</div>
+      </div>
+      <a class="mc-btn" href="#">Message our team</a>
+    </div>
+
+    <div class="row-btns">
+      <button class="btn-s">Save as draft</button>
+      <button class="btn-p">Submit quote request →</button>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<script>
+var drCnt=1;
+function toggleOther(id,sel){
+  var el=document.getElementById(id);
+  if(el) el.className='other-inp'+(sel.value.indexOf('Other')===0?' show':'');
+}
+function handleFiles(lid,inp){
+  var list=document.getElementById(lid);
+  if(!inp.files) return;
+  Array.from(inp.files).forEach(function(f){
+    var d=document.createElement('div');d.className='fitem';
+    d.innerHTML='<span style="display:flex;align-items:center;gap:5px;"><i class="ti ti-file"></i>'+f.name+'</span><button class="frem" onclick="this.parentNode.remove()"><i class="ti ti-x"></i></button>';
+    list.appendChild(d);
+  });
+}
+function handleMiniFiles(lid,inp){
+  var list=document.getElementById(lid);
+  if(!inp.files) return;
+  Array.from(inp.files).forEach(function(f){
+    var d=document.createElement('div');d.className='mini-fi';
+    d.innerHTML='<span>'+f.name+'</span><button style="background:none;border:none;cursor:pointer;color:#9A1E22;font-size:11px;" onclick="this.parentNode.remove()"><i class="ti ti-x"></i></button>';
+    list.appendChild(d);
+  });
+}
+function toggleWrap(id,cb){
+  var w=document.getElementById(id);
+  if(w) w.className='szwrap'+(cb.checked?' open':'');
+}
+function toggleSizes(id,btn){
+  var w=document.getElementById(id);
+  if(!w)return;
+  var opening=(w.className.indexOf('open')<0);
+  w.className='szwrap'+(opening?' open':'');
+  btn.innerHTML=opening?'<i class="ti ti-minus"></i> Remove extra sizes':'<i class="ti ti-plus"></i> Add another size of this design';
+}
+function addSSzRow(){
+  var wrap=document.getElementById('ssz-rows');var d=document.createElement('div');d.className='szrow';
+  d.innerHTML='<div class="ff"><label>Label</label><input type="text" placeholder="Medium"></div><div class="ff"><label>Width (in)</label><input type="number" min="0" step="0.1"></div><div class="ff"><label>Height (in)</label><input type="number" min="0" step="0.1"></div><button onclick="this.parentNode.remove()" style="background:none;border:none;cursor:pointer;color:#9A1E22;padding-bottom:2px;"><i class="ti ti-trash" style="font-size:13px"></i></button>';
+  wrap.appendChild(d);
+}
+function addSzIn(btn){
+  var d=document.createElement('div');d.className='szrow';
+  d.innerHTML='<div class="ff"><label>Label</label><input type="text" placeholder="Medium"></div><div class="ff"><label>W (in)</label><input type="number" min="0" step="0.1"></div><div class="ff"><label>H (in)</label><input type="number" min="0" step="0.1"></div><button onclick="this.parentNode.remove()" style="background:none;border:none;cursor:pointer;color:#9A1E22;padding-bottom:2px;"><i class="ti ti-trash" style="font-size:13px"></i></button>';
+  btn.parentNode.insertBefore(d,btn);
+}
+function addDesign(){
+  drCnt++;var id='dr-'+drCnt;var szid='dsz-'+drCnt;var moid='mo-'+drCnt;var mfid='mfl-'+drCnt;
+  var wrap=document.getElementById('mrows');var d=document.createElement('div');d.className='dcard';d.id=id;
+  d.innerHTML='<div class="dcard-h"><span class="dnum"><i class="ti ti-file"></i> Design '+drCnt+'</span><button class="dbtn" onclick="document.getElementById(\''+id+'\').remove()"><i class="ti ti-trash" style="font-size:13px"></i> Remove</button></div><div class="dcols"><div class="ff"><label>Files</label><div class="mini-up"><div class="mini-trg" onclick="this.nextElementSibling.nextElementSibling.click()"><i class="ti ti-upload" style="font-size:12px"></i> Add files</div><div class="mini-fl" id="'+mfid+'"></div><input type="file" multiple style="display:none" onchange="handleMiniFiles(\''+mfid+'\',this)"></div></div><div class="ff"><label>Design name</label><input type="text" placeholder="e.g. Sleeve logo"></div><div class="ff"><label>Placement</label><select onchange="toggleOther(\''+moid+'\',this)"><option>Hat / cap</option><option>Left chest</option><option>Right chest</option><option>Jacket back</option><option>Sleeve</option><option>Towel</option><option>Other — specify</option><option>Not sure</option></select><div class="other-inp" id="'+moid+'"><input type="text" placeholder="e.g. napkin, apron..."></div></div><div class="ff"><label>Fabric</label><select><option>Cap / hat</option><option>Polo / shirt</option><option>Fleece</option><option>Jacket</option><option>T-shirt</option><option>Towel</option><option>Not sure</option></select></div><div class="ff"><label>Size (W×H in)</label><div class="size-r"><input type="number" placeholder="W" step="0.1" min="0"><span class="sep">×</span><input type="number" placeholder="H" step="0.1" min="0"></div></div><div class="ff"><label>Colors</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6+</option><option>Not sure</option></select></div></div><div class="ff" style="margin-top:8px;"><label>Notes for this design (optional)</label><input type="text" placeholder="e.g. bold outline, no gradient"></div><button class="add-r" onclick="toggleSizes(\''+szid+'\',this)" style="margin-top:8px;"><i class="ti ti-plus"></i> Add another size of this design</button><div class="szwrap" id="'+szid+'"><div class="ibox" style="margin:7px 0;"><i class="ti ti-info-circle"></i> Each size = separate file.</div><div class="szrow"><div class="ff"><label>Label</label><input type="text" placeholder="Small"></div><div class="ff"><label>W (in)</label><input type="number" min="0" step="0.1"></div><div class="ff"><label>H (in)</label><input type="number" min="0" step="0.1"></div><div></div></div><button class="add-r" onclick="addSzIn(this)"><i class="ti ti-plus"></i> Add size</button></div>';
+  wrap.appendChild(d);
+}
+function selRush(v){
+  document.getElementById('r-std').className='ropt'+(v==='std'?' sel-s':'');
+  document.getElementById('r-rush').className='ropt'+(v==='rush'?' sel-w':'');
+  var n=document.getElementById('rush-note');if(n)n.style.display=(v==='rush'?'flex':'none');
+}
+function toggleAdv(btn){
+  var b=document.getElementById('adv-b');var c=document.getElementById('adv-chev');
+  var o=b.classList.toggle('open');c.style.transform=o?'rotate(180deg)':'';
+}
+function qSizeNote(sel){
+  document.getElementById('q-size-note').style.display=(sel.value.indexOf('Multiple')===0?'flex':'none');
+}
+function toggleFmt(el){el.classList.toggle('sel');}
+function toggleFmtOther(el){
+  var on=el.classList.toggle('sel');
+  document.getElementById('fmt-other-inp').style.display=on?'block':'none';
+  if(on)document.querySelector('#fmt-other-inp input').focus();
+}
+function selRushQ(v){
+  document.getElementById('rq-std').className='ropt'+(v==='std'?' sel-s':'');
+  document.getElementById('rq-rush').className='ropt'+(v==='rush'?' sel-w':'');
+  document.getElementById('rq-note').style.display=(v==='rush'?'flex':'none');
+}
+function setMode(m){
+  document.getElementById('mtab-q').className='mtab'+(m==='q'?' sel':'');
+  document.getElementById('mtab-d').className='mtab'+(m==='d'?' sel':'');
+  document.getElementById('mode-q').className='mode-body'+(m==='q'?' vis':'');
+  document.getElementById('mode-d').className='mode-body'+(m==='d'?' vis':'');
+}
+
+</script>
+<script src="bridge.js"></script>
+</body>
+</html>

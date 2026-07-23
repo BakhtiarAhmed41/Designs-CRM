@@ -1,0 +1,541 @@
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  adjustStoreCredit,
+  cancelInvoice,
+  createPayLink,
+  getBillingSummary,
+  getStoreCredit,
+  listInvoices,
+  openInvoicePrint,
+  payInvoice,
+  refundInvoice,
+  remindInvoice,
+  runMonthEnd,
+  type Invoice,
+  type MonthEndResult,
+  type PayMethod,
+  type RefundTo,
+} from '@/lib/billing';
+import { getErrorMessage } from '@/lib/api';
+import { money, dateShort } from '@/lib/format';
+import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
+
+export function AdminBilling() {
+  const qc = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
+  const [payLink, setPayLink] = useState<string | null>(null);
+  const [refundFor, setRefundFor] = useState<Invoice | null>(null);
+  const [creditFor, setCreditFor] = useState<Invoice | null>(null);
+  const [monthEndResult, setMonthEndResult] = useState<MonthEndResult | null>(null);
+
+  const summaryQ = useQuery({
+    queryKey: ['billing-summary'],
+    queryFn: getBillingSummary,
+    refetchInterval: 30_000,
+  });
+
+  const invoicesQ = useQuery({
+    queryKey: ['admin-invoices-all'],
+    queryFn: () => listInvoices(),
+    refetchInterval: 30_000,
+  });
+
+  const invoices = invoicesQ.data?.invoices ?? [];
+  const unpaidLinks = invoices.filter((i) => i.status === 'AWAITING' && i.kind === 'PER_ORDER');
+  const monthlyStatements = invoices.filter((i) => i.kind === 'MONTHLY' && i.status === 'AWAITING');
+  const s = summaryQ.data;
+
+  function invalidateAll() {
+    qc.invalidateQueries({ queryKey: ['admin-invoices-all'] });
+    qc.invalidateQueries({ queryKey: ['billing-summary'] });
+  }
+
+  const payMut = useMutation({
+    mutationFn: ({ id, method }: { id: string; method: PayMethod }) => payInvoice(id, method),
+    onSuccess: () => {
+      setError(null);
+      invalidateAll();
+    },
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
+  const linkMut = useMutation({
+    mutationFn: (id: string) => createPayLink(id),
+    onSuccess: (res) => {
+      setError(null);
+      setPayLink(`${window.location.origin}${res.url}`);
+      invalidateAll();
+    },
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
+  const remindMut = useMutation({
+    mutationFn: (id: string) => remindInvoice(id),
+    onSuccess: () => {
+      setError(null);
+      invalidateAll();
+    },
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
+  const cancelMut = useMutation({
+    mutationFn: (id: string) => cancelInvoice(id),
+    onSuccess: () => {
+      setError(null);
+      invalidateAll();
+    },
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
+  const monthEndMut = useMutation({
+    mutationFn: () => runMonthEnd(),
+    onSuccess: (res) => {
+      setError(null);
+      setMonthEndResult(res);
+      invalidateAll();
+    },
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
+  const avgOrder =
+    s && s.paidThisMonthCents > 0
+      ? Math.round(s.paidThisMonthCents / Math.max(1, unpaidLinks.length + monthlyStatements.length + 1))
+      : 0;
+
+  return (
+    <div>
+      <div className="ph">
+        <div>
+          <h1>Billing &amp; invoices</h1>
+          <div className="sub">
+            Money in, outstanding, and the month-end run for your net-monthly trade accounts.
+          </div>
+        </div>
+      </div>
+
+      {error && <div className="alert-error" style={{ marginBottom: 14 }}>{error}</div>}
+
+      <div className="stats" style={{ marginTop: 16 }}>
+        <div className="stats-grid">
+          <div className="sc">
+            <div className="scl">Received this month</div>
+            <div className="scv m">{money(s?.paidThisMonthCents ?? 0)}</div>
+            <div className="scd">paid invoices</div>
+          </div>
+          <div className="sc">
+            <div className="scl">Outstanding</div>
+            <div className="scv">{money(s?.outstandingCents ?? 0)}</div>
+            <div className="scd">{unpaidLinks.length} unpaid</div>
+          </div>
+          <div className="sc">
+            <div className="scl">Net-monthly unbilled</div>
+            <div className="scv">{money(s?.storeCreditOutstandingCents ?? 0)}</div>
+            <div className="scd">{monthlyStatements.length} trade accounts</div>
+          </div>
+          <div className="sc">
+            <div className="scl">Avg order value</div>
+            <div className="scv">{money(avgOrder)}</div>
+            <div className="scd">this month</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <div className="card-h">
+          <span className="ct">
+            <i className="ti ti-link" /> Unpaid payment links
+          </span>
+          <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Links auto-expire after 7 days</span>
+        </div>
+        {unpaidLinks.length === 0 && (
+          <div style={{ padding: 16, color: 'var(--muted)' }}>No unpaid payment links.</div>
+        )}
+        {unpaidLinks.map((inv) => (
+          <div key={inv.id} className="orow" style={{ cursor: 'default' }}>
+            <div className="othumb">
+              <i className="ti ti-needle-thread" />
+            </div>
+            <div className="oinfo">
+              <div className="on">{inv.customerName ?? 'Customer'}</div>
+              <div className="om">
+                <span>
+                  <i className="ti ti-hash" style={{ fontSize: 11 }} />
+                  {inv.coversText ?? inv.id.slice(0, 6)}
+                </span>
+                <span>Issued {dateShort(inv.issuedAt)}</span>
+              </div>
+            </div>
+            <span className="chip c-new">Awaiting payment</span>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                disabled={remindMut.isPending}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  remindMut.mutate(inv.id);
+                }}
+              >
+                <i className="ti ti-bell" /> Remind
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                style={{ color: 'var(--maroon)' }}
+                disabled={cancelMut.isPending}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (window.confirm('Cancel this invoice?')) {
+                    cancelMut.mutate(inv.id);
+                  }
+                }}
+              >
+                <i className="ti ti-x" />
+              </button>
+            </div>
+            <div className="oprice">{money(inv.amountCents, inv.currency)}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="card">
+        <div className="card-h">
+          <span className="ct">
+            <i className="ti ti-file-invoice" /> Monthly statements — net-monthly accounts
+          </span>
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            disabled={monthEndMut.isPending}
+            onClick={() => monthEndMut.mutate()}
+          >
+            <i className="ti ti-file-invoice" /> Generate all
+          </button>
+        </div>
+        <div className="note" style={{ margin: '14px 16px' }}>
+          <i className="ti ti-info-circle" /> On the 1st, all unbilled logos for each trade account roll into one
+          statement. Review here — nothing sends until you approve.
+        </div>
+        {monthlyStatements.length === 0 && (
+          <div style={{ padding: '0 16px 16px', color: 'var(--muted)' }}>No statements ready.</div>
+        )}
+        {monthlyStatements.map((inv) => (
+          <div key={inv.id} className="orow" style={{ cursor: 'default' }}>
+            <div className={`othumb ${serviceThumbClass('embroidery')}`}>
+              {(inv.customerName ?? '??').slice(0, 2).toUpperCase()}
+            </div>
+            <div className="oinfo">
+              <div className="on">{inv.customerName ?? 'Customer'}</div>
+              <div className="om">
+                <span>{inv.coversText ?? inv.periodMonth ?? 'Monthly statement'}</span>
+              </div>
+            </div>
+            <span className="chip c-prog">Ready to bill</span>
+            <div className="oprice">{money(inv.amountCents, inv.currency)}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="card">
+        <div className="card-h">
+          <span className="ct">
+            <i className="ti ti-receipt" /> All invoices
+          </span>
+        </div>
+        {invoicesQ.isLoading && <div style={{ padding: 16, color: 'var(--muted)' }}>Loading...</div>}
+        {invoices.map((inv) => (
+          <div key={inv.id} className="orow" style={{ cursor: 'default' }}>
+            <div className="othumb">
+              <i className={`ti ${inv.kind === 'MONTHLY' ? 'ti-file-invoice' : serviceTi('embroidery')}`} />
+            </div>
+            <div className="oinfo">
+              <div className="on">{inv.customerName ?? 'Customer'}</div>
+              <div className="om">
+                <span>{inv.coversText ?? (inv.kind === 'MONTHLY' ? 'Monthly' : 'Per order')}</span>
+                <span>{dateShort(inv.issuedAt)}</span>
+              </div>
+            </div>
+            <span className={`chip ${inv.status === 'PAID' ? 'c-done' : inv.status === 'CANCELLED' ? 'c-wait' : 'c-new'}`}>
+              {inv.status === 'PAID' ? 'Paid' : inv.status === 'CANCELLED' ? 'Cancelled' : 'Awaiting'}
+            </span>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {inv.status === 'AWAITING' && (
+                <>
+                  <button
+                    type="button"
+                    className="btn btn-green btn-sm"
+                    onClick={() => payMut.mutate({ id: inv.id, method: 'CARD' })}
+                  >
+                    Mark paid
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => linkMut.mutate(inv.id)}
+                  >
+                    Pay-link
+                  </button>
+                </>
+              )}
+              {inv.status === 'PAID' && (
+                <>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={() => setRefundFor(inv)}>
+                    Refund
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      void openInvoicePrint(inv.id, true).catch((e) =>
+                        setError(getErrorMessage(e)),
+                      );
+                    }}
+                  >
+                    <i className="ti ti-download" /> PDF
+                  </button>
+                </>
+              )}
+              {inv.status !== 'PAID' && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    void openInvoicePrint(inv.id, true).catch((e) =>
+                      setError(getErrorMessage(e)),
+                    );
+                  }}
+                >
+                  <i className="ti ti-printer" /> Print
+                </button>
+              )}
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setCreditFor(inv)}>
+                Credit +/−
+              </button>
+            </div>
+            <div className="oprice">{money(inv.amountCents, inv.currency)}</div>
+          </div>
+        ))}
+      </div>
+
+      {payLink && <PayLinkModal url={payLink} onClose={() => setPayLink(null)} />}
+      {monthEndResult && (
+        <MonthEndModal result={monthEndResult} onClose={() => setMonthEndResult(null)} />
+      )}
+      {refundFor && (
+        <RefundModal
+          invoice={refundFor}
+          onClose={() => setRefundFor(null)}
+          onDone={() => {
+            setRefundFor(null);
+            invalidateAll();
+          }}
+        />
+      )}
+      {creditFor && (
+        <StoreCreditModal
+          customerId={creditFor.customerId}
+          customerName={creditFor.customerName}
+          onClose={() => setCreditFor(null)}
+          onDone={() => {
+            setCreditFor(null);
+            invalidateAll();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function PayLinkModal({ url, onClose }: { url: string; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="overlay open" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-h">
+          <span>Guest pay-link</span>
+          <button type="button" className="modal-x" onClick={onClose}>
+            &times;
+          </button>
+        </div>
+        <div className="modal-b">
+          <div className="ff">
+            <label>Payment URL</label>
+            <input readOnly value={url} onFocus={(e) => e.target.select()} />
+          </div>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => {
+              navigator.clipboard?.writeText(url);
+              setCopied(true);
+            }}
+          >
+            {copied ? 'Copied!' : 'Copy link'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MonthEndModal({ result, onClose }: { result: MonthEndResult; onClose: () => void }) {
+  return (
+    <div className="overlay open" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-h">
+          <span>Month-end — {result.periodMonth}</span>
+          <button type="button" className="modal-x" onClick={onClose}>
+            &times;
+          </button>
+        </div>
+        <div className="modal-b">
+          {result.created.length === 0 && <div className="note">No new monthly invoices created.</div>}
+          {result.created.map((c) => (
+            <div key={c.invoiceId} className="orow" style={{ cursor: 'default' }}>
+              <div className="oinfo">
+                <div className="on">{c.customerName}</div>
+                <div className="om">
+                  <span>{c.orderCount} orders</span>
+                </div>
+              </div>
+              <div className="oprice">{money(c.amountCents)}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RefundModal({
+  invoice,
+  onClose,
+  onDone,
+}: {
+  invoice: Invoice;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [amount, setAmount] = useState((invoice.amountCents / 100).toFixed(2));
+  const [to, setTo] = useState<RefundTo>('CARD');
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const mut = useMutation({
+    mutationFn: () =>
+      refundInvoice(invoice.id, {
+        amountCents: Math.round(Number(amount) * 100),
+        to,
+        reason: reason || undefined,
+      }),
+    onSuccess: onDone,
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
+  return (
+    <div className="overlay open" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-h">
+          <span>Refund invoice</span>
+          <button type="button" className="modal-x" onClick={onClose}>
+            &times;
+          </button>
+        </div>
+        <div className="modal-b">
+          {error && <div className="alert-error" style={{ marginBottom: 12 }}>{error}</div>}
+          <div className="ff">
+            <label>Amount</label>
+            <input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          </div>
+          <div className="ff">
+            <label>Refund to</label>
+            <select value={to} onChange={(e) => setTo(e.target.value as RefundTo)}>
+              <option value="CARD">Card</option>
+              <option value="STORE_CREDIT">Store credit</option>
+            </select>
+          </div>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={mut.isPending || !(Number(amount) > 0)}
+            onClick={() => mut.mutate()}
+          >
+            Issue refund
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StoreCreditModal({
+  customerId,
+  customerName,
+  onClose,
+  onDone,
+}: {
+  customerId: string;
+  customerName: string | null;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [amount, setAmount] = useState('0.00');
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const balanceQ = useQuery({
+    queryKey: ['store-credit', customerId],
+    queryFn: () => getStoreCredit(customerId),
+  });
+
+  const mut = useMutation({
+    mutationFn: (deltaCents: number) =>
+      adjustStoreCredit(customerId, { deltaCents, reason: reason || undefined }),
+    onSuccess: onDone,
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
+  const cents = Math.round(Number(amount) * 100);
+
+  return (
+    <div className="overlay open" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-h">
+          <span>Store credit — {customerName ?? 'Customer'}</span>
+          <button type="button" className="modal-x" onClick={onClose}>
+            &times;
+          </button>
+        </div>
+        <div className="modal-b">
+          {error && <div className="alert-error" style={{ marginBottom: 12 }}>{error}</div>}
+          <div className="note" style={{ marginBottom: 12 }}>
+            Current balance: <b>{money(balanceQ.data?.balanceCents ?? 0)}</b>
+          </div>
+          <div className="ff">
+            <label>Amount</label>
+            <input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              className="btn btn-green"
+              disabled={mut.isPending || !(cents > 0)}
+              onClick={() => mut.mutate(cents)}
+            >
+              Add credit
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={mut.isPending || !(cents > 0)}
+              onClick={() => mut.mutate(-cents)}
+            >
+              Deduct
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

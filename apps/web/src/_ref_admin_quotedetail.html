@@ -1,0 +1,63 @@
+<section class="page" id="p-quotedetail">
+      <div class="ph"><div style="display:flex;align-items:center;gap:12px;">
+        <button class="btn btn-ghost btn-sm" onclick="go('quotes')"><i class="ti ti-arrow-left"></i> Quotes</button>
+        <div><h1 id="qd-title" style="font-size:18px;">Q-209 · Team crest — Oak United</h1><div class="sub" id="qd-sub">Waiting for your price · requested Mar 13</div></div>
+      </div>
+      <span class="chip c-quote" id="qd-status">Needs your price</span></div>
+      <div style="display:grid;grid-template-columns:1fr 320px;gap:16px;margin-top:16px;align-items:start;">
+        <div>
+          <div class="card">
+            <div class="card-h"><span class="ct"><i class="ti ti-clipboard-text"></i> What the customer wants</span></div>
+            <div class="od-line"><span class="l">Service</span><span class="v" id="qd-svc">Embroidery digitizing</span></div>
+            <div class="od-line"><span class="l">Designs</span><span class="v" id="qd-count">3</span></div>
+            <div class="od-line"><span class="l">Sizes</span><span class="v">Left chest 3.5" + cap 2.5"</span></div>
+            <div class="od-line"><span class="l">Formats (from their machine setup)</span><span class="v">DST + PES + sew sheet</span></div>
+            <div class="od-line"><span class="l">Notes from customer</span><span class="v" style="font-weight:400;">"Keep the shield outline thick, gold thread for the border"</span></div>
+          </div>
+          <div class="card" style="margin-top:14px;">
+            <div class="card-h"><span class="ct"><i class="ti ti-photo"></i> Customer's artwork</span></div>
+            <div style="padding:12px 16px;display:flex;gap:8px;flex-wrap:wrap;">
+              <div class="odf" style="cursor:pointer;" onclick="showToast('Prototype: opens the image')"><i class="ti ti-photo" style="color:var(--navy)"></i> crest_main.png</div>
+              <div class="odf" style="cursor:pointer;" onclick="showToast('Prototype: opens the image')"><i class="ti ti-photo" style="color:var(--navy)"></i> crest_alt.jpg</div>
+            </div>
+          </div>
+          <div class="card" style="margin-top:14px;">
+            <div class="card-h"><span class="ct"><i class="ti ti-message"></i> Messages on this quote</span></div>
+            <div class="thread" id="qd-thread">
+              <div class="tmsg them">Hi — how much for our club crest, 3 designs? Artwork attached. <div class="tm">Oak United · Mar 13</div></div>
+              <div class="tmsg them">Also, do you do 3D puff embroidery? <div class="tm">Oak United · 1d ago</div></div>
+            </div>
+            <div class="thread-in">
+              <input id="qd-input" placeholder="Reply — ask a question before pricing if you need to…" onkeydown="if(event.key==='Enter')qdSend()">
+              <button class="btn btn-primary btn-sm" onclick="qdSend()"><i class="ti ti-send"></i></button>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="card" style="border:1.5px solid var(--navy);">
+            <div class="card-h"><span class="ct"><i class="ti ti-currency-dollar"></i> Build the quote — price each design</span></div>
+            <div style="padding:14px 16px;">
+              <div style="font-size:11px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Customer's files — tap one, then tap "attach" on a line</div>
+              <div id="qb-files" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;"></div>
+              <div style="font-size:11px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;">Quote lines — you decide what the job actually is</div>
+              <div id="qb-lines"></div>
+              <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin:8px 0 12px;" onclick="qbAddLine()"><i class="ti ti-plus"></i> Add line</button>
+              <div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:10px;margin-bottom:12px;">
+                <span style="font-size:13px;font-weight:600;">Total</span>
+                <span style="font-size:19px;font-weight:700;color:var(--navy);" id="qb-total">$0.00</span>
+              </div>
+              <div class="note" style="margin:0 0 12px;"><i class="ti ti-info-circle"></i> Customer can accept or reject each line — they pay only for what they keep. Rejected lines stay quoted for later.</div>
+              <button class="btn btn-primary" style="width:100%;justify-content:center;" onclick="qdSendPrice()"><i class="ti ti-send"></i> Send quote — per-design approval</button>
+              <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:8px;" onclick="showToast('Quote declined politely — customer notified.');go('quotes')"><i class="ti ti-x"></i> Decline this request</button>
+            </div>
+          </div>
+          <div class="card" style="margin-top:12px;">
+            <div class="card-h"><span class="ct"><i class="ti ti-user"></i> Customer</span></div>
+            <div class="od-line"><span class="l">Name</span><span class="v" id="qd-cust">Oak United</span></div>
+            <div class="od-line"><span class="l">Past orders</span><span class="v">1 · $30 lifetime</span></div>
+            <div class="od-line"><span class="l">Machine</span><span class="v">4x4 + 5x7 hoops</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+    

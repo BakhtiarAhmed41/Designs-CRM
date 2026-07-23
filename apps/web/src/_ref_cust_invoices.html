@@ -1,0 +1,28 @@
+<section class="page" id="p-invoices">
+      <div class="ph"><div><h1>Invoices</h1><div class="sub" id="inv-sub">Your monthly statements and their status. This month's running total is shown up top.</div></div></div>
+
+      <!-- net-monthly banner -->
+      <div class="month-banner" id="month-banner" style="display: flex; margin-top: 20px;">
+        <div class="mb-l">
+          <div class="ml">This month so far — March</div>
+          <div class="mv">$124.00</div>
+          <div class="md">16 designs across 3 orders · statement generates April 1</div>
+        </div>
+        <div class="mb-r">
+          <div class="mstat">Your terms: <b>Net-15</b></div>
+          <div class="mstat" style="margin-top:6px;">Credit used: <b>$124</b> / $500</div>
+        </div>
+      </div>
+
+      <div class="stats" id="inv-stats" style="margin-top:20px;"><div class="stat"><div class="sl">Running this month</div><div class="sv maroon">$124</div><div class="sd"></div></div><div class="stat"><div class="sl">Last statement</div><div class="sv ">$286</div><div class="sd">Feb · pending</div></div><div class="stat"><div class="sl">Paid to date</div><div class="sv ">$3,240</div><div class="sd">Lifetime</div></div></div>
+
+      <div class="card">
+        <div class="card-h"><span class="ct">Invoice history</span>
+          <div class="filters"><button class="on">All</button><button>Pending</button><button>Paid</button></div>
+        </div>
+        <table class="itable" id="inv-table"><thead><tr><th>Invoice</th><th>Statement</th><th>Items</th><th>Amount</th><th>Date</th><th>Status</th><th></th></tr></thead><tbody><tr><td class="inv-id">MAR-24</td><td>March statement (in progress)</td><td style="color:var(--muted)">16 designs</td><td class="amt">$124.00</td><td style="color:var(--muted)">—</td><td><span class="chip c-prog">Building</span></td><td style="text-align:right"><span style="color:var(--faint);font-size:12px">—</span></td></tr><tr><td class="inv-id">FEB-24</td><td>February statement</td><td style="color:var(--muted)">22 designs</td><td class="amt">$286.00</td><td style="color:var(--muted)">Due Mar 15</td><td><span class="chip c-unpaid">Pending</span></td><td style="text-align:right"><button class="btn btn-primary btn-sm" onclick="alert(&#39;Prototype: opens payment for $286.00&#39;)">Pay</button></td></tr><tr><td class="inv-id">JAN-24</td><td>January statement</td><td style="color:var(--muted)">19 designs</td><td class="amt">$241.00</td><td style="color:var(--muted)">Jan 15</td><td><span class="chip c-paid">Paid</span></td><td style="text-align:right"><button class="btn btn-ghost btn-sm"><i class="ti ti-download"></i> PDF</button></td></tr><tr><td class="inv-id">DEC-23</td><td>December statement</td><td style="color:var(--muted)">14 designs</td><td class="amt">$168.00</td><td style="color:var(--muted)">Dec 15</td><td><span class="chip c-paid">Paid</span></td><td style="text-align:right"><button class="btn btn-ghost btn-sm"><i class="ti ti-download"></i> PDF</button></td></tr></tbody></table>
+      </div>
+    </section>
+
+    <!-- MESSAGES -->
+    

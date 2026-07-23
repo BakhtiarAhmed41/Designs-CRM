@@ -1,0 +1,111 @@
+export type UserRole =
+  | 'SUPER_ADMIN'
+  | 'ADMIN'
+  | 'SUPPORT'
+  | 'DESIGNER'
+  | 'CLIENT';
+
+export const STAFF_ROLES: UserRole[] = [
+  'SUPER_ADMIN',
+  'ADMIN',
+  'SUPPORT',
+  'DESIGNER',
+];
+
+export type CurrentUser = {
+  id: string;
+  email: string;
+  role: UserRole;
+  firstName: string | null;
+  lastName: string | null;
+  phone: string | null;
+};
+
+export type OrderStatus =
+  | 'CREATED'
+  | 'WAITING_FOR_QUOTATION'
+  | 'QUOTATION_PROVIDED'
+  | 'CLIENT_REJECTED_QUOTATION'
+  | 'WAITING_FOR_ADMIN_QUOTATION_APPROVAL'
+  | 'PENDING_PAYMENT'
+  | 'IN_PROGRESS'
+  | 'READY_TO_SEND'
+  | 'REVISION_REQUESTED'
+  | 'COMPLETED'
+  | 'CLOSED'
+  | 'REJECTED'
+  | 'CANCELLED'
+  | 'REFUNDED';
+
+export type Quotation = {
+  id: string;
+  orderId: string;
+  version: number;
+  status: string;
+  createdByRole: UserRole;
+  amountCents: number | null;
+  currency: string;
+  comment: string | null;
+  createdAt: string;
+};
+
+export type Attachment = {
+  id: string;
+  orderId: string;
+  originalName: string;
+};
+
+export type DeliveryFile = {
+  id: string;
+  originalName: string;
+  formatLabel: string | null;
+};
+
+export type Delivery = {
+  id: string;
+  orderId: string;
+  version: number;
+  deliveredVia: string;
+  createdAt: string;
+  files: DeliveryFile[];
+};
+
+export type Order = {
+  id: string;
+  humanRef: string | null;
+  customerId?: string | null;
+  clientId: string | null;
+  type: 'ORDER' | 'QUOTE_REQUEST';
+  serviceType: string | null;
+  mainCategory: string | null;
+  subCategory: string | null;
+  name: string | null;
+  instructions: string | null;
+  size: string | null;
+  preferences: unknown;
+  status: OrderStatus;
+  priceCents: number | null;
+  currency: string;
+  assignedDesignerId?: string | null;
+  internalNotes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  attachments?: Attachment[];
+  quotations?: Quotation[];
+  deliveries?: Delivery[];
+  client?: {
+    id: string;
+    email: string | null;
+    firstName: string | null;
+    lastName?: string | null;
+  } | null;
+};
+
+export type Notification = {
+  id: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  readAt: string | null;
+  createdAt: string;
+};
