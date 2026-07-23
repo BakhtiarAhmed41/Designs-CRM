@@ -1,0 +1,35 @@
+# Nginx site config for the Designs-CRM on a Hostinger VPS.
+# - Serves the built Vite SPA (apps/web/dist) as static files.
+# - Reverse-proxies /api (NestJS on 127.0.0.1:3001) including signed file downloads.
+#
+# Copy to /etc/nginx/sites-available/designs-crm, symlink into sites-enabled,
+# adjust server_name / paths, then: nginx -t && systemctl reload nginx
+# Add HTTPS with: certbot --nginx -d your-domain.com
+
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    # Built SPA
+    root /var/www/designs-crm/apps/web/dist;
+    index index.html;
+
+    # Max upload size for order attachments / deliveries
+    client_max_body_size 60M;
+
+    # API (auth, orders, files/download, etc.)
+    location /api/ {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
+    }
+
+    # SPA client-side routing fallback
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

@@ -18,13 +18,18 @@ import type { AuthUser } from '../auth/auth.types';
 import { OrdersService } from './orders.service';
 
 const createOrderSchema = z.object({
-  type: z.enum(['ORDER', 'QUOTATION_REQUEST']).optional(),
+  type: z.enum(['ORDER', 'QUOTE_REQUEST', 'QUOTATION_REQUEST']).optional(),
+  name: z.string().optional().nullable(),
   mainCategory: z.string().optional().nullable(),
   subCategory: z.string().optional().nullable(),
   serviceType: z.string().min(1),
   instructions: z.string().optional().nullable(),
   size: z.string().optional().nullable(),
   preferences: z.any().optional(),
+});
+
+const acceptQuotationSchema = z.object({
+  keepLineIds: z.array(z.string().min(1)).optional().nullable(),
 });
 
 const rejectQuotationSchema = z.object({
@@ -53,6 +58,12 @@ export class OrdersController {
   async listMine(@CurrentUser() user: AuthUser | undefined) {
     const orders = await this.orders.listMyOrders(user);
     return { orders };
+  }
+
+  @Get('my-files')
+  async myFiles(@CurrentUser() user: AuthUser | undefined) {
+    const files = await this.orders.listMyFiles(user);
+    return { files };
   }
 
   @Get(':id')
@@ -96,8 +107,13 @@ export class OrdersController {
   }
 
   @Patch(':id/quotations/accept')
-  async acceptQuotation(@CurrentUser() user: AuthUser | undefined, @Param('id') orderId: string) {
-    const order = await this.orders.clientAcceptQuotation(user, orderId);
+  async acceptQuotation(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('id') orderId: string,
+    @Body() body: unknown,
+  ) {
+    const data = acceptQuotationSchema.parse(body ?? {});
+    const order = await this.orders.clientAcceptQuotation(user, orderId, data);
     return { order };
   }
 

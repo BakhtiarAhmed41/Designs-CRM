@@ -1,16 +1,18 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from './prisma/prisma.service';
+import { DbService } from './db/db.service';
 
 @Injectable()
 export class AppService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private db: DbService) {}
 
   health(): { ok: true } {
     return { ok: true };
   }
 
   async healthDb(): Promise<{ ok: true; users: number }> {
-    const users = await this.prisma.user.count();
-    return { ok: true, users };
+    const row = await this.db.queryOne<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM users',
+    );
+    return { ok: true, users: Number(row?.n ?? 0) };
   }
 }

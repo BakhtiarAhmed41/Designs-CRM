@@ -1,0 +1,49 @@
+<section class="page" id="p-convo">
+      <div class="ph"><div style="display:flex;align-items:center;gap:12px;">
+        <button class="btn btn-ghost btn-sm" onclick="go('messages')"><i class="ti ti-arrow-left"></i> Inbox</button>
+        <div><h1 id="cv-name" style="font-size:18px;">Ashleigh</h1><div class="sub" id="cv-sub">Previous buyer · replied 2 minutes ago</div></div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost btn-sm" onclick="cvNewTab()" title="Open this conversation in a new browser tab"><i class="ti ti-external-link"></i> Open in new tab</button>
+        <button class="btn btn-primary btn-sm" onclick="openGen('order')"><i class="ti ti-plus"></i> Generate order</button>
+      </div></div>
+      <div style="display:grid;grid-template-columns:1fr 310px;gap:16px;margin-top:16px;align-items:start;">
+        <div class="card" style="display:flex;flex-direction:column;">
+          <div class="thread" id="cv-thread" style="max-height:none;height:430px;"></div>
+          <div class="thread-in">
+            <button class="tmpl-btn" onclick="openTemplates()" title="Insert saved reply"><i class="ti ti-template"></i></button>
+            <input id="cv-input" placeholder="Type your reply…" onkeydown="if(event.key==='Enter')cvSend()">
+            <button class="btn btn-primary btn-sm" onclick="cvSend()"><i class="ti ti-send"></i></button>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <div style="padding:16px;text-align:center;border-bottom:0.5px solid var(--line);">
+              <div style="width:52px;height:52px;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:17px;margin:0 auto 8px;" id="cv-av">A</div>
+              <div style="font-size:14.5px;font-weight:600;" id="cv-pname">Ashleigh</div>
+              <div style="font-size:11.5px;color:var(--muted);" id="cv-badge">Previous buyer · since 2024</div>
+            </div>
+            <div class="od-line"><span class="l">Orders</span><span class="v" id="cv-orders">6</span></div>
+            <div class="od-line"><span class="l">Lifetime spent</span><span class="v" id="cv-ltv">$142</span></div>
+            <div class="od-line"><span class="l">Store credit</span><span class="v" style="color:var(--green)" id="cv-credit">$0</span></div>
+          </div>
+          <div class="card" style="margin-top:12px;">
+            <div class="card-h"><span class="ct"><i class="ti ti-package"></i> Current order</span><a id="cv-ordlink" onclick="go('orderdetail')" style="font-size:11.5px;color:var(--navy);cursor:pointer;font-weight:600;">Open ↗</a></div>
+            <div style="padding:12px 16px;">
+              <div style="font-size:13px;font-weight:600;" id="cv-ordname">#1052 · QR patch</div>
+              <div style="font-size:12px;color:var(--muted);margin:2px 0 8px;" id="cv-ordmeta">Embroidery · 3.5" · $15.00</div>
+              <span class="chip c-prog" id="cv-ordstatus">In progress</span>
+            </div>
+          </div>
+          <div class="card" style="margin-top:12px;">
+            <div class="card-h"><span class="ct"><i class="ti ti-history"></i> Order history</span></div>
+            <div id="cv-history"></div>
+          </div>
+          <div class="card" style="margin-top:12px;">
+            <div class="card-h"><span class="ct"><i class="ti ti-note"></i> Private note</span></div>
+            <div style="padding:10px 16px 14px;"><textarea id="cv-note" placeholder="Only your team sees this…" style="width:100%;border:0.5px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;font-family:inherit;min-height:54px;outline:none;"></textarea></div>
+          </div>
+        </div>
+      </div>
+    </section>
+    

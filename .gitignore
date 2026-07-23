@@ -27,3 +27,11 @@ pnpm-debug.log*
 .idea
 
 node_modules
+
+# design prototypes (reference only, not tracked)
+/Admin_Final_-V2.html
+/Customer_Portal_Final_-V2 (1).html
+
+# uploaded files (local storage)
+/uploads
+apps/api/uploads

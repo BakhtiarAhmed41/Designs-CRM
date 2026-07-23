@@ -1,0 +1,19 @@
+<section class="page" id="p-team">
+      <div class="ph"><div><h1>Team</h1><div class="sub">Team accounts, roles, skills and who's online right now. Assign work to designers by skill.</div></div>
+      <button class="btn btn-primary" onclick="showToast('Prototype: add a new team member with role and skills.')"><i class="ti ti-plus"></i> Add member</button></div>
+      <div style="margin:16px 0 10px;"><div class="filters"><button class="on">All</button><button>Admins</button><button>Designers</button><button>Support</button><button>Online now</button></div></div>
+      <div class="card">
+        <table class="qtable" id="team-table"></table>
+      </div>
+      <div class="card" style="margin-top:14px;">
+        <div class="card-h"><span class="ct"><i class="ti ti-adjustments"></i> Support role — permissions</span><span style="font-size:11px;color:var(--faint)">what Support can do</span></div>
+        <div style="padding:6px 16px 12px;">
+          <div class="perm-row"><div style="flex:1"><div class="pt">Send invoices &amp; take payment</div><div class="pd">Let support handle money, not just messages</div></div><label class="tog"><input type="checkbox" onchange="showToast(this.checked?'Support can now send invoices and take payment.':'Support can no longer handle payments.')"><span class="sl"></span></label></div>
+          <div class="perm-row"><div style="flex:1"><div class="pt">Approve &amp; release designer files</div><div class="pd">Off by default — approvals stay with you</div></div><label class="tog"><input type="checkbox"><span class="sl"></span></label></div>
+          <div class="perm-row"><div style="flex:1"><div class="pt">Grant net-monthly terms</div><div class="pd">Off by default — you decide who gets credit</div></div><label class="tog"><input type="checkbox"><span class="sl"></span></label></div>
+          <div class="perm-row"><div style="flex:1"><div class="pt">View &amp; reply to all messages</div><div class="pd">Core support ability</div></div><label class="tog"><input type="checkbox" checked><span class="sl"></span></label></div>
+        </div>
+      </div>
+      <div class="note"><i class="ti ti-info-circle"></i> Roles control what each person sees: <b>Super Admin</b> everything · <b>Admin</b> operations &amp; money · <b>Support</b> messages &amp; customers (money is a toggle above) · <b>Designer</b> only assigned work, no money. Designer files route to you for approval before reaching the customer.</div>
+    </section>
+  

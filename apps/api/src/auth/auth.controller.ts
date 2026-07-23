@@ -1,14 +1,12 @@
 import {
   BadRequestException,
   Body,
-  ConflictException,
   Controller,
   HttpException,
   InternalServerErrorException,
   Post,
   Res,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import type { Response } from 'express';
 import { z, ZodError } from 'zod';
 import { getEnv } from '../config/env';
@@ -42,11 +40,6 @@ export class AuthController {
       const user = await this.auth.registerClient({ email, password });
       return { user };
     } catch (err) {
-      if (err instanceof Prisma.PrismaClientKnownRequestError) {
-        if (err.code === 'P2002') {
-          throw new ConflictException('Email already exists');
-        }
-      }
       if (err instanceof HttpException) throw err;
       throw new InternalServerErrorException(
         err instanceof Error ? err.message : 'Register failed',

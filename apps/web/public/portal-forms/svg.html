@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SVG & Cut Files — Quote Request</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:14px;color:#1a1a18;}
+.wrap{max-width:700px;margin:0 auto;}
+.card{background:#fff;border:0.5px solid rgba(0,0,0,.12);border-radius:12px;overflow:hidden;margin-bottom:14px;}
+.ch{padding:12px 16px;border-bottom:0.5px solid rgba(0,0,0,.1);display:flex;align-items:center;gap:8px;}
+.ch i{font-size:17px;color:#185fa5;}
+.ct{font-size:14px;font-weight:500;}
+.cb{padding:16px;}
+.sl{font-size:11px;font-weight:500;color:#888;letter-spacing:.05em;text-transform:uppercase;margin:14px 0 7px;}
+.sl:first-child{margin-top:0;}
+.fg{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:11px;}
+.ff{display:flex;flex-direction:column;gap:4px;}
+.ff label{font-size:12px;font-weight:500;color:#555;}
+.ff input,.ff select{font-size:13px;padding:7px 10px;border:0.5px solid rgba(0,0,0,.2);border-radius:8px;background:#fff;color:#1a1a18;outline:none;}
+.ff input:focus,.ff select:focus{border-color:#378ADD;box-shadow:0 0 0 2px rgba(55,138,221,.15);}
+.ff textarea{font-size:13px;padding:8px 10px;border:0.5px solid rgba(0,0,0,.2);border-radius:8px;resize:vertical;min-height:70px;outline:none;font-family:inherit;width:100%;}
+.lockable{transition:opacity .25s;}
+.lockable.locked{opacity:.25;pointer-events:none;user-select:none;}
+/* service type selector */
+.svc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:4px;}
+.sopt{border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:11px 8px;cursor:pointer;text-align:center;display:flex;flex-direction:column;align-items:center;gap:5px;}
+.sopt i{font-size:20px;color:#888;}
+.sopt .ot{font-size:12px;font-weight:500;color:#1a1a18;}
+.sopt .os{font-size:11px;color:#aaa;line-height:1.3;}
+.sopt.sel{border:2px solid #378ADD;background:#EDF5FD;}
+.sopt.sel i,.sopt.sel .ot{color:#185fa5;}
+.sopt.sel .os{color:#378ADD;}
+/* use selector */
+.use-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.uopt{border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;}
+.uopt i{font-size:18px;color:#888;}
+.uopt .ut{font-size:12px;font-weight:500;color:#1a1a18;}
+.uopt .us{font-size:11px;color:#aaa;}
+.uopt.sel{border:2px solid #185fa5;background:#EDF5FD;}
+.uopt.sel i,.uopt.sel .ut{color:#185fa5;}
+.uopt.sel .us{color:#378ADD;}
+/* upload areas */
+.upload-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:0;}
+.upload-area{border:1.5px dashed rgba(0,0,0,.2);border-radius:8px;background:#f9f9f7;overflow:hidden;}
+.utrg{padding:12px;text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;}
+.utrg i{font-size:20px;color:#888;}
+.utrg p{font-size:12px;color:#555;font-weight:500;}
+.utrg span{font-size:11px;color:#aaa;}
+.flist{padding:0 8px 6px;}
+.fitem{display:flex;align-items:center;justify-content:space-between;padding:4px 7px;background:#fff;border-radius:6px;margin-bottom:3px;font-size:12px;color:#555;border:0.5px solid rgba(0,0,0,.1);}
+.frem{background:none;border:none;cursor:pointer;color:#E24B4A;font-size:12px;}
+.ref-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:10px;background:#FAEEDA;color:#854F0B;margin-bottom:6px;}
+/* style selector */
+.style-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.style-opt{border:0.5px solid rgba(0,0,0,.15);border-radius:8px;overflow:hidden;cursor:pointer;}
+.style-thumb{height:70px;background:#f0f0ee;display:flex;align-items:center;justify-content:center;position:relative;}
+.style-thumb svg{width:100%;height:100%;}
+.style-label{padding:6px 8px;font-size:11px;font-weight:500;text-align:center;color:#555;border-top:0.5px solid rgba(0,0,0,.08);}
+.style-opt.sel{border:2px solid #378ADD;}
+.style-opt.sel .style-label{background:#EDF5FD;color:#185fa5;}
+/* dynamic fields */
+.dyn-sec{display:none;}
+.dyn-sec.show{display:block;}
+/* info box */
+.ibox{background:#f5f5f3;border-radius:8px;padding:8px 11px;font-size:12px;color:#666;display:flex;gap:6px;align-items:flex-start;margin-top:5px;}
+.ibox i{font-size:13px;flex-shrink:0;margin-top:1px;}
+.ibox.warn{background:#FAEEDA;color:#854F0B;}
+.ibox.info{background:#EDF5FD;color:#185fa5;}
+/* toggle row */
+.tog-row{display:flex;align-items:center;gap:8px;padding:9px 0;}
+.tgl{position:relative;width:32px;height:17px;flex-shrink:0;}
+.tgl input{opacity:0;width:0;height:0;}
+.tgl .sl2{position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:17px;transition:.2s;}
+.tgl .sl2:before{position:absolute;content:"";height:11px;width:11px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.2s;}
+.tgl input:checked+.sl2{background:#378ADD;}
+.tgl input:checked+.sl2:before{transform:translateX(15px);}
+/* rush */
+.rush-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.ropt{border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:9px 11px;cursor:pointer;font-size:12px;color:#555;}
+.ropt.sel-s{border-color:#3B6D11;background:#EAF3DE;color:#3B6D11;}
+.ropt.sel-w{border-color:#854F0B;background:#FAEEDA;color:#854F0B;}
+/* adv */
+.adv-tgl{width:100%;padding:10px 13px;background:#f5f5f3;border:0.5px solid rgba(0,0,0,.1);border-radius:8px;font-size:13px;color:#666;cursor:pointer;display:flex;align-items:center;justify-content:space-between;}
+.adv-b{border:0.5px solid rgba(0,0,0,.1);border-radius:8px;padding:13px;margin-top:5px;display:none;}
+.adv-b.open{display:block;}
+.cbg{display:grid;grid-template-columns:1fr 1fr;gap:0;}
+.cbr{display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:0.5px solid rgba(0,0,0,.08);}
+.cbr:last-child{border-bottom:none;}
+.cbr input[type=checkbox]{margin-top:2px;flex-shrink:0;}
+.cbr label{font-size:12px;color:#1a1a18;cursor:pointer;line-height:1.4;}
+.cbr .sub{font-size:11px;color:#aaa;display:block;margin-top:1px;}
+/* quick describe */
+.qdiv{border:none;border-top:0.5px dashed rgba(0,0,0,.15);margin:18px 0 14px;}
+.qtogrow{display:flex;align-items:flex-start;gap:10px;padding:12px 13px;background:#f5f5f3;border-radius:8px;margin-bottom:10px;cursor:pointer;border:0.5px solid rgba(0,0,0,.1);}
+.qtogrow input[type=checkbox]{margin-top:2px;flex-shrink:0;width:15px;height:15px;cursor:pointer;}
+.ql{font-size:13px;font-weight:500;}
+.qs{font-size:12px;color:#888;margin-top:2px;line-height:1.5;}
+.qwrap{display:none;}
+.qwrap.show{display:block;}
+.qbox{background:#fff;border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:10px 12px;margin-bottom:6px;}
+.qbox textarea{width:100%;font-size:13px;border:none;background:transparent;resize:none;min-height:78px;outline:none;font-family:inherit;}
+/* buttons */
+.row-btns{display:flex;justify-content:flex-end;gap:8px;padding-top:13px;border-top:0.5px solid rgba(0,0,0,.1);margin-top:13px;}
+.btn-p{padding:9px 20px;background:#EDF5FD;color:#185fa5;border:0.5px solid #378ADD;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;}
+.btn-s{padding:9px 13px;border:0.5px solid rgba(0,0,0,.15);border-radius:8px;font-size:13px;color:#666;cursor:pointer;background:transparent;}
+.other-inp{margin-top:5px;display:none;}
+.other-inp.show{display:block;}
+.badge-info{font-size:11px;background:#EDF5FD;color:#185fa5;padding:2px 8px;border-radius:10px;}
+.fmt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:7px;}
+.fmt-chip{border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:8px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;position:relative;}
+.fmt-chip i.icon{font-size:18px;color:#888;}
+.fmt-chip .fname{font-size:11px;font-weight:500;color:#555;}
+.fmt-chip .fext{font-size:10px;color:#aaa;}
+.fmt-chip .chk{display:none;position:absolute;top:4px;right:4px;width:14px;height:14px;border-radius:50%;background:#185fa5;color:#fff;font-size:9px;align-items:center;justify-content:center;}
+.fmt-chip.sel{border:2px solid #185fa5;background:#EDF5FD;}
+.fmt-chip.sel .icon,.fmt-chip.sel .fname{color:#185fa5;}
+.fmt-chip.sel .chk{display:flex;}
+.msg-cta{display:flex;align-items:center;gap:11px;padding:12px 14px;background:#EDF5FD;border:0.5px solid rgba(24,95,165,.25);border-radius:8px;margin-top:16px;}
+.msg-cta>i{font-size:20px;color:#185fa5;flex-shrink:0;}
+.mc-t{font-size:13px;font-weight:500;color:#185fa5;}
+.mc-s{font-size:12px;color:#555;margin-top:2px;line-height:1.45;}
+.mc-btn{flex-shrink:0;padding:8px 14px;background:#185fa5;color:#fff;border-radius:8px;font-size:12px;font-weight:500;text-decoration:none;white-space:nowrap;}
+@media(max-width:520px){.msg-cta{flex-wrap:wrap;}.mc-btn{width:100%;text-align:center;}}
+.divider{border:none;border-top:0.5px solid rgba(0,0,0,.08);margin:12px 0;}
+/* quick/detailed mode tabs */
+.mode-tabs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+.mtab{border:0.5px solid rgba(0,0,0,.15);border-radius:10px;padding:12px 14px;cursor:pointer;display:flex;gap:10px;align-items:flex-start;}
+.mtab i{font-size:19px;color:#888;margin-top:1px;}
+.mtab .mt-t{font-size:13px;font-weight:500;}
+.mtab .mt-s{font-size:11px;color:#aaa;margin-top:2px;line-height:1.4;}
+.mtab.sel{border:2px solid #378ADD;background:#EDF5FD;}
+.mtab.sel i,.mtab.sel .mt-t{color:#185fa5;}
+.mode-body{display:none;}
+.mode-body.vis{display:block;}
+.qbig{background:#fff;border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:10px 12px;}
+.qbig textarea{width:100%;font-size:13px;border:none;background:transparent;resize:none;min-height:95px;outline:none;font-family:inherit;}
+.qbig textarea::placeholder{color:#bbb;}
+/* single vs multiple */
+.type-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.topt{border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:13px;cursor:pointer;text-align:center;display:flex;flex-direction:column;align-items:center;gap:5px;}
+.topt i{font-size:21px;color:#888;}
+.topt .ot{font-size:13px;font-weight:500;color:#1a1a18;}
+.topt .os{font-size:11px;color:#aaa;}
+.topt.sel{border:2px solid #378ADD;background:#EDF5FD;}
+.topt.sel i,.topt.sel .ot{color:#185fa5;}
+/* design rows for multiple */
+.drow{background:#f9f9f7;border:0.5px solid rgba(0,0,0,.1);border-radius:8px;padding:12px;margin-bottom:8px;}
+.drow-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.drow-num{font-size:12px;font-weight:500;color:#666;display:flex;align-items:center;gap:5px;}
+.drow-del{background:none;border:none;cursor:pointer;color:#E24B4A;font-size:12px;display:flex;align-items:center;gap:3px;}
+.mini-up{border:1px dashed rgba(0,0,0,.2);border-radius:8px;background:#fff;overflow:hidden;}
+.mini-trg{padding:6px 8px;text-align:center;cursor:pointer;font-size:11px;color:#666;display:flex;align-items:center;justify-content:center;gap:4px;}
+.mini-fl{padding:0 5px 3px;}
+.mini-fi{display:flex;align-items:center;justify-content:space-between;padding:3px 5px;background:#f5f5f3;border-radius:4px;margin-bottom:2px;font-size:11px;color:#666;}
+.add-btn{width:100%;padding:9px;border:0.5px dashed rgba(0,0,0,.15);border-radius:8px;background:transparent;font-size:13px;color:#666;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;margin-bottom:12px;}
+
+/* Remake: stronger section grouping so Detailed reads in chunks, not a wall */
+#mode-d .sl{font-size:12px;font-weight:700;color:#143F65;letter-spacing:.06em;margin:26px 0 10px;padding-top:18px;border-top:1px solid rgba(20,63,101,.12);}
+#mode-d .sl:first-of-type{border-top:none;padding-top:0;margin-top:18px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="card">
+  <div class="ch"><i class="ti ti-vector-triangle"></i><span class="ct">Custom SVG and Cut files — quote request</span></div>
+  <div class="cb">
+
+    <!-- MODE TABS -->
+    <div class="mode-tabs">
+      <div class="mtab sel" id="mtab-q" onclick="setMode('q')">
+        <i class="ti ti-message-2"></i>
+        <div><div class="mt-t">Quick request</div><div class="mt-s">Just describe what you need in a few words. We'll handle the rest.</div></div>
+      </div>
+      <div class="mtab" id="mtab-d" onclick="setMode('d')">
+        <i class="ti ti-list-details"></i>
+        <div><div class="mt-t">Detailed request</div><div class="mt-s">Pick the SVG type, style and machine details for an exact quote.</div></div>
+      </div>
+    </div>
+
+    <!-- always visible: name + uploads -->
+    <div class="sl">Design name</div>
+    <div class="ff" style="margin-bottom:12px;"><input type="text" placeholder="e.g. Eagle full color SVG"></div>
+
+    <div class="sl">Upload files</div>
+    <div class="upload-row">
+      <div>
+        <div style="font-size:12px;font-weight:500;color:#555;margin-bottom:5px;display:flex;align-items:center;gap:5px;"><i class="ti ti-file" style="font-size:14px;"></i> Your artwork</div>
+        <div class="upload-area">
+          <div class="utrg" onclick="document.getElementById('fu-art').click()">
+            <i class="ti ti-cloud-upload"></i>
+            <p>Upload artwork</p>
+            <span>PNG, JPG, PDF, AI, EPS, SVG</span>
+            <input type="file" id="fu-art" multiple style="display:none" onchange="handleFiles('fl-art',this)">
+          </div>
+          <div class="flist" id="fl-art"></div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:500;color:#555;margin-bottom:5px;display:flex;align-items:center;gap:5px;"><i class="ti ti-photo" style="font-size:14px;"></i> Reference image <span style="font-size:11px;font-weight:400;color:#aaa;">(optional)</span></div>
+        <div class="upload-area" style="border-color:#EF9F27;background:#FAEEDA22;">
+          <div class="utrg" onclick="document.getElementById('fu-ref').click()">
+            <i class="ti ti-photo" style="color:#BA7517;"></i>
+            <p style="color:#854F0B;">Upload reference</p>
+            <span>"I want something like this"</span>
+            <input type="file" id="fu-ref" multiple style="display:none" onchange="handleFiles('fl-ref',this)">
+          </div>
+          <div class="flist" id="fl-ref"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- QUICK MODE -->
+    <div class="mode-body vis" id="mode-q">
+      <div class="sl" style="margin-top:14px;">Tell us about your design</div>
+      <div class="qbig">
+        <textarea placeholder="e.g. I need a full color SVG of my eagle logo for Cricut, no gradients, transparent background — that's all we need, our team handles the rest. You can also paste a link here if you want us to see a reference."></textarea>
+      </div>
+      <div class="fg" style="margin-top:11px;">
+        <div class="ff"><label>Color type</label>
+          <select id="q-color" onchange="qColorNote()">
+            <option value="">Select...</option>
+            <option value="single">Single color</option>
+            <option value="multi">Multi color</option>
+            <option value="ns">Not sure — let team decide</option>
+          </select>
+        </div>
+        <div class="ff" id="q-use-wrap" style="display:none;"><label>What will you use it for?</label>
+          <select id="q-use" onchange="qColorNote()">
+            <option value="">Select...</option>
+            <option value="cut">Cutting machine — Cricut, Silhouette, vinyl</option>
+            <option value="print">Printing — DTF, sublimation, stickers</option>
+            <option value="both">Both cutting and printing</option>
+            <option value="ns">Not sure — let team decide</option>
+          </select>
+        </div>
+        
+      </div>
+      <div class="ibox" id="q-color-note" style="display:none;"></div>
+
+      <div class="sl" style="margin-top:14px;">Turnaround</div>
+      <div class="rush-row">
+        <div class="ropt sel-s" id="rq-std" onclick="selRushQ('std')"><i class="ti ti-clock" style="font-size:13px"></i> Standard (12–24 hrs) — included</div>
+        <div class="ropt" id="rq-rush" onclick="selRushQ('rush')"><i class="ti ti-bolt" style="font-size:13px"></i> Urgent — contact us before placing an order</div>
+      </div>
+      <div class="ibox" id="rq-note" style="display:none;"><i class="ti ti-message-circle"></i> For urgent orders, please text or email us first so we can confirm the timeline before you place the order.</div>
+
+      <div class="ibox"><i class="ti ti-info-circle"></i> Don't worry about other technical details — layers, formats and cut settings can all be sorted after you submit. Switch to Detailed request if you already know your specs.</div>
+    </div>
+
+    <!-- DETAILED MODE -->
+    <div class="mode-body" id="mode-d">
+      <div style="display:flex;gap:9px;align-items:flex-start;background:#EAF0F5;border-radius:10px;padding:11px 14px;margin-top:14px;font-size:12.5px;color:#143F65;line-height:1.5;">
+        <i class="ti ti-heart-handshake" style="font-size:16px;margin-top:1px;"></i>
+        <span><b>Not sure about a field? Leave it blank.</b> We'll figure it out from your artwork — every field here is optional and just helps us quote faster.</span>
+      </div>
+
+      <div class="sl" style="margin-top:14px;">How many designs?</div>
+      <div class="type-grid">
+        <div class="topt sel" id="t-single" onclick="setType('single')"><i class="ti ti-file"></i><span class="ot">Single design</span><span class="os">One image, one output</span></div>
+        <div class="topt" id="t-multi" onclick="setType('multi')"><i class="ti ti-files"></i><span class="ot">Multiple designs</span><span class="os">Different images or settings</span></div>
+      </div>
+
+      <!-- MULTIPLE DESIGNS -->
+      <div id="sec-multi" style="display:none;margin-top:14px;">
+        <div class="ibox info" style="margin-bottom:10px;"><i class="ti ti-info-circle"></i> Add a row per design — each can have its own type and settings.</div>
+        <div id="multi-rows">
+          <div class="drow" id="mr-1">
+            <div class="drow-head"><span class="drow-num"><i class="ti ti-file" style="font-size:13px;"></i> Design 1</span></div>
+            <div style="display:grid;grid-template-columns:80px 1fr 1fr 1fr;gap:8px;align-items:start;">
+              <div class="ff"><label>File</label><div class="mini-up"><div class="mini-trg" onclick="this.nextElementSibling.nextElementSibling.click()"><i class="ti ti-upload" style="font-size:13px;"></i> Upload</div><div class="mini-fl" id="mfl-1"></div><input type="file" multiple style="display:none" onchange="handleMini('mfl-1',this)"></div></div>
+              <div class="ff"><label>Design name</label><input type="text" placeholder="e.g. Eagle logo"></div>
+              <div class="ff"><label>SVG type</label><select><option>One color SVG</option><option>Full color SVG</option><option>Line art</option><option>Cricut / Silhouette cut file</option><option>Not sure</option></select></div>
+              <div class="ff"><label>Colors</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6+</option><option>Not sure</option></select></div>
+            </div>
+            <div class="ff" style="margin-top:8px;"><label>Notes for this design</label><input type="text" placeholder="Any specific instructions for this design..."></div>
+          </div>
+        </div>
+        <button class="add-btn" onclick="addRow()"><i class="ti ti-plus"></i> Add another design</button>
+      </div>
+
+      <div class="single-wrap">
+
+      <!-- service type -->
+      <div class="sl" style="margin-top:14px;">What type of SVG do you need?</div>
+      <div class="svc-grid">
+        <div class="sopt sel" id="sv-1color" onclick="setSvc('1color')">
+          <i class="ti ti-circle-filled"></i>
+          <span class="ot">One color</span>
+          <span class="os">Single color vector</span>
+        </div>
+        <div class="sopt" id="sv-full" onclick="setSvc('full')">
+          <i class="ti ti-palette"></i>
+          <span class="ot">Full color</span>
+          <span class="os">Multi-color vector</span>
+        </div>
+        <div class="sopt" id="sv-line" onclick="setSvc('line')">
+          <i class="ti ti-pencil"></i>
+          <span class="ot">Line art</span>
+          <span class="os">Outline illustration</span>
+        </div>
+        <div class="sopt" id="sv-cricut" onclick="setSvc('cricut')">
+          <i class="ti ti-cut"></i>
+          <span class="ot">Cricut & Silhouette</span>
+          <span class="os">Cut-ready file</span>
+        </div>
+      </div>
+
+      <!-- style selector — changes per service -->
+      <div class="sl" style="margin-top:14px;">Style preference <span style="font-size:11px;font-weight:400;color:#aaa;">— click the style closest to what you want</span></div>
+      <div class="style-grid" id="style-grid">
+        <!-- rendered by JS -->
+      </div>
+      <div class="ibox" style="margin-top:8px;"><i class="ti ti-info-circle"></i> Not sure? Upload a reference image above showing the style you like — that works even better.</div>
+
+      <!-- intended use -->
+      <div class="sl" style="margin-top:14px;">What will you use this for?</div>
+      <div class="use-grid" id="use-grid">
+        <div class="uopt sel" id="u-cut" onclick="setUse('cut')"><i class="ti ti-cut"></i><span class="ut">Cutting machine</span><span class="us">Cricut, Silhouette, vinyl</span></div>
+        <div class="uopt" id="u-dtf" onclick="setUse('dtf')"><i class="ti ti-shirt"></i><span class="ut">DTF / screen print</span><span class="us">Heat transfer, printing</span></div>
+        <div class="uopt" id="u-emb" onclick="setUse('emb')"><i class="ti ti-needle-thread"></i><span class="ut">Embroidery later</span><span class="us">Will digitize after</span></div>
+        <div class="uopt" id="u-web" onclick="setUse('web')"><i class="ti ti-world"></i><span class="ut">Web / digital</span><span class="us">Online, social media</span></div>
+        <div class="uopt" id="u-print" onclick="setUse('print')"><i class="ti ti-printer"></i><span class="ut">General print</span><span class="us">Stickers, mugs, labels</span></div>
+        <div class="uopt" id="u-other" onclick="setUse('other')"><i class="ti ti-dots"></i><span class="ut">Other</span><span class="us">I'll describe below</span></div>
+      </div>
+
+      <!-- dynamic fields per use -->
+      <div id="dyn-cut" class="dyn-sec show">
+        <div class="sl" style="margin-top:14px;">Cutting machine details</div>
+        <div class="fg">
+          <div class="ff"><label>Machine</label><select><option>Cricut (any model)</option><option>Silhouette Cameo</option><option>Silhouette Portrait</option><option>Brother ScanNcut</option><option>Other cutter</option><option>Not sure</option></select></div>
+          <div class="ff"><label>Material to cut</label><select><option>Adhesive vinyl</option><option>HTV (heat transfer vinyl)</option><option>Glitter / specialty vinyl</option><option>Paper / cardstock</option><option>Fabric</option><option>Not sure — let team decide</option></select></div>
+          <div class="ff"><label>Cut type</label><select><option>Single layer cut</option><option>Multi layer cut</option><option>Print then cut</option><option>Not sure</option></select></div>
+          <div class="ff"><label>Output size</label><div style="display:grid;grid-template-columns:1fr 14px 1fr;align-items:center;gap:3px;"><input type="number" placeholder="W" min="0" step="0.1"><span style="text-align:center;font-size:12px;color:#aaa;">×</span><input type="number" placeholder="H" min="0" step="0.1"></div></div>
+        </div>
+        <div class="ibox warn" style="margin-top:8px;"><i class="ti ti-alert-triangle"></i> Gradients cannot be used in cut files. Design will be converted to solid flat colors only.</div>
+      </div>
+
+      <div id="dyn-dtf" class="dyn-sec">
+        <div class="sl" style="margin-top:14px;">DTF / screen print details</div>
+        <div class="fg">
+          <div class="ff"><label>Number of colors</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6+</option><option>Not sure — let team decide</option></select></div>
+          <div class="ff"><label>Print size</label><div style="display:grid;grid-template-columns:1fr 14px 1fr;align-items:center;gap:3px;"><input type="number" placeholder="W" min="0" step="0.1"><span style="text-align:center;font-size:12px;color:#aaa;">×</span><input type="number" placeholder="H" min="0" step="0.1"></div></div>
+          <div class="ff"><label>Color separation needed?</label><select><option>No — SVG file only</option><option>Yes — include color separation</option><option>Not sure</option></select></div>
+          <div class="ff"><label>Gradient</label><select><option>No gradient — flat colors only</option><option>Yes — preserve gradients</option><option>Not sure</option></select></div>
+        </div>
+      </div>
+
+      <div id="dyn-emb" class="dyn-sec">
+        <div class="ibox info" style="margin-top:14px;"><i class="ti ti-info-circle"></i> We'll create a clean vector SVG ready for digitizing. Once you receive it you can order our embroidery digitizing service to convert it to a stitch file.</div>
+        <div class="fg" style="margin-top:10px;">
+          <div class="ff"><label>Number of colors</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6+</option><option>Not sure</option></select></div>
+          <div class="ff"><label>Simplify for embroidery?</label><select><option>Yes — remove details too small to stitch</option><option>No — keep all details</option><option>Not sure — let team decide</option></select></div>
+        </div>
+      </div>
+
+      <div id="dyn-web" class="dyn-sec">
+        <div class="sl" style="margin-top:14px;">Web / digital details</div>
+        <div class="fg">
+          <div class="ff"><label>Background</label><select><option>Transparent</option><option>White background</option><option>Custom color</option></select></div>
+          <div class="ff"><label>Color mode</label><select><option>RGB (screen/web)</option><option>CMYK (print)</option><option>Not sure</option></select></div>
+          <div class="ff"><label>Dimensions needed?</label><select><option>No specific size</option><option>Yes — I'll specify</option></select></div>
+        </div>
+      </div>
+
+      <div id="dyn-print" class="dyn-sec">
+        <div class="sl" style="margin-top:14px;">Print details</div>
+        <div class="fg">
+          <div class="ff"><label>Number of colors</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6+</option><option>Not sure</option></select></div>
+          <div class="ff"><label>Background</label><select><option>Transparent</option><option>White</option><option>Custom color</option></select></div>
+          <div class="ff"><label>Gradient</label><select><option>No gradient — flat colors</option><option>Yes — preserve gradients</option><option>Not sure</option></select></div>
+        </div>
+      </div>
+
+      <div id="dyn-other" class="dyn-sec">
+        <div class="sl" style="margin-top:14px;">Tell us more</div>
+        <div class="ff"><textarea placeholder="Describe how you plan to use this SVG file..."></textarea></div>
+      </div>
+
+      </div><!-- /single-wrap -->
+
+      <!-- shared fields -->
+      <div class="sl" style="margin-top:14px;">Output formats <span style="font-size:11px;font-weight:400;color:#aaa;">— select all you need</span></div>
+      <div class="fmt-grid">
+        <div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-vector-bezier icon"></i><span class="fname">AI</span><span class="fext">Illustrator</span></div><div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-file-type-pdf icon"></i><span class="fname">PDF</span><span class="fext">Print ready</span></div><div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-file-3d icon"></i><span class="fname">DXF</span><span class="fext">CNC / laser</span></div><div class="fmt-chip sel" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-file-type-svg icon"></i><span class="fname">SVG</span><span class="fext">Vector</span></div><div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-file-vector icon"></i><span class="fname">EPS</span><span class="fext">Vector</span></div><div class="fmt-chip sel" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-photo icon"></i><span class="fname">PNG</span><span class="fext">Transparent</span></div><div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-pentagon icon"></i><span class="fname">CDR</span><span class="fext">CorelDRAW</span></div>
+      </div>
+      <div class="ibox" style="margin-top:8px;"><i class="ti ti-info-circle"></i> Not sure? SVG + PNG covers most uses — we can always export other formats on request.</div>
+
+      <div class="single-wrap">
+      <!-- 1 color specific -->
+      <div id="sec-1color" class="dyn-sec show">
+        <div class="sl" style="margin-top:14px;">One color options</div>
+        <div class="fg">
+          <div class="ff"><label>Color preference</label><select><option>Keep original color</option><option>Black</option><option>White</option><option>I'll specify in notes</option></select></div>
+          <div class="ff"><label>Background</label><select><option>Transparent</option><option>White</option><option>Colored — I'll specify</option></select></div>
+        </div>
+      </div>
+
+      <div id="sec-full" class="dyn-sec">
+        <div class="sl" style="margin-top:14px;">Full color options</div>
+        <div class="fg">
+          <div class="ff"><label>Color matching</label><select><option>Match original exactly</option><option>Simplify / flatten colors</option><option>Stylize / recolor</option><option>Not sure — let team decide</option></select></div>
+          <div class="ff"><label>Gradient</label><select><option>No gradient — flat colors only</option><option>Preserve gradients</option><option>Not sure</option></select></div>
+          <div class="ff"><label>Number of colors</label><select><option>Up to 3</option><option>Up to 5</option><option>Up to 8</option><option>10+</option><option>Match original exactly</option></select></div>
+        </div>
+      </div>
+
+      <div id="sec-line" class="dyn-sec">
+        <div class="sl" style="margin-top:14px;">Line art options</div>
+        <div class="fg">
+          <div class="ff"><label>Line weight</label><select><option>Thin / fine line</option><option>Medium</option><option>Bold / thick</option><option>Mixed — varies per element</option><option>Not sure</option></select></div>
+          <div class="ff"><label>Color</label><select><option>Black only</option><option>Single color</option><option>Multi-color outlines</option><option>I'll specify in notes</option></select></div>
+          <div class="ff"><label>Detail level</label><select><option>Simple / minimal</option><option>Medium detail</option><option>Highly detailed</option><option>Match reference image</option></select></div>
+        </div>
+      </div>
+
+      <div id="sec-cricut" class="dyn-sec">
+        <div class="sl" style="margin-top:14px;">Cricut & Silhouette options</div>
+        <div class="fg">
+          <div class="ff"><label>Machine</label><select><option>Cricut</option><option>Silhouette</option><option>Both</option><option>Not sure</option></select></div>
+          <div class="ff"><label>Layers</label><select><option>Single layer</option><option>Multi layer (layered colors)</option><option>Not sure</option></select></div>
+        </div>
+        <div class="ibox warn" style="margin-top:8px;"><i class="ti ti-alert-triangle"></i> Cut files must use flat solid colors — no gradients or effects.</div>
+      </div>
+      </div><!-- /single-wrap -->
+
+      <!-- rush -->
+      <div class="sl" style="margin-top:14px;">Turnaround</div>
+      <div class="rush-row">
+        <div class="ropt sel-s" id="r-std" onclick="selRush('std')"><i class="ti ti-clock" style="font-size:13px"></i> Standard (12–24 hrs) — included</div>
+        <div class="ropt" id="r-rush" onclick="selRush('rush')"><i class="ti ti-bolt" style="font-size:13px"></i> Urgent — contact us before placing an order</div>
+      </div>
+      <div class="ibox" id="rush-note" style="display:none;"><i class="ti ti-message-circle"></i> For urgent orders, please text or email us first so we can confirm the timeline before you place the order.</div>
+
+      <!-- advanced -->
+      <div style="margin-top:14px;">
+        <button class="adv-tgl" onclick="toggleAdv()">
+          <span style="display:flex;align-items:center;gap:7px;"><i class="ti ti-settings" style="font-size:14px;"></i> Advanced options <span class="badge-info">pre-set to recommended defaults</span></span>
+          <i class="ti ti-chevron-down" style="font-size:14px;transition:transform .2s;" id="adv-chev"></i>
+        </button>
+        <div class="adv-b" id="adv-b">
+          <div style="font-size:12px;color:#aaa;margin-bottom:9px;">Only change if you have specific requirements.</div>
+          <div class="cbg">
+            <div style="padding-right:11px;">
+              <div class="cbr"><input type="checkbox" checked><label>Remove background automatically<span class="sub">Clean transparent background</span></label></div>
+              <div class="cbr"><input type="checkbox" checked><label>Smooth anchor points<span class="sub">Clean up rough edges in paths</span></label></div>
+              <div class="cbr"><input type="checkbox"><label>Expand strokes to fills<span class="sub">Convert outlines to solid shapes</span></label></div>
+            </div>
+            <div style="padding-left:11px;border-left:0.5px solid rgba(0,0,0,.08);">
+              <div class="cbr"><input type="checkbox" checked><label>Simplify complex paths<span class="sub">Reduce node count for clean file</span></label></div>
+              <div class="cbr"><input type="checkbox"><label>Include original layer names<span class="sub">Keep structure for editing</span></label></div>
+              <div class="cbr"><input type="checkbox"><label>Contact me before changes<span class="sub">We'll ask before modifying</span></label></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    
+      <div class="sl" style="margin-top:14px;">Anything else we should know?</div>
+      <div class="qbig"><textarea style="min-height:64px;" placeholder="Deadlines, special requests, context — anything that didn&#39;t fit the fields above."></textarea></div>
+
+    </div>
+
+    <div class="msg-cta">
+      <i class="ti ti-messages"></i>
+      <div style="flex:1;">
+        <div class="mc-t">Prefer to message us directly?</div>
+        <div class="mc-s">Skip the form — chat with our team from your account, attach your image and send your details. We'll set up the order for you.</div>
+      </div>
+      <a class="mc-btn" href="#">Message our team</a>
+    </div>
+
+    <div class="row-btns">
+      <button class="btn-s">Save as draft</button>
+      <button class="btn-p">Submit quote request →</button>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<script>
+var rowCnt=1;
+function setType(t){
+  document.getElementById('t-single').className='topt'+(t==='single'?' sel':'');
+  document.getElementById('t-multi').className='topt'+(t==='multi'?' sel':'');
+  document.querySelectorAll('.single-wrap').forEach(function(e){e.style.display=(t==='single'?'block':'none');});
+  document.getElementById('sec-multi').style.display=(t==='multi'?'block':'none');
+}
+function addRow(){
+  rowCnt++;
+  var id='mr-'+rowCnt;var mflid='mfl-'+rowCnt;
+  var wrap=document.getElementById('multi-rows');
+  var d=document.createElement('div');
+  d.className='drow';d.id=id;
+  d.innerHTML='<div class="drow-head"><span class="drow-num"><i class="ti ti-file" style="font-size:13px;"></i> Design '+rowCnt+'</span><button class="drow-del" onclick="document.getElementById(\''+id+'\').remove()"><i class="ti ti-trash" style="font-size:13px;"></i> Remove</button></div><div style="display:grid;grid-template-columns:80px 1fr 1fr 1fr;gap:8px;align-items:start;"><div class="ff"><label>File</label><div class="mini-up"><div class="mini-trg" onclick="this.nextElementSibling.nextElementSibling.click()"><i class="ti ti-upload" style="font-size:13px;"></i> Upload</div><div class="mini-fl" id="'+mflid+'"></div><input type="file" multiple style="display:none" onchange="handleMini(\''+mflid+'\',this)"></div></div><div class="ff"><label>Design name</label><input type="text" placeholder="e.g. Back design"></div><div class="ff"><label>SVG type</label><select><option>One color SVG</option><option>Full color SVG</option><option>Line art</option><option>Cricut / Silhouette cut file</option><option>Not sure</option></select></div><div class="ff"><label>Colors</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6+</option><option>Not sure</option></select></div></div><div class="ff" style="margin-top:8px;"><label>Notes for this design</label><input type="text" placeholder="Any specific instructions..."></div>';
+  wrap.appendChild(d);
+}
+function handleMini(lid,inp){
+  var list=document.getElementById(lid);
+  if(!inp.files) return;
+  Array.from(inp.files).forEach(function(f){
+    var d=document.createElement('div');d.className='mini-fi';
+    d.innerHTML='<span>'+f.name+'</span><button style="background:none;border:none;cursor:pointer;color:#E24B4A;" onclick="this.parentNode.remove()"><i class="ti ti-x" style="font-size:11px;"></i></button>';
+    list.appendChild(d);
+  });
+}
+
+var styles={
+  '1color':[
+    {label:'Solid fill',svg:'<svg viewBox="0 0 80 70" xmlns="http://www.w3.org/2000/svg"><path d="M40 12 L62 55 L18 55 Z" fill="#1a1a18"/></svg>'},
+    {label:'Outline only',svg:'<svg viewBox="0 0 80 70" xmlns="http://www.w3.org/2000/svg"><path d="M40 12 L62 55 L18 55 Z" fill="none" stroke="#1a1a18" stroke-width="3"/></svg>'},
+    {label:'Fill + outline',svg:'<svg viewBox="0 0 80 70" xmlns="http://www.w3.org/2000/svg"><path d="M40 12 L62 55 L18 55 Z" fill="#888" stroke="#1a1a18" stroke-width="3"/></svg>'},
+    {label:'High contrast',svg:'<svg viewBox="0 0 80 70" xmlns="http://www.w3.org/2000/svg"><rect width="80" height="70" fill="#1a1a18"/><path d="M40 12 L62 55 L18 55 Z" fill="#fff"/></svg>'}
+  ],
+  'full':[
+    {label:'Flat colors',svg:'<svg viewBox="0 0 80 70" xmlns="http://www.w3.org/2000/svg"><circle cx="30" cy="35" r="18" fill="#378ADD"/><circle cx="50" cy="35" r="18" fill="#E24B4A"/></svg>'},
+    {label:'Match original',svg:'<svg viewBox="0 0 80 70" xmlns="http://www.w3.org/2000/svg"><circle cx="30" cy="35" r="18" fill="#378ADD"/><circle cx="50" cy="35" r="18" fill="#E24B4A"/><circle cx="40" cy="35" r="10" fill="#7F77DD"/></svg>'},
+    {label:'Simplified',svg:'<svg viewBox="0 0 80 70" xmlns="http://www.w3.org/2000/svg"><rect x="15" y="20" width="50" height="30" rx="4" fill="#378ADD"/><rect x="25" y="28" width="30" height="14" rx="2" fill="#fff"/></svg>'},
+    {label:'Stylized',svg:'<svg viewBox="0 0 80 70" xmlns="http://www.w3.org/2000/svg"><polygon points="40,10 65,55 15,55" fill="#378ADD" stroke="#185fa5" stroke-width="2"/><polygon points="40,22 56,50 24,50" fill="#E24B4A"/></svg>'}
+  ],
+  'line':[
+    {label:'Thin fine line',svg:'<svg viewBox="0 0 80 70" xmlns="http://www.w3.org/2000/svg"><circle cx="40" cy="35" r="20" fill="none" stroke="#1a1a18" stroke-width="1"/><path d="M25 35 Q40 15 55 35 Q40 55 25 35" fill="none" stroke="#1a1a18" stroke-width="1"/></svg>'},
+    {label:'Medium line',svg:'<svg viewBox="0 0 80 70" xmlns="http://www.w3.org/2000/svg"><circle cx="40" cy="35" r="20" fill="none" stroke="#1a1a18" stroke-width="2.5"/><path d="M25 35 Q40 15 55 35 Q40 55 25 35" fill="none" stroke="#1a1a18" stroke-width="2.5"/></svg>'},
+    {label:'Bold outline',svg:'<svg viewBox="0 0 80 70" xmlns="http://www.w3.org/2000/svg"><circle cx="40" cy="35" r="20" fill="none" stroke="#1a1a18" stroke-width="5"/><path d="M25 35 Q40 15 55 35 Q40 55 25 35" fill="none" stroke="#1a1a18" stroke-width="5"/></svg>'},
+    {label:'Sketch style',svg:'<svg viewBox="0 0 80 70" xmlns="http://www.w3.org/2000/svg"><path d="M20 50 Q22 48 40 14 Q58 48 60 50" fill="none" stroke="#1a1a18" stroke-width="2" stroke-linecap="round" stroke-dasharray="1,2"/><path d="M22 50 Q40 46 58 50" fill="none" stroke="#1a1a18" stroke-width="2" stroke-linecap="round" stroke-dasharray="1,2"/></svg>'}
+  ],
+  'cricut':[
+    {label:'Single layer',svg:'<svg viewBox="0 0 80 70" xmlns="http://www.w3.org/2000/svg"><path d="M40 12 L62 55 L18 55 Z" fill="#E24B4A"/></svg>'},
+    {label:'Multi layer',svg:'<svg viewBox="0 0 80 70" xmlns="http://www.w3.org/2000/svg"><path d="M40 12 L62 55 L18 55 Z" fill="#E24B4A"/><path d="M40 20 L56 52 L24 52 Z" fill="#378ADD"/><path d="M40 28 L50 48 L30 48 Z" fill="#fff"/></svg>'},
+    {label:'Print then cut',svg:'<svg viewBox="0 0 80 70" xmlns="http://www.w3.org/2000/svg"><rect x="18" y="15" width="44" height="40" rx="4" fill="#f0f0ee" stroke="#ccc" stroke-width="1"/><path d="M40 20 L54 48 L26 48 Z" fill="#378ADD"/><rect x="18" y="15" width="44" height="40" rx="4" fill="none" stroke="#E24B4A" stroke-width="2" stroke-dasharray="4,3"/></svg>'},
+    {label:'Weld / union',svg:'<svg viewBox="0 0 80 70" xmlns="http://www.w3.org/2000/svg"><path d="M25 20 L55 20 L55 50 L25 50 Z M35 15 L45 15 L45 55 L35 55 Z" fill="#378ADD" fill-rule="nonzero"/></svg>'}
+  ]
+};
+
+var currentSvc='1color';
+var currentUse='cut';
+
+function setSvc(svc){
+  ['1color','full','line','cricut'].forEach(function(s){
+    document.getElementById('sv-'+s).className='sopt'+(s===svc?' sel':'');
+    var el=document.getElementById('sec-'+s);
+    if(el) el.className='dyn-sec'+(s===svc?' show':'');
+  });
+  currentSvc=svc;
+  renderStyles(svc);
+}
+
+function setUse(use){
+  ['cut','dtf','emb','web','print','other'].forEach(function(u){
+    document.getElementById('u-'+u).className='uopt'+(u===use?' sel':'');
+    var el=document.getElementById('dyn-'+u);
+    if(el) el.className='dyn-sec'+(u===use?' show':'');
+  });
+  currentUse=use;
+}
+
+function renderStyles(svc){
+  var grid=document.getElementById('style-grid');
+  var items=styles[svc]||styles['1color'];
+  grid.innerHTML='';
+  items.forEach(function(st,i){
+    var d=document.createElement('div');
+    d.className='style-opt'+(i===0?' sel':'');
+    d.onclick=function(){
+      document.querySelectorAll('.style-opt').forEach(function(o){o.className='style-opt';});
+      d.className='style-opt sel';
+    };
+    d.innerHTML='<div class="style-thumb">'+st.svg+'</div><div class="style-label">'+st.label+'</div>';
+    grid.appendChild(d);
+  });
+}
+
+function selRush(v){
+  document.getElementById('r-std').className='ropt'+(v==='std'?' sel-s':'');
+  document.getElementById('r-rush').className='ropt'+(v==='rush'?' sel-w':'');
+  var n=document.getElementById('rush-note');if(n)n.style.display=(v==='rush'?'flex':'none');
+}
+
+function toggleAdv(){
+  var b=document.getElementById('adv-b');var c=document.getElementById('adv-chev');
+  var o=b.classList.toggle('open');
+  c.style.transform=o?'rotate(180deg)':'';
+}
+
+function toggleFmt(el){el.classList.toggle('sel');}
+function selRushQ(v){
+  document.getElementById('rq-std').className='ropt'+(v==='std'?' sel-s':'');
+  document.getElementById('rq-rush').className='ropt'+(v==='rush'?' sel-w':'');
+  document.getElementById('rq-note').style.display=(v==='rush'?'flex':'none');
+}
+function qColorNote(){
+  var c=document.getElementById('q-color').value;
+  var uw=document.getElementById('q-use-wrap');
+  var u=document.getElementById('q-use').value;
+  var n=document.getElementById('q-color-note');
+  uw.style.display=(c==='multi')?'flex':'none';
+  var msg='',warn=false;
+  if(c==='single'){
+    msg='One clean single-color vector — great for vinyl cutting, engraving, stencils and one-color prints.';
+  }else if(c==='ns'){
+    msg='No problem — describe your project above and we\u2019ll recommend the right file type.';
+  }else if(c==='multi'){
+    if(u==='cut'){
+      msg='Heads up: cut files use flat solid colors only — no gradients or shading. Each color becomes its own layer for your machine to cut.';warn=true;
+    }else if(u==='print'){
+      msg='For printing, gradients and shading are fine — we\u2019ll deliver a full color file ready for DTF, sublimation or stickers.';
+    }else if(u==='both'){
+      msg='We\u2019ll prepare a flat-color version for cutting (no gradients) and can keep the shading in your print version.';
+    }else if(u==='ns'){
+      msg='No problem — tell us a bit about your project above and we\u2019ll recommend cut-ready, print-ready, or both.';
+    }
+  }
+  if(msg){
+    n.style.display='flex';
+    n.className='ibox'+(warn?' warn':' info');
+    n.innerHTML='<i class="ti ti-'+(warn?'alert-triangle':'info-circle')+'"></i> '+msg;
+  }else{
+    n.style.display='none';
+  }
+}
+function setMode(m){
+  document.getElementById('mtab-q').className='mtab'+(m==='q'?' sel':'');
+  document.getElementById('mtab-d').className='mtab'+(m==='d'?' sel':'');
+  document.getElementById('mode-q').className='mode-body'+(m==='q'?' vis':'');
+  document.getElementById('mode-d').className='mode-body'+(m==='d'?' vis':'');
+}
+
+
+function handleFiles(lid,inp){
+  var list=document.getElementById(lid);
+  if(!inp.files) return;
+  Array.from(inp.files).forEach(function(f){
+    var d=document.createElement('div');d.className='fitem';
+    d.innerHTML='<span style="display:flex;align-items:center;gap:5px;"><i class="ti ti-file"></i>'+f.name+'</span><button class="frem" onclick="this.parentNode.remove()"><i class="ti ti-x"></i></button>';
+    list.appendChild(d);
+  });
+}
+
+renderStyles('1color');
+</script>
+<script src="bridge.js"></script>
+</body>
+</html>

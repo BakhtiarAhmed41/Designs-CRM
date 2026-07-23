@@ -1,228 +1,204 @@
-import { apiFetch, apiFetchForm } from "./api";
-import type { User } from "./auth";
+import { apiFetch, apiFetchForm } from './api';
+import type { Order } from './types';
 
-export type OrderStatus =
-  | "CREATED"
-  | "WAITING_FOR_QUOTATION"
-  | "QUOTATION_PROVIDED"
-  | "CLIENT_REJECTED_QUOTATION"
-  | "WAITING_FOR_ADMIN_QUOTATION_APPROVAL"
-  | "IN_PROGRESS"
-  | "REJECTED"
-  | "COMPLETED"
-  | "CLOSED"
-  | "REVISION_REQUESTED"
-  | "PENDING_PAYMENT";
-
-export type OrderType = "ORDER" | "QUOTATION_REQUEST";
-
-export type QuotationStatus = "PROPOSED" | "COUNTERED" | "APPROVED" | "REJECTED";
-
-export type OrderQuotation = {
-  id: string;
-  orderId: string;
-  version: number;
-  status: QuotationStatus;
-  createdByRole: "CLIENT" | "ADMIN";
-  createdById: string;
-  amountCents: number | null;
-  currency: string;
-  comment: string | null;
-  createdAt: string;
-};
-
-export type OrderAttachment = {
-  id: string;
-  orderId: string;
-  originalName: string;
-  mimeType: string | null;
-  byteSize: number | null;
-  createdAt: string;
-};
-
-export type OrderDeliveryFile = {
-  id: string;
-  deliveryId: string;
-  originalName: string;
-  mimeType: string | null;
-  byteSize: number | null;
-  createdAt: string;
-};
-
-export type OrderDelivery = {
-  id: string;
-  orderId: string;
-  version: number;
-  createdAt: string;
-  files: OrderDeliveryFile[];
-};
-
-export type Order = {
-  id: string;
-  clientId: string;
-  status: OrderStatus;
-  type?: OrderType;
-  serviceType: string;
-  mainCategory?: string | null;
-  subCategory?: string | null;
-  instructions: string | null;
-  size: string | null;
-  preferences: any;
-  rejectionReason: string | null;
-  createdAt: string;
-  approvedAt: string | null;
-  rejectedAt: string | null;
-  completedAt: string | null;
-  closedAt: string | null;
-  attachments: OrderAttachment[];
-  deliveries: OrderDelivery[];
-  quotations?: OrderQuotation[];
-};
-
-export type AdminOrder = Order & {
-  client: User;
-};
-
-export async function createOrder(input: {
-  type?: OrderType;
+// --- client ---------------------------------------------------------------
+export function createOrder(data: {
+  type?: 'ORDER' | 'QUOTE_REQUEST';
+  name?: string | null;
   mainCategory?: string | null;
   subCategory?: string | null;
   serviceType: string;
   instructions?: string | null;
   size?: string | null;
-  preferences?: any;
+  preferences?: unknown;
 }) {
-  return apiFetch<{ order: Order }>("/orders", {
-    method: "POST",
-    body: JSON.stringify(input),
+  return apiFetch<{ order: Order }>('/orders', {
+    method: 'POST',
+    body: JSON.stringify(data),
   });
 }
 
-export async function adminProposeQuotation(
-  orderId: string,
-  input: { amountCents?: number | null; currency?: string | null; comment?: string | null },
-) {
-  return apiFetch<{ quotation: OrderQuotation }>(`/admin/orders/${orderId}/quotations`, {
-    method: "POST",
-    body: JSON.stringify(input),
+export function listMyOrders() {
+  return apiFetch<{ orders: Order[] }>('/orders');
+}
+
+export function getMyOrder(id: string) {
+  return apiFetch<{ order: Order }>(`/orders/${id}`);
+}
+
+export function uploadAttachments(orderId: string, files: File[]) {
+  const form = new FormData();
+  files.forEach((f) => form.append('files', f));
+  return apiFetchForm<{ attachments: unknown[] }>(
+    `/orders/${orderId}/attachments`,
+    form,
+  );
+}
+
+export function acceptQuotation(orderId: string, keepLineIds?: string[]) {
+  return apiFetch<{ order: Order }>(`/orders/${orderId}/quotations/accept`, {
+    method: 'PATCH',
+    body: JSON.stringify(keepLineIds ? { keepLineIds } : {}),
   });
 }
 
-export async function adminApproveCounter(orderId: string) {
-  return apiFetch<{ order: AdminOrder }>(`/admin/orders/${orderId}/quotations/counter/approve`, { method: "PATCH" });
-}
-
-export async function adminRejectCounter(orderId: string, comment?: string | null) {
-  return apiFetch<{ order: AdminOrder }>(`/admin/orders/${orderId}/quotations/counter/reject`, {
-    method: "PATCH",
-    body: JSON.stringify({ comment: comment ?? null }),
-  });
-}
-
-export async function acceptQuotation(orderId: string) {
-  return apiFetch<{ order: Order }>(`/orders/${orderId}/quotations/accept`, { method: "PATCH" });
-}
-
-export async function rejectQuotation(orderId: string, comment?: string | null) {
+export function rejectQuotation(orderId: string, comment?: string) {
   return apiFetch<{ order: Order }>(`/orders/${orderId}/quotations/reject`, {
-    method: "PATCH",
-    body: JSON.stringify({ comment: comment ?? null }),
+    method: 'PATCH',
+    body: JSON.stringify({ comment }),
   });
 }
 
-export async function counterQuotation(
+export function counterQuotation(
   orderId: string,
-  input: { amountCents?: number | null; currency?: string | null; comment?: string | null },
+  data: { amountCents?: number; currency?: string; comment?: string },
 ) {
-  return apiFetch<{ quotation: OrderQuotation }>(`/orders/${orderId}/quotations/counter`, {
-    method: "POST",
-    body: JSON.stringify(input),
+  return apiFetch<{ quotation: unknown }>(
+    `/orders/${orderId}/quotations/counter`,
+    { method: 'POST', body: JSON.stringify(data) },
+  );
+}
+
+// --- admin ----------------------------------------------------------------
+export function listAdminOrders(params?: { status?: string; clientId?: string }) {
+  const q = new URLSearchParams();
+  if (params?.status) q.set('status', params.status);
+  if (params?.clientId) q.set('clientId', params.clientId);
+  const suffix = q.toString() ? `?${q.toString()}` : '';
+  return apiFetch<{ orders: Order[] }>(`/admin/orders${suffix}`);
+}
+
+export function getAdminOrder(id: string) {
+  return apiFetch<{ order: Order }>(`/admin/orders/${id}`);
+}
+
+export function proposeQuotation(
+  orderId: string,
+  data: { amountCents?: number; currency?: string; comment?: string },
+) {
+  return apiFetch<{ quotation: unknown }>(`/admin/orders/${orderId}/quotations`, {
+    method: 'POST',
+    body: JSON.stringify(data),
   });
 }
 
-export async function uploadOrderAttachments(orderId: string, files: File[]) {
-  const form = new FormData();
-  for (const f of files) form.append("files", f);
-  return apiFetchForm<{ attachments: OrderAttachment[] }>(`/orders/${orderId}/attachments`, form);
+export function approveCounter(orderId: string) {
+  return apiFetch<{ order: Order }>(
+    `/admin/orders/${orderId}/quotations/counter/approve`,
+    { method: 'PATCH' },
+  );
 }
 
-export async function listMyOrders() {
-  return apiFetch<{ orders: Order[] }>("/orders");
+export function rejectCounter(orderId: string, comment?: string) {
+  return apiFetch<{ order: Order }>(
+    `/admin/orders/${orderId}/quotations/counter/reject`,
+    { method: 'PATCH', body: JSON.stringify({ comment }) },
+  );
 }
 
-export async function getMyOrder(orderId: string) {
-  return apiFetch<{ order: Order }>(`/orders/${orderId}`);
-}
-
-export async function getMyAttachmentSignedUrl(orderId: string, attachmentId: string) {
-  return apiFetch<{ url: string }>(`/orders/${orderId}/attachments/${attachmentId}/signed-url`);
-}
-
-export async function getMyDeliveryFileSignedUrl(orderId: string, deliveryFileId: string) {
-  return apiFetch<{ url: string }>(`/orders/${orderId}/delivery-files/${deliveryFileId}/signed-url`);
-}
-
-export async function adminListOrders(filters: { status?: OrderStatus; clientId?: string } = {}) {
-  const sp = new URLSearchParams();
-  if (filters.status) sp.set("status", filters.status);
-  if (filters.clientId) sp.set("clientId", filters.clientId);
-  const qs = sp.toString();
-  return apiFetch<{ orders: AdminOrder[] }>(`/admin/orders${qs ? `?${qs}` : ""}`);
-}
-
-export async function adminGetOrder(orderId: string) {
-  return apiFetch<{ order: AdminOrder }>(`/admin/orders/${orderId}`);
-}
-
-export async function adminApproveOrder(orderId: string) {
-  return apiFetch<{ order: AdminOrder }>(`/admin/orders/${orderId}/approve`, { method: "PATCH" });
-}
-
-export async function adminRejectOrder(orderId: string, reason: string) {
-  return apiFetch<{ order: AdminOrder }>(`/admin/orders/${orderId}/reject`, {
-    method: "PATCH",
-    body: JSON.stringify({ reason }),
+export function adminDuplicateOrder(
+  sourceOrderId: string,
+  type?: 'ORDER' | 'QUOTE_REQUEST',
+) {
+  return apiFetch<{ order: Order }>('/admin/orders', {
+    method: 'POST',
+    body: JSON.stringify({ sourceOrderId, type }),
   });
 }
 
-export async function adminDeliverOrder(orderId: string, files: File[]) {
+export type AdminCreateOrderInput = {
+  type: 'ORDER' | 'QUOTE_REQUEST';
+  customerId?: string | null;
+  customerName?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  source?: string | null;
+  serviceType: string;
+  size?: string | null;
+  name?: string | null;
+  designCount?: number | null;
+  priceCents?: number | null;
+  instructions?: string | null;
+  channel?: string | null;
+};
+
+export function adminCreateOrder(data: AdminCreateOrderInput) {
+  return apiFetch<{
+    order: Order;
+    payLinkUrl?: string | null;
+    quoteUrl?: string | null;
+  }>('/admin/orders/create', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export function adminUpdateStatus(orderId: string, status: string) {
+  return apiFetch<{ order: Order }>(`/admin/orders/${orderId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
+export function adminRejectOrder(
+  orderId: string,
+  data: { reason: string; status?: 'REJECTED' | 'CANCELLED' },
+) {
+  return apiFetch<{ order: Order }>(`/admin/orders/${orderId}/reject`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+}
+
+export function updateOrderNotes(orderId: string, notes: string) {
+  return apiFetch<{ order: Order }>(`/admin/orders/${orderId}/notes`, {
+    method: 'PATCH',
+    body: JSON.stringify({ notes }),
+  });
+}
+
+export function resendOrderFiles(orderId: string) {
+  return apiFetch<{ ok: true }>(`/admin/orders/${orderId}/resend-files`, {
+    method: 'POST',
+  });
+}
+
+export function deliverOrder(
+  orderId: string,
+  files: File[],
+  options?: {
+    deliveredVia?: 'PORTAL' | 'EMAIL';
+    designIds?: string[];
+    notifyEmail?: boolean;
+    notifySms?: boolean;
+    complete?: boolean;
+  },
+) {
   const form = new FormData();
-  for (const f of files) form.append("files", f);
-  return apiFetchForm<{ order: Order; delivery: OrderDelivery }>(`/admin/orders/${orderId}/deliveries`, form);
+  files.forEach((f) => form.append('files', f));
+  if (options?.deliveredVia) form.append('deliveredVia', options.deliveredVia);
+  if (options?.designIds) form.append('designIds', JSON.stringify(options.designIds));
+  if (options?.notifyEmail !== undefined)
+    form.append('notifyEmail', String(options.notifyEmail));
+  if (options?.notifySms !== undefined)
+    form.append('notifySms', String(options.notifySms));
+  if (options?.complete !== undefined)
+    form.append('complete', String(options.complete));
+  return apiFetchForm<{ order: Order; partial?: boolean }>(
+    `/admin/orders/${orderId}/deliveries`,
+    form,
+  );
 }
 
-export async function adminGetAttachmentSignedUrl(orderId: string, attachmentId: string) {
-  return apiFetch<{ url: string }>(`/admin/orders/${orderId}/attachments/${attachmentId}/signed-url`);
+export function myAttachmentUrl(orderId: string, attachmentId: string) {
+  return `/orders/${orderId}/attachments/${attachmentId}/signed-url`;
 }
-
-export async function adminGetDeliveryFileSignedUrl(orderId: string, deliveryFileId: string) {
-  return apiFetch<{ url: string }>(`/admin/orders/${orderId}/delivery-files/${deliveryFileId}/signed-url`);
+export function myDeliveryFileUrl(orderId: string, fileId: string) {
+  return `/orders/${orderId}/delivery-files/${fileId}/signed-url`;
 }
-
-/**
- * Download a file from a signed URL without navigating away.
- * Uses a blob + temporary `<a download>` so images/PDFs save instead of opening inline.
- */
-export async function downloadSignedFile(url: string, filename: string): Promise<void> {
-  const safeName = filename?.trim() || "download";
-  try {
-    const res = await fetch(url, { mode: "cors" });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const blob = await res.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    try {
-      const a = document.createElement("a");
-      a.href = objectUrl;
-      a.download = safeName;
-      a.rel = "noopener";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-    } finally {
-      URL.revokeObjectURL(objectUrl);
-    }
-  } catch {
-    window.location.assign(url);
-  }
+export function adminAttachmentUrl(orderId: string, attachmentId: string) {
+  return `/admin/orders/${orderId}/attachments/${attachmentId}/signed-url`;
 }
-
+export function adminDeliveryFileUrl(orderId: string, fileId: string) {
+  return `/admin/orders/${orderId}/delivery-files/${fileId}/signed-url`;
+}

@@ -1,0 +1,54 @@
+<section class="page" id="p-profile">
+      <div class="ph"><div><h1>Profile</h1><div class="sub">Your contact details and default settings. Set defaults once and your reorders come pre-filled.</div></div></div>
+      <div class="card" style="margin-top:20px;padding:20px;">
+        <div class="pform">
+          <div class="pf"><label>Name / business</label><input value="Mike&#39;s Caps" id="pf-name"></div>
+          <div class="pf"><label>Email</label><input value="mike@mikescaps.com"></div>
+          <div class="pf"><label>Phone</label><input value="+1 702 555 0148"></div>
+          <div class="pf"><label>Account type</label><input id="pf-type" value="Pay per order" disabled="" style="color:var(--faint)"></div>
+          <div class="pf"><label>Default placement</label><select><option>Left chest</option><option>Cap front</option><option>Full back</option></select></div>
+        </div>
+        <div class="note"><i class="ti ti-lock"></i> Account type and payment terms are set by our team based on your account. Message us if you'd like to discuss monthly billing.</div>
+        <div style="margin-top:16px;"><button class="btn btn-primary" onclick="showToast&&showToast('Profile saved.')"><i class="ti ti-check"></i> Save changes</button></div>
+      </div>
+
+      <div class="card" style="margin-top:16px;padding:20px;">
+        <div style="font-size:15px;font-weight:600;margin-bottom:4px;"><i class="ti ti-settings" style="color:var(--navy)"></i> My setup &amp; file preferences</div>
+        <div style="font-size:12.5px;color:var(--muted);margin-bottom:14px;">Tell us once what you work with — every order and delivery uses this automatically, so you never have to repeat it.</div>
+
+        <label style="font-size:11px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.4px;">What do you order from us?</label>
+        <div id="svc-chips" style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 18px;"></div>
+
+        <div id="blk-emb">
+        <label style="font-size:11px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.4px;">My hoop sizes</label>
+        <div id="hoop-list" style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 10px;"></div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:20px;flex-wrap:wrap;">
+          <select id="hoop-pick" style="border:0.5px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12.5px;font-family:inherit;">
+            <option>4x4</option><option>5x7</option><option>6x10</option><option>7x12</option><option>8x8</option><option>8x12</option><option>Cap frame 2.5x6</option><option>Custom…</option>
+          </select>
+          <input id="hoop-custom" placeholder="e.g. 9x9" style="display:none;width:90px;border:0.5px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12.5px;font-family:inherit;">
+          <button class="btn btn-ghost" onclick="addHoop()" style="padding:8px 14px;"><i class="ti ti-plus"></i> Add hoop</button>
+        </div>
+
+        <label style="font-size:11px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.4px;">Embroidery formats I always need</label>
+        <div style="font-size:12px;color:var(--muted);margin:4px 0 8px;">Tap to select — every embroidery delivery includes all of these.</div>
+        <div id="fmt-list" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;"></div>
+        </div>
+
+        <div id="blk-dig" style="display:none;">
+        <label style="font-size:11px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.4px;">Vector / SVG / print formats I always need</label>
+        <div style="font-size:12px;color:var(--muted);margin:4px 0 8px;">For logos, cut files and print-ready art.</div>
+        <div id="fmt-dig" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;"></div>
+        </div>
+
+        <div id="blk-cnc" style="display:none;">
+        <label style="font-size:11px;font-weight:600;color:var(--faint);text-transform:uppercase;letter-spacing:.4px;">CNC / laser formats I always need</label>
+        <div style="font-size:12px;color:var(--muted);margin:4px 0 8px;">For cutting and engraving machines.</div>
+        <div id="fmt-cnc" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;"></div>
+        </div>
+
+        <button class="btn btn-primary" onclick="showToast&&showToast('Preferences saved — applied to all future orders and deliveries.')"><i class="ti ti-check"></i> Save my preferences</button>
+      </div>
+    </section>
+
+  

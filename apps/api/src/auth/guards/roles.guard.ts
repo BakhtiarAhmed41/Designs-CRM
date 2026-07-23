@@ -1,6 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '../../common/enums';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import type { AuthUser } from '../auth.types';
 
@@ -18,6 +18,8 @@ export class RolesGuard implements CanActivate {
     const req = context.switchToHttp().getRequest<{ user?: AuthUser }>();
     const user = req.user;
     if (!user) return false;
+    // SUPER_ADMIN can access anything a staff role can.
+    if (user.role === UserRole.SUPER_ADMIN) return true;
     return roles.includes(user.role);
   }
 }

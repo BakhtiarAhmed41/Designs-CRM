@@ -1,0 +1,134 @@
+<section class="page" id="p-orderdetail">
+      <div class="ph"><div>
+        <button class="btn btn-ghost btn-sm" onclick="goBack()" style="margin-bottom:10px;"><i class="ti ti-arrow-left"></i> Back</button>
+        <h1 id="od-title">#1043 · Eagle crest</h1>
+        <div class="sub" id="od-sub">Mike's Caps · Embroidery · 2 designs · placed Mar 14</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-sm" onclick="openGen('order');showToast('Copied #1043 into a new order — change what you need and generate the link.')"><i class="ti ti-copy"></i> Duplicate</button>
+        <button class="btn btn-ghost btn-sm" onclick="showToast('All final files re-sent to the customer by email and portal.')"><i class="ti ti-send"></i> Resend files</button>
+        <button class="btn btn-ghost btn-sm" onclick="openModal('revision-overlay')"><i class="ti ti-refresh"></i> Create revision</button>
+        <select class="stat-select" id="od-status" onchange="odStatusChange()">
+          <option>New</option><option selected>In progress</option><option>Ready to send</option><option>Partially delivered</option><option>Delivered</option>
+        </select>
+      </div></div>
+
+      <div class="od-grid" style="margin-top:16px;">
+        <div>
+          <div class="card">
+            <div class="card-h"><span class="ct"><i class="ti ti-paperclip"></i> Customer files &amp; reference</span></div>
+            <div class="od-files">
+              <div class="odf"><i class="ti ti-file"></i> eagle_logo.png</div>
+              <div class="odf"><i class="ti ti-file"></i> brand_colors.pdf</div>
+              <div class="odf"><i class="ti ti-photo"></i> reference_shot.jpg</div>
+            </div>
+            <div class="od-line"><span class="l">Formats requested</span><span class="v"><span class="fmtchip">DST</span><span class="fmtchip">PES</span><span class="fmtchip">PDF</span></span></div>
+            <div class="od-line"><span class="l">Placement / size</span><span class="v">Left chest 3.5" · Cap 2.5"</span></div>
+            <div class="od-line"><span class="l">Turnaround</span><span class="v">Standard (12–24 hrs)</span></div>
+            <div class="od-line"><span class="l">Customer note</span><span class="v" style="font-weight:400;color:var(--muted);max-width:60%;text-align:right">"Keep the eagle bold, no gradient on the cap version."</span></div>
+          </div>
+
+          <div class="card" style="margin-top:14px;" id="od-designs-card">
+            <div class="card-h"><span class="ct"><i class="ti ti-layout-list"></i> Designs in this order</span><span style="font-size:11.5px;color:var(--muted);" id="odd-summary">2 ready · 1 in progress</span></div>
+            <div class="od-line"><span class="l" style="display:flex;align-items:center;gap:8px;"><input type="checkbox" class="odd-rel" checked data-n="Eagle — left chest 3.5&quot;" data-f="eagle_chest.dst"> Eagle — left chest 3.5"</span><span class="v"><span class="chip c-review">Ready</span></span></div>
+            <div class="od-line"><span class="l" style="display:flex;align-items:center;gap:8px;"><input type="checkbox" class="odd-rel" checked data-n="Eagle — cap 2.5&quot;" data-f="eagle_cap.dst"> Eagle — cap 2.5"</span><span class="v"><span class="chip c-review">Ready</span></span></div>
+            <div class="od-line"><span class="l" style="display:flex;align-items:center;gap:8px;padding-left:24px;color:var(--muted);">Bear mascot — back</span><span class="v"><span class="chip c-prog">In progress · Ahmed</span></span></div>
+            <div style="padding:8px 16px 12px;font-size:11.5px;color:var(--muted);"><i class="ti ti-info-circle"></i> Tick the finished designs and release them now — the pending one follows when it's done. Customer sees exactly which files are ready and which are coming.</div>
+          </div>
+
+          <!-- DESIGNER: submit for approval -->
+          <div class="card role-designer">
+            <div class="card-h"><span class="ct"><i class="ti ti-upload"></i> Your finished files</span></div>
+            <div class="od-files">
+              <div class="odf"><i class="ti ti-check" style="color:var(--green)"></i> eagle_chest.dst</div>
+              <div class="odf up" onclick="showToast('Prototype: upload finished file')"><i class="ti ti-cloud-upload"></i> Upload file</div>
+            </div>
+            <div style="padding:0 16px 14px;">
+              <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;margin-bottom:10px;cursor:pointer;"><input type="checkbox"> File too large — will send by email</label>
+              <button class="btn btn-primary btn-sm" onclick="showToast('Submitted for admin approval. Qasim will review before it reaches the customer.')"><i class="ti ti-send"></i> Submit for approval</button>
+            </div>
+          </div>
+
+          <!-- ADMIN/SUPER: review designer file + release, or deliver directly -->
+          <div class="card role-manager" id="od-deliver-card">
+            <div class="card-h"><span class="ct"><i class="ti ti-checkup-list"></i> Finished files &amp; delivery</span></div>
+            <div class="od-files">
+              <div class="odf"><i class="ti ti-check" style="color:var(--green)"></i> eagle_chest.dst <span style="color:var(--faint);font-size:10px">· from Ahmed</span></div>
+              <div class="odf up" onclick="showToast('Prototype: upload finished file')"><i class="ti ti-cloud-upload"></i> Upload file</div>
+            </div>
+            <div class="note amber" style="margin:0 16px 12px;"><i class="ti ti-eye"></i> Ahmed submitted this for your approval. The customer can't see it yet.</div>
+            <div style="padding:0 16px 14px;">
+              <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;margin-bottom:8px;cursor:pointer;"><input type="checkbox" id="od-email"> File too large — deliver by email instead of portal</label>
+              <div style="font-size:12px;color:var(--muted);margin-bottom:10px;"><i class="ti ti-bell" style="font-size:13px;"></i> Customer gets <b id="notif-summary" style="color:var(--ink);font-weight:600;">email + Quo text</b> on release · <a onclick="toggleNotifOpts()" style="color:var(--navy);cursor:pointer;font-weight:500;">change</a></div>
+              <div id="notif-opts" style="display:none;background:#f7f8fa;border-radius:9px;padding:10px 12px;margin-bottom:10px;">
+                <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;margin-bottom:4px;cursor:pointer;"><input type="checkbox" checked id="od-notif-email" onchange="updNotifSummary()"> Email — "Your files are ready" template</label>
+                <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;"><input type="checkbox" checked id="od-notif-sms" onchange="updNotifSummary()"> Text via Quo — sent from your business number, replies land in your Quo chat</label>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-ghost btn-sm" onclick="showToast('Sent back to Ahmed with your notes.')"><i class="ti ti-arrow-back-up"></i> Send back</button>
+                <button class="btn btn-green btn-sm" onclick="deliverOrder()"><i class="ti ti-send"></i> Approve &amp; release to customer</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-h"><span class="ct"><i class="ti ti-message"></i> Messages on this order</span><button class="btn btn-ghost btn-sm" onclick="openInvoice()"><i class="ti ti-file-invoice"></i> Generate invoice</button></div>
+            <div class="thread" id="od-thread">
+              <div class="tmsg them">Hi! Can you keep the eagle bold on the cap? <div class="tm">Mike · 10:12 AM</div></div>
+              <div class="tmsg me">Absolutely — no gradient on the cap version. Left chest is done, cap in progress. <div class="tm">You · 10:24 AM</div></div>
+              <div class="tmsg them">Perfect, thank you! <div class="tm">Mike · 10:26 AM</div></div>
+            </div>
+            <div class="thread-in">
+              <button class="tmpl-btn" onclick="openTemplates()" title="Insert saved reply"><i class="ti ti-template"></i></button>
+              <input id="od-msg-input" placeholder="Reply to Mike…">
+              <button class="btn btn-primary btn-sm" onclick="sendThread()"><i class="ti ti-send"></i></button>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="card" id="od-assign-card">
+            <div class="card-h"><span class="ct"><i class="ti ti-user-star"></i> Designer</span><span class="chip c-prog" id="od-assign-chip" style="display:none;">Unassigned</span></div>
+            <div style="padding:12px 16px 14px;">
+              <div class="note amber" id="od-assign-note" style="display:none;margin:0 0 10px;"><i class="ti ti-alert-circle"></i> New order — assign a designer to start. Release controls appear after they submit finished files.</div>
+              <select class="stat-select" id="od-designer" style="width:100%;margin-bottom:9px;">
+                <option>Unassigned</option><option selected>Ahmed — Embroidery</option><option>Priya — SVG / Vector</option><option>Chen — CNC / Laser</option>
+              </select>
+              <button class="btn btn-primary btn-sm" style="width:100%;justify-content:center;" onclick="assignDesigner()"><i class="ti ti-user-check"></i> Assign — moves to their queue</button>
+            </div>
+          </div>
+
+          <!-- MONEY: only for roles with the permission -->
+          <div class="card role-money">
+            <div class="card-h"><span class="ct"><i class="ti ti-cash"></i> Price &amp; payment</span></div>
+            <div class="od-line"><span class="l">Price</span><span class="v" id="od-price">$24.00</span></div>
+            <div class="od-line"><span class="l">Payment</span><span class="v"><span class="pay-badge pay-paid" id="od-pay">Paid in full</span></span></div>
+            <div class="od-line"><span class="l">Method</span><span class="v" style="font-weight:400;color:var(--muted)">Card · paid upfront</span></div>
+            <div style="padding:12px 16px;display:flex;flex-direction:column;gap:8px;">
+              <button class="btn btn-ghost btn-sm" onclick="openInvoice()" style="justify-content:center;"><i class="ti ti-file-invoice"></i> Create / edit invoice</button>
+              <button class="btn btn-primary btn-sm" onclick="markPaid()" style="justify-content:center;"><i class="ti ti-check"></i> Mark payment received</button>
+              <button class="btn btn-ghost btn-sm" onclick="openModal('refund-overlay')" style="justify-content:center;color:var(--maroon);"><i class="ti ti-arrow-back-up"></i> Refund / cancel</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-h"><span class="ct"><i class="ti ti-notes"></i> Internal notes</span><span style="font-size:10.5px;color:var(--faint)">only your team</span></div>
+            <div style="padding:14px 16px;">
+              <textarea class="notes-box" placeholder="Notes about this order…">Cap version: reduce density on small text. Customer is a repeat — good to keep happy.</textarea>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-h"><span class="ct"><i class="ti ti-history"></i> Activity</span></div>
+            <div class="actlog" id="od-activity">
+              <div class="actrow"><div class="ai"><i class="ti ti-plus"></i></div><div><div>Order placed by Mike's Caps</div><div class="at">Mar 14, 9:58 AM</div></div></div>
+              <div class="actrow"><div class="ai"><i class="ti ti-cash"></i></div><div><div>Priced at $24 · deposit invoice sent</div><div class="at">Mar 14, 10:05 AM</div></div></div>
+              <div class="actrow"><div class="ai"><i class="ti ti-credit-card"></i></div><div><div>Deposit $12 received</div><div class="at">Mar 14, 10:09 AM</div></div></div>
+              <div class="actrow"><div class="ai"><i class="ti ti-check"></i></div><div><div>Left chest delivered</div><div class="at">Mar 14, 2:40 PM</div></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    
