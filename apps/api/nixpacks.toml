@@ -1,4 +1,0 @@
-# Pin nixpkgs so Node 22 is >= 22.12 (Prisma 7 requirement).
-# Default Nixpacks Node 22 was 22.11.0 and failed prisma install.
-[phases.setup]
-nixpkgsArchive = '51ad838b03a05b1de6f9f2a0fffecee64a9788ee'
