@@ -24,4 +24,4 @@ COPY --from=build /app/dist ./dist
 COPY db ./db
 
 EXPOSE 3001
-CMD ["node", "dist/src/main"]
+CMD ["node", "dist/main"]
