@@ -38,6 +38,7 @@
     "mysql2": "^3.11.5",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
+    "prisma": "file:vendor/prisma-stub",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "zod": "^4.3.6"

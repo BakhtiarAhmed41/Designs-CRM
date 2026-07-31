@@ -1,0 +1,9 @@
+{
+  "name": "prisma",
+  "version": "0.0.0-stub",
+  "private": true,
+  "description": "No-op prisma CLI so Coolify/Belmo build commands that still call prisma generate succeed.",
+  "bin": {
+    "prisma": "./bin.js"
+  }
+}
