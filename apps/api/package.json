@@ -35,7 +35,7 @@
     "argon2": "^0.44.0",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.4.1",
-    "mysql2": "^3.11.5",
+    "mysql2": "^3.23.2",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "prisma": "file:vendor/prisma-stub",

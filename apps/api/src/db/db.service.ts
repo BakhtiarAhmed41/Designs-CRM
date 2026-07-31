@@ -1,8 +1,10 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import mysql, {
+  type ExecuteValues,
   type Pool,
   type PoolConnection,
+  type QueryValues,
   type ResultSetHeader,
   type RowDataPacket,
 } from 'mysql2/promise';
@@ -60,7 +62,10 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
   /** Run a SELECT and return all rows typed as T. */
   async query<T = RowDataPacket>(sql: string, params: unknown[] = []): Promise<T[]> {
-    const [rows] = await this.pool.query<RowDataPacket[]>(sql, params);
+    const [rows] = await this.pool.query<RowDataPacket[]>(
+      sql,
+      params as QueryValues,
+    );
     return rows as unknown as T[];
   }
 
@@ -75,7 +80,10 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
   /** Run an INSERT/UPDATE/DELETE and return the raw result header. */
   async execute(sql: string, params: unknown[] = []): Promise<ResultSetHeader> {
-    const [result] = await this.pool.execute<ResultSetHeader>(sql, params);
+    const [result] = await this.pool.execute<ResultSetHeader>(
+      sql,
+      params as ExecuteValues,
+    );
     return result;
   }
 
@@ -110,7 +118,10 @@ export class DbTransaction {
   constructor(private readonly conn: PoolConnection) {}
 
   async query<T = RowDataPacket>(sql: string, params: unknown[] = []): Promise<T[]> {
-    const [rows] = await this.conn.query<RowDataPacket[]>(sql, params);
+    const [rows] = await this.conn.query<RowDataPacket[]>(
+      sql,
+      params as QueryValues,
+    );
     return rows as unknown as T[];
   }
 
@@ -123,7 +134,10 @@ export class DbTransaction {
   }
 
   async execute(sql: string, params: unknown[] = []): Promise<ResultSetHeader> {
-    const [result] = await this.conn.execute<ResultSetHeader>(sql, params);
+    const [result] = await this.conn.execute<ResultSetHeader>(
+      sql,
+      params as ExecuteValues,
+    );
     return result;
   }
 }
