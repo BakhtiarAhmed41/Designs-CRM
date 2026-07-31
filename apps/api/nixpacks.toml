@@ -1,6 +1,11 @@
 # Coolify / Nixpacks — NestJS + mysql2 (no Prisma)
+# Pin Node 22: this nixpkgs archive has no nodejs_24.
+[variables]
+NIXPACKS_NODE_VERSION = "22"
+
 [phases.setup]
 nixpkgsArchive = '51ad838b03a05b1de6f9f2a0fffecee64a9788ee'
+nixPkgs = ["nodejs_22", "npm-9_x", "openssl"]
 
 [phases.install]
 cmds = ["npm install"]
