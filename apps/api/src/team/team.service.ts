@@ -334,4 +334,45 @@ export class TeamService {
     );
     return row?.id ?? null;
   }
+
+  async listGroupChat() {
+    const rows = await this.db.query<{
+      id: string;
+      sender_user_id: string;
+      body: string;
+      created_at: Date;
+      first_name: string | null;
+      last_name: string | null;
+      email: string;
+    }>(
+      `SELECT m.id, m.sender_user_id, m.body, m.created_at,
+              u.first_name, u.last_name, u.email
+         FROM staff_group_messages m
+         JOIN users u ON u.id = m.sender_user_id
+        ORDER BY m.created_at ASC
+        LIMIT 300`,
+    );
+    return {
+      messages: rows.map((m) => ({
+        id: m.id,
+        senderUserId: m.sender_user_id,
+        body: m.body,
+        createdAt: m.created_at,
+        senderName:
+          [m.first_name, m.last_name].filter(Boolean).join(' ') ||
+          m.email.split('@')[0],
+      })),
+    };
+  }
+
+  async sendGroupChat(meId: string, body: string) {
+    const text = body.trim();
+    if (!text) throw new BadRequestException('Message required');
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO staff_group_messages (id, sender_user_id, body) VALUES (?, ?, ?)`,
+      [id, meId, text],
+    );
+    return this.listGroupChat();
+  }
 }

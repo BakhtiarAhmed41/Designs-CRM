@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
-import { NotificationBell } from '@/components/NotificationBell';
 import { QuoteBuilderModal } from '@/components/QuoteBuilderModal';
 import { listMyOrders } from '@/lib/orders';
 import { listMyInvoices } from '@/lib/billing';
@@ -131,7 +130,6 @@ export function PortalDashboard() {
           <div className="sub">Here&apos;s where everything stands right now.</div>
         </div>
         <div className="topbar">
-          <NotificationBell />
           <button type="button" className="btn btn-primary" onClick={() => setQuoteOpen(true)}>
             <i className="ti ti-plus" /> New order
           </button>

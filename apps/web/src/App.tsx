@@ -29,6 +29,8 @@ import { AdminCustomers } from '@/pages/admin/Customers';
 import { AdminTeam } from '@/pages/admin/Team';
 import { AdminMyWork } from '@/pages/admin/MyWork';
 import { AdminEdits } from '@/pages/admin/Edits';
+import { AdminRolesUsers } from '@/pages/admin/RolesUsers';
+import { AdminLoginRequests } from '@/pages/admin/LoginRequests';
 
 function HomeRedirect() {
   const { user } = useAuth();
@@ -105,6 +107,8 @@ export function App() {
         <Route path="billing" element={<AdminBilling />} />
         <Route path="mywork" element={<AdminMyWork />} />
         <Route path="team" element={<AdminTeam />} />
+        <Route path="roles" element={<AdminRolesUsers />} />
+        <Route path="login-requests" element={<AdminLoginRequests />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

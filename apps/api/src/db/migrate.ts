@@ -108,6 +108,23 @@ async function main() {
     );
   }
 
+  if (!(await columnExists('users', 'login_status'))) {
+    // eslint-disable-next-line no-console
+    console.log('Adding users.login_status column ...');
+    await conn.query(
+      `ALTER TABLE users ADD COLUMN login_status
+         ENUM('PENDING','ACTIVE','DISABLED') NOT NULL DEFAULT 'ACTIVE'`,
+    );
+  }
+
+  if (!(await columnExists('users', 'custom_role_id'))) {
+    // eslint-disable-next-line no-console
+    console.log('Adding users.custom_role_id column ...');
+    await conn.query(
+      'ALTER TABLE users ADD COLUMN custom_role_id CHAR(36) NULL',
+    );
+  }
+
   if (existsSync(migrationsDir)) {
     const applied = new Set(
       (

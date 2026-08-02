@@ -49,7 +49,7 @@ const monthEndSchema = z.object({
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.ADMIN, UserRole.SUPPORT)
+@Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.SUPPORT)
 export class AdminBillingController {
   constructor(private billing: BillingService) {}
 
@@ -58,10 +58,12 @@ export class AdminBillingController {
     @CurrentUser() user: AuthUser | undefined,
     @Query('status') status: string | undefined,
     @Query('customerId') customerId: string | undefined,
+    @Query('q') q: string | undefined,
   ) {
     const invoices = await this.billing.listInvoices(user, {
       status: status || undefined,
       customerId: customerId || undefined,
+      q: q?.trim() || undefined,
     });
     return { invoices };
   }

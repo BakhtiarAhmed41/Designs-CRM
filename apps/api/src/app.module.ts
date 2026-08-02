@@ -12,6 +12,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { OrdersModule } from './orders/orders.module';
 import { SearchModule } from './search/search.module';
 import { StorageModule } from './storage/storage.module';
+import { RolesModule } from './roles/roles.module';
 import { TeamModule } from './team/team.module';
 import { UsersModule } from './users/users.module';
 
@@ -28,6 +29,7 @@ import { UsersModule } from './users/users.module';
     BillingModule,
     CustomersModule,
     TeamModule,
+    RolesModule,
     EditsModule,
     DashboardModule,
   ],

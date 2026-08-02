@@ -258,7 +258,7 @@ export class EditsService {
 
   async listEdits(
     user: AuthUser | undefined,
-    filters: { status?: EditStatus },
+    filters: { status?: EditStatus; q?: string },
   ) {
     this.assertStaff(user);
     const where: string[] = [];
@@ -267,6 +267,13 @@ export class EditsService {
       where.push('e.status = ?');
       params.push(filters.status);
     }
+    if (filters.q) {
+      where.push(
+        `(o.human_ref LIKE ? OR o.name LIKE ? OR c.name LIKE ? OR e.note LIKE ?)`,
+      );
+      const like = `%${filters.q}%`;
+      params.push(like, like, like, like);
+    }
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
     const rows = await this.db.query<EditJoinRow>(
       `SELECT e.*, o.human_ref AS order_ref, o.name AS order_name, o.currency AS order_currency,
@@ -274,6 +281,7 @@ export class EditsService {
               d.initials AS designer_initials, d.first_name AS designer_first
          FROM edit_requests e
          JOIN orders o ON o.id = e.order_id
+         LEFT JOIN customers c ON c.id = o.customer_id
          LEFT JOIN orders ro ON ro.id = e.revision_order_id
          LEFT JOIN users d ON d.id = e.assigned_designer_id
          ${whereSql}

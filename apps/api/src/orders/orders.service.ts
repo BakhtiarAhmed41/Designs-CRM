@@ -18,6 +18,11 @@ import {
   UserRole,
 } from '../common/enums';
 import { BillingService } from '../billing/billing.service';
+import {
+  normalizePage,
+  pageResult,
+  parseDateBound,
+} from '../common/pagination';
 import { DbService } from '../db/db.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { LocalStorageService } from '../storage/local-storage.service';
@@ -353,10 +358,41 @@ export class OrdersService {
         ? OrderType.QUOTE_REQUEST
         : OrderType.ORDER;
 
-    const customer = await this.db.queryOne<{ id: string }>(
+    let customer = await this.db.queryOne<{ id: string }>(
       'SELECT id FROM customers WHERE user_id = ? LIMIT 1',
       [client.id],
     );
+    if (!customer) {
+      const user = await this.db.queryOne<{
+        email: string;
+        first_name: string | null;
+        last_name: string | null;
+        phone: string | null;
+      }>(
+        'SELECT email, first_name, last_name, phone FROM users WHERE id = ? LIMIT 1',
+        [client.id],
+      );
+      const customerId = randomUUID();
+      const displayName =
+        [user?.first_name, user?.last_name].filter(Boolean).join(' ') ||
+        user?.email ||
+        'Customer';
+      await this.db.execute(
+        `INSERT INTO customers
+           (id, user_id, name, email, phone, account_type, source, since_date)
+         VALUES (?, ?, ?, ?, ?, ?, ?, CURDATE())`,
+        [
+          customerId,
+          client.id,
+          displayName,
+          user?.email ?? null,
+          user?.phone ?? null,
+          AccountType.PAY_PER_ORDER,
+          CustomerSource.PORTAL,
+        ],
+      );
+      customer = { id: customerId };
+    }
 
     const id = randomUUID();
     const name =
@@ -370,7 +406,7 @@ export class OrdersService {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
-        customer?.id ?? null,
+        customer.id,
         client.id,
         type,
         toServiceType(data.serviceType),
@@ -719,9 +755,19 @@ export class OrdersService {
 
   async listAdminOrders(
     user: AuthUser | undefined,
-    filters: { status?: OrderStatus; clientId?: string },
+    filters: {
+      status?: OrderStatus;
+      clientId?: string;
+      type?: OrderType;
+      q?: string;
+      dateFrom?: string | null;
+      dateTo?: string | null;
+      page?: number;
+      pageSize?: number;
+    },
   ) {
     this.assertAdmin(user);
+    const { page, pageSize, offset } = normalizePage(filters);
     const where: string[] = [];
     const params: unknown[] = [];
     if (filters.status) {
@@ -732,27 +778,72 @@ export class OrdersService {
       where.push('o.client_user_id = ?');
       params.push(filters.clientId);
     }
+    if (filters.type) {
+      where.push('o.type = ?');
+      params.push(filters.type);
+    }
+    if (filters.q) {
+      where.push(
+        `(o.name LIKE ? OR o.human_ref LIKE ? OR c.name LIKE ? OR u.email LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ?)`,
+      );
+      const like = `%${filters.q}%`;
+      params.push(like, like, like, like, like, like);
+    }
+    const from = parseDateBound(filters.dateFrom);
+    const to = parseDateBound(filters.dateTo);
+    if (from) {
+      where.push('DATE(o.created_at) >= ?');
+      params.push(from);
+    }
+    if (to) {
+      where.push('DATE(o.created_at) <= ?');
+      params.push(to);
+    }
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
-    const rows = await this.db.query<OrderRow & { client_email: string | null; client_first: string | null }>(
-      `SELECT o.*, u.email AS client_email, u.first_name AS client_first
+    const count = await this.db.queryOne<{ n: number | string }>(
+      `SELECT COUNT(*) AS n
          FROM orders o
          LEFT JOIN users u ON u.id = o.client_user_id
-         ${whereSql}
-         ORDER BY o.created_at DESC`,
+         LEFT JOIN customers c ON c.id = o.customer_id
+         ${whereSql}`,
       params,
+    );
+    const rows = await this.db.query<
+      OrderRow & {
+        client_email: string | null;
+        client_first: string | null;
+        client_last: string | null;
+        customer_name: string | null;
+      }
+    >(
+      `SELECT o.*, u.email AS client_email, u.first_name AS client_first,
+              u.last_name AS client_last, c.name AS customer_name
+         FROM orders o
+         LEFT JOIN users u ON u.id = o.client_user_id
+         LEFT JOIN customers c ON c.id = o.customer_id
+         ${whereSql}
+         ORDER BY o.created_at DESC
+         LIMIT ? OFFSET ?`,
+      [...params, pageSize, offset],
     );
     const out = [];
     for (const r of rows) {
       out.push({
         ...this.orderDto(r),
+        customerName: r.customer_name,
         client: r.client_user_id
-          ? { id: r.client_user_id, email: r.client_email, firstName: r.client_first }
+          ? {
+              id: r.client_user_id,
+              email: r.client_email,
+              firstName: r.client_first,
+              lastName: r.client_last,
+            }
           : null,
         attachments: await this.getAttachments(r.id),
         quotations: await this.getQuotations(r.id),
       });
     }
-    return out;
+    return pageResult(out, Number(count?.n ?? 0), page, pageSize);
   }
 
   async duplicateOrder(

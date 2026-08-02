@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { NotificationBell } from '@/components/NotificationBell';
 import { GlobalSearch } from '@/components/GlobalSearch';
 import { BarChart } from '@/components/BarChart';
 import { GenerateOrderModal } from '@/components/GenerateOrderModal';
@@ -76,7 +75,7 @@ export function AdminDashboard() {
   });
   const { data: ordersData } = useQuery({
     queryKey: ['admin-orders'],
-    queryFn: () => listAdminOrders(),
+    queryFn: () => listAdminOrders({ pageSize: 500 }),
     refetchInterval: 30_000,
   });
   const { data: convosData } = useQuery({
@@ -128,7 +127,6 @@ export function AdminDashboard() {
           </div>
         </div>
         <div className="topwrap">
-          <NotificationBell />
           <button
             type="button"
             className="btn btn-ghost"

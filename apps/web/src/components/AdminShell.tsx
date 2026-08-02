@@ -163,6 +163,14 @@ export function AdminShell() {
             </NavLink>
           </>
         )}
+        {canSee('super,admin,support', viewAs) && (
+          <NavLink
+            to="/admin/login-requests"
+            className={({ isActive }) => (isActive ? 'on' : undefined)}
+          >
+            <i className="ti ti-user-plus" /> Login requests
+          </NavLink>
+        )}
         {canSee('super', viewAs) && (
           <>
             <div className="divider">Team</div>
@@ -171,6 +179,9 @@ export function AdminShell() {
               <span className="cnt" id="team-online">
                 {onlineCount} on
               </span>
+            </NavLink>
+            <NavLink to="/admin/roles" className={({ isActive }) => (isActive ? 'on' : undefined)}>
+              <i className="ti ti-shield-lock" /> Roles &amp; users
             </NavLink>
           </>
         )}

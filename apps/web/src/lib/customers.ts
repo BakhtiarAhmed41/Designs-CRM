@@ -20,6 +20,8 @@ export type Customer = {
   preferences?: unknown;
   ordersCount?: number;
   ltvCents?: number;
+  runningOrders?: number;
+  loginStatus?: 'PENDING' | 'ACTIVE' | 'DISABLED' | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -43,17 +45,32 @@ export type CustomerInput = {
   name: string;
   email?: string | null;
   phone?: string | null;
+  password?: string | null;
   accountType: AccountType;
   netTerms?: NetTerms | null;
   source: CustomerSource;
+  active?: boolean;
 };
 
-export function listCustomers(params?: { q?: string; accountType?: string }) {
+export function listCustomers(params?: {
+  q?: string;
+  accountType?: string;
+  page?: number;
+  pageSize?: number;
+}) {
   const q = new URLSearchParams();
   if (params?.q) q.set('q', params.q);
   if (params?.accountType) q.set('accountType', params.accountType);
+  if (params?.page) q.set('page', String(params.page));
+  if (params?.pageSize) q.set('pageSize', String(params.pageSize));
   const suffix = q.toString() ? `?${q.toString()}` : '';
-  return apiFetch<{ customers: Customer[] }>(`/admin/customers${suffix}`);
+  return apiFetch<{
+    customers: Customer[];
+    total?: number;
+    page?: number;
+    pageSize?: number;
+    totalPages?: number;
+  }>(`/admin/customers${suffix}`);
 }
 
 export function getCustomer(id: string) {
@@ -79,6 +96,10 @@ export function mergeCustomer(id: string, intoId: string) {
     `/admin/customers/${id}/merge`,
     { method: 'POST', body: JSON.stringify({ intoId }) },
   );
+}
+
+export function deleteCustomer(id: string) {
+  return apiFetch<{ ok: boolean }>(`/admin/customers/${id}`, { method: 'DELETE' });
 }
 
 export function getMyCustomer() {

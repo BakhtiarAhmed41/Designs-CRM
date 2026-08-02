@@ -14,6 +14,27 @@ export const UserRole = {
 } as const;
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
 
+export const LoginStatus = {
+  PENDING: 'PENDING',
+  ACTIVE: 'ACTIVE',
+  DISABLED: 'DISABLED',
+} as const;
+export type LoginStatus = (typeof LoginStatus)[keyof typeof LoginStatus];
+
+/** Feature keys used by custom roles (checkbox permissions). */
+export const FEATURE_KEYS = [
+  'dashboard',
+  'messages',
+  'orders',
+  'quotes',
+  'edits',
+  'customers',
+  'billing',
+  'team',
+  'roles',
+] as const;
+export type FeatureKey = (typeof FEATURE_KEYS)[number];
+
 /** Roles that belong to internal staff (the admin command center). */
 export const STAFF_ROLES: UserRole[] = [
   UserRole.SUPER_ADMIN,

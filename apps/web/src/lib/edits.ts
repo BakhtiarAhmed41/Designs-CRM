@@ -36,8 +36,11 @@ export type ActivityEntry = {
   actorInitials?: string | null;
 };
 
-export function listAdminEdits(status?: EditStatus) {
-  const q = status ? `?status=${status}` : '';
+export function listAdminEdits(status?: EditStatus, search?: string) {
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (search) params.set('q', search);
+  const q = params.toString() ? `?${params}` : '';
   return apiFetch<{ edits: EditRequest[] }>(`/admin/edits${q}`);
 }
 

@@ -5,6 +5,7 @@ import { listAdminEdits, updateAdminEdit, type EditRequest, type EditStatus } fr
 import { listTeam } from '@/lib/team';
 import { getErrorMessage } from '@/lib/api';
 import { money, dateShort } from '@/lib/format';
+import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
 
 type FilterId = '' | EditStatus | 'FREE' | 'PAID' | 'IN_PROGRESS';
 
@@ -25,11 +26,13 @@ function sectionFor(e: EditRequest): 'waiting' | 'progress' | 'done' {
 
 export function AdminEdits() {
   const [filter, setFilter] = useState<FilterId>('');
+  const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
   const statusFilter = filter === 'PENDING' || filter === 'DONE' ? filter : undefined;
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-edits', statusFilter ?? ''],
-    queryFn: () => listAdminEdits(statusFilter),
+    queryKey: ['admin-edits', statusFilter ?? '', q],
+    queryFn: () => listAdminEdits(statusFilter, q || undefined),
     refetchInterval: 30_000,
   });
 
@@ -40,7 +43,7 @@ export function AdminEdits() {
 
   const designers = (teamQ.data?.members ?? []).filter((m) => m.role === 'DESIGNER');
 
-  const edits = useMemo(() => {
+  const editsAll = useMemo(() => {
     let list = data?.edits ?? [];
     if (filter === 'FREE') list = list.filter((e) => e.kind === 'FREE');
     if (filter === 'PAID') list = list.filter((e) => e.kind === 'PAID');
@@ -48,6 +51,10 @@ export function AdminEdits() {
     if (filter === 'PENDING') list = list.filter((e) => e.status === 'PENDING' && !e.assignedDesignerId);
     return list;
   }, [data?.edits, filter]);
+
+  const pageSize = 20;
+  const totalPages = Math.max(1, Math.ceil(editsAll.length / pageSize));
+  const edits = editsAll.slice((page - 1) * pageSize, page * pageSize);
 
   const sections = useMemo(() => {
     const waiting = edits.filter((e) => sectionFor(e) === 'waiting');
@@ -57,8 +64,8 @@ export function AdminEdits() {
       { key: 'waiting', title: 'Waiting on you', items: waiting },
       { key: 'progress', title: 'In progress', items: progress },
       { key: 'done', title: 'Done', items: done },
-    ].filter((s) => s.items.length > 0 || filter === '');
-  }, [edits, filter]);
+    ].filter((s) => s.items.length > 0 || (filter === '' && page === 1));
+  }, [edits, filter, page]);
 
   return (
     <div>
@@ -71,14 +78,36 @@ export function AdminEdits() {
         </div>
       </div>
 
-      <div style={{ margin: '16px 0 10px' }}>
+      <ListToolbar
+        search={q}
+        onSearch={(v) => {
+          setQ(v);
+          setPage(1);
+        }}
+        searchPlaceholder="Search by order #, order name, customer…"
+        status={filter === 'PENDING' || filter === 'DONE' ? filter : ''}
+        onStatus={(v) => {
+          setFilter((v as FilterId) || '');
+          setPage(1);
+        }}
+        statusOptions={[
+          { value: '', label: 'All statuses' },
+          { value: 'PENDING', label: 'Pending' },
+          { value: 'DONE', label: 'Done' },
+        ]}
+      />
+
+      <div style={{ margin: '0 0 10px' }}>
         <div className="filters">
           {FILTERS.map((f) => (
             <button
               key={f.id || 'all'}
               type="button"
               className={filter === f.id ? 'on' : ''}
-              onClick={() => setFilter(f.id)}
+              onClick={() => {
+                setFilter(f.id);
+                setPage(1);
+              }}
             >
               {f.label}
             </button>
@@ -102,6 +131,12 @@ export function AdminEdits() {
           </div>
         ))}
       </div>
+      <PaginationBar
+        page={page}
+        totalPages={totalPages}
+        total={editsAll.length}
+        onPage={setPage}
+      />
     </div>
   );
 }

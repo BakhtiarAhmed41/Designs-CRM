@@ -11,11 +11,18 @@ import { ApiError } from '@/lib/api';
 import * as authApi from '@/lib/auth';
 import type { CurrentUser } from '@/lib/types';
 
+type RegisterInput = {
+  email: string;
+  password: string;
+  name: string;
+  phone?: string | null;
+};
+
 type AuthState = {
   user: CurrentUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<CurrentUser>;
-  register: (email: string, password: string) => Promise<CurrentUser>;
+  register: (data: RegisterInput) => Promise<{ user: CurrentUser; pending: boolean }>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 };
@@ -64,10 +71,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return res.user;
   }, []);
 
-  const register = useCallback(async (email: string, password: string) => {
-    const res = await authApi.register(email, password);
-    // Registration does not auto-login; caller should log in.
-    return res.user;
+  const register = useCallback(async (data: RegisterInput) => {
+    return authApi.register(data);
   }, []);
 
   const logout = useCallback(async () => {

@@ -32,7 +32,7 @@ const updateEditSchema = z.object({
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.ADMIN, UserRole.SUPPORT, UserRole.DESIGNER)
+@Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.SUPPORT, UserRole.DESIGNER)
 export class AdminEditsController {
   constructor(private edits: EditsService) {}
 
@@ -51,11 +51,15 @@ export class AdminEditsController {
   async list(
     @CurrentUser() user: AuthUser | undefined,
     @Query('status') status: string | undefined,
+    @Query('q') q: string | undefined,
   ) {
     const statuses = Object.values(EditStatus) as string[];
     const parsed =
       status && statuses.includes(status) ? (status as EditStatus) : undefined;
-    const edits = await this.edits.listEdits(user, { status: parsed });
+    const edits = await this.edits.listEdits(user, {
+      status: parsed,
+      q: q?.trim() || undefined,
+    });
     return { edits };
   }
 

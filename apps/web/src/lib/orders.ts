@@ -60,12 +60,33 @@ export function counterQuotation(
 }
 
 // --- admin ----------------------------------------------------------------
-export function listAdminOrders(params?: { status?: string; clientId?: string }) {
+export function listAdminOrders(params?: {
+  status?: string;
+  clientId?: string;
+  type?: string;
+  q?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  pageSize?: number;
+}) {
   const q = new URLSearchParams();
   if (params?.status) q.set('status', params.status);
   if (params?.clientId) q.set('clientId', params.clientId);
+  if (params?.type) q.set('type', params.type);
+  if (params?.q) q.set('q', params.q);
+  if (params?.dateFrom) q.set('dateFrom', params.dateFrom);
+  if (params?.dateTo) q.set('dateTo', params.dateTo);
+  if (params?.page) q.set('page', String(params.page));
+  if (params?.pageSize) q.set('pageSize', String(params.pageSize));
   const suffix = q.toString() ? `?${q.toString()}` : '';
-  return apiFetch<{ orders: Order[] }>(`/admin/orders${suffix}`);
+  return apiFetch<{
+    orders: Order[];
+    total?: number;
+    page?: number;
+    pageSize?: number;
+    totalPages?: number;
+  }>(`/admin/orders${suffix}`);
 }
 
 export function getAdminOrder(id: string) {

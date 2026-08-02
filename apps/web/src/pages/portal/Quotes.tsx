@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { QuoteBuilderModal } from '@/components/QuoteBuilderModal';
@@ -8,24 +8,31 @@ import { money, dateShort } from '@/lib/format';
 import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import type { Order, Quotation } from '@/lib/types';
 import type { QuotationLine } from '@/lib/designs';
+import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
 
 type QuoteWithLines = Quotation & { lines?: QuotationLine[] };
 
 function isQuoteOrder(o: Order) {
   return (
     o.type === 'QUOTE_REQUEST' ||
-    ['WAITING_FOR_QUOTATION', 'QUOTATION_PROVIDED', 'WAITING_FOR_ADMIN_QUOTATION_APPROVAL'].includes(
-      o.status,
-    )
+    [
+      'CREATED',
+      'WAITING_FOR_QUOTATION',
+      'QUOTATION_PROVIDED',
+      'WAITING_FOR_ADMIN_QUOTATION_APPROVAL',
+      'CLIENT_REJECTED_QUOTATION',
+    ].includes(o.status)
   );
 }
 
 function quoteChip(o: Order): { cls: string; label: string } {
+  if (o.status === 'CREATED') return { cls: 'chip c-new', label: 'Draft' };
   if (o.status === 'QUOTATION_PROVIDED') return { cls: 'chip c-quote', label: 'Quote ready' };
   if (o.status === 'WAITING_FOR_QUOTATION') return { cls: 'chip c-wait', label: 'Being priced' };
   if (o.status === 'WAITING_FOR_ADMIN_QUOTATION_APPROVAL') {
     return { cls: 'chip c-wait', label: 'Counter pending' };
   }
+  if (o.status === 'CLIENT_REJECTED_QUOTATION') return { cls: 'chip c-wait', label: 'Rejected' };
   return { cls: 'chip c-prog', label: 'In review' };
 }
 
@@ -40,15 +47,42 @@ export function PortalQuotes() {
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [keptByOrder, setKeptByOrder] = useState<Record<string, string[]>>({});
+  const [q, setQ] = useState('');
+  const [status, setStatus] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [page, setPage] = useState(1);
 
   const { data, isLoading } = useQuery({
     queryKey: ['my-orders'],
     queryFn: listMyOrders,
   });
 
-  const quotes = (data?.orders ?? []).filter(isQuoteOrder);
-  const awaiting = quotes.filter((o) => o.status === 'QUOTATION_PROVIDED').length;
-  const pricing = quotes.filter((o) => o.status === 'WAITING_FOR_QUOTATION').length;
+  const quotesAll = useMemo(() => {
+    let list = (data?.orders ?? []).filter(isQuoteOrder);
+    if (status) list = list.filter((o) => o.status === status);
+    if (q.trim()) {
+      const term = q.trim().toLowerCase();
+      list = list.filter(
+        (o) =>
+          (o.name ?? '').toLowerCase().includes(term) ||
+          (o.humanRef ?? '').toLowerCase().includes(term),
+      );
+    }
+    if (dateFrom) {
+      list = list.filter((o) => o.createdAt.slice(0, 10) >= dateFrom);
+    }
+    if (dateTo) {
+      list = list.filter((o) => o.createdAt.slice(0, 10) <= dateTo);
+    }
+    return list;
+  }, [data?.orders, q, status, dateFrom, dateTo]);
+
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(quotesAll.length / pageSize));
+  const quotes = quotesAll.slice((page - 1) * pageSize, page * pageSize);
+  const awaiting = quotesAll.filter((o) => o.status === 'QUOTATION_PROVIDED').length;
+  const pricing = quotesAll.filter((o) => o.status === 'WAITING_FOR_QUOTATION').length;
 
   const approveMut = useMutation({
     mutationFn: ({ orderId, keepLineIds }: { orderId: string; keepLineIds?: string[] }) =>
@@ -126,6 +160,37 @@ export function PortalQuotes() {
           <div className="sd">We&apos;ll get back within a few hours</div>
         </div>
       </div>
+
+      <ListToolbar
+        search={q}
+        onSearch={(v) => {
+          setQ(v);
+          setPage(1);
+        }}
+        searchPlaceholder="Search quotes…"
+        status={status}
+        onStatus={(v) => {
+          setStatus(v);
+          setPage(1);
+        }}
+        statusOptions={[
+          { value: '', label: 'All statuses' },
+          { value: 'CREATED', label: 'Draft' },
+          { value: 'WAITING_FOR_QUOTATION', label: 'Being priced' },
+          { value: 'QUOTATION_PROVIDED', label: 'Quote ready' },
+          { value: 'WAITING_FOR_ADMIN_QUOTATION_APPROVAL', label: 'Counter pending' },
+        ]}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onDateFrom={(v) => {
+          setDateFrom(v);
+          setPage(1);
+        }}
+        onDateTo={(v) => {
+          setDateTo(v);
+          setPage(1);
+        }}
+      />
 
       <div className="card">
         <div className="card-h">
@@ -275,6 +340,13 @@ export function PortalQuotes() {
           );
         })}
       </div>
+
+      <PaginationBar
+        page={page}
+        totalPages={totalPages}
+        total={quotesAll.length}
+        onPage={setPage}
+      />
 
       <QuoteBuilderModal
         open={quoteOpen}

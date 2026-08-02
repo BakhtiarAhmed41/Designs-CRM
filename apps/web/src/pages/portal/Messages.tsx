@@ -145,6 +145,24 @@ export function PortalMessages() {
             })}
           </div>
           <div className="chat-in">
+            <label title="Attach image or document" style={{ cursor: 'pointer', padding: '0 6px' }}>
+              <i className="ti ti-paperclip" />
+              <input
+                type="file"
+                accept="image/*,.pdf,.doc,.docx,.zip,.ai,.eps,.svg"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setDraft((d) =>
+                    d
+                      ? `${d}\n📎 Attachment: ${file.name} (${Math.round(file.size / 1024)} KB)`
+                      : `📎 Attachment: ${file.name} (${Math.round(file.size / 1024)} KB)`,
+                  );
+                  e.target.value = '';
+                }}
+              />
+            </label>
             <input
               placeholder="Type a message, or attach an image…"
               value={draft}

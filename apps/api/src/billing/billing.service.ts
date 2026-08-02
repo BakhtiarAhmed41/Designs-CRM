@@ -211,7 +211,7 @@ export class BillingService {
 
   async listInvoices(
     user: AuthUser | undefined,
-    filters: { status?: string; customerId?: string },
+    filters: { status?: string; customerId?: string; q?: string },
   ) {
     this.assertAdmin(user);
     const where: string[] = [];
@@ -225,11 +225,19 @@ export class BillingService {
       where.push('i.customer_id = ?');
       params.push(filters.customerId);
     }
+    if (filters.q) {
+      where.push(
+        `(c.name LIKE ? OR i.covers_text LIKE ? OR i.id LIKE ? OR o.human_ref LIKE ?)`,
+      );
+      const like = `%${filters.q}%`;
+      params.push(like, like, like, like);
+    }
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
     const rows = await this.db.query<InvoiceRow & { customer_name: string | null }>(
       `SELECT i.*, c.name AS customer_name
          FROM invoices i
          LEFT JOIN customers c ON c.id = i.customer_id
+         LEFT JOIN orders o ON o.id = i.order_id
          ${whereSql}
          ORDER BY i.issued_at DESC`,
       params,

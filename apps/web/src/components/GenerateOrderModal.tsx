@@ -62,12 +62,11 @@ export function GenerateOrderModal({
 
   const customersQ = useQuery({
     queryKey: ['admin-customers-gen'],
-    queryFn: () => listCustomers(),
+    queryFn: () => listCustomers({ pageSize: 500 }),
     enabled: open,
   });
 
   const customers = customersQ.data?.customers ?? [];
-  const datalistId = 'gen-order-customers';
 
   useEffect(() => {
     if (!open) return;
@@ -115,8 +114,26 @@ export function GenerateOrderModal({
     return `${window.location.origin}${resultLink}`;
   }, [resultLink]);
 
+  const [customerSearch, setCustomerSearch] = useState('');
+
+  const filteredCustomers = useMemo(() => {
+    const term = customerSearch.trim().toLowerCase();
+    if (!term) return customers.slice(0, 40);
+    return customers
+      .filter(
+        (c) =>
+          c.name.toLowerCase().includes(term) ||
+          (c.email ?? '').toLowerCase().includes(term) ||
+          (c.phone ?? '').includes(term),
+      )
+      .slice(0, 40);
+  }, [customers, customerSearch]);
+
   const create = useMutation({
     mutationFn: () => {
+      if (!customerId) {
+        throw new Error('Create a customer first, then select them here.');
+      }
       const priceCents = price.trim()
         ? Math.round(parseFloat(price) * 100)
         : null;
@@ -245,20 +262,61 @@ export function GenerateOrderModal({
               )}
 
               <div className="ff">
-                <label>Customer name</label>
+                <label>Customer (required)</label>
                 <input
-                  list={datalistId}
-                  placeholder="Start typing to match existing…"
-                  value={customerName}
-                  onChange={(e) => onCustomerNameChange(e.target.value)}
+                  placeholder="Search customers by name, email, phone…"
+                  value={customerSearch || customerName}
+                  onChange={(e) => {
+                    setCustomerSearch(e.target.value);
+                    onCustomerNameChange(e.target.value);
+                  }}
                 />
-                <datalist id={datalistId}>
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.name}>
-                      {c.email ?? c.phone ?? ''}
-                    </option>
+                {!customerId && (
+                  <div style={{ fontSize: 12, color: 'var(--amber)', marginTop: 6 }}>
+                    Select an existing customer. If they are not created yet, create them under Customers first.
+                  </div>
+                )}
+                <div
+                  style={{
+                    maxHeight: 140,
+                    overflow: 'auto',
+                    marginTop: 6,
+                    border: '0.5px solid var(--line)',
+                    borderRadius: 8,
+                  }}
+                >
+                  {filteredCustomers.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        setCustomerId(c.id);
+                        setCustomerName(c.name);
+                        setCustomerSearch(c.name);
+                        if (c.email) setEmail(c.email);
+                        if (c.phone) setPhone(c.phone);
+                      }}
+                      style={{
+                        display: 'block',
+                        width: '100%',
+                        textAlign: 'left',
+                        padding: '8px 10px',
+                        border: 'none',
+                        borderBottom: '0.5px solid var(--line-s)',
+                        background: customerId === c.id ? 'rgba(20,63,101,.08)' : '#fff',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        fontSize: 12.5,
+                      }}
+                    >
+                      <b>{c.name}</b>
+                      <span style={{ color: 'var(--muted)' }}>
+                        {' '}
+                        · {c.email || c.phone || 'No contact'}
+                      </span>
+                    </button>
                   ))}
-                </datalist>
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>

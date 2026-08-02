@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createCustomer,
+  deleteCustomer,
   getCustomer,
   listCustomers,
   mergeCustomer,
@@ -16,6 +17,7 @@ import {
 import { getErrorMessage } from '@/lib/api';
 import { money, dateShort, statusChipClass, statusLabel } from '@/lib/format';
 import type { OrderStatus } from '@/lib/types';
+import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
 
 type FilterId = '' | 'NET_MONTHLY' | 'PAY_PER_ORDER' | 'top';
 
@@ -36,6 +38,8 @@ function accountLabel(type: AccountType) {
 
 export function AdminCustomers() {
   const [filter, setFilter] = useState<FilterId>('');
+  const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showNew, setShowNew] = useState(false);
   const [showMerge, setShowMerge] = useState(false);
@@ -44,8 +48,14 @@ export function AdminCustomers() {
     filter === 'NET_MONTHLY' || filter === 'PAY_PER_ORDER' ? filter : undefined;
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-customers', accountType],
-    queryFn: () => listCustomers(accountType ? { accountType } : undefined),
+    queryKey: ['admin-customers', accountType, q, page],
+    queryFn: () =>
+      listCustomers({
+        accountType,
+        q: q || undefined,
+        page,
+        pageSize: 20,
+      }),
   });
 
   const customers = useMemo(() => {
@@ -73,7 +83,16 @@ export function AdminCustomers() {
         </div>
       </div>
 
-      <div style={{ margin: '16px 0 10px' }}>
+      <ListToolbar
+        search={q}
+        onSearch={(v) => {
+          setQ(v);
+          setPage(1);
+        }}
+        searchPlaceholder="Search customers by name, email, phone…"
+      />
+
+      <div style={{ margin: '0 0 10px' }}>
         <div className="filters">
           <button type="button" className={filter === '' ? 'on' : ''} onClick={() => setFilter('')}>
             All
@@ -126,12 +145,13 @@ export function AdminCustomers() {
             </div>
             <div className="oinfo">
               <div className="on">{c.name}</div>
-              <div className="om">
-                <span>{c.email ?? 'No email'}</span>
-                <span>{c.ordersCount} orders</span>
-                {c.netTerms && <span>{c.netTerms.replace('_', ' ')}</span>}
-              </div>
+            <div className="om">
+              <span>{c.email ?? 'No email'}</span>
+              <span>{c.ordersCount} orders</span>
+              <span>{c.runningOrders ?? 0} running</span>
+              {c.netTerms && <span>{c.netTerms.replace('_', ' ')}</span>}
             </div>
+          </div>
             <span className={accountChip(c.accountType)}>{accountLabel(c.accountType)}</span>
             <div className="oprice">
               {money(c.ltvCents)}
@@ -144,6 +164,12 @@ export function AdminCustomers() {
           </button>
         ))}
       </div>
+      <PaginationBar
+        page={data?.page ?? 1}
+        totalPages={data?.totalPages ?? 1}
+        total={data?.total ?? customers.length}
+        onPage={setPage}
+      />
 
       {selectedId && (
         <CustomerDetailModal
@@ -203,6 +229,15 @@ function CustomerDetailModal({
     onError: (e) => setError(getErrorMessage(e)),
   });
 
+  const remove = useMutation({
+    mutationFn: () => deleteCustomer(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin-customers'] });
+      onClose();
+    },
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
   return (
     <div className="overlay open" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -224,12 +259,12 @@ function CustomerDetailModal({
                     <div className="scv">{customer.ordersCount}</div>
                   </div>
                   <div className="sc">
-                    <div className="scl">Lifetime value</div>
-                    <div className="scv">{money(customer.ltvCents)}</div>
+                    <div className="scl">Running</div>
+                    <div className="scv">{customer.runningOrders ?? 0}</div>
                   </div>
                   <div className="sc">
-                    <div className="scl">Store credit</div>
-                    <div className="scv m">{money(customer.storeCreditCents)}</div>
+                    <div className="scl">Lifetime value</div>
+                    <div className="scv">{money(customer.ltvCents)}</div>
                   </div>
                   <div className="sc">
                     <div className="scl">Open invoices</div>
@@ -237,6 +272,28 @@ function CustomerDetailModal({
                   </div>
                 </div>
               </div>
+              {customer.userId && (
+                <label
+                  style={{
+                    display: 'flex',
+                    gap: 8,
+                    alignItems: 'center',
+                    marginBottom: 12,
+                    fontSize: 13,
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={customer.loginStatus !== 'DISABLED'}
+                    onChange={(e) =>
+                      updateCustomer(id, { active: e.target.checked }).then(() =>
+                        qc.invalidateQueries({ queryKey: ['admin-customer', id] }),
+                      )
+                    }
+                  />
+                  Login active ({customer.loginStatus ?? 'n/a'})
+                </label>
+              )}
 
               <div className="ff">
                 <label>Name</label>
@@ -310,14 +367,26 @@ function CustomerDetailModal({
                   ))}
                 </select>
               </div>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => save.mutate()}
-                disabled={save.isPending || !effective.name.trim()}
-              >
-                {save.isPending ? 'Saving…' : 'Save changes'}
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => save.mutate()}
+                  disabled={save.isPending || !effective.name.trim()}
+                >
+                  {save.isPending ? 'Saving…' : 'Save / edit'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    if (window.confirm('Delete this customer?')) remove.mutate();
+                  }}
+                  disabled={remove.isPending}
+                >
+                  Delete
+                </button>
+              </div>
 
               <div style={{ marginTop: 20 }}>
                 <div className="card-h" style={{ border: 'none', padding: '0 0 8px' }}>
@@ -360,9 +429,11 @@ function NewCustomerModal({ onClose }: { onClose: () => void }) {
     name: '',
     email: null,
     phone: null,
+    password: '',
     accountType: 'PAY_PER_ORDER',
     netTerms: null,
     source: 'PORTAL',
+    active: true,
   });
 
   const create = useMutation({
@@ -390,10 +461,27 @@ function NewCustomerModal({ onClose }: { onClose: () => void }) {
             <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           </div>
           <div className="ff">
+            <label>Number / phone</label>
+            <input
+              value={form.phone ?? ''}
+              onChange={(e) => setForm({ ...form, phone: e.target.value || null })}
+            />
+          </div>
+          <div className="ff">
             <label>Email</label>
             <input
               value={form.email ?? ''}
               onChange={(e) => setForm({ ...form, email: e.target.value || null })}
+            />
+          </div>
+          <div className="ff">
+            <label>Password (for portal login)</label>
+            <input
+              type="password"
+              value={form.password ?? ''}
+              onChange={(e) => setForm({ ...form, password: e.target.value || null })}
+              minLength={6}
+              placeholder="At least 6 characters"
             />
           </div>
           <div className="ff">
@@ -409,11 +497,23 @@ function NewCustomerModal({ onClose }: { onClose: () => void }) {
               ))}
             </select>
           </div>
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, fontSize: 13 }}>
+            <input
+              type="checkbox"
+              checked={form.active !== false}
+              onChange={(e) => setForm({ ...form, active: e.target.checked })}
+            />
+            Active (can login)
+          </label>
           <button
             type="button"
             className="btn btn-primary"
             onClick={() => create.mutate()}
-            disabled={create.isPending || !form.name.trim()}
+            disabled={
+              create.isPending ||
+              !form.name.trim() ||
+              (!!form.password && (form.password?.length ?? 0) < 6)
+            }
           >
             {create.isPending ? 'Creating…' : 'Create customer'}
           </button>

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -14,6 +15,7 @@ import {
   CustomerSource,
   NetTerms,
   STAFF_ROLES,
+  UserRole,
 } from '../common/enums';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -26,18 +28,22 @@ const createSchema = z.object({
   name: z.string().min(1).max(200),
   email: z.string().email().max(255).optional().nullable(),
   phone: z.string().min(3).max(60).optional().nullable(),
+  password: z.string().min(6).max(200).optional().nullable(),
   accountType: z.nativeEnum(AccountType),
   netTerms: z.nativeEnum(NetTerms).optional().nullable(),
   source: z.nativeEnum(CustomerSource),
+  active: z.boolean().optional(),
 });
 
 const updateSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   email: z.string().email().max(255).optional().nullable(),
   phone: z.string().min(3).max(60).optional().nullable(),
+  password: z.string().min(6).max(200).optional().nullable(),
   accountType: z.nativeEnum(AccountType).optional(),
   netTerms: z.nativeEnum(NetTerms).optional().nullable(),
   source: z.nativeEnum(CustomerSource).optional(),
+  active: z.boolean().optional(),
 });
 
 const mergeSchema = z.object({
@@ -52,7 +58,7 @@ const patchMeCustomerSchema = z.object({
 
 @Controller('admin/customers')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(...STAFF_ROLES)
+@Roles(...STAFF_ROLES, UserRole.SUPER_ADMIN)
 export class AdminCustomersController {
   constructor(private customers: CustomersService) {}
 
@@ -60,17 +66,27 @@ export class AdminCustomersController {
   async list(
     @Query('q') q: string | undefined,
     @Query('accountType') accountType: string | undefined,
+    @Query('page') page: string | undefined,
+    @Query('pageSize') pageSize: string | undefined,
   ) {
     const types = Object.values(AccountType) as string[];
     const parsedType =
       accountType && types.includes(accountType)
         ? (accountType as AccountType)
         : undefined;
-    const customers = await this.customers.list({
+    const result = await this.customers.list({
       q: q?.trim() || undefined,
       accountType: parsedType,
+      page: page ? Number(page) : undefined,
+      pageSize: pageSize ? Number(pageSize) : 500,
     });
-    return { customers };
+    return {
+      customers: result.items,
+      total: result.total,
+      page: result.page,
+      pageSize: result.pageSize,
+      totalPages: result.totalPages,
+    };
   }
 
   @Get(':id')
@@ -91,6 +107,11 @@ export class AdminCustomersController {
     const data = updateSchema.parse(body);
     const customer = await this.customers.update(id, data);
     return { customer };
+  }
+
+  @Delete(':id')
+  async remove(@Param('id') id: string) {
+    return this.customers.remove(id);
   }
 
   @Post(':id/merge')

@@ -61,7 +61,7 @@ export class AdminTeamController {
   }
 
   @Post('team')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   async create(@Body() body: unknown) {
     const data = createSchema.parse(body);
     const member = await this.team.create(data);
@@ -69,7 +69,7 @@ export class AdminTeamController {
   }
 
   @Patch('team/:id')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
   async update(@Param('id') id: string, @Body() body: unknown) {
     const data = updateSchema.parse(body);
     const member = await this.team.update(id, data);
@@ -114,6 +114,17 @@ export class AdminTeamController {
     const ownerId = await this.team.resolveOwnerId();
     if (!ownerId || ownerId === user.id) return { peerId: null };
     return { peerId: ownerId };
+  }
+
+  @Get('team-group-chat')
+  async listGroupChat() {
+    return this.team.listGroupChat();
+  }
+
+  @Post('team-group-chat')
+  async sendGroupChat(@CurrentUser() user: AuthUser, @Body() body: unknown) {
+    const { body: text } = staffChatSchema.parse(body);
+    return this.team.sendGroupChat(user.id, text);
   }
 }
 

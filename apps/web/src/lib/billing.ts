@@ -88,10 +88,15 @@ export type PayLinkSummary = {
 };
 
 // --- admin ----------------------------------------------------------------
-export function listInvoices(params?: { status?: string; customerId?: string }) {
+export function listInvoices(params?: {
+  status?: string;
+  customerId?: string;
+  q?: string;
+}) {
   const q = new URLSearchParams();
   if (params?.status) q.set('status', params.status);
   if (params?.customerId) q.set('customerId', params.customerId);
+  if (params?.q) q.set('q', params.q);
   const suffix = q.toString() ? `?${q.toString()}` : '';
   return apiFetch<{ invoices: Invoice[] }>(`/admin/invoices${suffix}`);
 }

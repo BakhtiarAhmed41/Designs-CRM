@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS users (
   email         VARCHAR(255) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   role          ENUM('SUPER_ADMIN','ADMIN','SUPPORT','DESIGNER','CLIENT') NOT NULL DEFAULT 'CLIENT',
+  login_status  ENUM('PENDING','ACTIVE','DISABLED') NOT NULL DEFAULT 'ACTIVE',
+  custom_role_id CHAR(36)    NULL,
   first_name    VARCHAR(120) NULL,
   last_name     VARCHAR(120) NULL,
   phone         VARCHAR(60)  NULL,
@@ -24,7 +26,33 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY uq_users_email (email),
-  KEY idx_users_role (role)
+  KEY idx_users_role (role),
+  KEY idx_users_login_status (login_status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS custom_roles (
+  id          CHAR(36)     NOT NULL,
+  name        VARCHAR(120) NOT NULL,
+  description VARCHAR(500) NULL,
+  base_role   ENUM('ADMIN','SUPPORT','DESIGNER') NOT NULL DEFAULT 'SUPPORT',
+  permissions JSON         NOT NULL,
+  created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_custom_roles_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id         CHAR(36)     NOT NULL,
+  user_id    CHAR(36)     NOT NULL,
+  token_hash VARCHAR(255) NOT NULL,
+  expires_at DATETIME     NOT NULL,
+  used_at    DATETIME     NULL,
+  created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_prt_user (user_id),
+  KEY idx_prt_expires (expires_at),
+  CONSTRAINT fk_prt_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS refresh_tokens (
@@ -385,4 +413,28 @@ CREATE TABLE IF NOT EXISTS staff_messages (
   KEY idx_staff_msg_to (to_user_id, created_at),
   CONSTRAINT fk_staff_msg_from FOREIGN KEY (from_user_id) REFERENCES users (id) ON DELETE CASCADE,
   CONSTRAINT fk_staff_msg_to FOREIGN KEY (to_user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS staff_group_messages (
+  id             CHAR(36) NOT NULL,
+  sender_user_id CHAR(36) NOT NULL,
+  body           TEXT     NOT NULL,
+  created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_sgm_created (created_at),
+  CONSTRAINT fk_sgm_sender FOREIGN KEY (sender_user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS message_attachments (
+  id              CHAR(36)     NOT NULL,
+  message_id      CHAR(36)     NOT NULL,
+  original_name   VARCHAR(255) NOT NULL,
+  mime_type       VARCHAR(150) NULL,
+  byte_size       INT          NULL,
+  storage_key     VARCHAR(500) NOT NULL,
+  created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_msg_att_key (storage_key),
+  KEY idx_msg_att_message (message_id),
+  CONSTRAINT fk_msg_att_message FOREIGN KEY (message_id) REFERENCES messages (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

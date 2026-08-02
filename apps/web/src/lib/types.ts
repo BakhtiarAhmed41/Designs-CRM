@@ -16,9 +16,11 @@ export type CurrentUser = {
   id: string;
   email: string;
   role: UserRole;
+  loginStatus?: 'PENDING' | 'ACTIVE' | 'DISABLED';
   firstName: string | null;
   lastName: string | null;
   phone: string | null;
+  customRoleId?: string | null;
 };
 
 export type OrderStatus =

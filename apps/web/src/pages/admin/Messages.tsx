@@ -16,6 +16,14 @@ import {
 } from '@/lib/messaging';
 import { listAdminOrders } from '@/lib/orders';
 import type { Order, OrderStatus } from '@/lib/types';
+import { useAuth } from '@/context/AuthContext';
+import {
+  getTeamChat,
+  listGroupChat,
+  listTeam,
+  sendGroupChat,
+  sendTeamChat,
+} from '@/lib/team';
 
 type FolderId =
   | 'inbox'
@@ -74,17 +82,178 @@ function labelClass(label: MessageLabel | null) {
 export function AdminMessages() {
   const [searchParams] = useSearchParams();
   const convoId = searchParams.get('c');
+  const [section, setSection] = useState<'customer' | 'team'>('customer');
 
   if (convoId) {
     return <AdminConversationView conversationId={convoId} />;
   }
 
-  return <AdminInboxView />;
+  return (
+    <div>
+      <div className="ph">
+        <div>
+          <h1>Messages</h1>
+          <div className="sub">Customer chats and internal team messaging.</div>
+        </div>
+      </div>
+      <div className="filters" style={{ marginBottom: 14 }}>
+        <button
+          type="button"
+          className={section === 'customer' ? 'on' : ''}
+          onClick={() => setSection('customer')}
+        >
+          Customer messages
+        </button>
+        <button
+          type="button"
+          className={section === 'team' ? 'on' : ''}
+          onClick={() => setSection('team')}
+        >
+          Team messages
+        </button>
+      </div>
+      {section === 'customer' ? <AdminInboxView hideHeader /> : <TeamMessagesView />}
+    </div>
+  );
 }
 
-function AdminInboxView() {
+function TeamMessagesView() {
+  const { user } = useAuth();
+  const [peerId, setPeerId] = useState<string | null>(null);
+  const [groupMode, setGroupMode] = useState(false);
+  const [draft, setDraft] = useState('');
+  const teamQ = useQuery({ queryKey: ['admin-team'], queryFn: listTeam, refetchInterval: 30_000 });
+  const groupQ = useQuery({
+    queryKey: ['team-group-chat'],
+    queryFn: listGroupChat,
+    enabled: groupMode,
+    refetchInterval: 5_000,
+  });
+  const chatQ = useQuery({
+    queryKey: ['team-chat', peerId],
+    queryFn: () => getTeamChat(peerId!),
+    enabled: !!peerId && !groupMode,
+    refetchInterval: 5_000,
+  });
+  const qc = useQueryClient();
+
+  const members = (teamQ.data?.members ?? []).filter((m) => m.id !== user?.id);
+
+  async function send() {
+    const body = draft.trim();
+    if (!body) return;
+    if (groupMode) {
+      await sendGroupChat(body);
+      qc.invalidateQueries({ queryKey: ['team-group-chat'] });
+    } else if (peerId) {
+      await sendTeamChat(peerId, body);
+      qc.invalidateQueries({ queryKey: ['team-chat', peerId] });
+    }
+    setDraft('');
+  }
+
+  return (
+    <div className="card" style={{ display: 'grid', gridTemplateColumns: '260px 1fr', minHeight: 480 }}>
+      <div style={{ borderRight: '0.5px solid var(--line)', padding: 10 }}>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          style={{
+            width: '100%',
+            justifyContent: 'flex-start',
+            marginBottom: 8,
+            background: groupMode ? 'rgba(20,63,101,.08)' : undefined,
+          }}
+          onClick={() => {
+            setGroupMode(true);
+            setPeerId(null);
+          }}
+        >
+          <i className="ti ti-users" /> Group chat (all team)
+        </button>
+        <div style={{ fontSize: 11, color: 'var(--faint)', margin: '8px 0' }}>Team members</div>
+        {members.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            onClick={() => {
+              setGroupMode(false);
+              setPeerId(m.id);
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              width: '100%',
+              textAlign: 'left',
+              padding: '8px 8px',
+              border: 'none',
+              borderRadius: 8,
+              background: !groupMode && peerId === m.id ? 'rgba(20,63,101,.08)' : 'transparent',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              fontSize: 13,
+            }}
+          >
+            <span
+              className="tm-dot"
+              style={{
+                background:
+                  m.presence === 'ON' ? 'var(--green)' : m.presence === 'AWAY' ? 'var(--amber)' : '#c3c9d1',
+              }}
+            />
+            {[m.firstName, m.lastName].filter(Boolean).join(' ') || m.email}
+          </button>
+        ))}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', padding: 12 }}>
+        <div style={{ fontWeight: 600, marginBottom: 10 }}>
+          {groupMode
+            ? 'Group chat'
+            : chatQ.data?.peer
+              ? [chatQ.data.peer.firstName, chatQ.data.peer.lastName].filter(Boolean).join(' ') ||
+                chatQ.data.peer.email
+              : 'Select a teammate'}
+        </div>
+        <div style={{ flex: 1, overflow: 'auto', marginBottom: 10 }}>
+          {(groupMode ? groupQ.data?.messages : chatQ.data?.messages)?.map((m) => (
+            <div key={m.id} style={{ marginBottom: 10, fontSize: 13 }}>
+              <div style={{ color: 'var(--muted)', fontSize: 11 }}>
+                {'senderName' in m ? m.senderName : m.mine ? 'You' : 'Them'} ·{' '}
+                {new Date(m.createdAt).toLocaleString()}
+              </div>
+              <div>{m.body}</div>
+            </div>
+          ))}
+          {!groupMode && !peerId && (
+            <div style={{ color: 'var(--muted)' }}>Pick a team member or open group chat.</div>
+          )}
+        </div>
+        {(groupMode || peerId) && (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void send();
+              }}
+              placeholder="Message…"
+              style={{ flex: 1 }}
+            />
+            <button type="button" className="btn btn-primary" onClick={() => void send()}>
+              Send
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AdminInboxView({ hideHeader }: { hideHeader?: boolean }) {
   const navigate = useNavigate();
   const [folder, setFolder] = useState<FolderId>('inbox');
+  const [customerSearch, setCustomerSearch] = useState('');
 
   const inboxQ = useQuery({
     queryKey: ['admin-conversations', 'inbox'],
@@ -106,25 +275,38 @@ function AdminInboxView() {
   const isLoading = folder === 'archived' ? archivedQ.isLoading : inboxQ.isLoading;
 
   const filtered = useMemo(() => {
+    let list = conversations;
     switch (folder) {
       case 'unread':
-        return conversations.filter((c) => c.unreadAdmin > 0);
+        list = conversations.filter((c) => c.unreadAdmin > 0);
+        break;
       case 'EDIT':
       case 'CUSTOM':
       case 'PAYMENT':
       case 'IMPORTANT':
-        return conversations.filter((c) => c.label === folder);
+        list = conversations.filter((c) => c.label === folder);
+        break;
       case 'starred':
-        return conversations.filter((c) => c.label === 'IMPORTANT');
+        list = conversations.filter((c) => c.label === 'IMPORTANT');
+        break;
       case 'sent':
-        return conversations.filter((c) => c.unreadClient > 0);
+        list = conversations.filter((c) => c.unreadClient > 0);
+        break;
       case 'archived':
-        return conversations;
+        list = conversations;
+        break;
       default:
-        // inbox: non-archived (already filtered by API)
-        return conversations;
+        list = conversations;
     }
-  }, [conversations, folder]);
+    const term = customerSearch.trim().toLowerCase();
+    if (!term) return list;
+    return list.filter(
+      (c) =>
+        (c.customerName ?? '').toLowerCase().includes(term) ||
+        (c.subject ?? '').toLowerCase().includes(term) ||
+        (c.orderRef ?? '').toLowerCase().includes(term),
+    );
+  }, [conversations, folder, customerSearch]);
 
   const inboxConversations = inboxQ.data?.conversations ?? [];
   const unreadCount = inboxConversations.filter((c) => c.unreadAdmin > 0).length;
@@ -138,16 +320,27 @@ function AdminInboxView() {
 
   return (
     <div>
-      <div className="ph">
-        <div>
-          <h1>Messages</h1>
-          <div className="sub">
-            All your customer conversations, organized with labels — just like you&apos;re used to, but tied to their orders.
+      {!hideHeader && (
+        <div className="ph">
+          <div>
+            <h1>Messages</h1>
+            <div className="sub">
+              All your customer conversations, organized with labels — just like you&apos;re used to, but tied to their orders.
+            </div>
           </div>
         </div>
+      )}
+
+      <div className="searchbar" style={{ maxWidth: 360, marginBottom: 10 }}>
+        <i className="ti ti-search si" />
+        <input
+          value={customerSearch}
+          onChange={(e) => setCustomerSearch(e.target.value)}
+          placeholder="Search customers…"
+        />
       </div>
 
-      <div className="card" style={{ marginTop: 16 }}>
+      <div className="card" style={{ marginTop: hideHeader ? 0 : 16 }}>
         <div className="inbox">
           <div className="folders">
             <div
@@ -273,7 +466,7 @@ function AdminConversationView({ conversationId }: { conversationId: string }) {
 
   const ordersQuery = useQuery({
     queryKey: ['admin-orders-msg'],
-    queryFn: () => listAdminOrders(),
+    queryFn: () => listAdminOrders({ pageSize: 500 }),
     enabled: !!thread,
   });
 
@@ -400,7 +593,13 @@ function AdminConversationView({ conversationId }: { conversationId: string }) {
               <div key={m.id} className={`tmsg ${m.direction === 'OUTBOUND' ? 'me' : 'them'}`}>
                 {m.body}
                 <div className="tm">
-                  {m.direction === 'OUTBOUND' ? 'You' : name} · {relativeTime(m.createdAt)}
+                  {m.direction === 'OUTBOUND' ? 'You' : name} ·{' '}
+                  {new Date(m.createdAt).toLocaleString([], {
+                    month: 'short',
+                    day: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })}
                 </div>
               </div>
             ))}
@@ -456,6 +655,24 @@ function AdminConversationView({ conversationId }: { conversationId: string }) {
             >
               <i className="ti ti-template" />
             </button>
+            <label className="tmpl-btn" title="Attach image or document" style={{ cursor: 'pointer' }}>
+              <i className="ti ti-paperclip" />
+              <input
+                type="file"
+                accept="image/*,.pdf,.doc,.docx,.zip,.ai,.eps,.dst,.pes,.svg"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setDraft((d) =>
+                    d
+                      ? `${d}\n📎 Attachment: ${file.name} (${Math.round(file.size / 1024)} KB)`
+                      : `📎 Attachment: ${file.name} (${Math.round(file.size / 1024)} KB)`,
+                  );
+                  e.target.value = '';
+                }}
+              />
+            </label>
             <input
               value={draft}
               placeholder="Type your reply…"

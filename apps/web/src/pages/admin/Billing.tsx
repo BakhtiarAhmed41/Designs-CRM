@@ -20,6 +20,7 @@ import {
 import { getErrorMessage } from '@/lib/api';
 import { money, dateShort } from '@/lib/format';
 import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
+import { ListToolbar } from '@/components/lists/ListToolbar';
 
 export function AdminBilling() {
   const qc = useQueryClient();
@@ -28,6 +29,8 @@ export function AdminBilling() {
   const [refundFor, setRefundFor] = useState<Invoice | null>(null);
   const [creditFor, setCreditFor] = useState<Invoice | null>(null);
   const [monthEndResult, setMonthEndResult] = useState<MonthEndResult | null>(null);
+  const [invoiceQ, setInvoiceQ] = useState('');
+  const [invoiceStatus, setInvoiceStatus] = useState('');
 
   const summaryQ = useQuery({
     queryKey: ['billing-summary'],
@@ -36,8 +39,12 @@ export function AdminBilling() {
   });
 
   const invoicesQ = useQuery({
-    queryKey: ['admin-invoices-all'],
-    queryFn: () => listInvoices(),
+    queryKey: ['admin-invoices-all', invoiceQ, invoiceStatus],
+    queryFn: () =>
+      listInvoices({
+        q: invoiceQ || undefined,
+        status: invoiceStatus || undefined,
+      }),
     refetchInterval: 30_000,
   });
 
@@ -115,6 +122,20 @@ export function AdminBilling() {
       </div>
 
       {error && <div className="alert-error" style={{ marginBottom: 14 }}>{error}</div>}
+
+      <ListToolbar
+        search={invoiceQ}
+        onSearch={setInvoiceQ}
+        searchPlaceholder="Search invoices by customer, cover, order…"
+        status={invoiceStatus}
+        onStatus={setInvoiceStatus}
+        statusOptions={[
+          { value: '', label: 'All statuses' },
+          { value: 'AWAITING', label: 'Unpaid' },
+          { value: 'PAID', label: 'Paid' },
+          { value: 'CANCELLED', label: 'Cancelled' },
+        ]}
+      />
 
       <div className="stats" style={{ marginTop: 16 }}>
         <div className="stats-grid">

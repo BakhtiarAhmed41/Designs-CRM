@@ -175,17 +175,39 @@ export class AdminOrdersController {
     @CurrentUser() user: AuthUser | undefined,
     @Query('status') status: string | undefined,
     @Query('clientId') clientId: string | undefined,
+    @Query('type') type: string | undefined,
+    @Query('q') q: string | undefined,
+    @Query('dateFrom') dateFrom: string | undefined,
+    @Query('dateTo') dateTo: string | undefined,
+    @Query('page') page: string | undefined,
+    @Query('pageSize') pageSize: string | undefined,
   ) {
     const statuses = Object.values(OrderStatus) as string[];
     const parsedStatus =
       status && statuses.includes(status)
         ? (status as OrderStatus)
         : undefined;
-    const orders = await this.orders.listAdminOrders(user, {
+    const types = Object.values(OrderType) as string[];
+    const parsedType =
+      type && types.includes(type) ? (type as OrderType) : undefined;
+    const result = await this.orders.listAdminOrders(user, {
       status: parsedStatus,
       clientId: clientId || undefined,
+      type: parsedType,
+      q: q?.trim() || undefined,
+      dateFrom: dateFrom || null,
+      dateTo: dateTo || null,
+      page: page ? Number(page) : undefined,
+      // Keep a high default so dashboards/modals that omit pagination still see full lists.
+      pageSize: pageSize ? Number(pageSize) : 500,
     });
-    return { orders };
+    return {
+      orders: result.items,
+      total: result.total,
+      page: result.page,
+      pageSize: result.pageSize,
+      totalPages: result.totalPages,
+    };
   }
 
   @Post()

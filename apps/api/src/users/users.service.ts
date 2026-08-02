@@ -6,9 +6,11 @@ type UserRow = {
   id: string;
   email: string;
   role: UserRole;
+  login_status: string;
   first_name: string | null;
   last_name: string | null;
   phone: string | null;
+  custom_role_id: string | null;
   created_at: Date;
   updated_at: Date;
 };
@@ -18,9 +20,11 @@ function toDto(u: UserRow) {
     id: u.id,
     email: u.email,
     role: u.role,
+    loginStatus: u.login_status,
     firstName: u.first_name,
     lastName: u.last_name,
     phone: u.phone,
+    customRoleId: u.custom_role_id,
     createdAt: u.created_at,
     updatedAt: u.updated_at,
   };
@@ -32,7 +36,8 @@ export class UsersService {
 
   async getById(id: string) {
     const user = await this.db.queryOne<UserRow>(
-      'SELECT id, email, role, first_name, last_name, phone, created_at, updated_at FROM users WHERE id = ? LIMIT 1',
+      `SELECT id, email, role, login_status, custom_role_id, first_name, last_name, phone, created_at, updated_at
+         FROM users WHERE id = ? LIMIT 1`,
       [id],
     );
     if (!user) throw new NotFoundException('User not found');

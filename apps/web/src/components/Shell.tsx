@@ -1,6 +1,7 @@
 import { Outlet, useNavigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { NotificationBell } from './NotificationBell';
 
 export function Shell({
   rolebar,
@@ -15,6 +16,17 @@ export function Shell({
       <div className="shell">
         {sidebar}
         <main className="main">
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              alignItems: 'center',
+              marginBottom: 4,
+              minHeight: 28,
+            }}
+          >
+            <NotificationBell />
+          </div>
           <Outlet />
         </main>
       </div>

@@ -11,6 +11,7 @@ import { getErrorMessage } from '@/lib/api';
 import { money, dateShort } from '@/lib/format';
 import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
 import type { Order, OrderStatus } from '@/lib/types';
+import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
 
 type QuoteFilter = 'all' | 'needs' | 'sent' | 'urgent';
 
@@ -30,6 +31,11 @@ const SENT: OrderStatus[] = ['QUOTATION_PROVIDED'];
 export function AdminQuotes() {
   const qc = useQueryClient();
   const [filter, setFilter] = useState<QuoteFilter>('all');
+  const [q, setQ] = useState('');
+  const [status, setStatus] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [page, setPage] = useState(1);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,22 +46,21 @@ export function AdminQuotes() {
   }, [toast]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-quotes'],
-    queryFn: () => listAdminOrders(),
+    queryKey: ['admin-quotes', q, status, dateFrom, dateTo, page],
+    queryFn: () =>
+      listAdminOrders({
+        type: 'QUOTE_REQUEST',
+        q: q || undefined,
+        status: status || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+        page,
+        pageSize: 20,
+      }),
     refetchInterval: 30_000,
   });
 
-  const allQuotes = useMemo(
-    () =>
-      (data?.orders ?? []).filter(
-        (o) =>
-          o.type === 'QUOTE_REQUEST' ||
-          NEEDS.includes(o.status) ||
-          SENT.includes(o.status) ||
-          o.status === 'CLIENT_REJECTED_QUOTATION',
-      ),
-    [data?.orders],
-  );
+  const allQuotes = useMemo(() => data?.orders ?? [], [data?.orders]);
 
   const quotes = useMemo(() => {
     switch (filter) {
@@ -135,7 +140,39 @@ export function AdminQuotes() {
 
       {error && <div className="alert-error" style={{ marginBottom: 12 }}>{error}</div>}
 
-      <div style={{ margin: '16px 0 10px' }}>
+      <ListToolbar
+        search={q}
+        onSearch={(v) => {
+          setQ(v);
+          setPage(1);
+        }}
+        searchPlaceholder="Search by name, quote #, customer…"
+        status={status}
+        onStatus={(v) => {
+          setStatus(v);
+          setPage(1);
+        }}
+        statusOptions={[
+          { value: '', label: 'All statuses' },
+          { value: 'WAITING_FOR_QUOTATION', label: 'Needs pricing' },
+          { value: 'QUOTATION_PROVIDED', label: 'Sent' },
+          { value: 'WAITING_FOR_ADMIN_QUOTATION_APPROVAL', label: 'Counter pending' },
+          { value: 'CLIENT_REJECTED_QUOTATION', label: 'Rejected' },
+          { value: 'CREATED', label: 'Draft' },
+        ]}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onDateFrom={(v) => {
+          setDateFrom(v);
+          setPage(1);
+        }}
+        onDateTo={(v) => {
+          setDateTo(v);
+          setPage(1);
+        }}
+      />
+
+      <div style={{ margin: '0 0 10px' }}>
         <div className="filters">
           <button type="button" className={filter === 'all' ? 'on' : ''} onClick={() => setFilter('all')}>
             All
@@ -164,6 +201,7 @@ export function AdminQuotes() {
             className="orow"
             style={{ textDecoration: 'none', color: 'inherit' }}
           >
+
             <div className={`othumb ${serviceThumbClass(o.serviceType)}`}>
               <i className={`ti ${serviceTi(o.serviceType)}`} />
             </div>
@@ -185,6 +223,13 @@ export function AdminQuotes() {
           </Link>
         ))}
       </div>
+
+      <PaginationBar
+        page={data?.page ?? 1}
+        totalPages={data?.totalPages ?? 1}
+        total={data?.total ?? quotes.length}
+        onPage={setPage}
+      />
 
       {followUps.length > 0 && (
         <div className="card" style={{ marginTop: 14 }}>

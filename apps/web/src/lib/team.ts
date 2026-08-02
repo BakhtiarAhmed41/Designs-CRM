@@ -113,3 +113,22 @@ export function sendTeamChat(peerId: string, body: string) {
 export function getTeamChatOwner() {
   return apiFetch<{ peerId: string | null }>('/admin/team-chat-owner');
 }
+
+export type GroupChatMessage = {
+  id: string;
+  senderUserId: string;
+  body: string;
+  createdAt: string;
+  senderName: string;
+};
+
+export function listGroupChat() {
+  return apiFetch<{ messages: GroupChatMessage[] }>('/admin/team-group-chat');
+}
+
+export function sendGroupChat(body: string) {
+  return apiFetch<{ messages: GroupChatMessage[] }>('/admin/team-group-chat', {
+    method: 'POST',
+    body: JSON.stringify({ body }),
+  });
+}
