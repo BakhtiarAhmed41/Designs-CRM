@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -18,10 +19,13 @@ import {
   UserRole,
 } from '../common/enums';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { RequireFeatures } from '../auth/decorators/features.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { FeaturesGuard } from '../auth/guards/features.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import type { AuthUser } from '../auth/auth.types';
+import { hasSupportPerm } from '../auth/permissions';
 import { CustomersService } from './customers.service';
 
 const createSchema = z.object({
@@ -57,8 +61,9 @@ const patchMeCustomerSchema = z.object({
 });
 
 @Controller('admin/customers')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, FeaturesGuard)
 @Roles(...STAFF_ROLES, UserRole.SUPER_ADMIN)
+@RequireFeatures('customers')
 export class AdminCustomersController {
   constructor(private customers: CustomersService) {}
 
@@ -96,15 +101,39 @@ export class AdminCustomersController {
   }
 
   @Post()
-  async create(@Body() body: unknown) {
+  async create(
+    @CurrentUser() user: AuthUser,
+    @Body() body: unknown,
+  ) {
     const data = createSchema.parse(body);
+    if (
+      data.accountType === AccountType.NET_MONTHLY &&
+      !hasSupportPerm(user.role, user.permissions, 'netTerms')
+    ) {
+      throw new ForbiddenException(
+        'Missing permission to grant net-monthly terms',
+      );
+    }
     const customer = await this.customers.create(data);
     return { customer };
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() body: unknown) {
+  async update(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
     const data = updateSchema.parse(body);
+    if (
+      (data.accountType === AccountType.NET_MONTHLY ||
+        data.netTerms !== undefined) &&
+      !hasSupportPerm(user.role, user.permissions, 'netTerms')
+    ) {
+      throw new ForbiddenException(
+        'Missing permission to grant net-monthly terms',
+      );
+    }
     const customer = await this.customers.update(id, data);
     return { customer };
   }

@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Brand, LogoutLink, Shell, useShellUser } from './Shell';
 import { listMyOrders } from '@/lib/orders';
 import { listMyInvoices } from '@/lib/billing';
 import { listMyConversations } from '@/lib/messaging';
 import { getMyCustomer } from '@/lib/customers';
+import { useMessagingSocket } from '@/hooks/useMessagingSocket';
 
 type NavEntry = {
   to: string;
@@ -18,6 +19,15 @@ type NavEntry = {
 
 export function PortalShell() {
   const { user, initials, onLogout } = useShellUser();
+  const qc = useQueryClient();
+  useMessagingSocket({
+    onUnreadChanged: () => {
+      void qc.invalidateQueries({ queryKey: ['portal-convos-nav'] });
+    },
+    onMessageNew: () => {
+      void qc.invalidateQueries({ queryKey: ['portal-convos-nav'] });
+    },
+  });
 
   const { data: ordersData } = useQuery({
     queryKey: ['portal-orders-nav'],
@@ -30,6 +40,7 @@ export function PortalShell() {
   const { data: convos } = useQuery({
     queryKey: ['portal-convos-nav'],
     queryFn: listMyConversations,
+    refetchInterval: 20_000,
   });
   const { data: meCustomer } = useQuery({
     queryKey: ['portal-customer-me'],
@@ -161,13 +172,5 @@ export function PortalShell() {
     </aside>
   );
 
-  // Prototype demobar is demo-only; keep sticky offset without fake account switching
-  const demobar = (
-    <div className="demobar">
-      <b>Customer portal</b>
-      <span className="hint">Live account · {badgeLabel}</span>
-    </div>
-  );
-
-  return <Shell rolebar={demobar} sidebar={sidebar} />;
+  return <Shell sidebar={sidebar} />;
 }

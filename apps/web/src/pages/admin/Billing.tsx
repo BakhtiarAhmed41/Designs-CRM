@@ -193,6 +193,7 @@ export function AdminBilling() {
                 type="button"
                 className="btn btn-ghost btn-sm"
                 disabled={remindMut.isPending}
+                title="Sends an in-portal payment reminder with a confirmation link"
                 onClick={(e) => {
                   e.stopPropagation();
                   remindMut.mutate(inv.id);

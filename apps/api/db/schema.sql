@@ -335,6 +335,8 @@ CREATE TABLE IF NOT EXISTS conversations (
   id             CHAR(36) NOT NULL,
   customer_id    CHAR(36) NULL,
   order_id       CHAR(36) NULL,
+  chat_type      ENUM('GENERAL','ORDER','QUOTE') NOT NULL DEFAULT 'GENERAL',
+  status         ENUM('OPEN','CLOSED') NOT NULL DEFAULT 'OPEN',
   subject        VARCHAR(255) NULL,
   label          ENUM('EDIT','PAYMENT','CUSTOM','IMPORTANT') NULL,
   source         ENUM('PORTAL','SITE_CHAT') NOT NULL DEFAULT 'PORTAL',
@@ -347,16 +349,20 @@ CREATE TABLE IF NOT EXISTS conversations (
   PRIMARY KEY (id),
   KEY idx_convo_customer (customer_id),
   KEY idx_convo_order (order_id),
+  KEY idx_convo_chat_type (chat_type),
+  KEY idx_convo_status (status),
   CONSTRAINT fk_convo_customer FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS messages (
-  id              CHAR(36) NOT NULL,
-  conversation_id CHAR(36) NOT NULL,
-  sender_user_id  CHAR(36) NULL,
-  direction       ENUM('INBOUND','OUTBOUND') NOT NULL,
-  body            TEXT NOT NULL,
-  created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  id                  CHAR(36) NOT NULL,
+  conversation_id     CHAR(36) NOT NULL,
+  sender_user_id      CHAR(36) NULL,
+  direction           ENUM('INBOUND','OUTBOUND') NOT NULL,
+  body                TEXT NOT NULL,
+  reply_to_message_id CHAR(36) NULL,
+  deleted_at          DATETIME NULL,
+  created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_msg_convo (conversation_id),
   CONSTRAINT fk_msg_convo FOREIGN KEY (conversation_id) REFERENCES conversations (id) ON DELETE CASCADE
@@ -407,10 +413,12 @@ CREATE TABLE IF NOT EXISTS staff_messages (
   from_user_id CHAR(36) NOT NULL,
   to_user_id   CHAR(36) NOT NULL,
   body         TEXT NOT NULL,
+  read_at      DATETIME NULL,
   created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_staff_msg_pair (from_user_id, to_user_id, created_at),
   KEY idx_staff_msg_to (to_user_id, created_at),
+  KEY idx_staff_msg_unread (to_user_id, read_at),
   CONSTRAINT fk_staff_msg_from FOREIGN KEY (from_user_id) REFERENCES users (id) ON DELETE CASCADE,
   CONSTRAINT fk_staff_msg_to FOREIGN KEY (to_user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -425,6 +433,13 @@ CREATE TABLE IF NOT EXISTS staff_group_messages (
   CONSTRAINT fk_sgm_sender FOREIGN KEY (sender_user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS staff_group_reads (
+  user_id      CHAR(36) NOT NULL,
+  last_read_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id),
+  CONSTRAINT fk_sgr_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS message_attachments (
   id              CHAR(36)     NOT NULL,
   message_id      CHAR(36)     NOT NULL,
@@ -437,4 +452,18 @@ CREATE TABLE IF NOT EXISTS message_attachments (
   UNIQUE KEY uq_msg_att_key (storage_key),
   KEY idx_msg_att_message (message_id),
   CONSTRAINT fk_msg_att_message FOREIGN KEY (message_id) REFERENCES messages (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS staff_message_attachments (
+  id              CHAR(36)     NOT NULL,
+  message_id      CHAR(36)     NOT NULL,
+  channel         ENUM('DM','GROUP') NOT NULL,
+  original_name   VARCHAR(255) NOT NULL,
+  mime_type       VARCHAR(150) NULL,
+  byte_size       INT          NULL,
+  storage_key     VARCHAR(500) NOT NULL,
+  created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_staff_msg_att_key (storage_key),
+  KEY idx_staff_msg_att_message (message_id, channel)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

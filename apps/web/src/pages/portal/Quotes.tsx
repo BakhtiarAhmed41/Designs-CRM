@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { QuoteBuilderModal } from '@/components/QuoteBuilderModal';
 import { acceptQuotation, listMyOrders, rejectQuotation } from '@/lib/orders';
+import { createMyConversation, listMyConversations } from '@/lib/messaging';
 import { getErrorMessage } from '@/lib/api';
 import { money, dateShort } from '@/lib/format';
 import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
@@ -101,6 +102,26 @@ export function PortalQuotes() {
       setError(null);
       qc.invalidateQueries({ queryKey: ['my-orders'] });
     },
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
+  const startQuoteChat = useMutation({
+    mutationFn: async (order: Order) => {
+      const listed = await listMyConversations();
+      const existing = listed.conversations.find(
+        (c) => c.orderId === order.id && c.chatType === 'QUOTE',
+      );
+      if (existing) return existing;
+      const created = await createMyConversation({
+        orderId: order.id,
+        chatType: 'QUOTE',
+        subject: order.humanRef
+          ? `Quotation ${order.humanRef} Chat`
+          : 'Quotation Chat',
+      });
+      return created.conversation;
+    },
+    onSuccess: (convo) => navigate(`/portal/messages?c=${convo.id}`),
     onError: (e) => setError(getErrorMessage(e)),
   });
 
@@ -297,13 +318,17 @@ export function PortalQuotes() {
                         flexWrap: 'wrap',
                       }}
                     >
-                      <Link
-                        to="/portal/messages"
+                      <button
+                        type="button"
                         className="btn btn-ghost btn-sm"
-                        onClick={(e) => e.stopPropagation()}
+                        disabled={startQuoteChat.isPending}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startQuoteChat.mutate(o);
+                        }}
                       >
-                        <i className="ti ti-message" /> Ask a question
-                      </Link>
+                        <i className="ti ti-message" /> Start Chat
+                      </button>
                       <button
                         type="button"
                         className="btn btn-ghost btn-sm"

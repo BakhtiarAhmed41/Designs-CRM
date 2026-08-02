@@ -1,38 +1,37 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Brand, LogoutLink, Shell, useShellUser } from './Shell';
 import { TeamChatPanel } from './TeamChatPanel';
-import { getTeamChatOwner, listTeam, type Presence } from '@/lib/team';
-import type { UserRole } from '@/lib/types';
+import { getTeamChatOwner, getTeamUnreadSummary, listTeam, type Presence } from '@/lib/team';
+import { getAdminUnreadSummary } from '@/lib/messaging';
+import { canAnyMessaging, featuresForNav } from '@/lib/permissions';
+import type { FeatureKey, UserRole } from '@/lib/types';
+import { useMessagingSocket } from '@/hooks/useMessagingSocket';
 
 type ViewRole = 'SUPER_ADMIN' | 'ADMIN' | 'SUPPORT' | 'DESIGNER';
 
 const ROLE_META: Record<
   ViewRole,
-  { label: string; seg: string; sideSub: string; footRole: string }
+  { label: string; sideSub: string; footRole: string }
 > = {
   SUPER_ADMIN: {
     label: 'Super Admin',
-    seg: 'super',
     sideSub: 'Command center',
     footRole: 'Owner · Super Admin',
   },
   ADMIN: {
     label: 'Admin',
-    seg: 'admin',
     sideSub: 'Operations',
     footRole: 'Admin · Operations',
   },
   SUPPORT: {
     label: 'Support',
-    seg: 'support',
     sideSub: 'Support desk',
     footRole: 'Support',
   },
   DESIGNER: {
     label: 'Designer',
-    seg: 'designer',
     sideSub: 'Designer workspace',
     footRole: 'Designer',
   },
@@ -43,10 +42,6 @@ function roleKey(role: UserRole): ViewRole {
     return role;
   }
   return 'ADMIN';
-}
-
-function canSee(roles: string, view: ViewRole) {
-  return roles.split(',').includes(ROLE_META[view].seg);
 }
 
 function presenceColor(p: Presence) {
@@ -80,6 +75,7 @@ export function AdminShell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to team param
   }, [teamParam]);
 
+  const qc = useQueryClient();
   const { data: teamData } = useQuery({
     queryKey: ['admin-team'],
     queryFn: listTeam,
@@ -88,12 +84,42 @@ export function AdminShell() {
   const members = (teamData?.members ?? []).filter((m) => m.id !== user?.id);
   const onlineCount = (teamData?.members ?? []).filter((m) => m.presence === 'ON').length;
   const meta = ROLE_META[viewAs];
+  const features = featuresForNav(actual, viewAs, user?.permissions);
+  const can = (key: FeatureKey) => Boolean(features[key]);
+  const isDesignerView = viewAs === 'DESIGNER';
+  const showMessages = canAnyMessaging(features);
+  const showCustomerMessages = can('messages') || can('messages_customer_view');
+  const showTeamMessages = can('messages') || can('messages_team_view');
+  const showOwnerChat =
+    viewAs !== 'SUPER_ADMIN' && (showTeamMessages || isDesignerView);
+
+  const { data: customerUnread } = useQuery({
+    queryKey: ['admin-unread-messages'],
+    queryFn: getAdminUnreadSummary,
+    enabled: showCustomerMessages,
+    refetchInterval: 20_000,
+  });
+  const { data: teamUnread } = useQuery({
+    queryKey: ['team-unread'],
+    queryFn: getTeamUnreadSummary,
+    enabled: showTeamMessages,
+    refetchInterval: 20_000,
+  });
+  useMessagingSocket({
+    onUnreadChanged: () => {
+      void qc.invalidateQueries({ queryKey: ['admin-unread-messages'] });
+      void qc.invalidateQueries({ queryKey: ['team-unread'] });
+    },
+  });
+  const customerBadge = customerUnread?.unreadConversations ?? 0;
+  const teamBadge =
+    (teamUnread?.dmUnread ?? 0) + (teamUnread?.groupUnread ?? 0);
 
   const rolebar =
     actual === 'SUPER_ADMIN' ? (
       <div className="rolebar">
         <div className="rb-l">
-          Viewing as
+          Preview nav as
           <div className="seg">
             {(Object.keys(ROLE_META) as ViewRole[]).map((r) => (
               <button
@@ -108,7 +134,9 @@ export function AdminShell() {
           </div>
         </div>
         <div className="rb-r">
-          <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{onlineCount} online</span>
+          <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>
+            Sidebar only · {onlineCount} online
+          </span>
         </div>
       </div>
     ) : undefined;
@@ -117,45 +145,60 @@ export function AdminShell() {
     <aside className="side">
       <Brand subtitle={meta.sideSub} />
       <nav className="nav" id="nav">
-        {canSee('super,admin,support', viewAs) && (
+        {can('dashboard') && (
           <NavLink to="/admin" end className={({ isActive }) => (isActive ? 'on' : undefined)}>
             <i className="ti ti-home" /> Dashboard
           </NavLink>
         )}
-        {canSee('designer', viewAs) && (
+        {isDesignerView && (
           <NavLink to="/admin/mywork" className={({ isActive }) => (isActive ? 'on' : undefined)}>
             <i className="ti ti-briefcase" /> My work
           </NavLink>
         )}
-        {canSee('super,admin,support,designer', viewAs) && (
+        {showMessages && (
           <>
-            <NavLink to="/admin/messages" className={({ isActive }) => (isActive ? 'on' : undefined)}>
-              <i className="ti ti-message" /> Messages
-            </NavLink>
-            <NavLink to="/admin/orders" className={({ isActive }) => (isActive ? 'on' : undefined)}>
-              <i className="ti ti-package" /> Orders
-            </NavLink>
+            <div className="divider">Messages</div>
+            {showCustomerMessages && (
+              <NavLink
+                to="/admin/messages/customers"
+                className={({ isActive }) => (isActive ? 'on' : undefined)}
+              >
+                <i className="ti ti-message-circle" /> Customer Messages
+                {customerBadge > 0 && <span className="cnt">{customerBadge}</span>}
+              </NavLink>
+            )}
+            {showTeamMessages && (
+              <NavLink
+                to="/admin/messages/team"
+                className={({ isActive }) => (isActive ? 'on' : undefined)}
+              >
+                <i className="ti ti-messages" /> Team Messages
+                {teamBadge > 0 && <span className="cnt">{teamBadge}</span>}
+              </NavLink>
+            )}
           </>
         )}
-        {canSee('super,admin,support', viewAs) && (
-          <>
-            <NavLink to="/admin/quotes" className={({ isActive }) => (isActive ? 'on' : undefined)}>
-              <i className="ti ti-file-invoice" /> Quotes
-            </NavLink>
-            <NavLink to="/admin/edits" className={({ isActive }) => (isActive ? 'on' : undefined)}>
-              <i className="ti ti-refresh" /> Edits
-            </NavLink>
-            <NavLink to="/admin/customers" className={({ isActive }) => (isActive ? 'on' : undefined)}>
-              <i className="ti ti-users" /> Customers
-            </NavLink>
-          </>
+        {can('orders') && (
+          <NavLink to="/admin/orders" className={({ isActive }) => (isActive ? 'on' : undefined)}>
+            <i className="ti ti-package" /> Orders
+          </NavLink>
         )}
-        {canSee('designer', viewAs) && (
+        {can('quotes') && (
+          <NavLink to="/admin/quotes" className={({ isActive }) => (isActive ? 'on' : undefined)}>
+            <i className="ti ti-file-invoice" /> Quotes
+          </NavLink>
+        )}
+        {can('edits') && (
           <NavLink to="/admin/edits" className={({ isActive }) => (isActive ? 'on' : undefined)}>
             <i className="ti ti-refresh" /> Edits
           </NavLink>
         )}
-        {canSee('super,admin', viewAs) && (
+        {can('customers') && (
+          <NavLink to="/admin/customers" className={({ isActive }) => (isActive ? 'on' : undefined)}>
+            <i className="ti ti-users" /> Customers
+          </NavLink>
+        )}
+        {can('billing') && (
           <>
             <div className="divider">Money</div>
             <NavLink to="/admin/billing" className={({ isActive }) => (isActive ? 'on' : undefined)}>
@@ -163,7 +206,7 @@ export function AdminShell() {
             </NavLink>
           </>
         )}
-        {canSee('super,admin,support', viewAs) && (
+        {can('customers') && (
           <NavLink
             to="/admin/login-requests"
             className={({ isActive }) => (isActive ? 'on' : undefined)}
@@ -171,21 +214,25 @@ export function AdminShell() {
             <i className="ti ti-user-plus" /> Login requests
           </NavLink>
         )}
-        {canSee('super', viewAs) && (
+        {(can('team') || can('roles')) && (
           <>
             <div className="divider">Team</div>
-            <NavLink to="/admin/team" className={({ isActive }) => (isActive ? 'on' : undefined)}>
-              <i className="ti ti-users-group" /> Team{' '}
-              <span className="cnt" id="team-online">
-                {onlineCount} on
-              </span>
-            </NavLink>
-            <NavLink to="/admin/roles" className={({ isActive }) => (isActive ? 'on' : undefined)}>
-              <i className="ti ti-shield-lock" /> Roles &amp; users
-            </NavLink>
+            {can('team') && (
+              <NavLink to="/admin/team" className={({ isActive }) => (isActive ? 'on' : undefined)}>
+                <i className="ti ti-users-group" /> Team{' '}
+                <span className="cnt" id="team-online">
+                  {onlineCount} on
+                </span>
+              </NavLink>
+            )}
+            {can('roles') && (
+              <NavLink to="/admin/roles" className={({ isActive }) => (isActive ? 'on' : undefined)}>
+                <i className="ti ti-shield-lock" /> Roles &amp; users
+              </NavLink>
+            )}
           </>
         )}
-        {canSee('super,admin', viewAs) &&
+        {can('team') &&
           members.slice(0, 6).map((m) => (
             <a
               key={m.id}
@@ -200,7 +247,7 @@ export function AdminShell() {
               {memberLabel(m)}
             </a>
           ))}
-        {canSee('designer,support,admin', viewAs) && !canSee('super', viewAs) && (
+        {showOwnerChat && (
           <>
             <div className="divider">Chat</div>
             <a

@@ -12,6 +12,36 @@ export const STAFF_ROLES: UserRole[] = [
   'DESIGNER',
 ];
 
+export type FeatureKey =
+  | 'dashboard'
+  | 'messages'
+  | 'messages_customer_view'
+  | 'messages_customer_reply'
+  | 'messages_customer_start'
+  | 'messages_team_view'
+  | 'messages_team_send'
+  | 'messages_group'
+  | 'messages_delete'
+  | 'orders'
+  | 'quotes'
+  | 'edits'
+  | 'customers'
+  | 'billing'
+  | 'team'
+  | 'roles';
+
+export type SupportPermissions = {
+  money: boolean;
+  approve: boolean;
+  netTerms: boolean;
+  messages: boolean;
+};
+
+export type UserPermissions = {
+  features: Record<FeatureKey, boolean>;
+  support: SupportPermissions;
+};
+
 export type CurrentUser = {
   id: string;
   email: string;
@@ -21,6 +51,7 @@ export type CurrentUser = {
   lastName: string | null;
   phone: string | null;
   customRoleId?: string | null;
+  permissions?: UserPermissions;
 };
 
 export type OrderStatus =

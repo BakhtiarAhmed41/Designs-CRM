@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   adminAttachmentUrl,
   adminRejectOrder,
+  adminUploadAttachments,
   approveCounter,
   getAdminOrder,
   rejectCounter,
@@ -19,6 +20,7 @@ import { getCustomer } from '@/lib/customers';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import { money, dateShort } from '@/lib/format';
 import { FormPreferencesDisplay } from '@/components/FormPreferencesDisplay';
+import { MessageAttachments } from '@/components/MessageAttachments';
 import type { Order } from '@/lib/types';
 
 function designsCountLabel(order: Order): string {
@@ -57,6 +59,8 @@ export function AdminQuoteDetail() {
   const [lines, setLines] = useState<QuoteLine[]>([emptyLine()]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [msgDraft, setMsgDraft] = useState('');
+  const [msgFiles, setMsgFiles] = useState<File[]>([]);
+  const [refUploading, setRefUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
@@ -102,21 +106,40 @@ export function AdminQuoteDetail() {
   }, [lines]);
 
   const sendMsg = useMutation({
-    mutationFn: async (body: string) => {
-      if (convo) return sendAdminMessage(convo.id, body);
+    mutationFn: async ({ body, files }: { body: string; files: File[] }) => {
+      if (convo) return sendAdminMessage(convo.id, body, files);
       const created = await createAdminConversation({
         orderId: id,
         customerId: order?.customerId ?? null,
-        subject: order?.name ?? `Quote Q-${order?.humanRef ?? id.slice(0, 6)}`,
+        chatType: 'QUOTE',
+        subject: order?.humanRef
+          ? `Quotation ${order.humanRef} Chat`
+          : `Quotation Chat`,
       });
-      return sendAdminMessage(created.conversation.id, body);
+      return sendAdminMessage(created.conversation.id, body, files);
     },
     onSuccess: () => {
       setMsgDraft('');
+      setMsgFiles([]);
       qc.invalidateQueries({ queryKey: ['admin-conversation'] });
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
+
+  async function uploadReferenceFiles(selected: FileList | null) {
+    const list = Array.from(selected ?? []);
+    if (!list.length || !id) return;
+    setRefUploading(true);
+    setError(null);
+    try {
+      await adminUploadAttachments(id, list);
+      qc.invalidateQueries({ queryKey: ['admin-order', id] });
+    } catch (e) {
+      setError(getErrorMessage(e));
+    } finally {
+      setRefUploading(false);
+    }
+  }
 
   const declineMut = useMutation({
     mutationFn: () =>
@@ -272,6 +295,20 @@ export function AdminQuoteDetail() {
                   <i className="ti ti-photo" style={{ color: 'var(--navy)' }} /> {a.originalName}
                 </button>
               ))}
+              <label className="odf up">
+                <i className="ti ti-cloud-upload" />{' '}
+                {refUploading ? 'Uploading…' : 'Upload artwork'}
+                <input
+                  type="file"
+                  multiple
+                  hidden
+                  disabled={refUploading}
+                  onChange={(e) => {
+                    void uploadReferenceFiles(e.target.files);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
             </div>
           </div>
 
@@ -284,7 +321,8 @@ export function AdminQuoteDetail() {
             <div className="thread">
               {messages.map((m) => (
                 <div key={m.id} className={`tmsg ${m.direction === 'OUTBOUND' ? 'me' : 'them'}`}>
-                  {m.body}
+                  {m.body && m.body !== '(attachment)' ? <div>{m.body}</div> : null}
+                  <MessageAttachments attachments={m.attachments} />
                   <div className="tm">
                     {m.direction === 'OUTBOUND' ? 'You' : customerName(order)} · {dateShort(m.createdAt)}
                   </div>
@@ -294,20 +332,52 @@ export function AdminQuoteDetail() {
                 <div style={{ color: 'var(--muted)', fontSize: 12 }}>No messages yet.</div>
               )}
             </div>
+            {msgFiles.length > 0 && (
+              <div style={{ padding: '0 14px 8px', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {msgFiles.map((f, i) => (
+                  <button
+                    key={`${f.name}-${i}`}
+                    type="button"
+                    className="odf"
+                    onClick={() => setMsgFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                  >
+                    <i className="ti ti-paperclip" /> {f.name} <i className="ti ti-x" />
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="thread-in">
+              <label className="tmpl-btn" title="Attach file" style={{ cursor: 'pointer' }}>
+                <i className="ti ti-paperclip" />
+                <input
+                  type="file"
+                  multiple
+                  hidden
+                  onChange={(e) => {
+                    const list = Array.from(e.target.files ?? []);
+                    if (list.length) setMsgFiles((prev) => [...prev, ...list].slice(0, 8));
+                    e.target.value = '';
+                  }}
+                />
+              </label>
               <input
                 value={msgDraft}
                 placeholder="Reply — ask a question before pricing if you need to…"
                 onChange={(e) => setMsgDraft(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && msgDraft.trim()) sendMsg.mutate(msgDraft.trim());
+                  if (e.key === 'Enter' && (msgDraft.trim() || msgFiles.length > 0)) {
+                    sendMsg.mutate({ body: msgDraft.trim(), files: msgFiles });
+                  }
                 }}
               />
               <button
                 type="button"
                 className="btn btn-primary btn-sm"
-                disabled={!msgDraft.trim() || sendMsg.isPending}
-                onClick={() => msgDraft.trim() && sendMsg.mutate(msgDraft.trim())}
+                disabled={(!msgDraft.trim() && msgFiles.length === 0) || sendMsg.isPending}
+                onClick={() =>
+                  (msgDraft.trim() || msgFiles.length > 0) &&
+                  sendMsg.mutate({ body: msgDraft.trim(), files: msgFiles })
+                }
               >
                 <i className="ti ti-send" />
               </button>

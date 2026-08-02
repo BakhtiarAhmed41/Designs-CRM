@@ -24,7 +24,9 @@ import {
   STAFF_ROLES,
 } from '../common/enums';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { RequireFeatures, RequireSupport } from '../auth/decorators/features.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { FeaturesGuard } from '../auth/guards/features.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { OrdersService } from './orders.service';
@@ -165,8 +167,9 @@ function parseBool(value: unknown, defaultValue: boolean): boolean {
 }
 
 @Controller('admin/orders')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, FeaturesGuard)
 @Roles(...STAFF_ROLES)
+@RequireFeatures('orders', 'quotes')
 export class AdminOrdersController {
   constructor(private orders: OrdersService) {}
 
@@ -276,6 +279,7 @@ export class AdminOrdersController {
   }
 
   @Patch(':id/approve')
+  @RequireSupport('approve')
   async approve(@CurrentUser() user: AuthUser | undefined, @Param('id') id: string) {
     const order = await this.orders.approveOrder(user, id);
     return { order };
@@ -354,6 +358,7 @@ export class AdminOrdersController {
   }
 
   @Patch(':id/quotations/counter/approve')
+  @RequireSupport('approve')
   async approveCounter(
     @CurrentUser() user: AuthUser | undefined,
     @Param('id') id: string,
@@ -414,6 +419,26 @@ export class AdminOrdersController {
     const data = quoteBuilderSchema.parse(body);
     const quotation = await this.orders.submitQuoteBuilder(user, id, data);
     return { quotation };
+  }
+
+  @Post(':id/attachments')
+  @UseInterceptors(
+    FilesInterceptor('files', 20, {
+      storage: memoryStorage(),
+      limits: { fileSize: 25 * 1024 * 1024 },
+    }),
+  )
+  async uploadAttachments(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('id') id: string,
+    @UploadedFiles() files: Express.Multer.File[],
+  ) {
+    const attachments = await this.orders.adminUploadOrderAttachments(
+      user,
+      id,
+      files,
+    );
+    return { attachments };
   }
 
   @Get(':id/attachments/:attachmentId/signed-url')

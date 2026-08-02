@@ -11,7 +11,9 @@ import {
 } from '@nestjs/common';
 import { z } from 'zod';
 import { LoginStatus, UserRole } from '../common/enums';
+import { RequireFeatures } from '../auth/decorators/features.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { FeaturesGuard } from '../auth/guards/features.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { RolesService } from './roles.service';
@@ -60,8 +62,9 @@ const updateUserSchema = z.object({
 });
 
 @Controller('admin')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, FeaturesGuard)
 @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+@RequireFeatures('roles')
 export class RolesController {
   constructor(private roles: RolesService) {}
 

@@ -117,7 +117,7 @@ export function GlobalSearch({
                 <div
                   key={c.id}
                   className="sd-item"
-                  onClick={() => go(`/admin/messages?c=${c.id}`)}
+                  onClick={() => go(`/admin/messages/customers/${c.id}`)}
                 >
                   <div className="sd-t">{c.subject || 'Conversation'}</div>
                 </div>

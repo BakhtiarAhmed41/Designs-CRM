@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { UserRole } from '../common/enums';
 import { DbService } from '../db/db.service';
+import { resolvePermissions } from '../auth/permissions';
 
 type UserRow = {
   id: string;
@@ -11,6 +12,8 @@ type UserRow = {
   last_name: string | null;
   phone: string | null;
   custom_role_id: string | null;
+  permissions: unknown;
+  cr_permissions: unknown | null;
   created_at: Date;
   updated_at: Date;
 };
@@ -25,6 +28,11 @@ function toDto(u: UserRow) {
     lastName: u.last_name,
     phone: u.phone,
     customRoleId: u.custom_role_id,
+    permissions: resolvePermissions({
+      role: u.role,
+      userPermissions: u.permissions,
+      customRolePermissions: u.cr_permissions,
+    }),
     createdAt: u.created_at,
     updatedAt: u.updated_at,
   };
@@ -36,8 +44,13 @@ export class UsersService {
 
   async getById(id: string) {
     const user = await this.db.queryOne<UserRow>(
-      `SELECT id, email, role, login_status, custom_role_id, first_name, last_name, phone, created_at, updated_at
-         FROM users WHERE id = ? LIMIT 1`,
+      `SELECT u.id, u.email, u.role, u.login_status, u.custom_role_id, u.permissions,
+              u.first_name, u.last_name, u.phone, u.created_at, u.updated_at,
+              r.permissions AS cr_permissions
+         FROM users u
+         LEFT JOIN custom_roles r ON r.id = u.custom_role_id
+        WHERE u.id = ?
+        LIMIT 1`,
       [id],
     );
     if (!user) throw new NotFoundException('User not found');

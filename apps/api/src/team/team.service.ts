@@ -2,12 +2,25 @@ import { randomUUID } from 'crypto';
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
+  Optional,
+  forwardRef,
 } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { OrderStatus, Presence, UserRole } from '../common/enums';
 import { DbService } from '../db/db.service';
+import { MessagingGateway } from '../messaging/messaging.gateway';
+import { NotificationsService } from '../notifications/notifications.service';
+import { LocalStorageService } from '../storage/local-storage.service';
+
+export type UploadFile = {
+  originalname: string;
+  mimetype?: string;
+  size: number;
+  buffer: Buffer;
+};
 
 type StaffRow = {
   id: string;
@@ -51,7 +64,14 @@ function parseJson<T>(value: unknown, fallback: T): T {
 
 @Injectable()
 export class TeamService {
-  constructor(private db: DbService) {}
+  constructor(
+    private db: DbService,
+    private storage: LocalStorageService,
+    private notifications: NotificationsService,
+    @Optional()
+    @Inject(forwardRef(() => MessagingGateway))
+    private gateway?: MessagingGateway,
+  ) {}
 
   private staffDto(u: StaffRow, workload = 0) {
     return {
@@ -277,24 +297,126 @@ export class TeamService {
     return { orderId, assignedDesignerId: userId };
   }
 
+  private async staffAttachments(messageIds: string[], channel: 'DM' | 'GROUP') {
+    if (messageIds.length === 0) return new Map<string, Array<{
+      id: string;
+      originalName: string;
+      mimeType: string | null;
+      byteSize: number | null;
+      url: string;
+    }>>();
+    const placeholders = messageIds.map(() => '?').join(',');
+    const rows = await this.db.query<{
+      id: string;
+      message_id: string;
+      original_name: string;
+      mime_type: string | null;
+      byte_size: number | null;
+      storage_key: string;
+    }>(
+      `SELECT id, message_id, original_name, mime_type, byte_size, storage_key
+         FROM staff_message_attachments
+        WHERE channel = ? AND message_id IN (${placeholders})`,
+      [channel, ...messageIds],
+    );
+    const map = new Map<
+      string,
+      Array<{
+        id: string;
+        originalName: string;
+        mimeType: string | null;
+        byteSize: number | null;
+        url: string;
+      }>
+    >();
+    for (const row of rows) {
+      const url = await this.storage.createSignedUrl({
+        key: row.storage_key,
+        downloadAs: row.original_name,
+      });
+      const list = map.get(row.message_id) ?? [];
+      list.push({
+        id: row.id,
+        originalName: row.original_name,
+        mimeType: row.mime_type,
+        byteSize: row.byte_size,
+        url,
+      });
+      map.set(row.message_id, list);
+    }
+    return map;
+  }
+
+  private async saveStaffAttachments(
+    messageId: string,
+    channel: 'DM' | 'GROUP',
+    files: UploadFile[],
+  ) {
+    const out = [];
+    for (const file of files) {
+      const key = this.storage.newObjectKey(
+        ['team-chat', channel.toLowerCase(), messageId],
+        file.originalname,
+      );
+      await this.storage.uploadObject({
+        key,
+        body: file.buffer,
+        contentType: file.mimetype,
+      });
+      const id = randomUUID();
+      await this.db.execute(
+        `INSERT INTO staff_message_attachments
+           (id, message_id, channel, original_name, mime_type, byte_size, storage_key)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          messageId,
+          channel,
+          file.originalname.slice(0, 255),
+          file.mimetype ?? null,
+          file.size,
+          key,
+        ],
+      );
+      const url = await this.storage.createSignedUrl({
+        key,
+        downloadAs: file.originalname,
+      });
+      out.push({
+        id,
+        originalName: file.originalname,
+        mimeType: file.mimetype ?? null,
+        byteSize: file.size,
+        url,
+      });
+    }
+    return out;
+  }
+
   async listStaffChat(meId: string, peerId: string) {
     const peer = await this.getStaffRow(peerId);
     if (!peer || peer.role === UserRole.CLIENT)
       throw new NotFoundException('Team member not found');
+    await this.markStaffChatRead(meId, peerId);
     const rows = await this.db.query<{
       id: string;
       from_user_id: string;
       to_user_id: string;
       body: string;
+      read_at: Date | null;
       created_at: Date;
     }>(
-      `SELECT id, from_user_id, to_user_id, body, created_at
+      `SELECT id, from_user_id, to_user_id, body, read_at, created_at
          FROM staff_messages
         WHERE (from_user_id = ? AND to_user_id = ?)
            OR (from_user_id = ? AND to_user_id = ?)
         ORDER BY created_at ASC
         LIMIT 200`,
       [meId, peerId, peerId, meId],
+    );
+    const attMap = await this.staffAttachments(
+      rows.map((r) => r.id),
+      'DM',
     );
     return {
       peer: this.staffDto(peer),
@@ -303,15 +425,34 @@ export class TeamService {
         fromUserId: m.from_user_id,
         toUserId: m.to_user_id,
         body: m.body,
+        readAt: m.read_at,
         createdAt: m.created_at,
         mine: m.from_user_id === meId,
+        attachments: attMap.get(m.id) ?? [],
       })),
     };
   }
 
-  async sendStaffChat(meId: string, peerId: string, body: string) {
+  async markStaffChatRead(meId: string, peerId: string) {
+    await this.db.execute(
+      `UPDATE staff_messages
+          SET read_at = NOW()
+        WHERE to_user_id = ? AND from_user_id = ? AND read_at IS NULL`,
+      [meId, peerId],
+    );
+    this.gateway?.emitToUser(meId, 'unread:changed', { scope: 'team' });
+    return { ok: true };
+  }
+
+  async sendStaffChat(
+    meId: string,
+    peerId: string,
+    body: string,
+    files: UploadFile[] = [],
+  ) {
     const text = body.trim();
-    if (!text) throw new BadRequestException('Message required');
+    if (!text && files.length === 0)
+      throw new BadRequestException('Message or attachment required');
     const peer = await this.getStaffRow(peerId);
     if (!peer || peer.role === UserRole.CLIENT)
       throw new NotFoundException('Team member not found');
@@ -319,9 +460,21 @@ export class TeamService {
     await this.db.execute(
       `INSERT INTO staff_messages (id, from_user_id, to_user_id, body)
        VALUES (?, ?, ?, ?)`,
-      [id, meId, peerId, text],
+      [id, meId, peerId, text || '(attachment)'],
     );
-    return this.listStaffChat(meId, peerId);
+    await this.saveStaffAttachments(id, 'DM', files);
+    await this.notifications.createFor(peerId, {
+      title: 'New team message',
+      body: (text || 'Sent an attachment').slice(0, 140),
+      link: `/admin/messages/team?peer=${meId}`,
+    });
+    const payload = await this.listStaffChat(meId, peerId);
+    this.gateway?.emitTeamDm(meId, peerId, 'team:message', {
+      peerId: meId,
+      channel: 'dm',
+    });
+    this.gateway?.emitToUser(peerId, 'unread:changed', { scope: 'team' });
+    return payload;
   }
 
   /** Prefer first SUPER_ADMIN / ADMIN as "owner" for designer/support chat. */
@@ -335,7 +488,8 @@ export class TeamService {
     return row?.id ?? null;
   }
 
-  async listGroupChat() {
+  async listGroupChat(meId?: string) {
+    if (meId) await this.markGroupChatRead(meId);
     const rows = await this.db.query<{
       id: string;
       sender_user_id: string;
@@ -352,6 +506,10 @@ export class TeamService {
         ORDER BY m.created_at ASC
         LIMIT 300`,
     );
+    const attMap = await this.staffAttachments(
+      rows.map((r) => r.id),
+      'GROUP',
+    );
     return {
       messages: rows.map((m) => ({
         id: m.id,
@@ -361,18 +519,110 @@ export class TeamService {
         senderName:
           [m.first_name, m.last_name].filter(Boolean).join(' ') ||
           m.email.split('@')[0],
+        attachments: attMap.get(m.id) ?? [],
       })),
     };
   }
 
-  async sendGroupChat(meId: string, body: string) {
+  async markGroupChatRead(meId: string) {
+    await this.db.execute(
+      `INSERT INTO staff_group_reads (user_id, last_read_at)
+       VALUES (?, NOW())
+       ON DUPLICATE KEY UPDATE last_read_at = NOW()`,
+      [meId],
+    );
+    this.gateway?.emitToUser(meId, 'unread:changed', { scope: 'team' });
+    return { ok: true };
+  }
+
+  async sendGroupChat(meId: string, body: string, files: UploadFile[] = []) {
     const text = body.trim();
-    if (!text) throw new BadRequestException('Message required');
+    if (!text && files.length === 0)
+      throw new BadRequestException('Message or attachment required');
     const id = randomUUID();
     await this.db.execute(
       `INSERT INTO staff_group_messages (id, sender_user_id, body) VALUES (?, ?, ?)`,
-      [id, meId, text],
+      [id, meId, text || '(attachment)'],
     );
-    return this.listGroupChat();
+    await this.saveStaffAttachments(id, 'GROUP', files);
+
+    const staff = await this.db.query<{ id: string }>(
+      `SELECT id FROM users WHERE role <> 'CLIENT' AND id <> ?`,
+      [meId],
+    );
+    await this.notifications.createForMany(
+      staff.map((s) => s.id),
+      {
+        title: 'New group chat message',
+        body: (text || 'Sent an attachment').slice(0, 140),
+        link: '/admin/messages/team?group=1',
+      },
+    );
+
+    const payload = await this.listGroupChat(meId);
+    this.gateway?.emitTeamGroup('team:message', { channel: 'group' });
+    this.gateway?.server?.emit('unread:changed', { scope: 'team' });
+    return payload;
+  }
+
+  async teamUnreadSummary(meId: string) {
+    const dm = await this.db.queryOne<{ total: number }>(
+      `SELECT COUNT(*) AS total FROM staff_messages
+        WHERE to_user_id = ? AND read_at IS NULL`,
+      [meId],
+    );
+    const group = await this.db.queryOne<{ total: number }>(
+      `SELECT COUNT(*) AS total
+         FROM staff_group_messages m
+         LEFT JOIN staff_group_reads r ON r.user_id = ?
+        WHERE m.sender_user_id <> ?
+          AND (r.last_read_at IS NULL OR m.created_at > r.last_read_at)`,
+      [meId, meId],
+    );
+    const peers = await this.db.query<{ peer_id: string; unread: number }>(
+      `SELECT from_user_id AS peer_id, COUNT(*) AS unread
+         FROM staff_messages
+        WHERE to_user_id = ? AND read_at IS NULL
+        GROUP BY from_user_id`,
+      [meId],
+    );
+    return {
+      dmUnread: Number(dm?.total ?? 0),
+      groupUnread: Number(group?.total ?? 0),
+      peerUnread: Object.fromEntries(
+        peers.map((p) => [p.peer_id, Number(p.unread)]),
+      ),
+    };
+  }
+
+  async recentTeamConversations(meId: string) {
+    const rows = await this.db.query<{
+      peer_id: string;
+      last_at: Date;
+      last_body: string;
+      unread: number;
+    }>(
+      `SELECT peer_id, MAX(created_at) AS last_at,
+              SUBSTRING_INDEX(GROUP_CONCAT(body ORDER BY created_at DESC SEPARATOR '\n'), '\n', 1) AS last_body,
+              SUM(CASE WHEN to_user_id = ? AND read_at IS NULL THEN 1 ELSE 0 END) AS unread
+         FROM (
+           SELECT CASE WHEN from_user_id = ? THEN to_user_id ELSE from_user_id END AS peer_id,
+                  from_user_id, to_user_id, body, read_at, created_at
+             FROM staff_messages
+            WHERE from_user_id = ? OR to_user_id = ?
+         ) t
+        GROUP BY peer_id
+        ORDER BY last_at DESC
+        LIMIT 50`,
+      [meId, meId, meId, meId],
+    );
+    return {
+      conversations: rows.map((r) => ({
+        peerId: r.peer_id,
+        lastAt: r.last_at,
+        lastBody: r.last_body,
+        unread: Number(r.unread),
+      })),
+    };
   }
 }

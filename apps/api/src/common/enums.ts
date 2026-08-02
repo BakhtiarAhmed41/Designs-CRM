@@ -25,6 +25,13 @@ export type LoginStatus = (typeof LoginStatus)[keyof typeof LoginStatus];
 export const FEATURE_KEYS = [
   'dashboard',
   'messages',
+  'messages_customer_view',
+  'messages_customer_reply',
+  'messages_customer_start',
+  'messages_team_view',
+  'messages_team_send',
+  'messages_group',
+  'messages_delete',
   'orders',
   'quotes',
   'edits',
@@ -34,6 +41,20 @@ export const FEATURE_KEYS = [
   'roles',
 ] as const;
 export type FeatureKey = (typeof FEATURE_KEYS)[number];
+
+export const ChatType = {
+  GENERAL: 'GENERAL',
+  ORDER: 'ORDER',
+  QUOTE: 'QUOTE',
+} as const;
+export type ChatType = (typeof ChatType)[keyof typeof ChatType];
+
+export const ConversationStatus = {
+  OPEN: 'OPEN',
+  CLOSED: 'CLOSED',
+} as const;
+export type ConversationStatus =
+  (typeof ConversationStatus)[keyof typeof ConversationStatus];
 
 /** Roles that belong to internal staff (the admin command center). */
 export const STAFF_ROLES: UserRole[] = [

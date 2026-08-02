@@ -425,7 +425,7 @@ export class BillingService {
         );
       });
     } else {
-      // CARD: simulated successful charge.
+      // CARD: record a manual/external card payment (no processor integrated).
       await this.db.execute(
         `INSERT INTO payments
            (id, invoice_id, order_id, customer_id, amount_cents, currency, method, type, status, paid_at)
@@ -525,7 +525,7 @@ export class BillingService {
     };
   }
 
-  /** PUBLIC: simulate a successful card payment via a pay-link. Idempotent. */
+  /** PUBLIC: confirm payment via a pay-link (manual settlement). Idempotent. */
   async payViaPayLink(token: string) {
     const payment = await this.db.queryOne<PaymentRow>(
       'SELECT * FROM payments WHERE pay_link_token = ? LIMIT 1',

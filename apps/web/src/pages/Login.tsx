@@ -44,9 +44,13 @@ export function Login() {
         if (res.resetToken) {
           setResetToken(res.resetToken);
           setMode('reset');
-          setInfo('Reset token ready (dev mode). Enter a new password below.');
+          setInfo(
+            'No email provider is configured. Use the reset token below to set a new password (local/dev).',
+          );
         } else {
-          setInfo('If that email exists, a reset link has been issued. Check with your admin.');
+          setInfo(
+            'If that account exists, a reset token was created. Ask an admin to complete the reset — email delivery is not configured.',
+          );
         }
         return;
       } else if (mode === 'reset') {

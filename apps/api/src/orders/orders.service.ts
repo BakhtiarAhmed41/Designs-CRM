@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import type { AuthUser } from '../auth/auth.types';
+import { hasSupportPerm } from '../auth/permissions';
 import {
   AccountType,
   CustomerSource,
@@ -46,6 +47,13 @@ function toServiceType(value?: string | null): ServiceType | null {
   return (Object.values(ServiceType) as string[]).includes(upper)
     ? (upper as ServiceType)
     : null;
+}
+
+function formatLabelFromName(name: string): string | null {
+  const base = name.trim();
+  const dot = base.lastIndexOf('.');
+  if (dot <= 0 || dot === base.length - 1) return null;
+  return base.slice(dot + 1).toUpperCase().slice(0, 60) || null;
 }
 
 type OrderRow = {
@@ -466,30 +474,11 @@ export class OrdersService {
     return this.assembleOrder(orderId);
   }
 
-  async uploadOrderAttachments(
-    user: AuthUser | undefined,
+  private async persistOrderAttachments(
     orderId: string,
+    user: AuthUser,
     files: Express.Multer.File[],
   ) {
-    assertAuthUser(user);
-    if (user.role !== UserRole.CLIENT) throw new ForbiddenException();
-    if (!files || files.length === 0)
-      throw new BadRequestException('No files uploaded');
-
-    const order = await this.getOrderRow(orderId);
-    if (!order || order.client_user_id !== user.id)
-      throw new NotFoundException('Order not found');
-
-    const canUpload =
-      order.status === OrderStatus.WAITING_FOR_QUOTATION ||
-      order.status === OrderStatus.WAITING_FOR_ADMIN_QUOTATION_APPROVAL ||
-      order.status === OrderStatus.QUOTATION_PROVIDED;
-    if (!canUpload) {
-      throw new BadRequestException(
-        'Attachments can only be uploaded before the order starts (quotation stage).',
-      );
-    }
-
     const out = [];
     for (const f of files) {
       const key = this.storage.newObjectKey(
@@ -520,6 +509,58 @@ export class OrdersService {
       out.push({ id, orderId, originalName: f.originalname });
     }
     return out;
+  }
+
+  async uploadOrderAttachments(
+    user: AuthUser | undefined,
+    orderId: string,
+    files: Express.Multer.File[],
+  ) {
+    assertAuthUser(user);
+    if (user.role !== UserRole.CLIENT) throw new ForbiddenException();
+    if (!files || files.length === 0)
+      throw new BadRequestException('No files uploaded');
+
+    const order = await this.getOrderRow(orderId);
+    if (!order || order.client_user_id !== user.id)
+      throw new NotFoundException('Order not found');
+
+    const canUpload =
+      order.status === OrderStatus.WAITING_FOR_QUOTATION ||
+      order.status === OrderStatus.WAITING_FOR_ADMIN_QUOTATION_APPROVAL ||
+      order.status === OrderStatus.QUOTATION_PROVIDED;
+    if (!canUpload) {
+      throw new BadRequestException(
+        'Attachments can only be uploaded before the order starts (quotation stage).',
+      );
+    }
+
+    return this.persistOrderAttachments(orderId, user, files);
+  }
+
+  async adminUploadOrderAttachments(
+    user: AuthUser | undefined,
+    orderId: string,
+    files: Express.Multer.File[],
+  ) {
+    this.assertAdmin(user);
+    if (!files || files.length === 0)
+      throw new BadRequestException('No files uploaded');
+
+    const order = await this.getOrderRow(orderId);
+    if (!order) throw new NotFoundException('Order not found');
+
+    const blocked =
+      order.status === OrderStatus.CLOSED ||
+      order.status === OrderStatus.CANCELLED ||
+      order.status === OrderStatus.REFUNDED;
+    if (blocked) {
+      throw new BadRequestException(
+        'Attachments cannot be uploaded on closed, cancelled, or refunded orders.',
+      );
+    }
+
+    return this.persistOrderAttachments(orderId, user, files);
   }
 
   private async signAttachment(orderId: string, attachmentId: string) {
@@ -1355,6 +1396,15 @@ export class OrdersService {
         'Deliveries can only be uploaded while order is IN_PROGRESS or READY_TO_SEND',
       );
     }
+    if (
+      user.role === UserRole.SUPPORT &&
+      order.status === OrderStatus.READY_TO_SEND &&
+      !hasSupportPerm(user.role, user.permissions, 'approve')
+    ) {
+      throw new ForbiddenException(
+        'Support cannot release designer files without approve permission',
+      );
+    }
 
     const deliveredVia =
       options?.deliveredVia === DeliveredVia.EMAIL
@@ -1403,12 +1453,13 @@ export class OrdersService {
         designIds.length > 0 ? designIds[i % designIds.length] : null;
       await this.db.execute(
         `INSERT INTO delivery_files
-           (id, delivery_id, design_id, original_name, mime_type, byte_size, storage_key)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+           (id, delivery_id, design_id, format_label, original_name, mime_type, byte_size, storage_key)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           randomUUID(),
           deliveryId,
           designId,
+          formatLabelFromName(f.originalname),
           f.originalname,
           f.mimetype || null,
           typeof f.size === 'number' ? f.size : null,

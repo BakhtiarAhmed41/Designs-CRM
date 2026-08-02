@@ -334,10 +334,12 @@ export class RolesService {
         sets.push('custom_role_id = ?', 'role = ?');
         params.push(data.customRoleId, cr.base_role);
       } else {
-        sets.push('custom_role_id = NULL');
+        sets.push('custom_role_id = ?');
+        params.push(null);
       }
     }
-    if (data.role !== undefined && data.customRoleId === undefined) {
+    // System role applies when not assigning a custom role in this update.
+    if (data.role !== undefined && !data.customRoleId) {
       if (data.role === UserRole.CLIENT) {
         throw new BadRequestException('Cannot set staff user to CLIENT');
       }
@@ -381,9 +383,24 @@ export class RolesService {
   }
 
   featureCatalog() {
-    return FEATURE_KEYS.map((key) => ({
-      key,
-      label: key.charAt(0).toUpperCase() + key.slice(1),
-    }));
+    const labels: Record<FeatureKey, string> = {
+      dashboard: 'Dashboard',
+      messages: 'Messages (umbrella)',
+      messages_customer_view: 'View customer messages',
+      messages_customer_reply: 'Reply to customer messages',
+      messages_customer_start: 'Start customer chats',
+      messages_team_view: 'View team messages',
+      messages_team_send: 'Send team messages',
+      messages_group: 'Access group chat',
+      messages_delete: 'Delete messages',
+      orders: 'Orders',
+      quotes: 'Quotes',
+      edits: 'Edits',
+      customers: 'Customers',
+      billing: 'Billing',
+      team: 'Team',
+      roles: 'Roles & users',
+    };
+    return FEATURE_KEYS.map((key) => ({ key, label: labels[key] }));
   }
 }

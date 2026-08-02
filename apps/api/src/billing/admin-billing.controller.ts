@@ -12,7 +12,9 @@ import type { Response } from 'express';
 import { z } from 'zod';
 import type { AuthUser } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { RequireFeatures } from '../auth/decorators/features.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { FeaturesGuard } from '../auth/guards/features.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { UserRole } from '../common/enums';
@@ -48,8 +50,9 @@ const monthEndSchema = z.object({
 });
 
 @Controller('admin')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, FeaturesGuard)
 @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.SUPPORT)
+@RequireFeatures('billing')
 export class AdminBillingController {
   constructor(private billing: BillingService) {}
 

@@ -4,8 +4,12 @@ import {
   Get,
   Param,
   Post,
+  UploadedFiles,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { z } from 'zod';
 import type { AuthUser } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -24,10 +28,6 @@ const createConversationSchema = z.object({
   subject: z.string().max(255).optional().nullable(),
   orderId: z.string().uuid().optional().nullable(),
   label: labelSchema.optional().nullable(),
-});
-
-const messageSchema = z.object({
-  body: z.string().min(1),
 });
 
 @Controller('conversations')
@@ -61,12 +61,29 @@ export class MessagingController {
   }
 
   @Post(':id/messages')
+  @UseInterceptors(
+    FilesInterceptor('files', 8, {
+      storage: memoryStorage(),
+      limits: { fileSize: 15 * 1024 * 1024 },
+    }),
+  )
   async sendMessage(
     @CurrentUser() user: AuthUser | undefined,
     @Param('id') id: string,
-    @Body() body: unknown,
+    @Body() body: { body?: string; replyToMessageId?: string },
+    @UploadedFiles() files?: Express.Multer.File[],
   ) {
-    const data = messageSchema.parse(body);
-    return this.messaging.addMyMessage(user, id, data.body);
+    return this.messaging.addMyMessage(
+      user,
+      id,
+      body.body ?? '',
+      (files ?? []).map((f) => ({
+        originalname: f.originalname,
+        mimetype: f.mimetype,
+        size: f.size,
+        buffer: f.buffer,
+      })),
+      body.replyToMessageId ?? null,
+    );
   }
 }

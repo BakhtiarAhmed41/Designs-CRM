@@ -1,4 +1,4 @@
-import { apiFetch } from './api';
+import { apiFetch, apiFetchForm } from './api';
 import type { OrderStatus, UserRole } from './types';
 
 export type Presence = 'ON' | 'AWAY' | 'OFF';
@@ -84,14 +84,31 @@ export function assignOrder(userId: string, orderId: string) {
   );
 }
 
+export type TeamChatAttachment = {
+  id: string;
+  originalName: string;
+  mimeType: string | null;
+  byteSize: number | null;
+  url: string;
+};
+
 export type TeamChatMessage = {
   id: string;
   fromUserId: string;
   toUserId: string;
   body: string;
+  readAt?: string | null;
   createdAt: string;
   mine: boolean;
+  attachments?: TeamChatAttachment[];
 };
+
+function buildChatForm(body: string, files?: File[]) {
+  const form = new FormData();
+  form.append('body', body);
+  for (const f of files ?? []) form.append('files', f);
+  return form;
+}
 
 export function getTeamChat(peerId: string) {
   return apiFetch<{
@@ -100,7 +117,13 @@ export function getTeamChat(peerId: string) {
   }>(`/admin/team-chat/${peerId}`);
 }
 
-export function sendTeamChat(peerId: string, body: string) {
+export function sendTeamChat(peerId: string, body: string, files?: File[]) {
+  if (files?.length) {
+    return apiFetchForm<{
+      peer: TeamMember;
+      messages: TeamChatMessage[];
+    }>(`/admin/team-chat/${peerId}`, buildChatForm(body, files));
+  }
   return apiFetch<{
     peer: TeamMember;
     messages: TeamChatMessage[];
@@ -114,19 +137,45 @@ export function getTeamChatOwner() {
   return apiFetch<{ peerId: string | null }>('/admin/team-chat-owner');
 }
 
+export function getTeamUnreadSummary() {
+  return apiFetch<{
+    dmUnread: number;
+    groupUnread: number;
+    peerUnread: Record<string, number>;
+  }>('/admin/team-chat/unread-summary');
+}
+
+export function getRecentTeamChats() {
+  return apiFetch<{
+    conversations: Array<{
+      peerId: string;
+      lastAt: string;
+      lastBody: string;
+      unread: number;
+    }>;
+  }>('/admin/team-chat/recent');
+}
+
 export type GroupChatMessage = {
   id: string;
   senderUserId: string;
   body: string;
   createdAt: string;
   senderName: string;
+  attachments?: TeamChatAttachment[];
 };
 
 export function listGroupChat() {
   return apiFetch<{ messages: GroupChatMessage[] }>('/admin/team-group-chat');
 }
 
-export function sendGroupChat(body: string) {
+export function sendGroupChat(body: string, files?: File[]) {
+  if (files?.length) {
+    return apiFetchForm<{ messages: GroupChatMessage[] }>(
+      '/admin/team-group-chat',
+      buildChatForm(body, files),
+    );
+  }
   return apiFetch<{ messages: GroupChatMessage[] }>('/admin/team-group-chat', {
     method: 'POST',
     body: JSON.stringify({ body }),

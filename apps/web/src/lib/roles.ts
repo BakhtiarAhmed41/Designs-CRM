@@ -4,6 +4,13 @@ import type { UserRole } from './types';
 export type FeatureKey =
   | 'dashboard'
   | 'messages'
+  | 'messages_customer_view'
+  | 'messages_customer_reply'
+  | 'messages_customer_start'
+  | 'messages_team_view'
+  | 'messages_team_send'
+  | 'messages_group'
+  | 'messages_delete'
   | 'orders'
   | 'quotes'
   | 'edits'

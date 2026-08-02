@@ -12,6 +12,7 @@ import { AccountType, CustomerSource, LoginStatus, UserRole } from '../common/en
 import { getEnv } from '../config/env';
 import { DbService } from '../db/db.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { resolvePermissions } from './permissions';
 
 type Tokens = {
   accessToken: string;
@@ -29,6 +30,8 @@ type UserRow = {
   last_name: string | null;
   phone: string | null;
   custom_role_id: string | null;
+  permissions: unknown;
+  cr_permissions?: unknown | null;
 };
 
 function publicUser(u: UserRow) {
@@ -41,6 +44,11 @@ function publicUser(u: UserRow) {
     lastName: u.last_name,
     phone: u.phone,
     customRoleId: u.custom_role_id,
+    permissions: resolvePermissions({
+      role: u.role,
+      userPermissions: u.permissions,
+      customRolePermissions: u.cr_permissions ?? null,
+    }),
   };
 }
 
@@ -58,16 +66,24 @@ export class AuthService {
 
   private async findByEmail(email: string): Promise<UserRow | null> {
     return this.db.queryOne<UserRow>(
-      `SELECT id, email, password_hash, role, login_status, first_name, last_name, phone, custom_role_id
-         FROM users WHERE email = ? LIMIT 1`,
+      `SELECT u.id, u.email, u.password_hash, u.role, u.login_status, u.first_name, u.last_name,
+              u.phone, u.custom_role_id, u.permissions, r.permissions AS cr_permissions
+         FROM users u
+         LEFT JOIN custom_roles r ON r.id = u.custom_role_id
+        WHERE u.email = ?
+        LIMIT 1`,
       [email.toLowerCase()],
     );
   }
 
   private async findById(id: string): Promise<UserRow | null> {
     return this.db.queryOne<UserRow>(
-      `SELECT id, email, password_hash, role, login_status, first_name, last_name, phone, custom_role_id
-         FROM users WHERE id = ? LIMIT 1`,
+      `SELECT u.id, u.email, u.password_hash, u.role, u.login_status, u.first_name, u.last_name,
+              u.phone, u.custom_role_id, u.permissions, r.permissions AS cr_permissions
+         FROM users u
+         LEFT JOIN custom_roles r ON r.id = u.custom_role_id
+        WHERE u.id = ?
+        LIMIT 1`,
       [id],
     );
   }
@@ -151,6 +167,11 @@ export class AuthService {
         lastName,
         phone,
         customRoleId: null,
+        permissions: resolvePermissions({
+          role: UserRole.CLIENT,
+          userPermissions: null,
+          customRolePermissions: null,
+        }),
       },
       pending: true as const,
     };

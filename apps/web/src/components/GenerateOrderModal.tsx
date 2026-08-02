@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { adminCreateOrder } from '@/lib/orders';
+import { adminCreateOrder, adminUploadAttachments } from '@/lib/orders';
 import { listCustomers, type Customer } from '@/lib/customers';
 import { getErrorMessage } from '@/lib/api';
 
@@ -59,6 +59,7 @@ export function GenerateOrderModal({
   const [resultLabel, setResultLabel] = useState('');
   const [copied, setCopied] = useState(false);
   const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
+  const [attachFiles, setAttachFiles] = useState<File[]>([]);
 
   const customersQ = useQuery({
     queryKey: ['admin-customers-gen'],
@@ -87,6 +88,7 @@ export function GenerateOrderModal({
     setResultLabel('');
     setCopied(false);
     setCreatedOrderId(null);
+    setAttachFiles([]);
   }, [open, defaultMode, prefill?.customerId, prefill?.customerName, prefill?.email, prefill?.phone]);
 
   const matchCustomer = (nameValue: string): Customer | undefined => {
@@ -130,7 +132,7 @@ export function GenerateOrderModal({
   }, [customers, customerSearch]);
 
   const create = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       if (!customerId) {
         throw new Error('Create a customer first, then select them here.');
       }
@@ -138,7 +140,7 @@ export function GenerateOrderModal({
         ? Math.round(parseFloat(price) * 100)
         : null;
       const count = designCount.trim() ? parseInt(designCount, 10) : null;
-      return adminCreateOrder({
+      const res = await adminCreateOrder({
         type: mode,
         customerId,
         customerName: customerName.trim() || null,
@@ -154,6 +156,10 @@ export function GenerateOrderModal({
           priceCents != null && Number.isFinite(priceCents) ? priceCents : null,
         instructions: notes.trim() || null,
       });
+      if (attachFiles.length > 0) {
+        await adminUploadAttachments(res.order.id, attachFiles);
+      }
+      return res;
     },
     onSuccess: (res) => {
       qc.invalidateQueries({ queryKey: ['admin-orders'] });
@@ -414,6 +420,20 @@ export function GenerateOrderModal({
                   onChange={(e) => setNotes(e.target.value)}
                   rows={3}
                 />
+              </div>
+
+              <div className="ff">
+                <label>Reference files (optional)</label>
+                <input
+                  type="file"
+                  multiple
+                  onChange={(e) => setAttachFiles(Array.from(e.target.files ?? []))}
+                />
+                {attachFiles.length > 0 && (
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
+                    {attachFiles.length} file(s) selected
+                  </div>
+                )}
               </div>
 
               <button

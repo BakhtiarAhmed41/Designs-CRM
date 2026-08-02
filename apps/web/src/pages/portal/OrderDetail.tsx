@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   acceptQuotation,
@@ -8,10 +8,12 @@ import {
   myAttachmentUrl,
   myDeliveryFileUrl,
   rejectQuotation,
+  uploadAttachments,
 } from '@/lib/orders';
-import { downloadSignedFile } from '@/lib/api';
+import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import { money, statusChipClass, statusLabel, dateShort } from '@/lib/format';
 import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
+import { createMyConversation, listMyConversations } from '@/lib/messaging';
 import type { Design, QuotationLine } from '@/lib/designs';
 import type { Order, Quotation } from '@/lib/types';
 
@@ -31,18 +33,52 @@ const DESIGN_STATUS_CHIP: Record<string, string> = {
 
 export function PortalOrderDetail() {
   const { id = '' } = useParams();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const [counter, setCounter] = useState('');
   const [keepLineIds, setKeepLineIds] = useState<string[] | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
   const { data, isLoading } = useQuery({
     queryKey: ['my-order', id],
     queryFn: () => getMyOrder(id),
+  });
+
+  const startChat = useMutation({
+    mutationFn: async () => {
+      const listed = await listMyConversations();
+      const existing = listed.conversations.find(
+        (c) => c.orderId === id && (c.chatType === 'ORDER' || c.chatType === 'QUOTE'),
+      );
+      if (existing) return existing;
+      const orderType = data?.order?.type;
+      const created = await createMyConversation({
+        orderId: id,
+        chatType: orderType === 'QUOTE_REQUEST' ? 'QUOTE' : 'ORDER',
+        subject:
+          orderType === 'QUOTE_REQUEST'
+            ? `Quotation ${data?.order?.humanRef ?? ''} Chat`.trim()
+            : `Order ${data?.order?.humanRef ?? ''} Chat`.trim(),
+      });
+      return created.conversation;
+    },
+    onSuccess: (convo) => navigate(`/portal/messages?c=${convo.id}`),
+    onError: (e) => setUploadError(getErrorMessage(e)),
   });
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['my-order', id] });
     qc.invalidateQueries({ queryKey: ['my-orders'] });
   };
+
+  const uploadRefs = useMutation({
+    mutationFn: (files: File[]) => uploadAttachments(id, files),
+    onSuccess: () => {
+      setUploadError(null);
+      invalidate();
+    },
+    onError: (e) => setUploadError(getErrorMessage(e)),
+  });
 
   const accept = useMutation({
     mutationFn: (ids?: string[]) => acceptQuotation(id, ids),
@@ -69,6 +105,10 @@ export function PortalOrderDetail() {
 
   const latestQuote = order.quotations?.[0];
   const canDecide = order.status === 'QUOTATION_PROVIDED';
+  const canUploadRefs =
+    order.status === 'WAITING_FOR_QUOTATION' ||
+    order.status === 'WAITING_FOR_ADMIN_QUOTATION_APPROVAL' ||
+    order.status === 'QUOTATION_PROVIDED';
   const lines = latestQuote?.lines ?? [];
   const selected =
     keepLineIds ?? lines.map((l) => l.id);
@@ -99,7 +139,17 @@ export function PortalOrderDetail() {
             {order.serviceType} · placed {dateShort(order.createdAt)}
           </div>
         </div>
-        <span className={statusChipClass(order.status)}>{statusLabel(order.status)}</span>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            disabled={startChat.isPending}
+            onClick={() => startChat.mutate()}
+          >
+            <i className="ti ti-message" /> Start Chat
+          </button>
+          <span className={statusChipClass(order.status)}>{statusLabel(order.status)}</span>
+        </div>
       </div>
 
       <div className="od-grid">
@@ -205,9 +255,14 @@ export function PortalOrderDetail() {
                       >
                         Reject
                       </button>
-                      <Link to="/portal/messages" className="btn btn-ghost btn-sm">
-                        <i className="ti ti-message" /> Ask a question
-                      </Link>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        disabled={startChat.isPending}
+                        onClick={() => startChat.mutate()}
+                      >
+                        <i className="ti ti-message" /> Start Chat
+                      </button>
                     </div>
                     <div className="pf" style={{ marginTop: 14 }}>
                       <label>Or propose your own price (counter)</label>
@@ -314,12 +369,12 @@ export function PortalOrderDetail() {
             )}
           </div>
 
-          {order.attachments && order.attachments.length > 0 && (
+          {(canUploadRefs || (order.attachments && order.attachments.length > 0)) && (
             <div className="card">
               <div className="card-h">
                 <span className="ct">Your references</span>
               </div>
-              {order.attachments.map((a) => (
+              {(order.attachments ?? []).map((a) => (
                 <div key={a.id} className="orow" style={{ cursor: 'default' }}>
                   <div className="thumb">
                     <i className="ti ti-paperclip" />
@@ -338,6 +393,30 @@ export function PortalOrderDetail() {
                   </button>
                 </div>
               ))}
+              {canUploadRefs && (
+                <div style={{ padding: '10px 14px 14px' }}>
+                  {uploadError && (
+                    <div className="alert-error" style={{ marginBottom: 8 }}>
+                      {uploadError}
+                    </div>
+                  )}
+                  <label className="btn btn-ghost btn-sm" style={{ cursor: 'pointer' }}>
+                    <i className="ti ti-cloud-upload" />{' '}
+                    {uploadRefs.isPending ? 'Uploading…' : 'Add files'}
+                    <input
+                      type="file"
+                      multiple
+                      hidden
+                      disabled={uploadRefs.isPending}
+                      onChange={(e) => {
+                        const files = Array.from(e.target.files ?? []);
+                        if (files.length) uploadRefs.mutate(files);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                </div>
+              )}
             </div>
           )}
         </div>

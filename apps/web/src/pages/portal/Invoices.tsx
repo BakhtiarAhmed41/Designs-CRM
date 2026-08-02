@@ -234,14 +234,19 @@ export function PortalInvoices() {
                           type="button"
                           className="btn btn-primary btn-sm"
                           disabled={payMut.isPending}
+                          title={
+                            useCredit
+                              ? 'Apply store credit to this invoice'
+                              : 'Mark this invoice paid after settling outside the portal'
+                          }
                           onClick={() =>
                             payMut.mutate({
                               id: inv.id,
-                              method: useCredit ? 'STORE_CREDIT' : 'CARD',
+                              method: (useCredit ? 'STORE_CREDIT' : 'CARD') as PayMethod,
                             })
                           }
                         >
-                          Pay
+                          {useCredit ? 'Use credit' : 'Confirm paid'}
                         </button>
                       ) : chip.label === 'Paid' ? (
                         <button

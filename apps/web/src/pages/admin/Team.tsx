@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createTeamMember,
@@ -63,7 +63,7 @@ function presenceLabel(p: Presence): string {
 export function AdminTeam() {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const canManage = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+  const canManage = Boolean(user?.permissions?.features?.team);
   const [filter, setFilter] = useState<TeamFilter>('');
   const [showNew, setShowNew] = useState(false);
   const [supportPerms, setSupportPerms] = useState({
@@ -72,6 +72,7 @@ export function AdminTeam() {
     netTerms: false,
     messages: true,
   });
+  const [permsHydrated, setPermsHydrated] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-team'],
@@ -85,6 +86,20 @@ export function AdminTeam() {
     else if (filter) list = list.filter((m) => m.role === filter);
     return list;
   }, [data?.members, filter]);
+
+  useEffect(() => {
+    if (permsHydrated || !data?.members) return;
+    const support = data.members.find((m) => m.role === 'SUPPORT');
+    if (support?.permissions) {
+      setSupportPerms({
+        money: Boolean(support.permissions.money),
+        approve: Boolean(support.permissions.approve),
+        netTerms: Boolean(support.permissions.netTerms),
+        messages: support.permissions.messages !== false,
+      });
+    }
+    setPermsHydrated(true);
+  }, [data?.members, permsHydrated]);
 
   const saveSupportPerms = useMutation({
     mutationFn: async () => {

@@ -36,7 +36,7 @@ export function PayLink() {
         <div className="card-h">
           <div className="ct" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <IconReceipt size={18} />
-            Secure payment
+            Confirm payment
           </div>
         </div>
         <div className="card-b">
@@ -67,6 +67,9 @@ export function PayLink() {
                     {s.coversText}
                   </div>
                 )}
+                <div style={{ color: 'var(--muted)', fontSize: 12, marginTop: 10 }}>
+                  Confirms payment for this invoice in the CRM. Card processing is handled outside the portal.
+                </div>
               </div>
               <button
                 className="btn btn-primary"
@@ -74,7 +77,7 @@ export function PayLink() {
                 disabled={payMut.isPending}
                 onClick={() => payMut.mutate()}
               >
-                {payMut.isPending ? 'Processing...' : 'Pay now'}
+                {payMut.isPending ? 'Confirming…' : 'Confirm payment'}
               </button>
             </>
           )}
@@ -88,7 +91,7 @@ export function PayLink() {
                 {money(s.amountCents, s.currency)}
               </div>
               <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 8 }}>
-                Thank you! Your payment has been received.
+                This invoice is marked as paid. Thank you!
               </div>
             </div>
           )}

@@ -35,6 +35,15 @@ export function uploadAttachments(orderId: string, files: File[]) {
   );
 }
 
+export function adminUploadAttachments(orderId: string, files: File[]) {
+  const form = new FormData();
+  files.forEach((f) => form.append('files', f));
+  return apiFetchForm<{ attachments: unknown[] }>(
+    `/admin/orders/${orderId}/attachments`,
+    form,
+  );
+}
+
 export function acceptQuotation(orderId: string, keepLineIds?: string[]) {
   return apiFetch<{ order: Order }>(`/orders/${orderId}/quotations/accept`, {
     method: 'PATCH',

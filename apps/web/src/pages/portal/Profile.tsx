@@ -14,8 +14,6 @@ type Prefs = {
   placement?: string;
 };
 
-const PREFS_KEY = 'lvd-portal-prefs';
-
 const SERVICE_CHIPS = [
   { id: 'emb', label: 'Embroidery' },
   { id: 'dig', label: 'SVG / Vector / Print' },
@@ -27,21 +25,13 @@ const DIG_FORMATS = ['SVG', 'PNG', 'EPS', 'AI', 'PDF', 'JPG'];
 const CNC_FORMATS = ['DXF', 'SVG', 'PDF', 'AI'];
 const HOOP_OPTIONS = ['4x4', '5x7', '6x10', '7x12', '8x8', '8x12', 'Cap frame 2.5x6'];
 
-function loadPrefs(userId: string): Prefs {
-  try {
-    const raw = localStorage.getItem(`${PREFS_KEY}-${userId}`);
-    if (raw) return JSON.parse(raw) as Prefs;
-  } catch {
-    /* ignore */
-  }
-  return {
-    services: ['emb'],
-    hoops: ['4x4', '5x7'],
-    embFormats: ['DST', 'PES'],
-    digFormats: ['SVG', 'PNG'],
-    cncFormats: ['DXF', 'SVG'],
-  };
-}
+const DEFAULT_PREFS: Prefs = {
+  services: ['emb'],
+  hoops: ['4x4', '5x7'],
+  embFormats: ['DST', 'PES'],
+  digFormats: ['SVG', 'PNG'],
+  cncFormats: ['DXF', 'SVG'],
+};
 
 function ChipToggle({
   label,
@@ -80,9 +70,7 @@ export function PortalProfile() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [placement, setPlacement] = useState('Left chest');
-  const [prefs, setPrefs] = useState<Prefs>(() =>
-    user ? loadPrefs(user.id) : loadPrefs('anon'),
-  );
+  const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
   const [hoopPick, setHoopPick] = useState(HOOP_OPTIONS[0]);
   const [msg, setMsg] = useState<string | null>(null);
   const [prefMsg, setPrefMsg] = useState<string | null>(null);
@@ -104,15 +92,15 @@ export function PortalProfile() {
     const apiPrefs = meCustomer?.customer?.preferences as Partial<Prefs> | null | undefined;
     if (apiPrefs && typeof apiPrefs === 'object') {
       setPrefs({
-        services: apiPrefs.services ?? ['emb'],
-        hoops: apiPrefs.hoops ?? ['4x4', '5x7'],
-        embFormats: apiPrefs.embFormats ?? ['DST', 'PES'],
-        digFormats: apiPrefs.digFormats ?? ['SVG', 'PNG'],
-        cncFormats: apiPrefs.cncFormats ?? ['DXF', 'SVG'],
+        services: apiPrefs.services ?? DEFAULT_PREFS.services,
+        hoops: apiPrefs.hoops ?? DEFAULT_PREFS.hoops,
+        embFormats: apiPrefs.embFormats ?? DEFAULT_PREFS.embFormats,
+        digFormats: apiPrefs.digFormats ?? DEFAULT_PREFS.digFormats,
+        cncFormats: apiPrefs.cncFormats ?? DEFAULT_PREFS.cncFormats,
       });
       if (apiPrefs.placement) setPlacement(apiPrefs.placement);
     } else {
-      setPrefs(loadPrefs(user.id));
+      setPrefs(DEFAULT_PREFS);
     }
     setName(
       meCustomer?.customer?.name ||
@@ -155,11 +143,8 @@ export function PortalProfile() {
     setPrefBusy(true);
     const payload: Prefs = { ...prefs, placement };
     try {
-      if (user) {
-        localStorage.setItem(`${PREFS_KEY}-${user.id}`, JSON.stringify(payload));
-        await updateMyCustomer({ preferences: payload });
-      }
-      setPrefMsg('Preferences saved — applied to all future orders and deliveries.');
+      await updateMyCustomer({ preferences: payload });
+      setPrefMsg('Preferences saved — applied to new quote requests.');
     } catch (err) {
       setPrefError(getErrorMessage(err));
     } finally {

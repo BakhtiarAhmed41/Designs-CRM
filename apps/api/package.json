@@ -32,6 +32,8 @@
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/platform-socket.io": "^11.1.28",
+    "@nestjs/websockets": "^11.1.28",
     "argon2": "^0.44.0",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.4.1",
@@ -41,6 +43,7 @@
     "prisma": "file:vendor/prisma-stub",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "socket.io": "^4.8.3",
     "zod": "^4.3.6"
   },
   "devDependencies": {

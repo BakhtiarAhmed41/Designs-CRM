@@ -81,6 +81,7 @@ export function QuoteBuilderModal({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [service, setService] = useState<(typeof SERVICES)[number] | null>(null);
   const [accountName, setAccountName] = useState('Your account');
+  const [customerPrefs, setCustomerPrefs] = useState<Record<string, unknown> | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -97,8 +98,17 @@ export function QuoteBuilderModal({
       return;
     }
     void getMyCustomer()
-      .then((res) => setAccountName(res.customer?.name ?? 'Your account'))
-      .catch(() => setAccountName('Your account'));
+      .then((res) => {
+        setAccountName(res.customer?.name ?? 'Your account');
+        const prefs = res.customer?.preferences;
+        setCustomerPrefs(
+          prefs && typeof prefs === 'object' ? (prefs as Record<string, unknown>) : null,
+        );
+      })
+      .catch(() => {
+        setAccountName('Your account');
+        setCustomerPrefs(null);
+      });
   }, [open, resetPicker]);
 
   useEffect(() => {
@@ -168,8 +178,20 @@ export function QuoteBuilderModal({
   useEffect(() => {
     if (!open) return;
     function onMsg(ev: MessageEvent) {
-      const data = ev.data as { type?: string } | null;
+      const data = ev.data as {
+        type?: string;
+        restoredDraft?: boolean;
+      } | null;
       if (!data || typeof data !== 'object') return;
+      if (data.type === 'lvd-form-ready') {
+        const win = iframeRef.current?.contentWindow;
+        if (win && customerPrefs) {
+          win.postMessage({ type: 'lvd-apply-prefs', prefs: customerPrefs }, '*');
+        }
+        if (data.restoredDraft) {
+          setToast('Restored draft from this device.');
+        }
+      }
       if (data.type === 'lvd-quote-submit') {
         void submitFromIframe();
       }
@@ -183,7 +205,7 @@ export function QuoteBuilderModal({
     }
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
-  }, [open, submitFromIframe, onClose, navigate]);
+  }, [open, submitFromIframe, onClose, navigate, customerPrefs]);
 
   if (!open) return null;
 

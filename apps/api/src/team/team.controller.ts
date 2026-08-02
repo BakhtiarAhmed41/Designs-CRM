@@ -5,12 +5,18 @@ import {
   Param,
   Patch,
   Post,
+  UploadedFiles,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { z } from 'zod';
 import { Presence, STAFF_ROLES, UserRole } from '../common/enums';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { RequireFeatures } from '../auth/decorators/features.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { FeaturesGuard } from '../auth/guards/features.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import type { AuthUser } from '../auth/auth.types';
@@ -44,12 +50,8 @@ const presenceSchema = z.object({
   presence: z.nativeEnum(Presence),
 });
 
-const staffChatSchema = z.object({
-  body: z.string().min(1).max(5000),
-});
-
 @Controller('admin')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, FeaturesGuard)
 @Roles(...STAFF_ROLES)
 export class AdminTeamController {
   constructor(private team: TeamService) {}
@@ -62,6 +64,7 @@ export class AdminTeamController {
 
   @Post('team')
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @RequireFeatures('team')
   async create(@Body() body: unknown) {
     const data = createSchema.parse(body);
     const member = await this.team.create(data);
@@ -70,6 +73,7 @@ export class AdminTeamController {
 
   @Patch('team/:id')
   @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @RequireFeatures('team')
   async update(@Param('id') id: string, @Body() body: unknown) {
     const data = updateSchema.parse(body);
     const member = await this.team.update(id, data);
@@ -83,7 +87,8 @@ export class AdminTeamController {
   }
 
   @Post('team/:userId/assign/:orderId')
-  @Roles(UserRole.ADMIN)
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @RequireFeatures('team')
   async assign(
     @Param('userId') userId: string,
     @Param('orderId') orderId: string,
@@ -91,7 +96,20 @@ export class AdminTeamController {
     return this.team.assignOrder(userId, orderId);
   }
 
+  @Get('team-chat/unread-summary')
+  @RequireFeatures('messages', 'messages_team_view')
+  async teamUnread(@CurrentUser() user: AuthUser) {
+    return this.team.teamUnreadSummary(user.id);
+  }
+
+  @Get('team-chat/recent')
+  @RequireFeatures('messages', 'messages_team_view')
+  async recentTeamChats(@CurrentUser() user: AuthUser) {
+    return this.team.recentTeamConversations(user.id);
+  }
+
   @Get('team-chat/:peerId')
+  @RequireFeatures('messages', 'messages_team_view')
   async listChat(
     @CurrentUser() user: AuthUser,
     @Param('peerId') peerId: string,
@@ -100,16 +118,43 @@ export class AdminTeamController {
   }
 
   @Post('team-chat/:peerId')
+  @RequireFeatures('messages', 'messages_team_send')
+  @UseInterceptors(
+    FilesInterceptor('files', 8, {
+      storage: memoryStorage(),
+      limits: { fileSize: 15 * 1024 * 1024 },
+    }),
+  )
   async sendChat(
     @CurrentUser() user: AuthUser,
     @Param('peerId') peerId: string,
-    @Body() body: unknown,
+    @Body() body: { body?: string },
+    @UploadedFiles() files?: Express.Multer.File[],
   ) {
-    const { body: text } = staffChatSchema.parse(body);
-    return this.team.sendStaffChat(user.id, peerId, text);
+    return this.team.sendStaffChat(
+      user.id,
+      peerId,
+      body.body ?? '',
+      (files ?? []).map((f) => ({
+        originalname: f.originalname,
+        mimetype: f.mimetype,
+        size: f.size,
+        buffer: f.buffer,
+      })),
+    );
+  }
+
+  @Post('team-chat/:peerId/read')
+  @RequireFeatures('messages', 'messages_team_view')
+  async markDmRead(
+    @CurrentUser() user: AuthUser,
+    @Param('peerId') peerId: string,
+  ) {
+    return this.team.markStaffChatRead(user.id, peerId);
   }
 
   @Get('team-chat-owner')
+  @RequireFeatures('messages', 'messages_team_view')
   async ownerPeer(@CurrentUser() user: AuthUser) {
     const ownerId = await this.team.resolveOwnerId();
     if (!ownerId || ownerId === user.id) return { peerId: null };
@@ -117,14 +162,40 @@ export class AdminTeamController {
   }
 
   @Get('team-group-chat')
-  async listGroupChat() {
-    return this.team.listGroupChat();
+  @RequireFeatures('messages', 'messages_group', 'messages_team_view')
+  async listGroupChat(@CurrentUser() user: AuthUser) {
+    return this.team.listGroupChat(user.id);
   }
 
   @Post('team-group-chat')
-  async sendGroupChat(@CurrentUser() user: AuthUser, @Body() body: unknown) {
-    const { body: text } = staffChatSchema.parse(body);
-    return this.team.sendGroupChat(user.id, text);
+  @RequireFeatures('messages', 'messages_group', 'messages_team_send')
+  @UseInterceptors(
+    FilesInterceptor('files', 8, {
+      storage: memoryStorage(),
+      limits: { fileSize: 15 * 1024 * 1024 },
+    }),
+  )
+  async sendGroupChat(
+    @CurrentUser() user: AuthUser,
+    @Body() body: { body?: string },
+    @UploadedFiles() files?: Express.Multer.File[],
+  ) {
+    return this.team.sendGroupChat(
+      user.id,
+      body.body ?? '',
+      (files ?? []).map((f) => ({
+        originalname: f.originalname,
+        mimetype: f.mimetype,
+        size: f.size,
+        buffer: f.buffer,
+      })),
+    );
+  }
+
+  @Post('team-group-chat/read')
+  @RequireFeatures('messages', 'messages_group', 'messages_team_view')
+  async markGroupRead(@CurrentUser() user: AuthUser) {
+    return this.team.markGroupChatRead(user.id);
   }
 }
 

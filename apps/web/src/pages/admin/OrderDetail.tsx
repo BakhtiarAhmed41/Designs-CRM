@@ -3,8 +3,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   adminAttachmentUrl,
+  adminDeliveryFileUrl,
   adminDuplicateOrder,
   adminUpdateStatus,
+  adminUploadAttachments,
   approveCounter,
   deliverOrder,
   getAdminOrder,
@@ -26,6 +28,7 @@ import { updateDesign, type Design, type DesignStatus } from '@/lib/designs';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import { money, dateShort, statusLabel } from '@/lib/format';
 import { FormPreferencesDisplay } from '@/components/FormPreferencesDisplay';
+import { MessageAttachments } from '@/components/MessageAttachments';
 import type { Order, OrderStatus } from '@/lib/types';
 
 type AdminOrderFull = Order & {
@@ -98,11 +101,11 @@ export function AdminOrderDetail() {
   const qc = useQueryClient();
   const [files, setFiles] = useState<File[]>([]);
   const [msgDraft, setMsgDraft] = useState('');
+  const [msgFiles, setMsgFiles] = useState<File[]>([]);
+  const [refUploading, setRefUploading] = useState(false);
   const [notes, setNotes] = useState('');
   const [designerId, setDesignerId] = useState('');
-  const [showNotifOpts, setShowNotifOpts] = useState(false);
-  const [notifEmail, setNotifEmail] = useState(true);
-  const [notifSms, setNotifSms] = useState(true);
+  const [notifyPortal, setNotifyPortal] = useState(true);
   const [deliverByEmail, setDeliverByEmail] = useState(false);
   const [selectedDesignIds, setSelectedDesignIds] = useState<string[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
@@ -182,8 +185,8 @@ export function AdminOrderDetail() {
       return deliverOrder(id, files, {
         deliveredVia: deliverByEmail ? 'EMAIL' : 'PORTAL',
         designIds: selectedDesignIds.length ? selectedDesignIds : undefined,
-        notifyEmail: notifEmail,
-        notifySms: notifSms,
+        notifyEmail: notifyPortal,
+        notifySms: notifyPortal,
         complete: allSelected,
       });
     },
@@ -240,22 +243,42 @@ export function AdminOrderDetail() {
   });
 
   const sendMsg = useMutation({
-    mutationFn: async (body: string) => {
-      if (convo) return sendAdminMessage(convo.id, body);
+    mutationFn: async ({ body, files: attach }: { body: string; files: File[] }) => {
+      if (convo) return sendAdminMessage(convo.id, body, attach);
       const created = await createAdminConversation({
         orderId: id,
         customerId: order?.customerId ?? null,
-        subject: order?.name ?? `Order #${order?.humanRef ?? id.slice(0, 6)}`,
+        chatType: 'ORDER',
+        subject: order?.humanRef
+          ? `Order ${order.humanRef} Chat`
+          : `Order #${id.slice(0, 6)} Chat`,
       });
-      return sendAdminMessage(created.conversation.id, body);
+      return sendAdminMessage(created.conversation.id, body, attach);
     },
     onSuccess: () => {
       setMsgDraft('');
+      setMsgFiles([]);
       qc.invalidateQueries({ queryKey: ['admin-conversations'] });
       qc.invalidateQueries({ queryKey: ['admin-conversation'] });
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
+
+  async function uploadReferenceFiles(selected: FileList | null) {
+    const list = Array.from(selected ?? []);
+    if (!list.length || !id) return;
+    setRefUploading(true);
+    setError(null);
+    try {
+      await adminUploadAttachments(id, list);
+      setToast('Reference files uploaded.');
+      invalidate();
+    } catch (e) {
+      setError(getErrorMessage(e));
+    } finally {
+      setRefUploading(false);
+    }
+  }
 
   const saveNotes = useMutation({
     mutationFn: (value: string) => updateOrderNotes(id, value),
@@ -331,15 +354,6 @@ export function AdminOrderDetail() {
   const messages = threadQ.data?.conversation.messages ?? [];
   const activity = activityQ.data?.activity ?? [];
   const hasDeliveries = (order.deliveries ?? []).length > 0;
-
-  const notifSummary =
-    notifEmail && notifSms
-      ? 'email + Quo text'
-      : notifEmail
-        ? 'email only'
-        : notifSms
-          ? 'Quo text only'
-          : 'no notification';
 
   return (
     <div>
@@ -464,6 +478,20 @@ export function AdminOrderDetail() {
                   <i className="ti ti-file" /> {a.originalName}
                 </button>
               ))}
+              <label className="odf up">
+                <i className="ti ti-cloud-upload" />{' '}
+                {refUploading ? 'Uploading…' : 'Upload reference'}
+                <input
+                  type="file"
+                  multiple
+                  hidden
+                  disabled={refUploading}
+                  onChange={(e) => {
+                    void uploadReferenceFiles(e.target.files);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
             </div>
             <div className="od-line">
               <span className="l">Formats requested</span>
@@ -554,7 +582,7 @@ export function AdminOrderDetail() {
             </div>
           </div>
 
-          {canDeliver && (
+          {(canDeliver || hasDeliveries) && (
             <div className="card role-manager" style={{ marginTop: 14 }}>
               <div className="card-h">
                 <span className="ct">
@@ -564,11 +592,19 @@ export function AdminOrderDetail() {
               <div className="od-files">
                 {(order.deliveries ?? []).flatMap((d) =>
                   d.files.map((f) => (
-                    <div key={f.id} className="odf">
+                    <button
+                      key={f.id}
+                      type="button"
+                      className="odf"
+                      onClick={() =>
+                        downloadSignedFile(adminDeliveryFileUrl(order.id, f.id), f.originalName)
+                      }
+                    >
                       <i className="ti ti-check" style={{ color: 'var(--green)' }} /> {f.originalName}
-                    </div>
+                    </button>
                   )),
                 )}
+                {canDeliver && (
                 <label className="odf up">
                   <i className="ti ti-cloud-upload" /> Upload file
                   <input
@@ -578,12 +614,14 @@ export function AdminOrderDetail() {
                     onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
                   />
                 </label>
+                )}
               </div>
-              {files.length > 0 && (
+              {canDeliver && files.length > 0 && (
                 <div style={{ padding: '0 16px', fontSize: 12, color: 'var(--muted)' }}>
                   {files.length} file(s) selected
                 </div>
               )}
+              {canDeliver && (
               <div style={{ padding: '0 16px 14px' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, marginBottom: 8, cursor: 'pointer' }}>
                   <input
@@ -591,32 +629,16 @@ export function AdminOrderDetail() {
                     checked={deliverByEmail}
                     onChange={(e) => setDeliverByEmail(e.target.checked)}
                   />{' '}
-                  File too large — deliver by email instead of portal
+                  Mark as emailed outside the portal (files still stored here)
                 </label>
-                <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
-                  <i className="ti ti-bell" style={{ fontSize: 13 }} /> Customer gets{' '}
-                  <b style={{ color: 'var(--ink)', fontWeight: 600 }}>{notifSummary}</b> on release ·{' '}
-                  <a onClick={() => setShowNotifOpts((v) => !v)} style={{ color: 'var(--navy)', cursor: 'pointer', fontWeight: 500 }}>
-                    change
-                  </a>
-                </div>
-                {showNotifOpts && (
-                  <div
-                    style={{
-                      background: '#f7f8fa',
-                      borderRadius: 9,
-                      padding: '10px 12px',
-                      marginBottom: 10,
-                    }}
-                  >
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, marginBottom: 4, cursor: 'pointer' }}>
-                      <input type="checkbox" checked={notifEmail} onChange={(e) => setNotifEmail(e.target.checked)} /> Email
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, cursor: 'pointer' }}>
-                      <input type="checkbox" checked={notifSms} onChange={(e) => setNotifSms(e.target.checked)} /> Text via Quo
-                    </label>
-                  </div>
-                )}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, marginBottom: 10, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={notifyPortal}
+                    onChange={(e) => setNotifyPortal(e.target.checked)}
+                  />{' '}
+                  Notify customer in the portal
+                </label>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {order.status === 'IN_PROGRESS' && (
                     <button
@@ -643,6 +665,7 @@ export function AdminOrderDetail() {
                   </button>
                 </div>
               </div>
+              )}
             </div>
           )}
 
@@ -664,7 +687,8 @@ export function AdminOrderDetail() {
             <div className="thread">
               {messages.map((m) => (
                 <div key={m.id} className={`tmsg ${m.direction === 'OUTBOUND' ? 'me' : 'them'}`}>
-                  {m.body}
+                  {m.body && m.body !== '(attachment)' ? <div>{m.body}</div> : null}
+                  <MessageAttachments attachments={m.attachments} />
                   <div className="tm">
                     {m.direction === 'OUTBOUND' ? 'You' : customerName(order)} · {relativeTime(m.createdAt)}
                   </div>
@@ -674,6 +698,20 @@ export function AdminOrderDetail() {
                 <div style={{ color: 'var(--muted)', fontSize: 12 }}>No messages on this order yet.</div>
               )}
             </div>
+            {msgFiles.length > 0 && (
+              <div style={{ padding: '0 14px 8px', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {msgFiles.map((f, i) => (
+                  <button
+                    key={`${f.name}-${i}`}
+                    type="button"
+                    className="odf"
+                    onClick={() => setMsgFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                  >
+                    <i className="ti ti-paperclip" /> {f.name} <i className="ti ti-x" />
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="thread-in" style={{ position: 'relative' }}>
               {showTemplates && (
                 <div
@@ -722,19 +760,40 @@ export function AdminOrderDetail() {
               >
                 <i className="ti ti-template" />
               </button>
+              <label className="tmpl-btn" title="Attach file" style={{ cursor: 'pointer' }}>
+                <i className="ti ti-paperclip" />
+                <input
+                  type="file"
+                  multiple
+                  hidden
+                  onChange={(e) => {
+                    const list = Array.from(e.target.files ?? []);
+                    if (list.length) setMsgFiles((prev) => [...prev, ...list].slice(0, 8));
+                    e.target.value = '';
+                  }}
+                />
+              </label>
               <input
                 value={msgDraft}
                 placeholder={`Reply to ${customerName(order)}…`}
                 onChange={(e) => setMsgDraft(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && msgDraft.trim()) sendMsg.mutate(msgDraft.trim());
+                  if (
+                    e.key === 'Enter' &&
+                    (msgDraft.trim() || msgFiles.length > 0)
+                  ) {
+                    sendMsg.mutate({ body: msgDraft.trim(), files: msgFiles });
+                  }
                 }}
               />
               <button
                 type="button"
                 className="btn btn-primary btn-sm"
-                disabled={!msgDraft.trim() || sendMsg.isPending}
-                onClick={() => msgDraft.trim() && sendMsg.mutate(msgDraft.trim())}
+                disabled={(!msgDraft.trim() && msgFiles.length === 0) || sendMsg.isPending}
+                onClick={() =>
+                  (msgDraft.trim() || msgFiles.length > 0) &&
+                  sendMsg.mutate({ body: msgDraft.trim(), files: msgFiles })
+                }
               >
                 <i className="ti ti-send" />
               </button>

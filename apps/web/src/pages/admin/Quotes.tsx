@@ -94,7 +94,10 @@ export function AdminQuotes() {
         const created = await createAdminConversation({
           customerId: order.customerId ?? null,
           orderId: order.id,
-          subject: order.name ?? `Quote Q-${order.humanRef ?? order.id.slice(0, 6)}`,
+          chatType: 'QUOTE',
+          subject: order.humanRef
+            ? `Quotation ${order.humanRef} Chat`
+            : 'Quotation Chat',
         });
         convo = created.conversation;
       }
@@ -238,7 +241,7 @@ export function AdminQuotes() {
               <i className="ti ti-clock" /> Follow-ups needed
             </span>
             <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>
-              Auto-reminder goes out after 48h · quotes expire in 14 days
+              Quotes awaiting a response for 2+ days
             </span>
           </div>
           {followUps.map((o) => (

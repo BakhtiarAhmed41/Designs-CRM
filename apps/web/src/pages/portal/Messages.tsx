@@ -1,190 +1,198 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ConversationThread } from '@/components/messaging/ConversationThread';
+import { MessageComposer } from '@/components/messaging/MessageComposer';
 import { getErrorMessage } from '@/lib/api';
-import { getMyCustomer } from '@/lib/customers';
+import { dateShort } from '@/lib/format';
 import {
+  chatTypeLabel,
   createMyConversation,
   getMyConversation,
   listMyConversations,
   sendMyMessage,
+  type ChatType,
+  type Conversation,
 } from '@/lib/messaging';
+import {
+  maybeRequestBrowserNotifications,
+  showBrowserNotification,
+  useMessagingSocket,
+} from '@/hooks/useMessagingSocket';
 
-function formatMsgTime(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+function relativeTime(iso: string | null | undefined) {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  return dateShort(iso);
 }
 
 export function PortalMessages() {
   const qc = useQueryClient();
-  const bodyRef = useRef<HTMLDivElement>(null);
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const [draft, setDraft] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
-
-  const { data: meCustomer } = useQuery({
-    queryKey: ['portal-customer-me'],
-    queryFn: getMyCustomer,
-  });
-  const isNet = meCustomer?.customer?.accountType === 'NET_MONTHLY';
+  const conversationId = searchParams.get('c');
 
   const convosQuery = useQuery({
     queryKey: ['my-conversations'],
     queryFn: listMyConversations,
-    refetchInterval: 15000,
+    refetchInterval: 20_000,
   });
 
-  const startedRef = useRef(false);
-
-  const createConvo = useMutation({
-    mutationFn: () => createMyConversation({ subject: 'Team chat' }),
-    onSuccess: (res) => {
-      setConversationId(res.conversation.id);
-      qc.invalidateQueries({ queryKey: ['my-conversations'] });
-    },
-  });
+  const conversations = convosQuery.data?.conversations ?? [];
 
   useEffect(() => {
-    if (conversationId) return;
-    const convos = convosQuery.data?.conversations ?? [];
-    if (convos.length > 0) {
-      setConversationId(convos[0].id);
-      return;
+    if (conversationId || convosQuery.isLoading) return;
+    if (conversations.length > 0) {
+      setSearchParams({ c: conversations[0].id }, { replace: true });
     }
-    if (!convosQuery.isLoading && !startedRef.current) {
-      startedRef.current = true;
-      createConvo.mutate();
-    }
-  }, [convosQuery.data, convosQuery.isLoading, conversationId, createConvo]);
+  }, [conversationId, conversations, convosQuery.isLoading, setSearchParams]);
 
   const threadQuery = useQuery({
     queryKey: ['my-conversation', conversationId],
     queryFn: () => getMyConversation(conversationId as string),
     enabled: !!conversationId,
-    refetchInterval: 15000,
+    refetchInterval: 15_000,
   });
 
-  const messages = threadQuery.data?.conversation.messages ?? [];
+  useMessagingSocket({
+    conversationId,
+    onMessageNew: (payload) => {
+      const p = payload as { message?: { body?: string } };
+      showBrowserNotification('New message from our team', p.message?.body);
+      if (conversationId) {
+        void qc.invalidateQueries({ queryKey: ['my-conversation', conversationId] });
+      }
+    },
+  });
 
-  useEffect(() => {
-    const el = bodyRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages.length]);
+  const active = threadQuery.data?.conversation;
+  const linkedSummary = useMemo(() => {
+    if (!active) return null;
+    if (active.chatType === 'GENERAL') return 'General inquiry';
+    return `${chatTypeLabel(active.chatType)}${active.orderRef ? ` · ${active.orderRef}` : ''}`;
+  }, [active]);
 
   const sendMutation = useMutation({
-    mutationFn: (body: string) => sendMyMessage(conversationId as string, body),
+    mutationFn: ({ body, files }: { body: string; files: File[] }) =>
+      sendMyMessage(conversationId as string, body, files),
     onSuccess: () => {
-      setDraft('');
       setError(null);
-      qc.invalidateQueries({ queryKey: ['my-conversation', conversationId] });
-      qc.invalidateQueries({ queryKey: ['my-conversations'] });
-      qc.invalidateQueries({ queryKey: ['portal-convos-nav'] });
+      void qc.invalidateQueries({ queryKey: ['my-conversation', conversationId] });
+      void qc.invalidateQueries({ queryKey: ['my-conversations'] });
+      void qc.invalidateQueries({ queryKey: ['portal-convos-nav'] });
     },
-    onError: (e) => setError(getErrorMessage(e)),
+    onError: (err) => setError(getErrorMessage(err)),
   });
 
-  function handleSend() {
-    const body = draft.trim();
-    if (!body || !conversationId) return;
-    sendMutation.mutate(body);
+  const startGeneral = useMutation({
+    mutationFn: () =>
+      createMyConversation({ chatType: 'GENERAL', subject: 'General Inquiry' }),
+    onSuccess: (res) => {
+      setSearchParams({ c: res.conversation.id });
+      void qc.invalidateQueries({ queryKey: ['my-conversations'] });
+    },
+    onError: (err) => setError(getErrorMessage(err)),
+  });
+
+  function selectConvo(c: Conversation) {
+    setSearchParams({ c: c.id });
+    maybeRequestBrowserNotifications();
   }
 
   return (
-    <div>
-      <div className="ph">
-        <div>
-          <h1>Messages</h1>
-          <div className="sub">
-            Chat directly with our team. Ask a question, send new details, or request a change —
-            we usually reply within a couple of hours.
-          </div>
+    <div className="msg-workspace portal">
+      <aside className="msg-left">
+        <div className="msg-left-head">
+          <div className="h2" style={{ margin: 0 }}>Messages</div>
+          <button
+            type="button"
+            className="primary"
+            style={{ width: '100%', marginTop: 10 }}
+            onClick={() => startGeneral.mutate()}
+            disabled={startGeneral.isPending}
+          >
+            Start New Inquiry
+          </button>
         </div>
-      </div>
-
-      {isNet && (
-        <div className="approve-banner" style={{ marginTop: 20 }}>
-          <i className="ti ti-shield-check" />
-          <div>
-            <div className="abt">Trade account — approved for monthly billing</div>
-            <div className="abs">
-              Your account is approved by our team for net-monthly terms. New logos you send are
-              added straight to this month&apos;s order without a per-order quote. Reach out here
-              anytime to adjust your terms or credit limit.
-            </div>
-          </div>
-        </div>
-      )}
-
-      {error && (
-        <div className="alert-error" style={{ margin: `${isNet ? 14 : 20}px 0` }}>
-          {error}
-        </div>
-      )}
-
-      <div className="card" style={{ marginTop: 20 }}>
-        <div className="chat">
-          <div className="chat-body" ref={bodyRef}>
-            {threadQuery.isLoading && (
-              <div style={{ color: 'var(--muted)', fontSize: 13 }}>Loading conversation…</div>
-            )}
-            {!threadQuery.isLoading && messages.length === 0 && (
-              <div style={{ color: 'var(--muted)', fontSize: 13 }}>
-                Say hello — our team usually replies within a couple of hours.
-              </div>
-            )}
-            {messages.map((m) => {
-              const mine = m.direction === 'INBOUND';
-              return (
-                <div key={m.id} className={`msg ${mine ? 'me' : 'them'}`}>
-                  {m.body}
-                  <div className="mt">
-                    {mine ? 'You' : 'LVD team'} · {formatMsgTime(m.createdAt)}
-                  </div>
+        <div className="msg-left-list">
+          {conversations.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              className={`msg-cust-card ${c.id === conversationId ? 'on' : ''}`}
+              onClick={() => selectConvo(c)}
+            >
+              <div className="msg-cust-main" style={{ width: '100%' }}>
+                <div className="msg-cust-top">
+                  <strong>
+                    {chatTypeLabel(c.chatType as ChatType)}
+                    {c.orderRef ? ` ${c.orderRef}` : ''}
+                  </strong>
+                  <span>{relativeTime(c.lastMessageAt)}</span>
                 </div>
-              );
-            })}
-          </div>
-          <div className="chat-in">
-            <label title="Attach image or document" style={{ cursor: 'pointer', padding: '0 6px' }}>
-              <i className="ti ti-paperclip" />
-              <input
-                type="file"
-                accept="image/*,.pdf,.doc,.docx,.zip,.ai,.eps,.svg"
-                style={{ display: 'none' }}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  setDraft((d) =>
-                    d
-                      ? `${d}\n📎 Attachment: ${file.name} (${Math.round(file.size / 1024)} KB)`
-                      : `📎 Attachment: ${file.name} (${Math.round(file.size / 1024)} KB)`,
-                  );
-                  e.target.value = '';
-                }}
-              />
-            </label>
-            <input
-              placeholder="Type a message, or attach an image…"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
+                <div className="msg-cust-preview">
+                  {c.lastMessagePreview || c.subject || 'No messages yet'}
+                </div>
+                <div className="msg-cust-meta">
+                  <span className="msg-type">{c.status}</span>
+                  {c.unreadClient > 0 && (
+                    <span className="msg-badge">{c.unreadClient}</span>
+                  )}
+                </div>
+              </div>
+            </button>
+          ))}
+          {!convosQuery.isLoading && conversations.length === 0 && (
+            <div className="msg-empty">
+              No conversations yet. Start a general inquiry or open chat from an order/quote.
+            </div>
+          )}
+        </div>
+      </aside>
+
+      <section className="msg-center">
+        {active ? (
+          <>
+            <div className="msg-center-head">
+              <div>
+                <div className="h2" style={{ margin: 0 }}>
+                  {active.subject || chatTypeLabel(active.chatType)}
+                </div>
+                <div className="muted" style={{ fontSize: 12.5 }}>
+                  {linkedSummary}
+                  {active.orderStatus ? ` · ${active.orderStatus}` : ''}
+                </div>
+              </div>
+            </div>
+            <ConversationThread
+              messages={active.messages}
+              mineDirection="INBOUND"
+              emptyText="Say hello — our team will reply here."
+            />
+            {error && <div className="err" style={{ margin: '0 12px' }}>{error}</div>}
+            <MessageComposer
+              disabled={active.status === 'CLOSED'}
+              placeholder={
+                active.status === 'CLOSED'
+                  ? 'This conversation is closed'
+                  : 'Write a message…'
+              }
+              onSend={async (body, files) => {
+                await sendMutation.mutateAsync({ body, files });
               }}
             />
-            <button
-              type="button"
-              className="send"
-              disabled={!draft.trim() || sendMutation.isPending}
-              onClick={handleSend}
-            >
-              <i className="ti ti-send" />
-            </button>
+          </>
+        ) : (
+          <div className="msg-empty-state">
+            Select a conversation or start a new inquiry.
           </div>
-        </div>
-      </div>
+        )}
+      </section>
     </div>
   );
 }

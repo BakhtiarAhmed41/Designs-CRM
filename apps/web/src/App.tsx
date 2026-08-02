@@ -24,6 +24,8 @@ import { AdminOrderDetail } from '@/pages/admin/OrderDetail';
 import { AdminQuotes } from '@/pages/admin/Quotes';
 import { AdminQuoteDetail } from '@/pages/admin/QuoteDetail';
 import { AdminMessages } from '@/pages/admin/Messages';
+import { AdminCustomerMessages } from '@/pages/admin/CustomerMessages';
+import { AdminTeamMessages } from '@/pages/admin/TeamMessages';
 import { AdminBilling } from '@/pages/admin/Billing';
 import { AdminCustomers } from '@/pages/admin/Customers';
 import { AdminTeam } from '@/pages/admin/Team';
@@ -98,6 +100,9 @@ export function App() {
       >
         <Route index element={<AdminDashboard />} />
         <Route path="messages" element={<AdminMessages />} />
+        <Route path="messages/customers" element={<AdminCustomerMessages />} />
+        <Route path="messages/customers/:conversationId" element={<AdminCustomerMessages />} />
+        <Route path="messages/team" element={<AdminTeamMessages />} />
         <Route path="orders" element={<AdminOrders />} />
         <Route path="orders/:id" element={<AdminOrderDetail />} />
         <Route path="quotes" element={<AdminQuotes />} />

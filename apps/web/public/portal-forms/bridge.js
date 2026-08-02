@@ -181,6 +181,76 @@
     return adv;
   }
 
+  function setChipSelected(chip, on) {
+    if (!chip) return;
+    if (on) chip.classList.add('sel');
+    else chip.classList.remove('sel');
+  }
+
+  function applyFormats(formats) {
+    if (!formats || !formats.length) return;
+    var wanted = {};
+    formats.forEach(function (f) {
+      wanted[String(f).toUpperCase()] = true;
+    });
+    document.querySelectorAll('.fmt-chip').forEach(function (chip) {
+      var nameEl = chip.querySelector('.fname');
+      if (!nameEl) return;
+      var name = nameEl.textContent.trim().toUpperCase();
+      setChipSelected(chip, !!wanted[name]);
+    });
+  }
+
+  function applyPlacement(placement) {
+    if (!placement) return;
+    document.querySelectorAll('select').forEach(function (sel) {
+      var lbl =
+        sel.closest('.ff') && sel.closest('.ff').querySelector('label')
+          ? sel.closest('.ff').querySelector('label').textContent.trim().toLowerCase()
+          : '';
+      if (lbl.indexOf('placement') === -1) return;
+      var match = Array.prototype.find.call(sel.options, function (opt) {
+        return opt.value === placement || opt.textContent.trim() === placement;
+      });
+      if (match) sel.value = match.value;
+    });
+  }
+
+  function applyHoops(hoops) {
+    if (!hoops || !hoops.length) return;
+    var first = String(hoops[0]);
+    document.querySelectorAll('select').forEach(function (sel) {
+      var lbl =
+        sel.closest('.ff') && sel.closest('.ff').querySelector('label')
+          ? sel.closest('.ff').querySelector('label').textContent.trim().toLowerCase()
+          : '';
+      if (lbl.indexOf('hoop') === -1 && lbl.indexOf('size') === -1) return;
+      var match = Array.prototype.find.call(sel.options, function (opt) {
+        return (
+          opt.value === first ||
+          opt.textContent.indexOf(first) !== -1 ||
+          opt.value.replace(/"/g, '') === first
+        );
+      });
+      if (match) sel.value = match.value;
+    });
+  }
+
+  function formatsForService(prefs, svc) {
+    if (!prefs) return [];
+    if (svc === 'embroidery') return prefs.embFormats || [];
+    if (svc === 'laser') return prefs.cncFormats || [];
+    return prefs.digFormats || [];
+  }
+
+  window.LVD_APPLY_PREFS = function (prefs) {
+    if (!prefs || typeof prefs !== 'object') return;
+    var svc = serviceKey();
+    applyFormats(formatsForService(prefs, svc));
+    applyPlacement(prefs.placement);
+    applyHoops(prefs.hoops);
+  };
+
   window.LVD_COLLECT = function () {
     var mode = getMode();
     var body = activeModeBody();
@@ -208,8 +278,31 @@
     return files;
   };
 
+  function restoreDraft(svc) {
+    try {
+      var raw = localStorage.getItem('lvd_quote_draft_' + svc);
+      if (!raw) return false;
+      var draft = JSON.parse(raw);
+      if (!draft || typeof draft !== 'object') return false;
+
+      if (draft.designName) {
+        var nameInputs = document.querySelectorAll('.cb > .ff input[type="text"]');
+        if (nameInputs[0] && !nameInputs[0].value) nameInputs[0].value = draft.designName;
+      }
+      if (draft.formats && draft.formats.length) applyFormats(draft.formats);
+      if (draft.instructions) {
+        var ta = document.querySelector('.mode-body.vis textarea') || document.querySelector('textarea');
+        if (ta && !ta.value) ta.value = draft.instructions;
+      }
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     var svc = serviceKey();
+    var restored = restoreDraft(svc);
 
     document.querySelectorAll('.btn-p').forEach(function (btn) {
       btn.addEventListener('click', function (e) {
@@ -236,5 +329,15 @@
         parent.postMessage({ type: 'lvd-open-messages' }, '*');
       });
     });
+
+    parent.postMessage({ type: 'lvd-form-ready', service: svc, restoredDraft: restored }, '*');
+  });
+
+  window.addEventListener('message', function (ev) {
+    var data = ev.data;
+    if (!data || typeof data !== 'object') return;
+    if (data.type === 'lvd-apply-prefs') {
+      window.LVD_APPLY_PREFS(data.prefs);
+    }
   });
 })();

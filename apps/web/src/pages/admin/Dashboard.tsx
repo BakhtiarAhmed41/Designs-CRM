@@ -166,7 +166,7 @@ export function AdminDashboard() {
             <b>{newOrders} new</b> unassigned · <b>{inProgress} in progress</b>
           </div>
         </Link>
-        <Link to="/admin/messages" className="task" style={{ textDecoration: 'none', color: 'inherit' }}>
+        <Link to="/admin/messages/customers" className="task" style={{ textDecoration: 'none', color: 'inherit' }}>
           <div className="tt">
             <i className="ti ti-message" style={{ color: 'var(--maroon)' }} /> Messages{' '}
             <span className="badge">{unreadMsgs}</span>
@@ -285,7 +285,7 @@ export function AdminDashboard() {
             <span className="ct">
               <i className="ti ti-message" /> Recent messages
             </span>
-            <Link to="/admin/messages">Open inbox</Link>
+            <Link to="/admin/messages/customers">Open inbox</Link>
           </div>
           <div className="scroll-body">
             {conversations.length === 0 && (
@@ -296,7 +296,7 @@ export function AdminDashboard() {
               return (
                 <Link
                   key={c.id}
-                  to={`/admin/messages?c=${c.id}`}
+                  to={`/admin/messages/customers/${c.id}`}
                   className={`mrow${c.unreadAdmin > 0 ? ' unread' : ''}`}
                   style={{ textDecoration: 'none', color: 'inherit' }}
                 >
@@ -314,7 +314,7 @@ export function AdminDashboard() {
               );
             })}
           </div>
-          <Link to="/admin/messages" className="scroll-foot" style={{ display: 'block', textDecoration: 'none' }}>
+          <Link to="/admin/messages/customers" className="scroll-foot" style={{ display: 'block', textDecoration: 'none' }}>
             <i className="ti ti-chevron-down" style={{ fontSize: 12 }} /> Show older
           </Link>
         </div>
