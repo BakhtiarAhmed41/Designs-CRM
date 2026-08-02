@@ -6,7 +6,12 @@ import { dirname, join, normalize, resolve, sep } from 'path';
 import { getEnv } from '../config/env';
 
 function sanitizeFilename(name: string): string {
-  return name.replace(/[\\/\u0000-\u001F\u007F]+/g, '_').slice(0, 200) || 'file';
+  return (
+    name
+      .replace(/[\\/\u0000-\u001F\u007F]+/g, '_')
+      .replace(/[<>:"|?*']/g, '_')
+      .slice(0, 200) || 'file'
+  );
 }
 
 function signSecret(): string {

@@ -397,7 +397,7 @@ export class AuthService {
     const passwordHash = await argon2.hash(env.SEED_ADMIN_PASSWORD);
     await this.db.execute(
       `INSERT INTO users (id, email, password_hash, role, login_status, initials, presence)
-       VALUES (?, ?, ?, 'ADMIN', 'ACTIVE', 'AD', 'ON')`,
+       VALUES (?, ?, ?, 'SUPER_ADMIN', 'ACTIVE', 'AD', 'ON')`,
       [randomUUID(), email, passwordHash],
     );
   }

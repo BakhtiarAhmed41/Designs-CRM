@@ -14,7 +14,8 @@ import { z } from 'zod';
 import type { AuthUser } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { MessageLabel } from '../common/enums';
+import { ChatType, MessageLabel } from '../common/enums';
+import { MESSAGE_UPLOAD, mapMulterFiles } from '../common/multer-errors';
 import { MessagingService } from './messaging.service';
 
 const labelSchema = z.enum([
@@ -24,10 +25,17 @@ const labelSchema = z.enum([
   MessageLabel.IMPORTANT,
 ]);
 
+const chatTypeSchema = z.enum([
+  ChatType.GENERAL,
+  ChatType.ORDER,
+  ChatType.QUOTE,
+]);
+
 const createConversationSchema = z.object({
   subject: z.string().max(255).optional().nullable(),
   orderId: z.string().uuid().optional().nullable(),
   label: labelSchema.optional().nullable(),
+  chatType: chatTypeSchema.optional(),
 });
 
 @Controller('conversations')
@@ -62,28 +70,23 @@ export class MessagingController {
 
   @Post(':id/messages')
   @UseInterceptors(
-    FilesInterceptor('files', 8, {
+    FilesInterceptor('files', MESSAGE_UPLOAD.maxFiles, {
       storage: memoryStorage(),
-      limits: { fileSize: 15 * 1024 * 1024 },
+      limits: { fileSize: MESSAGE_UPLOAD.maxFileSize },
     }),
   )
   async sendMessage(
     @CurrentUser() user: AuthUser | undefined,
     @Param('id') id: string,
-    @Body() body: { body?: string; replyToMessageId?: string },
+    @Body() body: { body?: string; replyToMessageId?: string } | undefined,
     @UploadedFiles() files?: Express.Multer.File[],
   ) {
     return this.messaging.addMyMessage(
       user,
       id,
-      body.body ?? '',
-      (files ?? []).map((f) => ({
-        originalname: f.originalname,
-        mimetype: f.mimetype,
-        size: f.size,
-        buffer: f.buffer,
-      })),
-      body.replyToMessageId ?? null,
+      body?.body ?? '',
+      mapMulterFiles(files),
+      body?.replyToMessageId ?? null,
     );
   }
 }

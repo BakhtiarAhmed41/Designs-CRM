@@ -20,6 +20,7 @@ import { FeaturesGuard } from '../auth/guards/features.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import type { AuthUser } from '../auth/auth.types';
+import { MESSAGE_UPLOAD, mapMulterFiles } from '../common/multer-errors';
 import { TeamService } from './team.service';
 
 const STAFF_ROLE_VALUES = [
@@ -120,27 +121,22 @@ export class AdminTeamController {
   @Post('team-chat/:peerId')
   @RequireFeatures('messages', 'messages_team_send')
   @UseInterceptors(
-    FilesInterceptor('files', 8, {
+    FilesInterceptor('files', MESSAGE_UPLOAD.maxFiles, {
       storage: memoryStorage(),
-      limits: { fileSize: 15 * 1024 * 1024 },
+      limits: { fileSize: MESSAGE_UPLOAD.maxFileSize },
     }),
   )
   async sendChat(
     @CurrentUser() user: AuthUser,
     @Param('peerId') peerId: string,
-    @Body() body: { body?: string },
+    @Body() body: { body?: string } | undefined,
     @UploadedFiles() files?: Express.Multer.File[],
   ) {
     return this.team.sendStaffChat(
       user.id,
       peerId,
-      body.body ?? '',
-      (files ?? []).map((f) => ({
-        originalname: f.originalname,
-        mimetype: f.mimetype,
-        size: f.size,
-        buffer: f.buffer,
-      })),
+      body?.body ?? '',
+      mapMulterFiles(files),
     );
   }
 
@@ -170,25 +166,20 @@ export class AdminTeamController {
   @Post('team-group-chat')
   @RequireFeatures('messages', 'messages_group', 'messages_team_send')
   @UseInterceptors(
-    FilesInterceptor('files', 8, {
+    FilesInterceptor('files', MESSAGE_UPLOAD.maxFiles, {
       storage: memoryStorage(),
-      limits: { fileSize: 15 * 1024 * 1024 },
+      limits: { fileSize: MESSAGE_UPLOAD.maxFileSize },
     }),
   )
   async sendGroupChat(
     @CurrentUser() user: AuthUser,
-    @Body() body: { body?: string },
+    @Body() body: { body?: string } | undefined,
     @UploadedFiles() files?: Express.Multer.File[],
   ) {
     return this.team.sendGroupChat(
       user.id,
-      body.body ?? '',
-      (files ?? []).map((f) => ({
-        originalname: f.originalname,
-        mimetype: f.mimetype,
-        size: f.size,
-        buffer: f.buffer,
-      })),
+      body?.body ?? '',
+      mapMulterFiles(files),
     );
   }
 

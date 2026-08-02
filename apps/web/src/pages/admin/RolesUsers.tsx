@@ -41,6 +41,54 @@ const EMPTY_PERMS: Record<FeatureKey, boolean> = {
   roles: false,
 };
 
+const MESSAGING_KEYS: FeatureKey[] = [
+  'messages',
+  'messages_customer_view',
+  'messages_customer_reply',
+  'messages_customer_start',
+  'messages_team_view',
+  'messages_team_send',
+  'messages_group',
+  'messages_delete',
+];
+
+type FeatureItem = { key: FeatureKey; label: string };
+
+function FeatureCheckboxGrid({
+  items,
+  permissions,
+  onToggle,
+}: {
+  items: FeatureItem[];
+  permissions: Record<FeatureKey, boolean>;
+  onToggle: (key: FeatureKey, checked: boolean) => void;
+}) {
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+        gap: '6px 12px',
+        marginBottom: 8,
+      }}
+    >
+      {items.map((f) => (
+        <label
+          key={f.key}
+          style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}
+        >
+          <input
+            type="checkbox"
+            checked={!!permissions[f.key]}
+            onChange={(e) => onToggle(f.key, e.target.checked)}
+          />
+          {f.label}
+        </label>
+      ))}
+    </div>
+  );
+}
+
 function systemRoleLabel(role: UserRole | SystemStaffRole): string {
   switch (role) {
     case 'SUPER_ADMIN':
@@ -238,9 +286,30 @@ function RoleFormModal({
     });
   };
 
+  const messagingFeatures = features.filter((f) => MESSAGING_KEYS.includes(f.key));
+  const otherFeatures = features.filter((f) => !MESSAGING_KEYS.includes(f.key));
+
+  const toggle = (key: FeatureKey, checked: boolean) => {
+    setPermissions((p) => {
+      const next = { ...p, [key]: checked };
+      // Umbrella "Messages" toggles all messaging sub-permissions together.
+      if (key === 'messages') {
+        for (const mk of MESSAGING_KEYS) next[mk] = checked;
+      } else if (MESSAGING_KEYS.includes(key) && checked) {
+        next.messages = true;
+      } else if (MESSAGING_KEYS.includes(key) && !checked) {
+        const anySub = MESSAGING_KEYS.some(
+          (mk) => mk !== 'messages' && mk !== key && next[mk],
+        );
+        if (!anySub) next.messages = false;
+      }
+      return next;
+    });
+  };
+
   return (
     <div className="overlay open" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-h">
           <span>{editing ? 'Edit role' : 'Create role'}</span>
           <button type="button" className="modal-x" onClick={onClose}>
@@ -295,30 +364,28 @@ function RoleFormModal({
               </button>
             </span>
           </div>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-              gap: '6px 12px',
-              marginBottom: 8,
-            }}
-          >
-            {features.map((f) => (
-              <label
-                key={f.key}
-                style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13 }}
-              >
-                <input
-                  type="checkbox"
-                  checked={!!permissions[f.key]}
-                  onChange={(e) =>
-                    setPermissions((p) => ({ ...p, [f.key]: e.target.checked }))
-                  }
-                />
-                {f.label}
-              </label>
-            ))}
+
+          <div style={{ fontWeight: 600, fontSize: 12, margin: '10px 0 6px', color: 'var(--muted)' }}>
+            Screens
           </div>
+          <FeatureCheckboxGrid
+            items={otherFeatures}
+            permissions={permissions}
+            onToggle={toggle}
+          />
+
+          <div style={{ fontWeight: 600, fontSize: 12, margin: '12px 0 6px', color: 'var(--muted)' }}>
+            Messaging
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 6 }}>
+            Grant Customer Messages, Team Messages, group chat, and delete separately.
+          </div>
+          <FeatureCheckboxGrid
+            items={messagingFeatures}
+            permissions={permissions}
+            onToggle={toggle}
+          />
+
           <button
             type="button"
             className="btn btn-primary"

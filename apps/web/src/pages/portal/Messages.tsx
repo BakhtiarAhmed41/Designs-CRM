@@ -111,12 +111,13 @@ export function PortalMessages() {
           <div className="h2" style={{ margin: 0 }}>Messages</div>
           <button
             type="button"
-            className="primary"
+            className="btn btn-primary"
             style={{ width: '100%', marginTop: 10 }}
             onClick={() => startGeneral.mutate()}
             disabled={startGeneral.isPending}
           >
-            Start New Inquiry
+            <i className="ti ti-message" />
+            {startGeneral.isPending ? 'Starting…' : 'Start New Inquiry'}
           </button>
         </div>
         <div className="msg-left-list">

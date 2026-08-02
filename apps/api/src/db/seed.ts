@@ -55,8 +55,8 @@ async function main() {
     const adminHash = await argon2.hash(env.SEED_ADMIN_PASSWORD);
     await conn.execute(
       `INSERT INTO users (id, email, password_hash, role, first_name, initials, presence)
-       VALUES (?, ?, ?, 'ADMIN', 'Admin', 'AD', 'ON')
-       ON DUPLICATE KEY UPDATE role = 'ADMIN'`,
+       VALUES (?, ?, ?, 'SUPER_ADMIN', 'Admin', 'AD', 'ON')
+       ON DUPLICATE KEY UPDATE role = 'SUPER_ADMIN'`,
       [randomUUID(), env.SEED_ADMIN_EMAIL.toLowerCase(), adminHash],
     );
   }

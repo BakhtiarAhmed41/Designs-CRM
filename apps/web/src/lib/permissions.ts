@@ -69,6 +69,8 @@ export function defaultFeaturesForRole(role: UserRole): Record<FeatureKey, boole
         edits: true,
         customers: true,
         billing: true,
+        team: true,
+        roles: true,
       };
     case 'SUPPORT':
       return {

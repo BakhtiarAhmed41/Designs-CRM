@@ -270,34 +270,42 @@ export class MessagingService {
   private async saveAttachments(messageId: string, files: UploadFile[]) {
     const out = [];
     for (const file of files) {
-      const key = this.storage.newObjectKey(
-        ['messages', messageId, 'attachments'],
-        file.originalname,
-      );
-      await this.storage.uploadObject({
-        key,
-        body: file.buffer,
-        contentType: file.mimetype,
-      });
-      const id = this.db.uuid();
-      await this.db.execute(
-        `INSERT INTO message_attachments
-           (id, message_id, original_name, mime_type, byte_size, storage_key)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [
-          id,
-          messageId,
-          file.originalname.slice(0, 255),
-          file.mimetype ?? null,
-          file.size,
+      try {
+        const key = this.storage.newObjectKey(
+          ['messages', messageId, 'attachments'],
+          file.originalname,
+        );
+        await this.storage.uploadObject({
           key,
-        ],
-      );
-      const row = await this.db.queryOne<AttachmentRow>(
-        'SELECT * FROM message_attachments WHERE id = ? LIMIT 1',
-        [id],
-      );
-      if (row) out.push(await this.attachmentDto(row));
+          body: file.buffer,
+          contentType: file.mimetype,
+        });
+        const id = this.db.uuid();
+        await this.db.execute(
+          `INSERT INTO message_attachments
+             (id, message_id, original_name, mime_type, byte_size, storage_key)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            id,
+            messageId,
+            file.originalname.slice(0, 255),
+            file.mimetype ?? null,
+            file.size,
+            key,
+          ],
+        );
+        const row = await this.db.queryOne<AttachmentRow>(
+          'SELECT * FROM message_attachments WHERE id = ? LIMIT 1',
+          [id],
+        );
+        if (row) out.push(await this.attachmentDto(row));
+      } catch (err) {
+        throw new BadRequestException(
+          `Could not save attachment "${file.originalname}": ${
+            err instanceof Error ? err.message : 'upload failed'
+          }`,
+        );
+      }
     }
     return out;
   }

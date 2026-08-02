@@ -27,6 +27,7 @@ import {
   MessageLabel,
   STAFF_ROLES,
 } from '../common/enums';
+import { MESSAGE_UPLOAD, mapMulterFiles } from '../common/multer-errors';
 import { MessagingService } from './messaging.service';
 
 const labelSchema = z.enum([
@@ -156,28 +157,23 @@ export class AdminMessagingController {
   @Post('conversations/:id/messages')
   @RequireFeatures('messages', 'messages_customer_reply')
   @UseInterceptors(
-    FilesInterceptor('files', 8, {
+    FilesInterceptor('files', MESSAGE_UPLOAD.maxFiles, {
       storage: memoryStorage(),
-      limits: { fileSize: 15 * 1024 * 1024 },
+      limits: { fileSize: MESSAGE_UPLOAD.maxFileSize },
     }),
   )
   async sendMessage(
     @CurrentUser() user: AuthUser | undefined,
     @Param('id') id: string,
-    @Body() body: { body?: string; replyToMessageId?: string },
+    @Body() body: { body?: string; replyToMessageId?: string } | undefined,
     @UploadedFiles() files?: Express.Multer.File[],
   ) {
     return this.messaging.addAdminMessage(
       user,
       id,
-      body.body ?? '',
-      (files ?? []).map((f) => ({
-        originalname: f.originalname,
-        mimetype: f.mimetype,
-        size: f.size,
-        buffer: f.buffer,
-      })),
-      body.replyToMessageId ?? null,
+      body?.body ?? '',
+      mapMulterFiles(files),
+      body?.replyToMessageId ?? null,
     );
   }
 

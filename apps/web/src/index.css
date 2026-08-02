@@ -60,6 +60,23 @@ body{font-family:'Inter',system-ui,-apple-system,sans-serif;background:var(--bg)
 .btn-ghost{background:#fff;border:0.5px solid var(--line);color:var(--navy);}
 .btn-sm{padding:6px 11px;font-size:12px;border-radius:7px;}
 .btn-green{background:var(--green);color:#fff;}
+/* Messaging / legacy shorthand button variants */
+button.primary,.btn.primary{
+  border:none;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;
+  padding:8px 14px;display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  background:var(--navy);color:#fff;
+}
+button.primary:hover:not(:disabled){background:var(--navy-d);}
+button.primary:disabled{opacity:.55;cursor:not-allowed;}
+button.ghost{
+  border:0.5px solid var(--line);border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;
+  padding:8px 14px;display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  background:#fff;color:var(--navy);
+}
+button.ghost:hover:not(:disabled){background:var(--tint);}
+button.ghost:disabled{opacity:.55;cursor:not-allowed;}
+button.ghost.icon{padding:0;width:40px;height:40px;min-width:40px;color:var(--muted);}
+button.ghost.icon:hover:not(:disabled){color:var(--navy);background:var(--tint);}
 /* SPA uses client routing — pages are always mounted when visible */
 .page{display:block;animation:fade .2s ease;}
 .page.on{display:block;}
@@ -952,8 +969,10 @@ button { font-family: inherit; }
 .msg-center-head{
   display:flex;justify-content:space-between;align-items:center;gap:12px;
   padding:14px 16px;border-bottom:0.5px solid var(--line);
+  background:#fff;
 }
-.msg-center-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.msg-center-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;flex-shrink:0;}
+.msg-center-actions .btn i{font-size:15px;line-height:1;}
 .msg-thread-tabs{
   display:flex;gap:6px;flex-wrap:wrap;
   padding:10px 14px;border-bottom:0.5px solid var(--line);
@@ -995,8 +1014,11 @@ button { font-family: inherit; }
   border:0.5px solid var(--line);border-radius:10px;padding:10px 12px;
   font:inherit;font-size:13.5px;outline:none;
 }
-.msg-composer-row button.primary,.msg-composer-row button.ghost.icon{
-  height:40px;min-width:40px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;
+.msg-composer-row button.primary{
+  height:40px;min-width:44px;padding:0 14px;border-radius:10px;
+}
+.msg-composer-row button.ghost.icon{
+  height:40px;width:40px;min-width:40px;border-radius:10px;
 }
 .msg-attach-preview,.msg-templates{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
 .msg-chip{
@@ -1004,7 +1026,11 @@ button { font-family: inherit; }
   background:#f1f3f5;border-radius:999px;padding:4px 8px;font-size:11.5px;
 }
 .msg-chip button{border:none;background:transparent;cursor:pointer;font-size:14px;line-height:1;}
-.msg-templates button.ghost{font-size:11px;padding:4px 8px;}
+.msg-templates button.ghost{
+  font-size:11px;padding:4px 10px;border-radius:999px;
+  background:#f5f6f8;color:var(--muted);border-color:var(--line-s);
+}
+.msg-templates button.ghost:hover:not(:disabled){background:var(--tint);color:var(--navy);}
 .msg-right-section{padding:14px;border-bottom:0.5px solid var(--line);}
 .msg-right-title{
   font-size:11px;text-transform:uppercase;letter-spacing:.05em;

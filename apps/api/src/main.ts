@@ -3,6 +3,7 @@ import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { getEnv } from './config/env';
 import { AuthService } from './auth/auth.service';
+import { MulterExceptionFilter } from './common/multer-errors';
 
 async function bootstrap() {
   const env = getEnv();
@@ -10,6 +11,7 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
   app.use(cookieParser());
+  app.useGlobalFilters(new MulterExceptionFilter());
   app.enableCors({
     origin: env.WEB_ORIGIN,
     credentials: true,

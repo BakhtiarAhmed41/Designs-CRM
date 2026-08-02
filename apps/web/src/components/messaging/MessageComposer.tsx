@@ -80,7 +80,12 @@ export function MessageComposer({
           hidden
           onChange={(e) => {
             const list = Array.from(e.target.files ?? []);
-            if (list.length) setFiles((prev) => [...prev, ...list].slice(0, 8));
+            const max = 25 * 1024 * 1024;
+            const ok = list.filter((f) => f.size <= max);
+            if (ok.length < list.length) {
+              window.alert('Some files were skipped (max 25MB each).');
+            }
+            if (ok.length) setFiles((prev) => [...prev, ...ok].slice(0, 8));
           }}
         />
         <textarea

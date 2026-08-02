@@ -287,33 +287,46 @@ export function AdminCustomerMessages() {
                 <div className="h2" style={{ margin: 0 }}>
                   {contextQuery.data?.customer.name || active?.customerName || 'Customer'}
                 </div>
-                <div className="muted" style={{ fontSize: 12.5 }}>
-                  {active
-                    ? `${chatTypeLabel(active.chatType)}${active.orderRef ? ` · ${active.orderRef}` : ''} · ${active.status}`
-                    : 'Choose a conversation'}
+                <div className="muted" style={{ fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}>
+                  {active ? (
+                    <>
+                      <span>
+                        {chatTypeLabel(active.chatType)}
+                        {active.orderRef ? ` · ${active.orderRef}` : ''}
+                      </span>
+                      <span className={`chip ${active.status === 'OPEN' ? 'c-done' : 'c-wait'}`}>
+                        {active.status === 'OPEN' ? 'Open' : 'Closed'}
+                      </span>
+                    </>
+                  ) : (
+                    'Choose a conversation'
+                  )}
                 </div>
               </div>
               <div className="msg-center-actions">
                 {canStart && (
                   <button
                     type="button"
-                    className="primary"
+                    className="btn btn-primary btn-sm"
                     onClick={() => startGeneral.mutate()}
                     disabled={startGeneral.isPending}
                   >
-                    Start New Chat
+                    <i className="ti ti-message" />
+                    {startGeneral.isPending ? 'Starting…' : 'Start New Chat'}
                   </button>
                 )}
                 {active && (
                   <button
                     type="button"
-                    className="ghost"
+                    className="btn btn-ghost btn-sm"
                     onClick={() =>
                       updateMutation.mutate({
                         status: active.status === 'OPEN' ? 'CLOSED' : 'OPEN',
                       })
                     }
+                    disabled={updateMutation.isPending}
                   >
+                    <i className={`ti ${active.status === 'OPEN' ? 'ti-x' : 'ti-refresh'}`} />
                     {active.status === 'OPEN' ? 'Close' : 'Reopen'}
                   </button>
                 )}
