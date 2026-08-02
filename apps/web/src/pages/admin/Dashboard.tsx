@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { GlobalSearch } from '@/components/GlobalSearch';
 import { BarChart } from '@/components/BarChart';
 import { GenerateOrderModal } from '@/components/GenerateOrderModal';
+import { NotificationBell } from '@/components/NotificationBell';
 import { getDashboardChart, getDashboardStats } from '@/lib/dashboard';
 import { listAdminEdits } from '@/lib/edits';
 import { listAdminConversations } from '@/lib/messaging';
@@ -147,6 +148,7 @@ export function AdminDashboard() {
           >
             <i className="ti ti-plus" /> Generate order
           </button>
+          <NotificationBell />
         </div>
       </div>
 

@@ -1,7 +1,17 @@
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { NotificationBell } from './NotificationBell';
+
+/** Dashboards place the bell in their own page header row. */
+function isDashboardPath(pathname: string) {
+  return (
+    pathname === '/admin' ||
+    pathname === '/admin/' ||
+    pathname === '/portal' ||
+    pathname === '/portal/'
+  );
+}
 
 export function Shell({
   rolebar,
@@ -10,23 +20,28 @@ export function Shell({
   rolebar?: ReactNode;
   sidebar: ReactNode;
 }) {
+  const { pathname } = useLocation();
+  const showGlobalBell = !isDashboardPath(pathname);
+
   return (
     <div>
       {rolebar}
       <div className="shell">
         {sidebar}
         <main className="main">
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              alignItems: 'center',
-              marginBottom: 4,
-              minHeight: 28,
-            }}
-          >
-            <NotificationBell />
-          </div>
+          {showGlobalBell && (
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                alignItems: 'center',
+                marginBottom: 4,
+                minHeight: 28,
+              }}
+            >
+              <NotificationBell />
+            </div>
+          )}
           <Outlet />
         </main>
       </div>

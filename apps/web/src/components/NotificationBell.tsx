@@ -6,6 +6,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from '@/lib/notifications';
+import { IconBell } from './Icon';
 
 function relativeTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -73,7 +74,7 @@ export function NotificationBell() {
           if (e.key === 'Enter' || e.key === ' ') setOpen((v) => !v);
         }}
       >
-        <i className="ti ti-bell" />
+        <IconBell size={19} />
         {unread > 0 && <span className="nb">{unread}</span>}
       </div>
       {open && (
