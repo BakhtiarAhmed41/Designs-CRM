@@ -233,7 +233,7 @@ export function PortalMessages() {
             </div>
             {error && <div className="err" style={{ margin: '0 12px' }}>{error}</div>}
             <ConversationThread
-              messages={threadQuery.data?.messages ?? []}
+              messages={active?.messages ?? []}
               mineDirection="INBOUND"
             />
             <MessageComposer
