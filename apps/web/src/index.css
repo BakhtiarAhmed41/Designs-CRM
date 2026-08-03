@@ -598,6 +598,7 @@ body{font-size:15px;}
 .nic.msg{background:var(--tint);color:var(--navy);}
 .nic.quote{background:#EDE7F6;color:#5e35b1;}
 .nic.file{background:var(--green-bg);color:var(--green);}
+.nic.pay{background:#E8F5E9;color:#2e7d32;}
 .nitem .ntx{font-size:12.5px;line-height:1.4;}
 .nitem .ntx b{font-weight:600;}
 .nitem .ntm{font-size:11px;color:var(--faint);margin-top:3px;}
@@ -896,6 +897,25 @@ button { font-family: inherit; }
   overflow:hidden;
 }
 .msg-workspace.portal{grid-template-columns:280px 1fr;}
+.msg-workspace.chatgpt{grid-template-columns:300px 1fr 280px;}
+.msg-back{
+  border:none;background:transparent;color:var(--navy);font:inherit;
+  font-size:12.5px;font-weight:600;cursor:pointer;padding:0;
+  display:inline-flex;align-items:center;gap:4px;
+}
+.msg-back:hover{text-decoration:underline;}
+.msg-start-menu{
+  position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:20;
+  background:#fff;border:0.5px solid var(--line);border-radius:10px;
+  box-shadow:0 10px 28px rgba(0,0,0,.12);overflow:hidden;max-height:280px;overflow-y:auto;
+}
+.msg-start-menu button{
+  width:100%;display:flex;align-items:center;gap:8px;
+  border:none;border-bottom:0.5px solid var(--line);background:#fff;
+  padding:10px 12px;font:inherit;font-size:13px;cursor:pointer;text-align:left;
+}
+.msg-start-menu button:hover{background:var(--tint);}
+.msg-start-menu button:last-child{border-bottom:none;}
 .msg-left,.msg-right{
   border-right:0.5px solid var(--line);
   display:flex;

@@ -27,7 +27,20 @@ function signSecret(): string {
 @Injectable()
 export class LocalStorageService {
   private baseDir(): string {
-    return resolve(process.cwd(), getEnv().UPLOAD_DIR);
+    const configured = getEnv().UPLOAD_DIR;
+    if (configured.startsWith('/') || /^[A-Za-z]:[\\/]/.test(configured)) {
+      return resolve(configured);
+    }
+    const candidates = [
+      resolve(process.cwd(), configured),
+      resolve(process.cwd(), 'apps', 'api', configured),
+      // Compiled: dist/storage → apps/api/uploads
+      resolve(__dirname, '..', '..', configured),
+    ];
+    for (const candidate of candidates) {
+      if (existsSync(candidate)) return candidate;
+    }
+    return candidates[candidates.length - 1];
   }
 
   private absPath(key: string): string {

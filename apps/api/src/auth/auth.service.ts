@@ -11,6 +11,7 @@ import { createHash, randomBytes, randomUUID } from 'crypto';
 import { AccountType, CustomerSource, LoginStatus, UserRole } from '../common/enums';
 import { getEnv } from '../config/env';
 import { DbService } from '../db/db.service';
+import { MailService } from '../mail/mail.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { resolvePermissions } from './permissions';
 
@@ -62,6 +63,7 @@ export class AuthService {
     private db: DbService,
     private jwt: JwtService,
     private notifications: NotificationsService,
+    private mail: MailService,
   ) {}
 
   private async findByEmail(email: string): Promise<UserRow | null> {
@@ -145,17 +147,19 @@ export class AuthService {
       );
     });
 
-    const admins = await this.db.query<{ id: string }>(
-      `SELECT id FROM users WHERE role IN ('SUPER_ADMIN','ADMIN') AND login_status = 'ACTIVE'`,
+    const verifyToken = randomBytes(32).toString('hex');
+    await this.db.execute(
+      `INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at)
+       VALUES (?, ?, ?, ?)`,
+      [
+        randomUUID(),
+        id,
+        hashToken(`verify:${verifyToken}`),
+        new Date(Date.now() + 48 * 60 * 60 * 1000),
+      ],
     );
-    await this.notifications.createForMany(
-      admins.map((a) => a.id),
-      {
-        title: 'New login request',
-        body: `${name} (${email}) requested portal access`,
-        link: '/admin/login-requests',
-      },
-    );
+    const mailed = await this.mail.sendEmailVerification(email, verifyToken);
+    const env = getEnv();
 
     return {
       user: {
@@ -174,6 +178,8 @@ export class AuthService {
         }),
       },
       pending: true as const,
+      emailSent: mailed,
+      verifyToken: env.NODE_ENV === 'production' ? null : verifyToken,
     };
   }
 
@@ -273,7 +279,7 @@ export class AuthService {
     const user = await this.findByEmail(email);
     // Always succeed to avoid email enumeration.
     if (!user || user.login_status === LoginStatus.DISABLED) {
-      return { ok: true, resetToken: null as string | null };
+      return { ok: true, resetToken: null as string | null, emailSent: false };
     }
     const token = randomBytes(32).toString('hex');
     const id = randomUUID();
@@ -283,10 +289,56 @@ export class AuthService {
        VALUES (?, ?, ?, ?)`,
       [id, user.id, hashToken(token), expiresAt],
     );
+    const emailSent = await this.mail.sendPasswordReset(user.email, token);
     const env = getEnv();
-    // No email provider configured — return token in non-production for local testing.
-    const resetToken = env.NODE_ENV === 'production' ? null : token;
-    return { ok: true, resetToken };
+    // Return token in non-production when SMTP is not configured, for local testing.
+    const resetToken =
+      env.NODE_ENV === 'production' || emailSent ? null : token;
+    return { ok: true, resetToken, emailSent };
+  }
+
+  async verifyEmail(token: string) {
+    if (!token?.trim()) throw new BadRequestException('Verification token is required');
+    const row = await this.db.queryOne<{
+      id: string;
+      user_id: string;
+    }>(
+      `SELECT id, user_id FROM password_reset_tokens
+        WHERE token_hash = ? AND used_at IS NULL AND expires_at > NOW()
+        LIMIT 1`,
+      [hashToken(`verify:${token}`)],
+    );
+    if (!row) throw new BadRequestException('Invalid or expired verification link');
+
+    const user = await this.findById(row.user_id);
+    await this.db.withTransaction(async (tx) => {
+      await tx.execute(
+        'UPDATE users SET email_verified_at = COALESCE(email_verified_at, NOW()) WHERE id = ?',
+        [row.user_id],
+      );
+      await tx.execute(
+        'UPDATE password_reset_tokens SET used_at = NOW() WHERE id = ?',
+        [row.id],
+      );
+    });
+
+    if (user && user.login_status === LoginStatus.PENDING) {
+      const admins = await this.db.query<{ id: string }>(
+        `SELECT id FROM users WHERE role IN ('SUPER_ADMIN','ADMIN') AND login_status = 'ACTIVE'`,
+      );
+      const name =
+        [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email;
+      await this.notifications.createForMany(
+        admins.map((a) => a.id),
+        {
+          title: 'New login request',
+          body: `${name} (${user.email}) verified their email and requested portal access`,
+          link: '/admin/login-requests',
+        },
+      );
+    }
+
+    return { ok: true as const };
   }
 
   async resetPassword(token: string, password: string) {

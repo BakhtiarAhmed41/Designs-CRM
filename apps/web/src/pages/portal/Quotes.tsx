@@ -5,7 +5,7 @@ import { QuoteBuilderModal } from '@/components/QuoteBuilderModal';
 import { acceptQuotation, listMyOrders, rejectQuotation } from '@/lib/orders';
 import { createMyConversation, listMyConversations } from '@/lib/messaging';
 import { getErrorMessage } from '@/lib/api';
-import { money, dateShort } from '@/lib/format';
+import { money, dateShort, quoteLifecycleChip } from '@/lib/format';
 import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import type { Order, Quotation } from '@/lib/types';
 import type { QuotationLine } from '@/lib/designs';
@@ -22,19 +22,10 @@ function isQuoteOrder(o: Order) {
       'QUOTATION_PROVIDED',
       'WAITING_FOR_ADMIN_QUOTATION_APPROVAL',
       'CLIENT_REJECTED_QUOTATION',
+      'REJECTED',
+      'CANCELLED',
     ].includes(o.status)
   );
-}
-
-function quoteChip(o: Order): { cls: string; label: string } {
-  if (o.status === 'CREATED') return { cls: 'chip c-new', label: 'Draft' };
-  if (o.status === 'QUOTATION_PROVIDED') return { cls: 'chip c-quote', label: 'Quote ready' };
-  if (o.status === 'WAITING_FOR_QUOTATION') return { cls: 'chip c-wait', label: 'Being priced' };
-  if (o.status === 'WAITING_FOR_ADMIN_QUOTATION_APPROVAL') {
-    return { cls: 'chip c-wait', label: 'Counter pending' };
-  }
-  if (o.status === 'CLIENT_REJECTED_QUOTATION') return { cls: 'chip c-wait', label: 'Rejected' };
-  return { cls: 'chip c-prog', label: 'In review' };
 }
 
 function lineTotal(l: QuotationLine) {
@@ -60,7 +51,9 @@ export function PortalQuotes() {
   });
 
   const quotesAll = useMemo(() => {
-    let list = (data?.orders ?? []).filter(isQuoteOrder);
+    let list = (data?.orders ?? []).filter(
+      (o) => o.type === 'QUOTE_REQUEST' && isQuoteOrder(o),
+    );
     if (status) list = list.filter((o) => o.status === status);
     if (q.trim()) {
       const term = q.trim().toLowerCase();
@@ -91,7 +84,10 @@ export function PortalQuotes() {
     onSuccess: () => {
       setError(null);
       qc.invalidateQueries({ queryKey: ['my-orders'] });
+      qc.invalidateQueries({ queryKey: ['my-order'] });
       qc.invalidateQueries({ queryKey: ['portal-orders-nav'] });
+      qc.invalidateQueries({ queryKey: ['admin-quotes'] });
+      qc.invalidateQueries({ queryKey: ['admin-orders'] });
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -101,6 +97,8 @@ export function PortalQuotes() {
     onSuccess: () => {
       setError(null);
       qc.invalidateQueries({ queryKey: ['my-orders'] });
+      qc.invalidateQueries({ queryKey: ['my-order'] });
+      qc.invalidateQueries({ queryKey: ['admin-quotes'] });
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -225,7 +223,9 @@ export function PortalQuotes() {
           </div>
         )}
         {quotes.map((o) => {
-          const chip = quoteChip(o);
+          const chip = quoteLifecycleChip(o.status, 'customer', {
+            partiallyAccepted: o.partiallyAccepted,
+          });
           const quote = o.quotations?.[0] as QuoteWithLines | undefined;
           const lines = quote?.lines ?? [];
           const total = quote?.amountCents ?? null;
@@ -236,7 +236,11 @@ export function PortalQuotes() {
 
           return (
             <div key={o.id}>
-              <div className="orow" onClick={() => toggle(o.id)}>
+              <div
+                className="orow"
+                onClick={() => navigate(`/portal/quotes/${o.id}`)}
+                style={{ cursor: 'pointer' }}
+              >
                 <div className={`thumb${serviceThumbClass(o.serviceType) ? ' m' : ''}`}>
                   <i className={`ti ${serviceTi(o.serviceType)}`} />
                 </div>
@@ -376,7 +380,7 @@ export function PortalQuotes() {
       <QuoteBuilderModal
         open={quoteOpen}
         onClose={() => setQuoteOpen(false)}
-        onSubmitted={(id) => navigate(`/portal/orders/${id}`)}
+        onSubmitted={(id) => navigate(`/portal/quotes/${id}`)}
       />
     </div>
   );

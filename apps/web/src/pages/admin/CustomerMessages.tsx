@@ -47,39 +47,39 @@ function relativeTime(iso: string | null | undefined) {
   return dateShort(iso);
 }
 
-type FilterKey =
-  | 'all'
-  | 'unread'
-  | 'read'
-  | 'open'
-  | 'closed'
-  | 'GENERAL'
-  | 'ORDER'
-  | 'QUOTE';
+type FilterKey = 'all' | 'unread' | 'open' | 'closed' | 'GENERAL' | 'ORDER' | 'QUOTE';
 
+/**
+ * ChatGPT-style layout:
+ * 1) No customer selected → left lists customers
+ * 2) Customer selected → left lists THAT customer's chats; right is the thread (+ optional context)
+ */
 export function AdminCustomerMessages() {
   const { conversationId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { user } = useAuth();
-  const canReply = canFeature(user?.permissions, 'messages_customer_reply') ||
+  const canReply =
+    canFeature(user?.permissions, 'messages_customer_reply') ||
     canFeature(user?.permissions, 'messages');
-  const canStart = canFeature(user?.permissions, 'messages_customer_start') ||
+  const canStart =
+    canFeature(user?.permissions, 'messages_customer_start') ||
     canFeature(user?.permissions, 'messages');
 
   const [q, setQ] = useState(searchParams.get('q') ?? '');
+  const [chatSearch, setChatSearch] = useState('');
   const [filter, setFilter] = useState<FilterKey>('all');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
     searchParams.get('customer') || null,
   );
   const [error, setError] = useState<string | null>(null);
   const [notesDraft, setNotesDraft] = useState('');
+  const [startMenuOpen, setStartMenuOpen] = useState(false);
 
   const listFilters = useMemo(() => {
     const base: Parameters<typeof listAdminConversations>[0] = { q: q || undefined };
     if (filter === 'unread') base.unread = true;
-    if (filter === 'read') base.read = true;
     if (filter === 'open') base.status = 'OPEN';
     if (filter === 'closed') base.status = 'CLOSED';
     if (filter === 'GENERAL' || filter === 'ORDER' || filter === 'QUOTE') {
@@ -133,11 +133,12 @@ export function AdminCustomerMessages() {
 
   const active = threadQuery.data?.conversation;
   const customerId = active?.customerId ?? selectedCustomerId;
+  const customerSelected = !!customerId && customerId !== 'unknown';
 
   const contextQuery = useQuery({
     queryKey: ['msg-customer-context', customerId],
     queryFn: () => getCustomerMessagingContext(customerId as string),
-    enabled: !!customerId && customerId !== 'unknown',
+    enabled: customerSelected,
   });
 
   const templatesQuery = useQuery({
@@ -170,15 +171,23 @@ export function AdminCustomerMessages() {
     onError: (err) => setError(getErrorMessage(err)),
   });
 
-  const startGeneral = useMutation({
-    mutationFn: () =>
+  const startChat = useMutation({
+    mutationFn: (input: {
+      chatType: ChatType;
+      orderId?: string | null;
+      subject?: string;
+    }) =>
       createAdminConversation({
         customerId: customerId,
-        chatType: 'GENERAL',
-        subject: 'General Inquiry',
+        chatType: input.chatType,
+        orderId: input.orderId ?? null,
+        subject: input.subject,
       }),
     onSuccess: (res) => {
-      navigate(`/admin/messages/customers/${res.conversation.id}`);
+      setStartMenuOpen(false);
+      navigate(
+        `/admin/messages/customers/${res.conversation.id}?customer=${customerId}`,
+      );
       void qc.invalidateQueries({ queryKey: ['admin-conversations'] });
       void qc.invalidateQueries({ queryKey: ['msg-customer-context', customerId] });
     },
@@ -196,267 +205,398 @@ export function AdminCustomerMessages() {
 
   function selectCustomer(id: string) {
     setSelectedCustomerId(id);
+    setChatSearch('');
     const next = new URLSearchParams(searchParams);
     next.set('customer', id);
     setSearchParams(next, { replace: true });
-    const first = conversations.find((c) => c.customerId === id);
+    const first = conversations
+      .filter((c) => c.customerId === id)
+      .sort((a, b) => (b.lastMessageAt || '').localeCompare(a.lastMessageAt || ''))[0];
     if (first) navigate(`/admin/messages/customers/${first.id}?customer=${id}`);
     else navigate(`/admin/messages/customers?customer=${id}`);
   }
 
-  const customerThreads =
-    contextQuery.data?.conversations ??
-    conversations.filter((c) => c.customerId === customerId);
+  function clearCustomer() {
+    setSelectedCustomerId(null);
+    setChatSearch('');
+    setSearchParams({}, { replace: true });
+    navigate('/admin/messages/customers');
+  }
+
+  const customerThreads = useMemo(() => {
+    const threads =
+      contextQuery.data?.conversations ??
+      conversations.filter((c) => c.customerId === customerId);
+    const term = chatSearch.trim().toLowerCase();
+    const filtered = !term
+      ? threads
+      : threads.filter((t) => {
+          const hay = `${t.subject || ''} ${t.orderRef || ''} ${chatTypeLabel(t.chatType)} ${t.lastMessagePreview || ''}`.toLowerCase();
+          return hay.includes(term);
+        });
+    return [...filtered].sort((a, b) =>
+      (b.lastMessageAt || '').localeCompare(a.lastMessageAt || ''),
+    );
+  }, [contextQuery.data?.conversations, conversations, customerId, chatSearch]);
+
+  const customerName =
+    contextQuery.data?.customer.name ||
+    active?.customerName ||
+    customerGroups.find((g) => g.customerId === customerId)?.name ||
+    'Customer';
 
   return (
-    <div className="msg-workspace">
+    <div className={`msg-workspace ${customerSelected ? 'chatgpt' : ''}`}>
       <aside className="msg-left">
-        <div className="msg-left-head">
-          <div className="h2" style={{ margin: 0 }}>Customer Messages</div>
-          <input
-            className="msg-search"
-            placeholder="Search name, phone, email, order…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onFocus={() => maybeRequestBrowserNotifications()}
-          />
-          <div className="filters" style={{ marginTop: 8 }}>
-            {(
-              [
-                ['all', 'All'],
-                ['unread', 'Unread'],
-                ['open', 'Open'],
-                ['closed', 'Closed'],
-                ['GENERAL', 'General'],
-                ['ORDER', 'Orders'],
-                ['QUOTE', 'Quotes'],
-              ] as Array<[FilterKey, string]>
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                className={filter === key ? 'on' : ''}
-                onClick={() => setFilter(key)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="msg-left-list">
-          {customerGroups.map((g) => {
-            const top = g.items[0];
-            const on = g.customerId === customerId;
-            return (
-              <button
-                key={g.customerId}
-                type="button"
-                className={`msg-cust-card ${on ? 'on' : ''}`}
-                onClick={() => selectCustomer(g.customerId)}
-              >
-                <div className="av">{initials(g.name)}</div>
-                <div className="msg-cust-main">
-                  <div className="msg-cust-top">
-                    <strong>{g.name}</strong>
-                    <span>{relativeTime(g.lastAt)}</span>
-                  </div>
-                  <div className="msg-cust-preview">
-                    {top?.lastMessagePreview || top?.subject || 'No messages'}
-                  </div>
-                  <div className="msg-cust-meta">
-                    <span className="msg-type">{chatTypeLabel(top?.chatType as ChatType)}</span>
-                    {g.unread > 0 && <span className="msg-badge">{g.unread}</span>}
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-          {!listQuery.isLoading && customerGroups.length === 0 && (
-            <div className="msg-empty">No conversations match.</div>
-          )}
-        </div>
-      </aside>
-
-      <section className="msg-center">
-        {!customerId ? (
-          <div className="msg-empty-state">Select a customer to open conversations.</div>
-        ) : (
+        {!customerSelected ? (
           <>
-            <div className="msg-center-head">
-              <div>
-                <div className="h2" style={{ margin: 0 }}>
-                  {contextQuery.data?.customer.name || active?.customerName || 'Customer'}
-                </div>
-                <div className="muted" style={{ fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}>
-                  {active ? (
-                    <>
-                      <span>
-                        {chatTypeLabel(active.chatType)}
-                        {active.orderRef ? ` · ${active.orderRef}` : ''}
-                      </span>
-                      <span className={`chip ${active.status === 'OPEN' ? 'c-done' : 'c-wait'}`}>
-                        {active.status === 'OPEN' ? 'Open' : 'Closed'}
-                      </span>
-                    </>
-                  ) : (
-                    'Choose a conversation'
-                  )}
-                </div>
-              </div>
-              <div className="msg-center-actions">
-                {canStart && (
+            <div className="msg-left-head">
+              <div className="h2" style={{ margin: 0 }}>Customer Messages</div>
+              <input
+                className="msg-search"
+                placeholder="Search customers…"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                onFocus={() => maybeRequestBrowserNotifications()}
+              />
+              <div className="filters" style={{ marginTop: 8 }}>
+                {(
+                  [
+                    ['all', 'All'],
+                    ['unread', 'Unread'],
+                    ['open', 'Open'],
+                    ['closed', 'Closed'],
+                    ['GENERAL', 'General'],
+                    ['ORDER', 'Orders'],
+                    ['QUOTE', 'Quotes'],
+                  ] as Array<[FilterKey, string]>
+                ).map(([key, label]) => (
                   <button
+                    key={key}
                     type="button"
-                    className="btn btn-primary btn-sm"
-                    onClick={() => startGeneral.mutate()}
-                    disabled={startGeneral.isPending}
+                    className={filter === key ? 'on' : ''}
+                    onClick={() => setFilter(key)}
                   >
-                    <i className="ti ti-message" />
-                    {startGeneral.isPending ? 'Starting…' : 'Start New Chat'}
+                    {label}
                   </button>
-                )}
-                {active && (
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    onClick={() =>
-                      updateMutation.mutate({
-                        status: active.status === 'OPEN' ? 'CLOSED' : 'OPEN',
-                      })
-                    }
-                    disabled={updateMutation.isPending}
-                  >
-                    <i className={`ti ${active.status === 'OPEN' ? 'ti-x' : 'ti-refresh'}`} />
-                    {active.status === 'OPEN' ? 'Close' : 'Reopen'}
-                  </button>
-                )}
+                ))}
               </div>
             </div>
-
-            <div className="msg-thread-tabs">
+            <div className="msg-left-list">
+              {customerGroups.map((g) => {
+                const top = g.items[0];
+                return (
+                  <button
+                    key={g.customerId}
+                    type="button"
+                    className="msg-cust-card"
+                    onClick={() => selectCustomer(g.customerId)}
+                  >
+                    <div className="av">{initials(g.name)}</div>
+                    <div className="msg-cust-main">
+                      <div className="msg-cust-top">
+                        <strong>{g.name}</strong>
+                        <span>{relativeTime(g.lastAt)}</span>
+                      </div>
+                      <div className="msg-cust-preview">
+                        {top?.lastMessagePreview || top?.subject || 'No messages'}
+                      </div>
+                      <div className="msg-cust-meta">
+                        <span className="msg-type">{g.items.length} chat{g.items.length === 1 ? '' : 's'}</span>
+                        {g.unread > 0 && <span className="msg-badge">{g.unread}</span>}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+              {!listQuery.isLoading && customerGroups.length === 0 && (
+                <div className="msg-empty">No conversations match.</div>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="msg-left-head">
+              <button type="button" className="msg-back" onClick={clearCustomer}>
+                <i className="ti ti-arrow-left" /> All customers
+              </button>
+              <div className="h2" style={{ margin: '8px 0 0' }}>{customerName}</div>
+              <input
+                className="msg-search"
+                placeholder="Search chats…"
+                value={chatSearch}
+                onChange={(e) => setChatSearch(e.target.value)}
+                onFocus={() => maybeRequestBrowserNotifications()}
+              />
+              {canStart && (
+                <div style={{ position: 'relative', marginTop: 10 }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    style={{ width: '100%' }}
+                    onClick={() => setStartMenuOpen((v) => !v)}
+                    disabled={startChat.isPending}
+                  >
+                    <i className="ti ti-plus" />
+                    {startChat.isPending ? 'Starting…' : 'New chat'}
+                  </button>
+                  {startMenuOpen && (
+                    <div className="msg-start-menu">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          startChat.mutate({
+                            chatType: 'GENERAL',
+                            subject: 'General Inquiry',
+                          })
+                        }
+                      >
+                        <i className="ti ti-message" /> General inquiry
+                      </button>
+                      {(contextQuery.data?.recentOrders ?? []).slice(0, 5).map((o) => (
+                        <button
+                          key={o.id}
+                          type="button"
+                          onClick={() =>
+                            startChat.mutate({
+                              chatType: 'ORDER',
+                              orderId: o.id,
+                              subject: o.humanRef
+                                ? `Order ${o.humanRef} Chat`
+                                : 'Order Chat',
+                            })
+                          }
+                        >
+                          <i className="ti ti-package" /> Order {o.humanRef || o.id.slice(0, 6)}
+                        </button>
+                      ))}
+                      {(contextQuery.data?.recentQuotes ?? []).slice(0, 5).map((o) => (
+                        <button
+                          key={o.id}
+                          type="button"
+                          onClick={() =>
+                            startChat.mutate({
+                              chatType: 'QUOTE',
+                              orderId: o.id,
+                              subject: o.humanRef
+                                ? `Quotation ${o.humanRef} Chat`
+                                : 'Quotation Chat',
+                            })
+                          }
+                        >
+                          <i className="ti ti-file-invoice" /> Quote {o.humanRef || o.id.slice(0, 6)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="msg-left-list">
               {customerThreads.map((t) => (
                 <button
                   key={t.id}
                   type="button"
-                  className={t.id === activeConversationId ? 'on' : ''}
+                  className={`msg-cust-card ${t.id === activeConversationId ? 'on' : ''}`}
                   onClick={() =>
                     navigate(`/admin/messages/customers/${t.id}?customer=${customerId}`)
                   }
                 >
-                  {chatTypeLabel(t.chatType)}
-                  {t.orderRef ? ` ${t.orderRef}` : ''}
-                  {t.unreadAdmin > 0 && <span className="msg-badge">{t.unreadAdmin}</span>}
-                </button>
-              ))}
-            </div>
-
-            {activeConversationId && active ? (
-              <>
-                <ConversationThread messages={active.messages} mineDirection="OUTBOUND" />
-                {error && <div className="err" style={{ margin: '0 12px' }}>{error}</div>}
-                <MessageComposer
-                  disabled={!canReply || active.status === 'CLOSED'}
-                  templates={templatesQuery.data?.templates}
-                  onSend={async (body, files) => {
-                    await sendMutation.mutateAsync({ body, files });
-                  }}
-                />
-              </>
-            ) : (
-              <div className="msg-empty-state">Select or start a conversation.</div>
-            )}
-          </>
-        )}
-      </section>
-
-      <aside className="msg-right">
-        {!contextQuery.data ? (
-          <div className="msg-empty">Customer context appears here.</div>
-        ) : (
-          <>
-            <div className="msg-right-section">
-              <div className="msg-right-title">Customer Information</div>
-              <div className="msg-kv"><span>Name</span><b>{contextQuery.data.customer.name}</b></div>
-              <div className="msg-kv"><span>Phone</span><b>{contextQuery.data.customer.phone || '—'}</b></div>
-              <div className="msg-kv"><span>Email</span><b>{contextQuery.data.customer.email || '—'}</b></div>
-              <div className="msg-kv">
-                <span>Customer since</span>
-                <b>{dateShort(contextQuery.data.customer.customerSince)}</b>
-              </div>
-              <div className="msg-kv">
-                <span>Total orders</span>
-                <b>{contextQuery.data.customer.totalOrders}</b>
-              </div>
-              <div className="msg-kv">
-                <span>Total spending</span>
-                <b>{money(contextQuery.data.customer.totalSpentCents)}</b>
-              </div>
-              <div className="msg-kv">
-                <span>Last contact</span>
-                <b>{dateShort(contextQuery.data.customer.lastContactAt)}</b>
-              </div>
-            </div>
-
-            <div className="msg-right-section">
-              <div className="msg-right-title">Recent Orders</div>
-              {contextQuery.data.recentOrders.map((o) => (
-                <Link key={o.id} to={`/admin/orders/${o.id}`} className="msg-side-row">
-                  <div>
-                    <b>{o.humanRef || o.id.slice(0, 8)}</b>
-                    <div className="muted">{dateShort(o.createdAt)}</div>
-                  </div>
-                  <div>
-                    <span className={`chip ${statusChipClass(o.status as OrderStatus)}`}>
-                      {statusLabel(o.status as OrderStatus)}
-                    </span>
-                    <div className="muted" style={{ textAlign: 'right' }}>
-                      {money(o.totalCents)}
+                  <div className="msg-cust-main" style={{ width: '100%' }}>
+                    <div className="msg-cust-top">
+                      <strong>
+                        {chatTypeLabel(t.chatType)}
+                        {t.orderRef ? ` ${t.orderRef}` : ''}
+                      </strong>
+                      <span>{relativeTime(t.lastMessageAt)}</span>
+                    </div>
+                    <div className="msg-cust-preview">
+                      {t.lastMessagePreview || t.subject || 'No messages yet'}
+                    </div>
+                    <div className="msg-cust-meta">
+                      <span className="msg-type">{t.status === 'OPEN' ? 'Open' : 'Closed'}</span>
+                      {t.unreadAdmin > 0 && <span className="msg-badge">{t.unreadAdmin}</span>}
                     </div>
                   </div>
-                </Link>
+                </button>
               ))}
-              {contextQuery.data.recentOrders.length === 0 && (
-                <div className="muted">No orders</div>
+              {customerThreads.length === 0 && (
+                <div className="msg-empty">No chats yet. Start a new conversation.</div>
               )}
             </div>
-
-            <div className="msg-right-section">
-              <div className="msg-right-title">Recent Quotations</div>
-              {contextQuery.data.recentQuotes.map((o) => (
-                <Link key={o.id} to={`/admin/quotes/${o.id}`} className="msg-side-row">
-                  <div>
-                    <b>{o.humanRef || o.id.slice(0, 8)}</b>
-                    <div className="muted">{dateShort(o.createdAt)}</div>
-                  </div>
-                  <span className={`chip ${statusChipClass(o.status as OrderStatus)}`}>
-                    {statusLabel(o.status as OrderStatus)}
-                  </span>
-                </Link>
-              ))}
-              {contextQuery.data.recentQuotes.length === 0 && (
-                <div className="muted">No quotes</div>
-              )}
-            </div>
-
-            {active && (
-              <div className="msg-right-section">
-                <div className="msg-right-title">Private notes</div>
-                <textarea
-                  rows={4}
-                  value={notesDraft || active.privateNotes || ''}
-                  onChange={(e) => setNotesDraft(e.target.value)}
-                  onBlur={() => {
-                    if ((notesDraft || '') !== (active.privateNotes || '')) {
-                      updateMutation.mutate({ privateNotes: notesDraft });
-                    }
-                  }}
-                  placeholder="Visible to staff only"
-                />
-              </div>
-            )}
           </>
         )}
       </aside>
+
+      <section className="msg-center">
+        {!customerSelected ? (
+          <div className="msg-empty-state">Select a customer to open their chats.</div>
+        ) : activeConversationId && active ? (
+          <>
+            <div className="msg-center-head">
+              <div>
+                <div className="h2" style={{ margin: 0 }}>
+                  {active.subject || chatTypeLabel(active.chatType)}
+                </div>
+                <div
+                  className="muted"
+                  style={{ fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}
+                >
+                  <span>
+                    {chatTypeLabel(active.chatType)}
+                    {active.orderRef ? ` · ${active.orderRef}` : ''}
+                  </span>
+                  <span className={`chip ${active.status === 'OPEN' ? 'c-done' : 'c-wait'}`}>
+                    {active.status === 'OPEN' ? 'Open' : 'Closed'}
+                  </span>
+                </div>
+              </div>
+              <div className="msg-center-actions">
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() =>
+                    updateMutation.mutate({
+                      status: active.status === 'OPEN' ? 'CLOSED' : 'OPEN',
+                    })
+                  }
+                  disabled={updateMutation.isPending}
+                >
+                  <i className={`ti ${active.status === 'OPEN' ? 'ti-x' : 'ti-refresh'}`} />
+                  {active.status === 'OPEN' ? 'Close' : 'Reopen'}
+                </button>
+              </div>
+            </div>
+            <ConversationThread messages={active.messages} mineDirection="OUTBOUND" />
+            {error && <div className="err" style={{ margin: '0 12px' }}>{error}</div>}
+            <MessageComposer
+              disabled={!canReply || active.status === 'CLOSED'}
+              templates={templatesQuery.data?.templates}
+              onSend={async (body, files) => {
+                await sendMutation.mutateAsync({ body, files });
+              }}
+            />
+          </>
+        ) : (
+          <div className="msg-empty-state">Select a chat on the left, or start a new one.</div>
+        )}
+      </section>
+
+      {customerSelected && (
+        <aside className="msg-right">
+          {!contextQuery.data ? (
+            <div className="msg-empty">Customer context appears here.</div>
+          ) : (
+            <>
+              <div className="msg-right-section">
+                <div className="msg-right-title">Customer Information</div>
+                <div className="msg-kv"><span>Name</span><b>{contextQuery.data.customer.name}</b></div>
+                <div className="msg-kv"><span>Phone</span><b>{contextQuery.data.customer.phone || '—'}</b></div>
+                <div className="msg-kv"><span>Email</span><b>{contextQuery.data.customer.email || '—'}</b></div>
+                <div className="msg-kv">
+                  <span>Customer since</span>
+                  <b>{dateShort(contextQuery.data.customer.customerSince)}</b>
+                </div>
+                <div className="msg-kv">
+                  <span>Total orders</span>
+                  <b>{contextQuery.data.customer.totalOrders}</b>
+                </div>
+                <div className="msg-kv">
+                  <span>Total spending</span>
+                  <b>{money(contextQuery.data.customer.totalSpentCents)}</b>
+                </div>
+              </div>
+
+              <div className="msg-right-section">
+                <div className="msg-right-title">Recent Orders</div>
+                {contextQuery.data.recentOrders.map((o) => (
+                  <div key={o.id} className="msg-side-row" style={{ gap: 8 }}>
+                    <Link to={`/admin/orders/${o.id}`} style={{ flex: 1, textDecoration: 'none', color: 'inherit' }}>
+                      <b>{o.humanRef || o.id.slice(0, 8)}</b>
+                      <div className="muted">{dateShort(o.createdAt)}</div>
+                    </Link>
+                    {canStart && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        title="Start order chat"
+                        onClick={() =>
+                          startChat.mutate({
+                            chatType: 'ORDER',
+                            orderId: o.id,
+                            subject: o.humanRef ? `Order ${o.humanRef} Chat` : 'Order Chat',
+                          })
+                        }
+                      >
+                        <i className="ti ti-message" />
+                      </button>
+                    )}
+                    <span className={`chip ${statusChipClass(o.status as OrderStatus)}`}>
+                      {statusLabel(o.status as OrderStatus)}
+                    </span>
+                  </div>
+                ))}
+                {contextQuery.data.recentOrders.length === 0 && (
+                  <div className="muted">No orders</div>
+                )}
+              </div>
+
+              <div className="msg-right-section">
+                <div className="msg-right-title">Recent Quotations</div>
+                {contextQuery.data.recentQuotes.map((o) => (
+                  <div key={o.id} className="msg-side-row" style={{ gap: 8 }}>
+                    <Link to={`/admin/quotes/${o.id}`} style={{ flex: 1, textDecoration: 'none', color: 'inherit' }}>
+                      <b>{o.humanRef || o.id.slice(0, 8)}</b>
+                      <div className="muted">{dateShort(o.createdAt)}</div>
+                    </Link>
+                    {canStart && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        title="Start quote chat"
+                        onClick={() =>
+                          startChat.mutate({
+                            chatType: 'QUOTE',
+                            orderId: o.id,
+                            subject: o.humanRef
+                              ? `Quotation ${o.humanRef} Chat`
+                              : 'Quotation Chat',
+                          })
+                        }
+                      >
+                        <i className="ti ti-message" />
+                      </button>
+                    )}
+                    <span className={`chip ${statusChipClass(o.status as OrderStatus)}`}>
+                      {statusLabel(o.status as OrderStatus)}
+                    </span>
+                  </div>
+                ))}
+                {contextQuery.data.recentQuotes.length === 0 && (
+                  <div className="muted">No quotes</div>
+                )}
+              </div>
+
+              {active && (
+                <div className="msg-right-section">
+                  <div className="msg-right-title">Private notes</div>
+                  <textarea
+                    rows={4}
+                    value={notesDraft || active.privateNotes || ''}
+                    onChange={(e) => setNotesDraft(e.target.value)}
+                    onBlur={() => {
+                      if ((notesDraft || '') !== (active.privateNotes || '')) {
+                        updateMutation.mutate({ privateNotes: notesDraft });
+                      }
+                    }}
+                    placeholder="Visible to staff only"
+                  />
+                </div>
+              )}
+            </>
+          )}
+        </aside>
+      )}
     </div>
   );
 }

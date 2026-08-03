@@ -44,7 +44,7 @@ const envSchema = z.object({
     .number()
     .int()
     .positive()
-    .default(60 * 10),
+    .default(60 * 60 * 24 * 7),
   // Optional; empty string is allowed and falls back to JWT_ACCESS_SECRET.
   STORAGE_URL_SECRET: z
     .string()

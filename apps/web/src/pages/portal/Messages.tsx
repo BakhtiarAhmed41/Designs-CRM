@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ConversationThread } from '@/components/messaging/ConversationThread';
 import { MessageComposer } from '@/components/messaging/MessageComposer';
 import { getErrorMessage } from '@/lib/api';
-import { dateShort } from '@/lib/format';
+import { dateShort, statusLabel } from '@/lib/format';
 import {
   chatTypeLabel,
   createMyConversation,
@@ -35,6 +35,7 @@ export function PortalMessages() {
   const qc = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
+  const [q, setQ] = useState('');
   const conversationId = searchParams.get('c');
 
   const convosQuery = useQuery({
@@ -43,14 +44,23 @@ export function PortalMessages() {
     refetchInterval: 20_000,
   });
 
-  const conversations = convosQuery.data?.conversations ?? [];
+  const conversations = useMemo(() => {
+    const all = convosQuery.data?.conversations ?? [];
+    const term = q.trim().toLowerCase();
+    if (!term) return all;
+    return all.filter((c) => {
+      const hay = `${c.subject || ''} ${c.orderRef || ''} ${chatTypeLabel(c.chatType)} ${c.lastMessagePreview || ''}`.toLowerCase();
+      return hay.includes(term);
+    });
+  }, [convosQuery.data?.conversations, q]);
 
   useEffect(() => {
     if (conversationId || convosQuery.isLoading) return;
-    if (conversations.length > 0) {
-      setSearchParams({ c: conversations[0].id }, { replace: true });
+    const all = convosQuery.data?.conversations ?? [];
+    if (all.length > 0) {
+      setSearchParams({ c: all[0].id }, { replace: true });
     }
-  }, [conversationId, conversations, convosQuery.isLoading, setSearchParams]);
+  }, [conversationId, convosQuery.data?.conversations, convosQuery.isLoading, setSearchParams]);
 
   const threadQuery = useQuery({
     queryKey: ['my-conversation', conversationId],
@@ -109,6 +119,13 @@ export function PortalMessages() {
       <aside className="msg-left">
         <div className="msg-left-head">
           <div className="h2" style={{ margin: 0 }}>Messages</div>
+          <input
+            className="msg-search"
+            placeholder="Search chats…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onFocus={() => maybeRequestBrowserNotifications()}
+          />
           <button
             type="button"
             className="btn btn-primary"
@@ -166,7 +183,9 @@ export function PortalMessages() {
                 </div>
                 <div className="muted" style={{ fontSize: 12.5 }}>
                   {linkedSummary}
-                  {active.orderStatus ? ` · ${active.orderStatus}` : ''}
+                  {active.orderStatus
+                    ? ` · ${statusLabel(active.orderStatus, 'customer')}`
+                    : ''}
                 </div>
               </div>
             </div>
@@ -178,20 +197,13 @@ export function PortalMessages() {
             {error && <div className="err" style={{ margin: '0 12px' }}>{error}</div>}
             <MessageComposer
               disabled={active.status === 'CLOSED'}
-              placeholder={
-                active.status === 'CLOSED'
-                  ? 'This conversation is closed'
-                  : 'Write a message…'
-              }
               onSend={async (body, files) => {
                 await sendMutation.mutateAsync({ body, files });
               }}
             />
           </>
         ) : (
-          <div className="msg-empty-state">
-            Select a conversation or start a new inquiry.
-          </div>
+          <div className="msg-empty-state">Select a conversation or start a new inquiry.</div>
         )}
       </section>
     </div>

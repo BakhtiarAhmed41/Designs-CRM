@@ -3,6 +3,7 @@ import { NavLink, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Brand, LogoutLink, Shell, useShellUser } from './Shell';
 import { TeamChatPanel } from './TeamChatPanel';
+import { listLoginRequests } from '@/lib/auth';
 import { getTeamChatOwner, getTeamUnreadSummary, listTeam, type Presence } from '@/lib/team';
 import { getAdminUnreadSummary } from '@/lib/messaging';
 import { canAnyMessaging, featuresForNav } from '@/lib/permissions';
@@ -105,6 +106,12 @@ export function AdminShell() {
     enabled: showTeamMessages,
     refetchInterval: 20_000,
   });
+  const { data: loginRequests } = useQuery({
+    queryKey: ['login-requests'],
+    queryFn: listLoginRequests,
+    enabled: can('customers'),
+    refetchInterval: 30_000,
+  });
   useMessagingSocket({
     onUnreadChanged: () => {
       void qc.invalidateQueries({ queryKey: ['admin-unread-messages'] });
@@ -114,6 +121,7 @@ export function AdminShell() {
   const customerBadge = customerUnread?.unreadConversations ?? 0;
   const teamBadge =
     (teamUnread?.dmUnread ?? 0) + (teamUnread?.groupUnread ?? 0);
+  const loginRequestBadge = loginRequests?.requests?.length ?? 0;
 
   const rolebar =
     actual === 'SUPER_ADMIN' ? (
@@ -212,6 +220,7 @@ export function AdminShell() {
             className={({ isActive }) => (isActive ? 'on' : undefined)}
           >
             <i className="ti ti-user-plus" /> Login requests
+            {loginRequestBadge > 0 && <span className="cnt">{loginRequestBadge}</span>}
           </NavLink>
         )}
         {(can('team') || can('roles')) && (

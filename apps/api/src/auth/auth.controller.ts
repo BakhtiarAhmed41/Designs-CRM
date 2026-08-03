@@ -34,6 +34,10 @@ const resetSchema = z.object({
   password: z.string().min(6).max(200),
 });
 
+const verifySchema = z.object({
+  token: z.string().min(10),
+});
+
 function parseBody<T>(schema: z.ZodType<T>, body: unknown): T {
   try {
     return schema.parse(body);
@@ -103,6 +107,12 @@ export class AuthController {
   async resetPassword(@Body() body: unknown) {
     const data = parseBody(resetSchema, body);
     return this.auth.resetPassword(data.token, data.password);
+  }
+
+  @Post('verify-email')
+  async verifyEmail(@Body() body: unknown) {
+    const { token } = parseBody(verifySchema, body);
+    return this.auth.verifyEmail(token);
   }
 
   @Post('refresh')

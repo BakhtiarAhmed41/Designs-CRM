@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { forgotPassword, resetPassword } from '@/lib/auth';
+import { forgotPassword, resetPassword, verifyEmail } from '@/lib/auth';
 import { getErrorMessage } from '@/lib/api';
 
 type Mode = 'login' | 'register' | 'forgot' | 'reset';
@@ -9,6 +9,7 @@ type Mode = 'login' | 'register' | 'forgot' | 'reset';
 export function Login() {
   const { login, register } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -18,6 +19,28 @@ export function Login() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const reset = searchParams.get('reset');
+    const verify = searchParams.get('verify');
+    if (reset) {
+      setResetToken(reset);
+      setMode('reset');
+      setInfo('Enter a new password to finish resetting your account.');
+    }
+    if (verify) {
+      setBusy(true);
+      void verifyEmail(verify)
+        .then(() => {
+          setInfo(
+            'Email verified. Your login request is pending admin approval — you can sign in after approval.',
+          );
+          setMode('login');
+        })
+        .catch((err) => setError(getErrorMessage(err)))
+        .finally(() => setBusy(false));
+    }
+  }, [searchParams]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -34,22 +57,24 @@ export function Login() {
         });
         if (res.pending) {
           setInfo(
-            'Your account verification is in progress. Please wait for admin approval before signing in.',
+            'Check your email to verify your address. After verification, an admin will review your login request.',
           );
           setMode('login');
           return;
         }
       } else if (mode === 'forgot') {
         const res = await forgotPassword(email);
-        if (res.resetToken) {
+        if (res.emailSent) {
+          setInfo('If that account exists, a password reset link was sent to your email.');
+        } else if (res.resetToken) {
           setResetToken(res.resetToken);
           setMode('reset');
           setInfo(
-            'No email provider is configured. Use the reset token below to set a new password (local/dev).',
+            'SMTP is not configured. Use the reset token below (dev only) to set a new password.',
           );
         } else {
           setInfo(
-            'If that account exists, a reset token was created. Ask an admin to complete the reset — email delivery is not configured.',
+            'If that account exists, a reset was prepared. Configure SMTP_HOST on the API to deliver emails.',
           );
         }
         return;

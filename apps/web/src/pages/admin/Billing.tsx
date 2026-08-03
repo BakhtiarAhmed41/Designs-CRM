@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   adjustStoreCredit,
   cancelInvoice,
+  createInvoice,
   createPayLink,
   getBillingSummary,
   getStoreCredit,
@@ -17,6 +18,7 @@ import {
   type PayMethod,
   type RefundTo,
 } from '@/lib/billing';
+import { listCustomers } from '@/lib/customers';
 import { getErrorMessage } from '@/lib/api';
 import { money, dateShort } from '@/lib/format';
 import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
@@ -31,6 +33,11 @@ export function AdminBilling() {
   const [monthEndResult, setMonthEndResult] = useState<MonthEndResult | null>(null);
   const [invoiceQ, setInvoiceQ] = useState('');
   const [invoiceStatus, setInvoiceStatus] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createCustomerId, setCreateCustomerId] = useState('');
+  const [createAmount, setCreateAmount] = useState('');
+  const [createCover, setCreateCover] = useState('');
+  const [createCustomerSearch, setCreateCustomerSearch] = useState('');
 
   const summaryQ = useQuery({
     queryKey: ['billing-summary'],
@@ -48,6 +55,12 @@ export function AdminBilling() {
     refetchInterval: 30_000,
   });
 
+  const customersQ = useQuery({
+    queryKey: ['admin-customers-billing'],
+    queryFn: () => listCustomers({ pageSize: 500 }),
+    enabled: createOpen,
+  });
+
   const invoices = invoicesQ.data?.invoices ?? [];
   const unpaidLinks = invoices.filter((i) => i.status === 'AWAITING' && i.kind === 'PER_ORDER');
   const monthlyStatements = invoices.filter((i) => i.kind === 'MONTHLY' && i.status === 'AWAITING');
@@ -57,6 +70,29 @@ export function AdminBilling() {
     qc.invalidateQueries({ queryKey: ['admin-invoices-all'] });
     qc.invalidateQueries({ queryKey: ['billing-summary'] });
   }
+
+  const createMut = useMutation({
+    mutationFn: () => {
+      const dollars = parseFloat(createAmount);
+      if (!createCustomerId) throw new Error('Select a customer');
+      if (!Number.isFinite(dollars) || dollars <= 0) throw new Error('Enter a valid amount');
+      return createInvoice({
+        customerId: createCustomerId,
+        amountCents: Math.round(dollars * 100),
+        coversText: createCover.trim() || null,
+      });
+    },
+    onSuccess: () => {
+      setError(null);
+      setCreateOpen(false);
+      setCreateCustomerId('');
+      setCreateAmount('');
+      setCreateCover('');
+      setCreateCustomerSearch('');
+      invalidateAll();
+    },
+    onError: (e) => setError(getErrorMessage(e)),
+  });
 
   const payMut = useMutation({
     mutationFn: ({ id, method }: { id: string; method: PayMethod }) => payInvoice(id, method),
@@ -119,6 +155,9 @@ export function AdminBilling() {
             Money in, outstanding, and the month-end run for your net-monthly trade accounts.
           </div>
         </div>
+        <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>
+          <i className="ti ti-plus" /> Create invoice
+        </button>
       </div>
 
       {error && <div className="alert-error" style={{ marginBottom: 14 }}>{error}</div>}
@@ -364,6 +403,78 @@ export function AdminBilling() {
             invalidateAll();
           }}
         />
+      )}
+      {createOpen && (
+        <div className="overlay open" onClick={() => setCreateOpen(false)}>
+          <div className="modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-h">
+              <span>Create invoice</span>
+              <button type="button" className="modal-x" onClick={() => setCreateOpen(false)}>
+                &times;
+              </button>
+            </div>
+            <div className="modal-b">
+              <div className="ff">
+                <label>Customer</label>
+                <input
+                  placeholder="Search customers…"
+                  value={createCustomerSearch}
+                  onChange={(e) => setCreateCustomerSearch(e.target.value)}
+                />
+                <select
+                  value={createCustomerId}
+                  onChange={(e) => setCreateCustomerId(e.target.value)}
+                  style={{ marginTop: 8 }}
+                >
+                  <option value="">Select customer…</option>
+                  {(customersQ.data?.customers ?? [])
+                    .filter((c) => {
+                      const term = createCustomerSearch.trim().toLowerCase();
+                      if (!term) return true;
+                      return (
+                        c.name.toLowerCase().includes(term) ||
+                        (c.email ?? '').toLowerCase().includes(term)
+                      );
+                    })
+                    .slice(0, 80)
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                        {c.email ? ` · ${c.email}` : ''}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <div className="ff">
+                <label>Amount (USD)</label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={createAmount}
+                  onChange={(e) => setCreateAmount(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="ff">
+                <label>Covers / notes</label>
+                <input
+                  value={createCover}
+                  onChange={(e) => setCreateCover(e.target.value)}
+                  placeholder="What this invoice is for"
+                />
+              </div>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={createMut.isPending}
+                onClick={() => createMut.mutate()}
+              >
+                {createMut.isPending ? 'Creating…' : 'Create invoice'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

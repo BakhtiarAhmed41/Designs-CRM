@@ -8,12 +8,12 @@ import {
   sendAdminMessage,
 } from '@/lib/messaging';
 import { getErrorMessage } from '@/lib/api';
-import { money, dateShort } from '@/lib/format';
+import { money, dateShort, quoteLifecycleChip } from '@/lib/format';
 import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
 import type { Order, OrderStatus } from '@/lib/types';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
 
-type QuoteFilter = 'all' | 'needs' | 'sent' | 'urgent';
+type QuoteFilter = 'all' | 'needs' | 'sent' | 'urgent' | 'declined';
 
 function customerLabel(o: Order) {
   const c = o.client;
@@ -25,8 +25,13 @@ function daysAgo(iso: string) {
   return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
 }
 
-const NEEDS: OrderStatus[] = ['WAITING_FOR_QUOTATION', 'WAITING_FOR_ADMIN_QUOTATION_APPROVAL'];
+const NEEDS: OrderStatus[] = ['WAITING_FOR_QUOTATION'];
 const SENT: OrderStatus[] = ['QUOTATION_PROVIDED'];
+const DECLINED: OrderStatus[] = [
+  'CLIENT_REJECTED_QUOTATION',
+  'REJECTED',
+  'CANCELLED',
+];
 
 export function AdminQuotes() {
   const qc = useQueryClient();
@@ -72,6 +77,8 @@ export function AdminQuotes() {
         return allQuotes.filter(
           (o) => NEEDS.includes(o.status) && daysAgo(o.createdAt) >= 2,
         );
+      case 'declined':
+        return allQuotes.filter((o) => DECLINED.includes(o.status));
       default:
         return allQuotes;
     }
@@ -158,10 +165,12 @@ export function AdminQuotes() {
         statusOptions={[
           { value: '', label: 'All statuses' },
           { value: 'WAITING_FOR_QUOTATION', label: 'Needs pricing' },
-          { value: 'QUOTATION_PROVIDED', label: 'Sent' },
+          { value: 'QUOTATION_PROVIDED', label: 'Awaiting customer' },
           { value: 'WAITING_FOR_ADMIN_QUOTATION_APPROVAL', label: 'Counter pending' },
-          { value: 'CLIENT_REJECTED_QUOTATION', label: 'Rejected' },
+          { value: 'CLIENT_REJECTED_QUOTATION', label: 'Declined by customer' },
+          { value: 'REJECTED', label: 'Declined by staff' },
           { value: 'CREATED', label: 'Draft' },
+          { value: 'CANCELLED', label: 'Expired' },
         ]}
         dateFrom={dateFrom}
         dateTo={dateTo}
@@ -185,6 +194,9 @@ export function AdminQuotes() {
           </button>
           <button type="button" className={filter === 'sent' ? 'on' : ''} onClick={() => setFilter('sent')}>
             Sent — awaiting customer
+          </button>
+          <button type="button" className={filter === 'declined' ? 'on' : ''} onClick={() => setFilter('declined')}>
+            Declined
           </button>
           <button type="button" className={filter === 'urgent' ? 'on' : ''} onClick={() => setFilter('urgent')}>
             Urgent
@@ -219,9 +231,12 @@ export function AdminQuotes() {
                 <span className="item-date">{dateShort(o.createdAt)}</span>
               </div>
             </div>
-            <span className={`chip ${NEEDS.includes(o.status) ? 'c-quote' : 'c-prog'}`}>
-              {NEEDS.includes(o.status) ? 'Needs your price' : 'Awaiting customer'}
-            </span>
+            {(() => {
+              const chip = quoteLifecycleChip(o.status, 'admin', {
+                partiallyAccepted: o.partiallyAccepted,
+              });
+              return <span className={chip.cls}>{chip.label}</span>;
+            })()}
             <div className="oprice">{money(o.priceCents)}</div>
           </Link>
         ))}

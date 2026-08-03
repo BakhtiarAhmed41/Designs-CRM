@@ -4,10 +4,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import { createOrder, getMyOrder, listMyOrders } from '@/lib/orders';
 import { requestEdit } from '@/lib/edits';
 import { getErrorMessage } from '@/lib/api';
-import { money, dateShort } from '@/lib/format';
+import { money, dateShort, lifecycleChip } from '@/lib/format';
 import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import type { Design } from '@/lib/designs';
 import type { Order } from '@/lib/types';
+import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
 
 type OrderFilter = 'all' | 'active' | 'delivered';
 
@@ -26,7 +27,7 @@ function monthLabel(key: string) {
 function orderChip(o: Order, designs?: Design[]): { cls: string; label: string } {
   if (DONE.includes(o.status)) return { cls: 'chip c-done', label: 'Delivered' };
   if (['REVISION_REQUESTED', 'PENDING_PAYMENT'].includes(o.status)) {
-    return { cls: 'chip c-wait', label: 'Waiting on you' };
+    return lifecycleChip(o.status, 'customer');
   }
   if (designs && designs.length > 0) {
     const done = designs.filter((d) => d.status === 'DELIVERED' || d.status === 'DONE').length;
@@ -34,10 +35,7 @@ function orderChip(o: Order, designs?: Design[]): { cls: string; label: string }
       return { cls: 'chip c-prog', label: `${done} of ${designs.length} done` };
     }
   }
-  if (o.status === 'IN_PROGRESS' || o.status === 'READY_TO_SEND') {
-    return { cls: 'chip c-prog', label: 'In progress' };
-  }
-  return { cls: 'chip c-prog', label: 'In progress' };
+  return lifecycleChip(o.status, 'customer', { partiallyAccepted: o.partiallyAccepted });
 }
 
 function designLineIcon(status: Design['status']) {
@@ -241,9 +239,15 @@ function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
 }
 
 export function PortalOrders() {
+  const navigate = useNavigate();
   const [month, setMonth] = useState<string>('all');
   const [filter, setFilter] = useState<OrderFilter>('all');
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [q, setQ] = useState('');
+  const [status, setStatus] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [page, setPage] = useState(1);
 
   const { data, isLoading } = useQuery({
     queryKey: ['my-orders'],
@@ -251,7 +255,10 @@ export function PortalOrders() {
   });
 
   const orders = useMemo(
-    () => (data?.orders ?? []).filter((o) => o.type === 'ORDER'),
+    () =>
+      (data?.orders ?? [])
+        .filter((o) => o.type === 'ORDER')
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     [data],
   );
 
@@ -274,9 +281,23 @@ export function PortalOrders() {
     if (filter === 'delivered') {
       list = list.filter((o) => DONE.includes(o.status));
     }
+    if (status) list = list.filter((o) => o.status === status);
+    if (q.trim()) {
+      const term = q.trim().toLowerCase();
+      list = list.filter(
+        (o) =>
+          (o.name ?? '').toLowerCase().includes(term) ||
+          (o.humanRef ?? '').toLowerCase().includes(term),
+      );
+    }
+    if (dateFrom) list = list.filter((o) => o.createdAt.slice(0, 10) >= dateFrom);
+    if (dateTo) list = list.filter((o) => o.createdAt.slice(0, 10) <= dateTo);
     return list;
-  }, [orders, month, filter]);
+  }, [orders, month, filter, status, q, dateFrom, dateTo]);
 
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
   const summary = useMemo(() => {
     let designs = 0;
     let delivered = 0;
@@ -299,6 +320,39 @@ export function PortalOrders() {
           </div>
         </div>
       </div>
+
+      <ListToolbar
+        search={q}
+        onSearch={(v) => {
+          setQ(v);
+          setPage(1);
+        }}
+        searchPlaceholder="Search by name or order #…"
+        status={status}
+        onStatus={(v) => {
+          setStatus(v);
+          setPage(1);
+        }}
+        statusOptions={[
+          { value: '', label: 'All statuses' },
+          { value: 'IN_PROGRESS', label: 'In progress' },
+          { value: 'READY_TO_SEND', label: 'Ready to send' },
+          { value: 'REVISION_REQUESTED', label: 'Revision requested' },
+          { value: 'PENDING_PAYMENT', label: 'Pending payment' },
+          { value: 'COMPLETED', label: 'Delivered' },
+          { value: 'CLOSED', label: 'Closed' },
+        ]}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        onDateFrom={(v) => {
+          setDateFrom(v);
+          setPage(1);
+        }}
+        onDateTo={(v) => {
+          setDateTo(v);
+          setPage(1);
+        }}
+      />
 
       <div className="period-bar">
         <span className="plabel">Period</span>
@@ -361,21 +415,24 @@ export function PortalOrders() {
         </div>
 
         {isLoading && <div className="empty">Loading…</div>}
-        {!isLoading && filtered.length === 0 && (
+        {!isLoading && pageItems.length === 0 && (
           <div className="empty">
             <i className="ti ti-package" />
             <p>No orders in this period.</p>
           </div>
         )}
 
-        {filtered.map((o) => {
+        {pageItems.map((o) => {
           const open = expanded === o.id;
           const chip = orderChip(o);
           return (
             <div key={o.id}>
               <div
                 className="orow"
-                onClick={() => setExpanded((prev) => (prev === o.id ? null : o.id))}
+                onClick={() => {
+                  navigate(`/portal/orders/${o.id}`);
+                }}
+                onDoubleClick={() => setExpanded((prev) => (prev === o.id ? null : o.id))}
               >
                 <div className={`thumb${serviceThumbClass(o.serviceType) ? ' m' : ''}`}>
                   <i className={`ti ${serviceTi(o.serviceType)}`} />
@@ -398,6 +455,13 @@ export function PortalOrders() {
           );
         })}
       </div>
+
+      <PaginationBar
+        page={page}
+        totalPages={totalPages}
+        total={filtered.length}
+        onPage={setPage}
+      />
     </div>
   );
 }

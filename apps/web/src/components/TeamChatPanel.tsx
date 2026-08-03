@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getErrorMessage } from '@/lib/api';
+import { MessageComposer } from '@/components/messaging/MessageComposer';
+import { getErrorMessage, resolveFileUrl } from '@/lib/api';
 import {
   getTeamChat,
   sendTeamChat,
@@ -16,7 +17,6 @@ export function TeamChatPanel({
   onClose: () => void;
 }) {
   const qc = useQueryClient();
-  const [draft, setDraft] = useState('');
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -39,11 +39,13 @@ export function TeamChatPanel({
   }, [messages.length]);
 
   const send = useMutation({
-    mutationFn: (body: string) => sendTeamChat(peerId, body),
+    mutationFn: ({ body, files }: { body: string; files: File[] }) =>
+      sendTeamChat(peerId, body, files),
     onSuccess: () => {
-      setDraft('');
       setError(null);
       qc.invalidateQueries({ queryKey: ['team-chat', peerId] });
+      qc.invalidateQueries({ queryKey: ['team-unread'] });
+      qc.invalidateQueries({ queryKey: ['team-recent'] });
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -56,7 +58,7 @@ export function TeamChatPanel({
         bottom: 20,
         width: 340,
         maxWidth: 'calc(100vw - 24px)',
-        height: 420,
+        height: 460,
         background: '#fff',
         border: '0.5px solid var(--line)',
         borderRadius: 14,
@@ -122,6 +124,25 @@ export function TeamChatPanel({
               }}
             >
               {m.body}
+              {(m.attachments?.length ?? 0) > 0 && (
+                <div style={{ marginTop: 6 }}>
+                  {m.attachments!.map((a) => (
+                    <a
+                      key={a.id}
+                      href={resolveFileUrl(a.url)}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: 'block',
+                        fontSize: 11.5,
+                        color: m.mine ? '#cfe0ff' : 'var(--navy)',
+                      }}
+                    >
+                      📎 {a.originalName}
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -132,39 +153,12 @@ export function TeamChatPanel({
           {error}
         </div>
       )}
-      <div
-        style={{
-          display: 'flex',
-          gap: 8,
-          padding: 12,
-          borderTop: '0.5px solid var(--line)',
+      <MessageComposer
+        placeholder="Message…"
+        onSend={async (body, files) => {
+          await send.mutateAsync({ body, files });
         }}
-      >
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder="Message…"
-          style={{
-            flex: 1,
-            border: '0.5px solid var(--line)',
-            borderRadius: 8,
-            padding: '8px 10px',
-            fontSize: 13,
-            fontFamily: 'inherit',
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && draft.trim()) send.mutate(draft.trim());
-          }}
-        />
-        <button
-          type="button"
-          className="btn btn-primary btn-sm"
-          disabled={!draft.trim() || send.isPending}
-          onClick={() => draft.trim() && send.mutate(draft.trim())}
-        >
-          <i className="ti ti-send" />
-        </button>
-      </div>
+      />
     </div>
   );
 }

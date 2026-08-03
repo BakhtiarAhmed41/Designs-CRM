@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
   presence      ENUM('ON','AWAY','OFF') NOT NULL DEFAULT 'OFF',
   skills        JSON         NULL,
   permissions   JSON         NULL,
+  email_verified_at DATETIME NULL,
   created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),

@@ -68,6 +68,7 @@ export class AdminCustomersController {
   constructor(private customers: CustomersService) {}
 
   @Get()
+  @RequireFeatures('customers', 'orders', 'quotes', 'billing')
   async list(
     @Query('q') q: string | undefined,
     @Query('accountType') accountType: string | undefined,

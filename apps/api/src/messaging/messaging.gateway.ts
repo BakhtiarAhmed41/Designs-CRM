@@ -10,7 +10,9 @@ import {
 } from '@nestjs/websockets';
 import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
+import { Presence, STAFF_ROLES } from '../common/enums';
 import { getEnv } from '../config/env';
+import { DbService } from '../db/db.service';
 
 type SocketUser = {
   id: string;
@@ -28,11 +30,18 @@ export class MessagingGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
   private readonly logger = new Logger(MessagingGateway.name);
+  /** userId → active socket ids */
+  private readonly socketsByUser = new Map<string, Set<string>>();
+  /** Grace period before marking OFF so brief reconnects don't flicker */
+  private readonly offlineTimers = new Map<string, NodeJS.Timeout>();
 
   @WebSocketServer()
   server!: Server;
 
-  constructor(private jwt: JwtService) {}
+  constructor(
+    private jwt: JwtService,
+    private db: DbService,
+  ) {}
 
   private parseCookieToken(cookieHeader: string | undefined): string | null {
     if (!cookieHeader) return null;
@@ -68,6 +77,21 @@ export class MessagingGateway
     }
   }
 
+  private isStaff(role: string) {
+    return (STAFF_ROLES as readonly string[]).includes(role);
+  }
+
+  private async setPresence(userId: string, presence: Presence) {
+    await this.db.execute('UPDATE users SET presence = ? WHERE id = ?', [
+      presence,
+      userId,
+    ]);
+    this.server?.to('team:group').emit('presence:update', {
+      userId,
+      presence,
+    });
+  }
+
   async handleConnection(client: Socket) {
     const user = await this.authenticate(client);
     if (!user) {
@@ -77,12 +101,69 @@ export class MessagingGateway
     client.data.user = user;
     await client.join(`user:${user.id}`);
     await client.join('team:group');
+
+    const existing = this.socketsByUser.get(user.id) ?? new Set<string>();
+    existing.add(client.id);
+    this.socketsByUser.set(user.id, existing);
+
+    const pending = this.offlineTimers.get(user.id);
+    if (pending) {
+      clearTimeout(pending);
+      this.offlineTimers.delete(user.id);
+    }
+
+    if (this.isStaff(user.role) && existing.size === 1) {
+      try {
+        await this.setPresence(user.id, Presence.ON);
+      } catch (err) {
+        this.logger.warn(`failed to set presence ON for ${user.id}: ${String(err)}`);
+      }
+    }
+
     this.logger.debug(`socket connected user=${user.id}`);
   }
 
   handleDisconnect(client: Socket) {
     const user = client.data.user as SocketUser | undefined;
-    if (user) this.logger.debug(`socket disconnected user=${user.id}`);
+    if (!user) return;
+    this.logger.debug(`socket disconnected user=${user.id}`);
+
+    const set = this.socketsByUser.get(user.id);
+    if (set) {
+      set.delete(client.id);
+      if (set.size === 0) this.socketsByUser.delete(user.id);
+    }
+
+    if (!this.isStaff(user.role)) return;
+    if ((this.socketsByUser.get(user.id)?.size ?? 0) > 0) return;
+
+    const prev = this.offlineTimers.get(user.id);
+    if (prev) clearTimeout(prev);
+
+    const timer = setTimeout(() => {
+      this.offlineTimers.delete(user.id);
+      if ((this.socketsByUser.get(user.id)?.size ?? 0) > 0) return;
+      void this.setPresence(user.id, Presence.OFF).catch((err) => {
+        this.logger.warn(`failed to set presence OFF for ${user.id}: ${String(err)}`);
+      });
+    }, 15_000);
+    this.offlineTimers.set(user.id, timer);
+  }
+
+  @SubscribeMessage('presence:away')
+  async markAway(@ConnectedSocket() client: Socket) {
+    const user = client.data.user as SocketUser | undefined;
+    if (!user || !this.isStaff(user.role)) return { ok: false };
+    await this.setPresence(user.id, Presence.AWAY);
+    return { ok: true };
+  }
+
+  @SubscribeMessage('presence:online')
+  async markOnline(@ConnectedSocket() client: Socket) {
+    const user = client.data.user as SocketUser | undefined;
+    if (!user || !this.isStaff(user.role)) return { ok: false };
+    await this.setPresence(user.id, Presence.ON);
+    return { ok: true };
   }
 
   @SubscribeMessage('join:conversation')
@@ -138,5 +219,9 @@ export class MessagingGateway
 
   emitTeamGroup(event: string, payload: unknown) {
     this.server?.to('team:group').emit(event, payload);
+  }
+
+  isUserOnline(userId: string) {
+    return (this.socketsByUser.get(userId)?.size ?? 0) > 0;
   }
 }

@@ -303,17 +303,17 @@ export function QuoteBuilderModal({
                     marginTop: 16,
                   }}
                 >
-                  <button type="button" className="btn btn-ghost" onClick={onClose}>
-                    Cancel
-                  </button>
                   <button
                     type="button"
-                    className="btn btn-primary"
+                    className="btn btn-ghost"
                     disabled={busy}
-                    onClick={() => void submitFromIframe()}
+                    onClick={onClose}
                   >
-                    <i className="ti ti-send" /> {busy ? 'Submitting…' : 'Submit request'}
+                    Cancel
                   </button>
+                </div>
+                <div className="muted" style={{ fontSize: 12, marginTop: 8, textAlign: 'right' }}>
+                  Use the <b>Submit</b> button inside the form above to send your request.
                 </div>
               </>
             )}

@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { GenerateOrderModal } from '@/components/GenerateOrderModal';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
 import { listAdminOrders } from '@/lib/orders';
-import { money, dateShort, statusChipClass, statusLabel } from '@/lib/format';
+import { money, dateShort, lifecycleChip } from '@/lib/format';
 import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
 import type { Order, OrderStatus } from '@/lib/types';
 
@@ -16,9 +16,10 @@ const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'IN_PROGRESS', label: 'In progress' },
   { value: 'READY_TO_SEND', label: 'Ready to send' },
   { value: 'REVISION_REQUESTED', label: 'Revision requested' },
-  { value: 'COMPLETED', label: 'Completed' },
+  { value: 'COMPLETED', label: 'Delivered' },
   { value: 'CLOSED', label: 'Closed' },
   { value: 'CANCELLED', label: 'Cancelled' },
+  { value: 'REJECTED', label: 'Rejected' },
 ];
 
 function customerLabel(o: Order & { customerName?: string | null }) {
@@ -107,9 +108,12 @@ export function AdminOrders() {
                 <span>{dateShort(o.createdAt)}</span>
               </div>
             </div>
-            <span className={statusChipClass(o.status as OrderStatus)}>
-              {statusLabel(o.status as OrderStatus)}
-            </span>
+            {(() => {
+              const chip = lifecycleChip(o.status as OrderStatus, 'admin', {
+                partiallyAccepted: o.partiallyAccepted,
+              });
+              return <span className={chip.cls}>{chip.label}</span>;
+            })()}
             <div className="oprice">{money(o.priceCents)}</div>
           </Link>
         ))}

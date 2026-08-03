@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/context/AuthContext';
 import {
   listNotifications,
   markAllNotificationsRead,
   markNotificationRead,
 } from '@/lib/notifications';
+import { STAFF_ROLES } from '@/lib/types';
 import { IconBell } from './Icon';
 
 function relativeTime(iso: string) {
@@ -33,6 +35,8 @@ export function NotificationBell() {
   const wrapRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const isStaff = !!user && STAFF_ROLES.includes(user.role);
   const { data } = useQuery({
     queryKey: ['notifications'],
     queryFn: listNotifications,
@@ -59,7 +63,37 @@ export function NotificationBell() {
     await markNotificationRead(id);
     qc.invalidateQueries({ queryKey: ['notifications'] });
     setOpen(false);
-    if (link) navigate(link);
+    if (!link) return;
+    let target = link;
+    if (target.startsWith('/orders/')) {
+      target = isStaff ? `/admin${target}` : `/portal${target}`;
+    } else if (target.startsWith('/quotes/')) {
+      target = isStaff ? `/admin${target}` : `/portal${target}`;
+    } else if (
+      !target.startsWith('/portal') &&
+      !target.startsWith('/admin') &&
+      !target.startsWith('/pay') &&
+      !target.startsWith('/login')
+    ) {
+      target = isStaff
+        ? target.startsWith('/')
+          ? `/admin${target}`
+          : `/admin/${target}`
+        : target.startsWith('/')
+          ? `/portal${target}`
+          : `/portal/${target}`;
+    }
+    // Role mismatch: staff shouldn't open portal-only shells and vice versa.
+    if (isStaff && target.startsWith('/portal/')) {
+      target = target.replace(/^\/portal/, '/admin');
+      if (target.startsWith('/admin/quotes/') === false && target.includes('/quotes/')) {
+        /* ok */
+      }
+    }
+    if (!isStaff && target.startsWith('/admin/')) {
+      target = target.replace(/^\/admin/, '/portal');
+    }
+    navigate(target);
   }
 
   return (

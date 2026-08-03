@@ -248,10 +248,10 @@ export function AdminOrderDetail() {
       const created = await createAdminConversation({
         orderId: id,
         customerId: order?.customerId ?? null,
-        chatType: 'ORDER',
+        chatType: order?.type === 'QUOTE_REQUEST' ? 'QUOTE' : 'ORDER',
         subject: order?.humanRef
-          ? `Order ${order.humanRef} Chat`
-          : `Order #${id.slice(0, 6)} Chat`,
+          ? `${order?.type === 'QUOTE_REQUEST' ? 'Quotation' : 'Order'} ${order.humanRef} Chat`
+          : `${order?.type === 'QUOTE_REQUEST' ? 'Quotation' : 'Order'} #${id.slice(0, 6)} Chat`,
       });
       return sendAdminMessage(created.conversation.id, body, attach);
     },
@@ -407,7 +407,7 @@ export function AdminOrderDetail() {
           >
             {ADMIN_STATUS_OPTIONS.map((s) => (
               <option key={s} value={s}>
-                {statusLabel(s)}
+                {statusLabel(s, 'admin')}
               </option>
             ))}
           </select>

@@ -121,6 +121,7 @@ export type Order = {
   currency: string;
   assignedDesignerId?: string | null;
   internalNotes?: string | null;
+  partiallyAccepted?: boolean;
   createdAt: string;
   updatedAt: string;
   attachments?: Attachment[];

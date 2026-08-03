@@ -23,6 +23,7 @@ export function useMessagingSocket(handlers: {
   onConversationUpdated?: Handler;
   onUnreadChanged?: Handler;
   onTeamMessage?: Handler;
+  onPresenceUpdate?: Handler;
   conversationId?: string | null;
   peerId?: string | null;
 }) {
@@ -59,17 +60,45 @@ export function useMessagingSocket(handlers: {
       void qc.invalidateQueries({ queryKey: ['team-unread'] });
       void qc.invalidateQueries({ queryKey: ['team-recent'] });
     };
+    const onPresenceUpdate = (payload: unknown) => {
+      handlersRef.current.onPresenceUpdate?.(payload);
+      const p = payload as { userId?: string; presence?: string };
+      if (p?.userId && p.presence) {
+        qc.setQueryData(['admin-team'], (prev: unknown) => {
+          if (!prev || typeof prev !== 'object') return prev;
+          const data = prev as { members?: Array<{ id: string; presence: string }> };
+          if (!Array.isArray(data.members)) return prev;
+          return {
+            ...data,
+            members: data.members.map((m) =>
+              m.id === p.userId ? { ...m, presence: p.presence as string } : m,
+            ),
+          };
+        });
+      }
+      void qc.invalidateQueries({ queryKey: ['admin-team'] });
+    };
 
     socket.on('message:new', onMessageNew);
     socket.on('conversation:updated', onConversationUpdated);
     socket.on('unread:changed', onUnreadChanged);
     socket.on('team:message', onTeamMessage);
+    socket.on('presence:update', onPresenceUpdate);
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible' && socket.connected) {
+        socket.emit('presence:online');
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
       socket.off('message:new', onMessageNew);
       socket.off('conversation:updated', onConversationUpdated);
       socket.off('unread:changed', onUnreadChanged);
       socket.off('team:message', onTeamMessage);
+      socket.off('presence:update', onPresenceUpdate);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [qc]);
 

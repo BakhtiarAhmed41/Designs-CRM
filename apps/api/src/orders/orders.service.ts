@@ -134,9 +134,70 @@ export class OrdersService {
     private billing: BillingService,
   ) {}
 
+  private async convertQuoteChatToOrderChat(orderId: string) {
+    await this.db.execute(
+      `UPDATE conversations
+          SET chat_type = 'ORDER',
+              subject = CASE
+                WHEN subject LIKE 'Quotation %' THEN REPLACE(subject, 'Quotation', 'Order')
+                WHEN subject = 'Quotation Chat' THEN 'Order Chat'
+                ELSE subject
+              END
+        WHERE order_id = ? AND chat_type = 'QUOTE'`,
+      [orderId],
+    );
+  }
+
+  private async ensureDesignsFromQuotationLines(
+    orderId: string,
+    lines: Array<{
+      id: string;
+      name: string;
+      priceCents: number | null;
+      sizes: Array<{ priceCents: number | null }>;
+    }>,
+    keepIds?: Set<string>,
+  ) {
+    const existingDesigns = await this.getDesigns(orderId);
+    if (existingDesigns.length > 0) return;
+    let sort = 0;
+    for (const line of lines) {
+      if (keepIds && !keepIds.has(line.id)) continue;
+      await this.db.execute(
+        `INSERT INTO order_designs
+           (id, order_id, name, placement, size, status, price_cents, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          randomUUID(),
+          orderId,
+          line.name,
+          null,
+          null,
+          DesignStatus.WAITING,
+          (line.priceCents ?? 0) +
+            line.sizes.reduce((s, sz) => s + (sz.priceCents ?? 0), 0),
+          sort++,
+        ],
+      );
+    }
+  }
+
+  private async orderPartialFlag(orderId: string): Promise<boolean> {
+    const row = await this.db.queryOne<{ dropped: number | string }>(
+      `SELECT COUNT(*) AS dropped
+         FROM quotation_lines ql
+         JOIN quotations q ON q.id = ql.quotation_id
+        WHERE q.order_id = ?
+          AND q.status = ?
+          AND ql.client_decision = 'DROPPED'`,
+      [orderId, QuotationStatus.APPROVED],
+    );
+    return Number(row?.dropped ?? 0) > 0;
+  }
+
   // --- mapping helpers -----------------------------------------------------
 
-  private orderDto(o: OrderRow) {
+  private orderDto(o: OrderRow, extras?: { partiallyAccepted?: boolean }) {
     return {
       id: o.id,
       humanRef: o.human_ref,
@@ -160,6 +221,7 @@ export class OrdersService {
       rejectionReason: o.rejection_reason,
       createdAt: o.created_at,
       updatedAt: o.updated_at,
+      partiallyAccepted: extras?.partiallyAccepted ?? false,
     };
   }
 
@@ -440,8 +502,9 @@ export class OrdersService {
   private async assembleOrder(id: string) {
     const row = await this.getOrderRow(id);
     if (!row) throw new NotFoundException('Order not found');
+    const partiallyAccepted = await this.orderPartialFlag(id);
     return {
-      ...this.orderDto(row),
+      ...this.orderDto(row, { partiallyAccepted }),
       designs: await this.getDesigns(id),
       attachments: await this.getAttachments(id),
       quotations: await this.getQuotations(id),
@@ -457,8 +520,9 @@ export class OrdersService {
     );
     const out = [];
     for (const r of rows) {
+      const partiallyAccepted = await this.orderPartialFlag(r.id);
       out.push({
-        ...this.orderDto(r),
+        ...this.orderDto(r, { partiallyAccepted }),
         attachments: await this.getAttachments(r.id),
         quotations: await this.getQuotations(r.id),
       });
@@ -670,51 +734,33 @@ export class OrdersService {
         [QuotationStatus.APPROVED, totalCents, latest.id],
       );
       await this.db.execute(
-        'UPDATE orders SET status = ?, price_cents = ?, approved_at = NOW() WHERE id = ?',
-        [OrderStatus.IN_PROGRESS, totalCents, orderId],
+        `UPDATE orders SET status = ?, type = ?, price_cents = ?, approved_at = NOW() WHERE id = ?`,
+        [OrderStatus.IN_PROGRESS, OrderType.ORDER, totalCents, orderId],
       );
 
-      // Ensure designs exist for kept lines (admin production board).
-      const existingDesigns = await this.getDesigns(orderId);
-      if (existingDesigns.length === 0) {
-        let sort = 0;
-        for (const line of lines) {
-          if (!keepIds.has(line.id)) continue;
-          await this.db.execute(
-            `INSERT INTO order_designs
-               (id, order_id, name, placement, size, status, price_cents, sort_order)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-              randomUUID(),
-              orderId,
-              line.name,
-              null,
-              null,
-              DesignStatus.WAITING,
-              (line.priceCents ?? 0) +
-                line.sizes.reduce((s, sz) => s + (sz.priceCents ?? 0), 0),
-              sort++,
-            ],
-          );
-        }
-      }
+      await this.ensureDesignsFromQuotationLines(orderId, lines, keepIds);
     } else {
       await this.db.execute(
         'UPDATE quotations SET status = ? WHERE id = ?',
         [QuotationStatus.APPROVED, latest.id],
       );
       await this.db.execute(
-        'UPDATE orders SET status = ?, approved_at = NOW() WHERE id = ?',
-        [OrderStatus.IN_PROGRESS, orderId],
+        `UPDATE orders SET status = ?, type = ?, approved_at = NOW() WHERE id = ?`,
+        [OrderStatus.IN_PROGRESS, OrderType.ORDER, orderId],
       );
     }
 
+    await this.convertQuoteChatToOrderChat(orderId);
+
     await this.notifyAdmins({
       title: 'Quotation approved',
-      body: `Order is now IN_PROGRESS - ${order.name ?? ''}`,
+      body:
+        keepIds.size < lines.length
+          ? `Customer partially accepted — converted to order - ${order.name ?? ''}`
+          : `Customer accepted — converted to order - ${order.name ?? ''}`,
       link: `/admin/orders/${orderId}`,
     });
-    return this.orderDto((await this.getOrderRow(orderId))!);
+    return this.assembleOrder(orderId);
   }
 
   async clientRejectQuotation(
@@ -740,7 +786,12 @@ export class OrdersService {
       OrderStatus.CLIENT_REJECTED_QUOTATION,
       orderId,
     ]);
-    return this.orderDto((await this.getOrderRow(orderId))!);
+    await this.notifyAdmins({
+      title: 'Quote declined by customer',
+      body: input.comment?.trim() || `Customer declined the quote - ${order.name ?? ''}`,
+      link: `/admin/quotes/${orderId}`,
+    });
+    return this.assembleOrder(orderId);
   }
 
   async clientCounterQuotation(
@@ -869,8 +920,9 @@ export class OrdersService {
     );
     const out = [];
     for (const r of rows) {
+      const partiallyAccepted = await this.orderPartialFlag(r.id);
       out.push({
-        ...this.orderDto(r),
+        ...this.orderDto(r, { partiallyAccepted }),
         customerName: r.customer_name,
         client: r.client_user_id
           ? {
@@ -1150,7 +1202,7 @@ export class OrdersService {
       await this.notifications.createFor(order.client_user_id, {
         title: 'Your files are ready',
         body: `Your deliverables for ${order.name ?? 'your order'} are available in the portal.`,
-        link: `/orders/${orderId}`,
+        link: `/portal/orders/${orderId}`,
       });
     }
 
@@ -1236,7 +1288,7 @@ export class OrdersService {
       await this.notifications.createFor(order.client_user_id, {
         title: 'Quotation provided',
         body: `Review and approve the quotation - ${order.name ?? ''}`,
-        link: `/orders/${orderId}`,
+        link: `/portal/quotes/${orderId}`,
       });
     }
     return this.quotationDto((await this.getLatestQuotation(orderId))!);
@@ -1252,22 +1304,43 @@ export class OrdersService {
     if (order.status !== OrderStatus.WAITING_FOR_ADMIN_QUOTATION_APPROVAL)
       throw new BadRequestException('Order is not awaiting counter approval');
 
+    const amount =
+      typeof latest.amount_cents === 'number' ? latest.amount_cents : order.price_cents;
+
     await this.db.execute('UPDATE quotations SET status = ? WHERE id = ?', [
       QuotationStatus.APPROVED,
       latest.id,
     ]);
     await this.db.execute(
-      'UPDATE orders SET status = ?, approved_at = NOW() WHERE id = ?',
-      [OrderStatus.IN_PROGRESS, orderId],
+      `UPDATE orders SET status = ?, type = ?, price_cents = COALESCE(?, price_cents), approved_at = NOW() WHERE id = ?`,
+      [OrderStatus.IN_PROGRESS, OrderType.ORDER, amount, orderId],
     );
+
+    // Prefer lines from the previous admin quotation when creating designs.
+    const priorAdmin = await this.db.queryOne<{ id: string }>(
+      `SELECT id FROM quotations
+        WHERE order_id = ? AND status IN (?, ?) AND created_by_role != ?
+        ORDER BY version DESC LIMIT 1`,
+      [
+        orderId,
+        QuotationStatus.PROPOSED,
+        QuotationStatus.APPROVED,
+        UserRole.CLIENT,
+      ],
+    );
+    const lineSourceId = priorAdmin?.id ?? latest.id;
+    const lines = await this.getQuotationLines(lineSourceId);
+    await this.ensureDesignsFromQuotationLines(orderId, lines);
+    await this.convertQuoteChatToOrderChat(orderId);
+
     if (order.client_user_id) {
       await this.notifications.createFor(order.client_user_id, {
-        title: 'Counter quotation approved',
-        body: 'Your counter was approved. The order is now IN_PROGRESS.',
-        link: `/orders/${orderId}`,
+        title: 'Counter approved — now an order',
+        body: 'Your counter was approved. Status is now In progress.',
+        link: `/portal/orders/${orderId}`,
       });
     }
-    return this.orderDto((await this.getOrderRow(orderId))!);
+    return this.assembleOrder(orderId);
   }
 
   async adminRejectCounter(
@@ -1284,22 +1357,38 @@ export class OrdersService {
     if (order.status !== OrderStatus.WAITING_FOR_ADMIN_QUOTATION_APPROVAL)
       throw new BadRequestException('Order is not awaiting counter approval');
 
+    // Reject only the counter; restore awaiting-customer so both sides sync.
     await this.db.execute(
       'UPDATE quotations SET status = ?, comment = COALESCE(?, comment) WHERE id = ?',
       [QuotationStatus.REJECTED, input.comment?.trim() || null, latest.id],
     );
     await this.db.execute('UPDATE orders SET status = ? WHERE id = ?', [
-      OrderStatus.CLIENT_REJECTED_QUOTATION,
+      OrderStatus.QUOTATION_PROVIDED,
       orderId,
     ]);
+    // Re-open the previous admin quote as the active proposal if present.
+    const prior = await this.db.queryOne<{ id: string }>(
+      `SELECT id FROM quotations
+        WHERE order_id = ? AND id != ? AND created_by_role != ?
+        ORDER BY version DESC LIMIT 1`,
+      [orderId, latest.id, UserRole.CLIENT],
+    );
+    if (prior) {
+      await this.db.execute('UPDATE quotations SET status = ? WHERE id = ?', [
+        QuotationStatus.PROPOSED,
+        prior.id,
+      ]);
+    }
     if (order.client_user_id) {
       await this.notifications.createFor(order.client_user_id, {
-        title: 'Counter quotation rejected',
-        body: input.comment?.trim() || 'Admin rejected the counter quotation.',
-        link: `/orders/${orderId}`,
+        title: 'Counter not accepted',
+        body:
+          input.comment?.trim() ||
+          'Your counter was declined. The previous quote is still available to accept or decline.',
+        link: `/portal/quotes/${orderId}`,
       });
     }
-    return this.orderDto((await this.getOrderRow(orderId))!);
+    return this.assembleOrder(orderId);
   }
 
   async approveOrder(user: AuthUser | undefined, orderId: string) {
@@ -1493,7 +1582,7 @@ export class OrdersService {
         body: partial
           ? `Partial deliverables uploaded - v${nextVersion}`
           : `Deliverables uploaded - v${nextVersion}`,
-        link: `/orders/${orderId}`,
+        link: `/portal/orders/${orderId}`,
       });
     }
 
@@ -1660,6 +1749,18 @@ export class OrdersService {
     this.assertAdmin(user);
     const order = await this.getOrderRow(orderId);
     if (!order) throw new NotFoundException('Order not found');
+    const allowPrice = new Set<string>([
+      OrderStatus.WAITING_FOR_QUOTATION,
+      OrderStatus.WAITING_FOR_ADMIN_QUOTATION_APPROVAL,
+      OrderStatus.CLIENT_REJECTED_QUOTATION,
+      OrderStatus.QUOTATION_PROVIDED, // allow revise/re-send
+      OrderStatus.CREATED,
+    ]);
+    if (!allowPrice.has(order.status)) {
+      throw new BadRequestException(
+        `Cannot send a quote while status is ${order.status}. Converted orders are managed from the Orders screen.`,
+      );
+    }
     if (!input.lines || input.lines.length === 0)
       throw new BadRequestException('At least one line item is required');
 
@@ -1737,9 +1838,34 @@ export class OrdersService {
             order.client_user_id,
             'Quotation provided',
             `Review your quote - ${order.name ?? ''}`,
-            `/portal/orders/${orderId}`,
+            `/portal/quotes/${orderId}`,
           ],
         );
+      }
+
+      // Ensure a quote-linked conversation exists for messaging about this quote.
+      if (order.customer_id) {
+        const existing = await tx.queryOne<{ id: string }>(
+          `SELECT id FROM conversations
+            WHERE customer_id = ? AND order_id = ? AND chat_type = 'QUOTE' AND status = 'OPEN'
+            ORDER BY created_at DESC LIMIT 1`,
+          [order.customer_id, orderId],
+        );
+        if (!existing) {
+          await tx.execute(
+            `INSERT INTO conversations
+               (id, customer_id, order_id, chat_type, status, subject, source, last_message_at)
+             VALUES (?, ?, ?, 'QUOTE', 'OPEN', ?, 'PORTAL', NOW())`,
+            [
+              randomUUID(),
+              order.customer_id,
+              orderId,
+              order.human_ref
+                ? `Quotation ${order.human_ref} Chat`
+                : 'Quotation Chat',
+            ],
+          );
+        }
       }
 
       return qId;

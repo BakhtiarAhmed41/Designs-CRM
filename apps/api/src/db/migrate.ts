@@ -125,6 +125,14 @@ async function main() {
     );
   }
 
+  if (!(await columnExists('users', 'email_verified_at'))) {
+    // eslint-disable-next-line no-console
+    console.log('Adding users.email_verified_at column ...');
+    await conn.query(
+      'ALTER TABLE users ADD COLUMN email_verified_at DATETIME NULL',
+    );
+  }
+
   if (existsSync(migrationsDir)) {
     const applied = new Set(
       (

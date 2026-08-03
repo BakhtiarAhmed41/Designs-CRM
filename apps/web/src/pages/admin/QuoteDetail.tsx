@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -18,7 +18,7 @@ import {
 import { submitQuoteBuilder } from '@/lib/designs';
 import { getCustomer } from '@/lib/customers';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
-import { money, dateShort } from '@/lib/format';
+import { money, dateShort, quoteLifecycleChip } from '@/lib/format';
 import { FormPreferencesDisplay } from '@/components/FormPreferencesDisplay';
 import { MessageAttachments } from '@/components/MessageAttachments';
 import type { Order } from '@/lib/types';
@@ -70,6 +70,12 @@ export function AdminQuoteDetail() {
 
   const order = data?.order;
   const attachments = order?.attachments ?? [];
+
+  useEffect(() => {
+    if (order?.type === 'ORDER') {
+      navigate(`/admin/orders/${id}`, { replace: true });
+    }
+  }, [order?.type, id, navigate]);
 
   const customerId = order?.customerId;
 
@@ -153,8 +159,8 @@ export function AdminQuoteDetail() {
   });
 
   const sendQuote = useMutation({
-    mutationFn: () =>
-      submitQuoteBuilder(id, {
+    mutationFn: async () => {
+      await submitQuoteBuilder(id, {
         lines: lines
           .filter((l) => l.name.trim())
           .map((l) => ({
@@ -162,11 +168,31 @@ export function AdminQuoteDetail() {
             note: l.note.trim() || l.attachedFile || undefined,
             priceCents: l.price ? Math.round(parseFloat(l.price) * 100) : undefined,
           })),
-      }),
-    onSuccess: () => {
+      });
+      let convoId = convo?.id;
+      if (!convoId) {
+        const created = await createAdminConversation({
+          orderId: id,
+          customerId: order?.customerId ?? null,
+          chatType: 'QUOTE',
+          subject: order?.humanRef
+            ? `Quotation ${order.humanRef} Chat`
+            : 'Quotation Chat',
+        });
+        convoId = created.conversation.id;
+      }
+      return convoId;
+    },
+    onSuccess: (convoId) => {
       qc.invalidateQueries({ queryKey: ['admin-order', id] });
       qc.invalidateQueries({ queryKey: ['admin-quotes'] });
-      navigate('/admin/quotes');
+      qc.invalidateQueries({ queryKey: ['admin-conversations'] });
+      qc.invalidateQueries({ queryKey: ['my-orders'] });
+      qc.invalidateQueries({ queryKey: ['my-order', id] });
+      const customer = order?.customerId;
+      navigate(
+        `/admin/messages/customers/${convoId}${customer ? `?customer=${customer}` : ''}`,
+      );
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -177,6 +203,8 @@ export function AdminQuoteDetail() {
       qc.invalidateQueries({ queryKey: ['admin-order', id] });
       qc.invalidateQueries({ queryKey: ['admin-quotes'] });
       qc.invalidateQueries({ queryKey: ['admin-orders'] });
+      qc.invalidateQueries({ queryKey: ['my-orders'] });
+      navigate(`/admin/orders/${id}`);
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -187,17 +215,25 @@ export function AdminQuoteDetail() {
       qc.invalidateQueries({ queryKey: ['admin-order', id] });
       qc.invalidateQueries({ queryKey: ['admin-quotes'] });
       qc.invalidateQueries({ queryKey: ['admin-orders'] });
+      qc.invalidateQueries({ queryKey: ['my-orders'] });
+      qc.invalidateQueries({ queryKey: ['my-order', id] });
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
 
   if (isLoading) return <div style={{ padding: 16, color: 'var(--muted)' }}>Loading...</div>;
   if (!order) return <div style={{ padding: 16, color: 'var(--muted)' }}>Quote not found.</div>;
+  if (order.type === 'ORDER') {
+    return <div style={{ padding: 16, color: 'var(--muted)' }}>Converted to order — redirecting…</div>;
+  }
 
   const customer = customerQ.data?.customer;
   const messages = threadQ.data?.conversation.messages ?? [];
   const awaitingCounter = order.status === 'WAITING_FOR_ADMIN_QUOTATION_APPROVAL';
   const needsPrice = order.status === 'WAITING_FOR_QUOTATION';
+  const statusChip = quoteLifecycleChip(order.status, 'admin', {
+    partiallyAccepted: order.partiallyAccepted,
+  });
   const latestQuote = [...(order.quotations ?? [])].sort(
     (a, b) => b.version - a.version,
   )[0];
@@ -214,24 +250,11 @@ export function AdminQuoteDetail() {
               Q-{order.humanRef ?? order.id.slice(0, 6)} · {order.name ?? 'Quote request'}
             </h1>
             <div className="sub">
-              {awaitingCounter
-                ? 'Customer countered — decide'
-                : needsPrice
-                  ? 'Waiting for your price'
-                  : 'Quote sent'}{' '}
-              · requested {dateShort(order.createdAt)}
+              {statusChip.label} · requested {dateShort(order.createdAt)}
             </div>
           </div>
         </div>
-        <span
-          className={`chip ${awaitingCounter ? 'c-review' : needsPrice ? 'c-quote' : 'c-prog'}`}
-        >
-          {awaitingCounter
-            ? 'Counter pending'
-            : needsPrice
-              ? 'Needs your price'
-              : 'Awaiting customer'}
-        </span>
+        <span className={statusChip.cls}>{statusChip.label}</span>
       </div>
 
       {error && <div className="alert-error" style={{ marginBottom: 12 }}>{error}</div>}

@@ -11,7 +11,7 @@ import {
   uploadAttachments,
 } from '@/lib/orders';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
-import { money, statusChipClass, statusLabel, dateShort } from '@/lib/format';
+import { money, lifecycleChip, dateShort } from '@/lib/format';
 import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import { createMyConversation, listMyConversations } from '@/lib/messaging';
 import type { Design, QuotationLine } from '@/lib/designs';
@@ -148,7 +148,12 @@ export function PortalOrderDetail() {
           >
             <i className="ti ti-message" /> Start Chat
           </button>
-          <span className={statusChipClass(order.status)}>{statusLabel(order.status)}</span>
+          {(() => {
+            const chip = lifecycleChip(order.status, 'customer', {
+              partiallyAccepted: order.partiallyAccepted,
+            });
+            return <span className={chip.cls}>{chip.label}</span>;
+          })()}
         </div>
       </div>
 

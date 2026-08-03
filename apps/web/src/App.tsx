@@ -11,6 +11,7 @@ import { PortalDashboard } from '@/pages/portal/Dashboard';
 import { PortalOrders } from '@/pages/portal/Orders';
 import { PortalOrderDetail } from '@/pages/portal/OrderDetail';
 import { PortalQuotes } from '@/pages/portal/Quotes';
+import { PortalQuoteDetail } from '@/pages/portal/QuoteDetail';
 import { PortalNewQuote } from '@/pages/portal/NewQuote';
 import { PortalProfile } from '@/pages/portal/Profile';
 import { PortalFiles } from '@/pages/portal/Files';
@@ -82,6 +83,7 @@ export function App() {
         <Route index element={<PortalDashboard />} />
         <Route path="quotes" element={<PortalQuotes />} />
         <Route path="quotes/new" element={<PortalNewQuote />} />
+        <Route path="quotes/:id" element={<PortalQuoteDetail />} />
         <Route path="orders" element={<PortalOrders />} />
         <Route path="orders/:id" element={<PortalOrderDetail />} />
         <Route path="files" element={<PortalFiles />} />

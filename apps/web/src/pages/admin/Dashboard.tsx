@@ -304,7 +304,9 @@ export function AdminDashboard() {
                   <div className="mbody">
                     <div className="mtop">
                       <span className="mname">{name}</span>
-                      {c.label && <span className={labelClass(c.label)}>{c.label}</span>}
+                      {c.chatType && (
+                        <span className="msg-type">{c.chatType}</span>
+                      )}
                       {c.unreadAdmin > 0 && <span className="dot-unread" />}
                       <span className="mtime">{relativeTime(c.lastMessageAt)}</span>
                     </div>

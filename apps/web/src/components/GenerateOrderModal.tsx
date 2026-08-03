@@ -134,7 +134,7 @@ export function GenerateOrderModal({
   const create = useMutation({
     mutationFn: async () => {
       if (!customerId) {
-        throw new Error('Create a customer first, then select them here.');
+        throw new Error('Select an existing customer from the list. Create the customer first if needed.');
       }
       const priceCents = price.trim()
         ? Math.round(parseFloat(price) * 100)
@@ -181,7 +181,16 @@ export function GenerateOrderModal({
         setResultLabel(mode === 'QUOTE_REQUEST' ? 'Quote created' : 'Order created');
       }
     },
-    onError: (e) => setError(getErrorMessage(e)),
+    onError: (e) => {
+      const msg = getErrorMessage(e);
+      if (/missing feature|forbidden|403/i.test(msg)) {
+        setError(
+          'You need permission to view customers (or orders/quotes) to generate. Ask an admin to update your role.',
+        );
+      } else {
+        setError(msg);
+      }
+    },
   });
 
   if (!open) return null;
