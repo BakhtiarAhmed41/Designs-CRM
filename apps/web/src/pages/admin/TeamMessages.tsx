@@ -49,11 +49,11 @@ export function AdminTeamMessages() {
   const [error, setError] = useState<string | null>(null);
 
   const canSend =
-    canFeature(user?.permissions, 'messages_team_send') ||
-    canFeature(user?.permissions, 'messages');
+    canFeature(user?.permissions, 'messages_team_send', user?.role) ||
+    canFeature(user?.permissions, 'messages', user?.role);
   const canGroup =
-    canFeature(user?.permissions, 'messages_group') ||
-    canFeature(user?.permissions, 'messages');
+    canFeature(user?.permissions, 'messages_group', user?.role) ||
+    canFeature(user?.permissions, 'messages', user?.role);
 
   const teamQuery = useQuery({
     queryKey: ['admin-team'],

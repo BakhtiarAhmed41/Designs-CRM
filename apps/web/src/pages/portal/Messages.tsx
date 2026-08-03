@@ -4,14 +4,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ConversationThread } from '@/components/messaging/ConversationThread';
 import { MessageComposer } from '@/components/messaging/MessageComposer';
 import { getErrorMessage } from '@/lib/api';
-import { dateShort, statusLabel } from '@/lib/format';
+import { dateShort } from '@/lib/format';
 import {
   chatTypeLabel,
+  conversationTitle,
   createMyConversation,
   getMyConversation,
   listMyConversations,
   sendMyMessage,
-  type ChatType,
   type Conversation,
 } from '@/lib/messaging';
 import {
@@ -36,6 +36,8 @@ export function PortalMessages() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState('');
+  const [topicDraft, setTopicDraft] = useState('');
+  const [topicFormOpen, setTopicFormOpen] = useState(false);
   const conversationId = searchParams.get('c');
 
   const convosQuery = useQuery({
@@ -49,7 +51,7 @@ export function PortalMessages() {
     const term = q.trim().toLowerCase();
     if (!term) return all;
     return all.filter((c) => {
-      const hay = `${c.subject || ''} ${c.orderRef || ''} ${chatTypeLabel(c.chatType)} ${c.lastMessagePreview || ''}`.toLowerCase();
+      const hay = `${conversationTitle(c)} ${c.subject || ''} ${c.orderRef || ''} ${chatTypeLabel(c.chatType)} ${c.lastMessagePreview || ''}`.toLowerCase();
       return hay.includes(term);
     });
   }, [convosQuery.data?.conversations, q]);
@@ -83,7 +85,7 @@ export function PortalMessages() {
   const active = threadQuery.data?.conversation;
   const linkedSummary = useMemo(() => {
     if (!active) return null;
-    if (active.chatType === 'GENERAL') return 'General inquiry';
+    if (active.chatType === 'GENERAL') return 'Topic';
     return `${chatTypeLabel(active.chatType)}${active.orderRef ? ` · ${active.orderRef}` : ''}`;
   }, [active]);
 
@@ -99,10 +101,12 @@ export function PortalMessages() {
     onError: (err) => setError(getErrorMessage(err)),
   });
 
-  const startGeneral = useMutation({
-    mutationFn: () =>
-      createMyConversation({ chatType: 'GENERAL', subject: 'General Inquiry' }),
+  const startTopic = useMutation({
+    mutationFn: (subject: string) =>
+      createMyConversation({ chatType: 'GENERAL', subject }),
     onSuccess: (res) => {
+      setTopicFormOpen(false);
+      setTopicDraft('');
       setSearchParams({ c: res.conversation.id });
       void qc.invalidateQueries({ queryKey: ['my-conversations'] });
     },
@@ -126,16 +130,58 @@ export function PortalMessages() {
             onChange={(e) => setQ(e.target.value)}
             onFocus={() => maybeRequestBrowserNotifications()}
           />
-          <button
-            type="button"
-            className="btn btn-primary"
-            style={{ width: '100%', marginTop: 10 }}
-            onClick={() => startGeneral.mutate()}
-            disabled={startGeneral.isPending}
-          >
-            <i className="ti ti-message" />
-            {startGeneral.isPending ? 'Starting…' : 'Start New Inquiry'}
-          </button>
+          {!topicFormOpen ? (
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ width: '100%', marginTop: 10 }}
+              onClick={() => setTopicFormOpen(true)}
+              disabled={startTopic.isPending}
+            >
+              <i className="ti ti-message" />
+              Start new chat
+            </button>
+          ) : (
+            <form
+              className="msg-topic-form"
+              style={{ marginTop: 10 }}
+              onSubmit={(e) => {
+                e.preventDefault();
+                const subject = topicDraft.trim();
+                if (!subject) return;
+                startTopic.mutate(subject);
+              }}
+            >
+              <input
+                className="msg-search"
+                style={{ marginTop: 0 }}
+                autoFocus
+                placeholder="What’s this about?"
+                value={topicDraft}
+                onChange={(e) => setTopicDraft(e.target.value)}
+                maxLength={120}
+              />
+              <div className="msg-topic-actions">
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => {
+                    setTopicFormOpen(false);
+                    setTopicDraft('');
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary btn-sm"
+                  disabled={!topicDraft.trim() || startTopic.isPending}
+                >
+                  {startTopic.isPending ? 'Starting…' : 'Start'}
+                </button>
+              </div>
+            </form>
+          )}
         </div>
         <div className="msg-left-list">
           {conversations.map((c) => (
@@ -147,16 +193,14 @@ export function PortalMessages() {
             >
               <div className="msg-cust-main" style={{ width: '100%' }}>
                 <div className="msg-cust-top">
-                  <strong>
-                    {chatTypeLabel(c.chatType as ChatType)}
-                    {c.orderRef ? ` ${c.orderRef}` : ''}
-                  </strong>
+                  <strong>{conversationTitle(c)}</strong>
                   <span>{relativeTime(c.lastMessageAt)}</span>
                 </div>
                 <div className="msg-cust-preview">
-                  {c.lastMessagePreview || c.subject || 'No messages yet'}
+                  {c.lastMessagePreview || 'No messages yet'}
                 </div>
                 <div className="msg-cust-meta">
+                  <span className="msg-type">{chatTypeLabel(c.chatType)}</span>
                   <span className="msg-type">{c.status}</span>
                   {c.unreadClient > 0 && (
                     <span className="msg-badge">{c.unreadClient}</span>
@@ -167,7 +211,7 @@ export function PortalMessages() {
           ))}
           {!convosQuery.isLoading && conversations.length === 0 && (
             <div className="msg-empty">
-              No conversations yet. Start a general inquiry or open chat from an order/quote.
+              No conversations yet. Start a topic chat or open chat from an order/quote.
             </div>
           )}
         </div>
@@ -179,31 +223,29 @@ export function PortalMessages() {
             <div className="msg-center-head">
               <div>
                 <div className="h2" style={{ margin: 0 }}>
-                  {active.subject || chatTypeLabel(active.chatType)}
+                  {conversationTitle(active)}
                 </div>
-                <div className="muted" style={{ fontSize: 12.5 }}>
+                <div className="muted" style={{ fontSize: 12.5, marginTop: 3 }}>
                   {linkedSummary}
-                  {active.orderStatus
-                    ? ` · ${statusLabel(active.orderStatus, 'customer')}`
-                    : ''}
+                  {active.status ? ` · ${active.status === 'OPEN' ? 'Open' : 'Closed'}` : ''}
                 </div>
               </div>
             </div>
-            <ConversationThread
-              messages={active.messages}
-              mineDirection="INBOUND"
-              emptyText="Say hello — our team will reply here."
-            />
             {error && <div className="err" style={{ margin: '0 12px' }}>{error}</div>}
+            <ConversationThread
+              messages={threadQuery.data?.messages ?? []}
+              mineDirection="INBOUND"
+            />
             <MessageComposer
-              disabled={active.status === 'CLOSED'}
               onSend={async (body, files) => {
                 await sendMutation.mutateAsync({ body, files });
               }}
             />
           </>
         ) : (
-          <div className="msg-empty-state">Select a conversation or start a new inquiry.</div>
+          <div className="msg-empty-state">
+            Select a conversation or start a new topic chat.
+          </div>
         )}
       </section>
     </div>

@@ -124,7 +124,7 @@ export function NotificationBell() {
               Mark all read
             </a>
           </div>
-          <div>
+          <div className="notif-list">
             {items.length === 0 && (
               <div className="nitem">
                 <div>

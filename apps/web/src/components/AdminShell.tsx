@@ -80,6 +80,7 @@ export function AdminShell() {
   const { data: teamData } = useQuery({
     queryKey: ['admin-team'],
     queryFn: listTeam,
+    enabled: Boolean(user),
     refetchInterval: 60_000,
   });
   const members = (teamData?.members ?? []).filter((m) => m.id !== user?.id);

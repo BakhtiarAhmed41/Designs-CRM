@@ -36,6 +36,17 @@ export function resolveFileUrl(url: string): string {
 
 /** Safely extract a human message from any thrown value. */
 export function getErrorMessage(err: unknown): string {
+  if (err instanceof ApiError) {
+    if (err.status === 401) {
+      return 'Session expired or not authorized — please log in again.';
+    }
+    if (err.status === 403) {
+      return err.message && err.message !== 'Forbidden'
+        ? err.message
+        : 'You don’t have permission for this action.';
+    }
+    if (err.message) return err.message;
+  }
   if (err instanceof Error && err.message) return err.message;
   if (typeof err === 'string') return err;
   return 'Something went wrong';

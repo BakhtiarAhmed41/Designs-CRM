@@ -118,8 +118,53 @@ export function chatTypeLabel(type: ChatType | undefined) {
     case 'QUOTE':
       return 'Quote';
     default:
-      return 'General';
+      return 'Topic';
   }
+}
+
+/** True for old/default GENERAL subjects that aren't a real topic. */
+export function isPlaceholderSubject(subject: string | null | undefined) {
+  if (!subject?.trim()) return true;
+  const s = subject.trim().toLowerCase();
+  return (
+    s === 'general' ||
+    s === 'general inquiry' ||
+    s === 'new chat' ||
+    s === 'new inquiry'
+  );
+}
+
+function truncateTitle(text: string, max = 72) {
+  const t = text.trim().replace(/\s+/g, ' ');
+  if (t.length <= max) return t;
+  return `${t.slice(0, max - 1).trimEnd()}…`;
+}
+
+/** Display title for a conversation — prefers real subject / order ref over "General". */
+export function conversationTitle(c: {
+  chatType?: ChatType;
+  subject?: string | null;
+  orderRef?: string | null;
+  lastMessagePreview?: string | null;
+}) {
+  if (c.chatType === 'ORDER') {
+    if (c.orderRef) return `Order ${c.orderRef}`;
+    if (c.subject?.trim() && !isPlaceholderSubject(c.subject)) return c.subject.trim();
+    return 'Order chat';
+  }
+  if (c.chatType === 'QUOTE') {
+    if (c.orderRef) return `Quote ${c.orderRef}`;
+    if (c.subject?.trim() && !isPlaceholderSubject(c.subject)) return c.subject.trim();
+    return 'Quote chat';
+  }
+  if (c.subject?.trim() && !isPlaceholderSubject(c.subject)) {
+    return c.subject.trim();
+  }
+  if (c.lastMessagePreview?.trim()) {
+    return truncateTitle(c.lastMessagePreview);
+  }
+  if (c.subject?.trim()) return c.subject.trim();
+  return 'New chat';
 }
 
 // --- admin ----------------------------------------------------------------

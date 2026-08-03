@@ -39,7 +39,7 @@ VITE_API_BASE_URL=https://your-domain.com/api
 Either run the migration runner:
 ```bash
 npm run db:migrate     # applies apps/api/db/schema.sql (idempotent)
-npm run db:seed        # optional: sample team/customers/orders
+npm run db:seed        # optional: SEED_ADMIN + Sara portal sample
 ```
 …or paste `apps/api/db/schema.sql` into **phpMyAdmin** (SQL tab) against your database.
 

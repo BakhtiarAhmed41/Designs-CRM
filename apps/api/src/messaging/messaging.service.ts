@@ -247,11 +247,41 @@ export class MessagingService {
   }
 
   private defaultSubject(chatType: ChatType, orderRef: string | null) {
-    if (chatType === ChatType.GENERAL) return 'General Inquiry';
+    if (chatType === ChatType.GENERAL) return null;
     if (chatType === ChatType.QUOTE) {
       return orderRef ? `Quotation ${orderRef} Chat` : 'Quotation Chat';
     }
     return orderRef ? `Order ${orderRef} Chat` : 'Order Chat';
+  }
+
+  private isPlaceholderGeneralSubject(
+    subject: string | null,
+    chatType: string | ChatType,
+  ) {
+    if (chatType !== ChatType.GENERAL) return false;
+    if (!subject?.trim()) return true;
+    const s = subject.trim().toLowerCase();
+    return (
+      s === 'general' ||
+      s === 'general inquiry' ||
+      s === 'new chat' ||
+      s === 'new inquiry'
+    );
+  }
+
+  private async adoptSubjectFromFirstMessage(
+    convo: ConversationRow,
+    text: string,
+  ) {
+    if (!this.isPlaceholderGeneralSubject(convo.subject, convo.chat_type)) {
+      return;
+    }
+    const title = text.trim().replace(/\s+/g, ' ').slice(0, 80);
+    if (!title || title === '(attachment)') return;
+    await this.db.execute('UPDATE conversations SET subject = ? WHERE id = ?', [
+      title,
+      convo.id,
+    ]);
   }
 
   private async findOpenTypedChat(
@@ -686,6 +716,7 @@ export class MessagingService {
       ],
     );
     const attachments = await this.saveAttachments(messageId, files);
+    await this.adoptSubjectFromFirstMessage(convo, text || '(attachment)');
     await this.db.execute(
       'UPDATE conversations SET last_message_at = NOW(), unread_client = unread_client + 1, status = ? WHERE id = ?',
       [ConversationStatus.OPEN, conversationId],
@@ -1033,6 +1064,7 @@ export class MessagingService {
       ],
     );
     const attachments = await this.saveAttachments(messageId, files);
+    await this.adoptSubjectFromFirstMessage(convo, text || '(attachment)');
     await this.db.execute(
       'UPDATE conversations SET last_message_at = NOW(), unread_admin = unread_admin + 1, status = ? WHERE id = ?',
       [ConversationStatus.OPEN, conversationId],

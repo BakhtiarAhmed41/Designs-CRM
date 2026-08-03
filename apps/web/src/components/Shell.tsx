@@ -13,6 +13,10 @@ function isDashboardPath(pathname: string) {
   );
 }
 
+function isMessagingPath(pathname: string) {
+  return pathname.includes('/messages');
+}
+
 export function Shell({
   rolebar,
   sidebar,
@@ -22,23 +26,16 @@ export function Shell({
 }) {
   const { pathname } = useLocation();
   const showGlobalBell = !isDashboardPath(pathname);
+  const messaging = isMessagingPath(pathname);
 
   return (
-    <div>
+    <div className={`app-frame${rolebar ? ' with-rolebar' : ''}`}>
       {rolebar}
       <div className="shell">
         {sidebar}
-        <main className="main">
+        <main className={`main${messaging ? ' main-messaging' : ''}`}>
           {showGlobalBell && (
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                alignItems: 'center',
-                marginBottom: 4,
-                minHeight: 28,
-              }}
-            >
+            <div className="shell-bell">
               <NotificationBell />
             </div>
           )}

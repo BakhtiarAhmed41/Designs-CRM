@@ -116,8 +116,20 @@ export function featuresForNav(
 export function canFeature(
   permissions: UserPermissions | undefined,
   feature: FeatureKey,
+  role?: UserRole,
 ): boolean {
-  return Boolean(permissions?.features?.[feature]);
+  if (permissions?.features?.[feature]) return true;
+  // Legacy / partial permission blobs: full messages unlocks granular keys.
+  if (
+    permissions?.features?.messages &&
+    (feature === 'messages' || feature.startsWith('messages_'))
+  ) {
+    return true;
+  }
+  if (role) {
+    return Boolean(expandMessaging(defaultFeaturesForRole(role))[feature]);
+  }
+  return false;
 }
 
 export function canAnyMessaging(features: Record<FeatureKey, boolean>) {

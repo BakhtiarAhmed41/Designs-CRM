@@ -3,14 +3,13 @@ import { randomUUID } from 'crypto';
 import * as argon2 from 'argon2';
 import mysql from 'mysql2/promise';
 import { getEnv } from '../config/env';
-import { UserRole } from '../common/enums';
 
 /**
- * Seed baseline users (team) + sample customers/orders/quotes so both the
- * admin command center and the customer portal render immediately.
- * Idempotent: users are upserted by email; sample data only inserted once.
+ * Seeds optional env-configured admin + the Sara portal sample customer.
+ * Demo staff (@lvd.test) are not seeded — create real team accounts in the app.
  */
-const DEFAULT_PASSWORD = 'Password123!';
+const SARA_EMAIL = 'sara@client.test';
+const SARA_PASSWORD = 'Password123!';
 
 async function main() {
   const env = getEnv();
@@ -22,87 +21,55 @@ async function main() {
     database: env.DB_NAME,
   });
 
-  const pwHash = await argon2.hash(DEFAULT_PASSWORD);
-
-  const staff: Array<{
-    email: string;
-    role: UserRole;
-    first: string;
-    initials: string;
-    presence: string;
-    skills: string[];
-  }> = [
-    { email: 'qasim@lvd.test', role: UserRole.SUPER_ADMIN, first: 'Qasim', initials: 'QA', presence: 'ON', skills: ['Owner'] },
-    { email: 'sam@lvd.test', role: UserRole.ADMIN, first: 'Sam', initials: 'SM', presence: 'ON', skills: ['Operations'] },
-    { email: 'lina@lvd.test', role: UserRole.SUPPORT, first: 'Lina', initials: 'Li', presence: 'ON', skills: ['Support'] },
-    { email: 'ahmed@lvd.test', role: UserRole.DESIGNER, first: 'Ahmed', initials: 'Ah', presence: 'ON', skills: ['Embroidery'] },
-    { email: 'priya@lvd.test', role: UserRole.DESIGNER, first: 'Priya', initials: 'Pr', presence: 'AWAY', skills: ['SVG', 'Vector'] },
-    { email: 'chen@lvd.test', role: UserRole.DESIGNER, first: 'Chen', initials: 'Ch', presence: 'OFF', skills: ['CNC/Laser', 'Vector'] },
-  ];
-
-  for (const s of staff) {
-    await conn.execute(
-      `INSERT INTO users (id, email, password_hash, role, first_name, initials, presence, skills)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE role = VALUES(role), first_name = VALUES(first_name),
-         initials = VALUES(initials), presence = VALUES(presence), skills = VALUES(skills)`,
-      [randomUUID(), s.email, pwHash, s.role, s.first, s.initials, s.presence, JSON.stringify(s.skills)],
-    );
-  }
-
-  // Env-configured admin (optional) - kept for backwards compatibility.
   if (env.SEED_ADMIN_EMAIL && env.SEED_ADMIN_PASSWORD) {
     const adminHash = await argon2.hash(env.SEED_ADMIN_PASSWORD);
     await conn.execute(
-      `INSERT INTO users (id, email, password_hash, role, first_name, initials, presence)
-       VALUES (?, ?, ?, 'SUPER_ADMIN', 'Admin', 'AD', 'ON')
-       ON DUPLICATE KEY UPDATE role = 'SUPER_ADMIN'`,
+      `INSERT INTO users (id, email, password_hash, role, first_name, initials, presence, login_status)
+       VALUES (?, ?, ?, 'SUPER_ADMIN', 'Admin', 'AD', 'ON', 'ACTIVE')
+       ON DUPLICATE KEY UPDATE role = 'SUPER_ADMIN', login_status = 'ACTIVE', password_hash = VALUES(password_hash)`,
       [randomUUID(), env.SEED_ADMIN_EMAIL.toLowerCase(), adminHash],
     );
+    // eslint-disable-next-line no-console
+    console.log(`Admin ensured: ${env.SEED_ADMIN_EMAIL}`);
   }
 
-  // Sample client user (customer login).
-  const clientId = randomUUID();
+  const saraHash = await argon2.hash(SARA_PASSWORD);
   await conn.execute(
     `INSERT INTO users (id, email, password_hash, role, first_name, initials, presence)
-     VALUES (?, 'sara@client.test', ?, 'CLIENT', 'Sara', 'SA', 'OFF')
-     ON DUPLICATE KEY UPDATE first_name = 'Sara'`,
-    [clientId, pwHash],
+     VALUES (?, ?, ?, 'CLIENT', 'Sara', 'SA', 'OFF')
+     ON DUPLICATE KEY UPDATE first_name = 'Sara', initials = 'SA'`,
+    [randomUUID(), SARA_EMAIL, saraHash],
   );
   const [clientRows] = await conn.query<mysql.RowDataPacket[]>(
-    `SELECT id FROM users WHERE email = 'sara@client.test' LIMIT 1`,
+    `SELECT id FROM users WHERE email = ? LIMIT 1`,
+    [SARA_EMAIL],
   );
   const saraId = clientRows[0]?.id as string;
 
-  // Only insert sample customers/orders once.
-  const [custCount] = await conn.query<mysql.RowDataPacket[]>(
-    'SELECT COUNT(*) AS n FROM customers',
+  const [existingCust] = await conn.query<mysql.RowDataPacket[]>(
+    `SELECT id FROM customers WHERE email = ? OR name = 'Sara (Portal)' LIMIT 1`,
+    [SARA_EMAIL],
   );
-  if ((custCount[0]?.n ?? 0) === 0) {
-    const customers: Array<[string, string, string, string, string | null, number]> = [
-      // [id, name, accountType, source, netTerms, storeCreditCents]
-      [randomUUID(), 'Stitch & Press Co.', 'NET_MONTHLY', 'PORTAL', 'NET_15', 0],
-      [randomUUID(), 'Tempo Threads', 'NET_MONTHLY', 'PORTAL', 'NET_30', 0],
-      [randomUUID(), "Mike's Caps", 'PAY_PER_ORDER', 'GUEST', null, 2400],
-      [randomUUID(), 'Riverside FC', 'PAY_PER_ORDER', 'PORTAL', null, 0],
-    ];
-    for (const c of customers) {
-      await conn.execute(
-        `INSERT INTO customers (id, name, account_type, source, net_terms, store_credit_cents, since_date)
-         VALUES (?, ?, ?, ?, ?, ?, CURDATE())`,
-        c,
-      );
-    }
-
-    // Link Sara to a portal customer.
-    const saraCustomerId = randomUUID();
+  let saraCustomerId = existingCust[0]?.id as string | undefined;
+  if (saraCustomerId) {
+    await conn.execute(
+      `UPDATE customers SET user_id = ?, email = ?, name = 'Sara (Portal)' WHERE id = ?`,
+      [saraId, SARA_EMAIL, saraCustomerId],
+    );
+  } else {
+    saraCustomerId = randomUUID();
     await conn.execute(
       `INSERT INTO customers (id, user_id, name, email, account_type, source, since_date)
-       VALUES (?, ?, 'Sara (Portal)', 'sara@client.test', 'PAY_PER_ORDER', 'PORTAL', CURDATE())`,
-      [saraCustomerId, saraId],
+       VALUES (?, ?, 'Sara (Portal)', ?, 'PAY_PER_ORDER', 'PORTAL', CURDATE())`,
+      [saraCustomerId, saraId, SARA_EMAIL],
     );
+  }
 
-    // A couple of sample orders for Sara.
+  const [orderCount] = await conn.query<mysql.RowDataPacket[]>(
+    `SELECT COUNT(*) AS n FROM orders WHERE customer_id = ?`,
+    [saraCustomerId],
+  );
+  if ((orderCount[0]?.n ?? 0) === 0) {
     const o1 = randomUUID();
     await conn.execute(
       `INSERT INTO orders (id, human_ref, customer_id, client_user_id, type, service_type, name, status, price_cents, currency)
@@ -115,11 +82,16 @@ async function main() {
        VALUES (?, 'Q-209', ?, ?, 'QUOTE_REQUEST', 'EMBROIDERY', 'Team crest - Oak United', 'WAITING_FOR_QUOTATION')`,
       [o2, saraCustomerId, saraId],
     );
+  } else {
+    await conn.execute(
+      `UPDATE orders SET client_user_id = ? WHERE customer_id = ? AND client_user_id IS NULL`,
+      [saraId, saraCustomerId],
+    );
   }
 
   await conn.end();
   // eslint-disable-next-line no-console
-  console.log(`Seed complete. Default password for sample accounts: ${DEFAULT_PASSWORD}`);
+  console.log(`Seed complete. Sara portal login: ${SARA_EMAIL} / ${SARA_PASSWORD}`);
 }
 
 main().catch((err) => {

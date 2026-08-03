@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ConversationThread } from '@/components/messaging/ConversationThread';
@@ -8,6 +8,7 @@ import { getErrorMessage } from '@/lib/api';
 import { dateShort, money, statusChipClass, statusLabel } from '@/lib/format';
 import {
   chatTypeLabel,
+  conversationTitle,
   createAdminConversation,
   getAdminConversation,
   getCustomerMessagingContext,
@@ -61,11 +62,11 @@ export function AdminCustomerMessages() {
   const qc = useQueryClient();
   const { user } = useAuth();
   const canReply =
-    canFeature(user?.permissions, 'messages_customer_reply') ||
-    canFeature(user?.permissions, 'messages');
+    canFeature(user?.permissions, 'messages_customer_reply', user?.role) ||
+    canFeature(user?.permissions, 'messages', user?.role);
   const canStart =
-    canFeature(user?.permissions, 'messages_customer_start') ||
-    canFeature(user?.permissions, 'messages');
+    canFeature(user?.permissions, 'messages_customer_start', user?.role) ||
+    canFeature(user?.permissions, 'messages', user?.role);
 
   const [q, setQ] = useState(searchParams.get('q') ?? '');
   const [chatSearch, setChatSearch] = useState('');
@@ -76,6 +77,9 @@ export function AdminCustomerMessages() {
   const [error, setError] = useState<string | null>(null);
   const [notesDraft, setNotesDraft] = useState('');
   const [startMenuOpen, setStartMenuOpen] = useState(false);
+  const [topicDraft, setTopicDraft] = useState('');
+  const [topicFormOpen, setTopicFormOpen] = useState(false);
+  const startMenuRef = useRef<HTMLDivElement>(null);
 
   const listFilters = useMemo(() => {
     const base: Parameters<typeof listAdminConversations>[0] = { q: q || undefined };
@@ -135,6 +139,23 @@ export function AdminCustomerMessages() {
   const customerId = active?.customerId ?? selectedCustomerId;
   const customerSelected = !!customerId && customerId !== 'unknown';
 
+  useEffect(() => {
+    setNotesDraft(active?.privateNotes ?? '');
+  }, [active?.id, active?.privateNotes]);
+
+  useEffect(() => {
+    if (!startMenuOpen) return;
+    function onDoc(e: MouseEvent) {
+      if (!startMenuRef.current?.contains(e.target as Node)) {
+        setStartMenuOpen(false);
+        setTopicFormOpen(false);
+        setTopicDraft('');
+      }
+    }
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [startMenuOpen]);
+
   const contextQuery = useQuery({
     queryKey: ['msg-customer-context', customerId],
     queryFn: () => getCustomerMessagingContext(customerId as string),
@@ -184,7 +205,10 @@ export function AdminCustomerMessages() {
         subject: input.subject,
       }),
     onSuccess: (res) => {
+      setError(null);
       setStartMenuOpen(false);
+      setTopicFormOpen(false);
+      setTopicDraft('');
       navigate(
         `/admin/messages/customers/${res.conversation.id}?customer=${customerId}`,
       );
@@ -266,7 +290,7 @@ export function AdminCustomerMessages() {
                     ['unread', 'Unread'],
                     ['open', 'Open'],
                     ['closed', 'Closed'],
-                    ['GENERAL', 'General'],
+                    ['GENERAL', 'Topics'],
                     ['ORDER', 'Orders'],
                     ['QUOTE', 'Quotes'],
                   ] as Array<[FilterKey, string]>
@@ -329,12 +353,20 @@ export function AdminCustomerMessages() {
                 onFocus={() => maybeRequestBrowserNotifications()}
               />
               {canStart && (
-                <div style={{ position: 'relative', marginTop: 10 }}>
+                <div ref={startMenuRef} style={{ position: 'relative', marginTop: 10 }}>
                   <button
                     type="button"
                     className="btn btn-primary"
                     style={{ width: '100%' }}
-                    onClick={() => setStartMenuOpen((v) => !v)}
+                    onClick={() => {
+                      setStartMenuOpen((v) => {
+                        if (v) {
+                          setTopicFormOpen(false);
+                          setTopicDraft('');
+                        }
+                        return !v;
+                      });
+                    }}
                     disabled={startChat.isPending}
                   >
                     <i className="ti ti-plus" />
@@ -342,17 +374,56 @@ export function AdminCustomerMessages() {
                   </button>
                   {startMenuOpen && (
                     <div className="msg-start-menu">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          startChat.mutate({
-                            chatType: 'GENERAL',
-                            subject: 'General Inquiry',
-                          })
-                        }
-                      >
-                        <i className="ti ti-message" /> General inquiry
-                      </button>
+                      {!topicFormOpen ? (
+                        <button
+                          type="button"
+                          onClick={() => setTopicFormOpen(true)}
+                        >
+                          <i className="ti ti-message" /> Topic chat…
+                        </button>
+                      ) : (
+                        <form
+                          className="msg-topic-form"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            const subject = topicDraft.trim();
+                            if (!subject) return;
+                            startChat.mutate({
+                              chatType: 'GENERAL',
+                              subject,
+                            });
+                          }}
+                        >
+                          <input
+                            className="msg-search"
+                            style={{ marginTop: 0 }}
+                            autoFocus
+                            placeholder="What’s this chat about?"
+                            value={topicDraft}
+                            onChange={(e) => setTopicDraft(e.target.value)}
+                            maxLength={120}
+                          />
+                          <div className="msg-topic-actions">
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => {
+                                setTopicFormOpen(false);
+                                setTopicDraft('');
+                              }}
+                            >
+                              Back
+                            </button>
+                            <button
+                              type="submit"
+                              className="btn btn-primary btn-sm"
+                              disabled={!topicDraft.trim() || startChat.isPending}
+                            >
+                              {startChat.isPending ? 'Starting…' : 'Start'}
+                            </button>
+                          </div>
+                        </form>
+                      )}
                       {(contextQuery.data?.recentOrders ?? []).slice(0, 5).map((o) => (
                         <button
                           key={o.id}
@@ -404,16 +475,14 @@ export function AdminCustomerMessages() {
                 >
                   <div className="msg-cust-main" style={{ width: '100%' }}>
                     <div className="msg-cust-top">
-                      <strong>
-                        {chatTypeLabel(t.chatType)}
-                        {t.orderRef ? ` ${t.orderRef}` : ''}
-                      </strong>
+                      <strong>{conversationTitle(t)}</strong>
                       <span>{relativeTime(t.lastMessageAt)}</span>
                     </div>
                     <div className="msg-cust-preview">
-                      {t.lastMessagePreview || t.subject || 'No messages yet'}
+                      {t.lastMessagePreview || 'No messages yet'}
                     </div>
                     <div className="msg-cust-meta">
+                      <span className="msg-type">{chatTypeLabel(t.chatType)}</span>
                       <span className="msg-type">{t.status === 'OPEN' ? 'Open' : 'Closed'}</span>
                       {t.unreadAdmin > 0 && <span className="msg-badge">{t.unreadAdmin}</span>}
                     </div>
@@ -436,7 +505,7 @@ export function AdminCustomerMessages() {
             <div className="msg-center-head">
               <div>
                 <div className="h2" style={{ margin: 0 }}>
-                  {active.subject || chatTypeLabel(active.chatType)}
+                  {conversationTitle(active)}
                 </div>
                 <div
                   className="muted"
@@ -467,10 +536,22 @@ export function AdminCustomerMessages() {
                 </button>
               </div>
             </div>
-            <ConversationThread messages={active.messages} mineDirection="OUTBOUND" />
+            <ConversationThread messages={active.messages ?? []} mineDirection="OUTBOUND" />
             {error && <div className="err" style={{ margin: '0 12px' }}>{error}</div>}
+            {!canReply && active.status === 'OPEN' && (
+              <div className="muted" style={{ margin: '0 12px 8px', fontSize: 12.5 }}>
+                You don’t have permission to reply in customer chats.
+              </div>
+            )}
             <MessageComposer
               disabled={!canReply || active.status === 'CLOSED'}
+              placeholder={
+                !canReply
+                  ? 'No reply permission'
+                  : active.status === 'CLOSED'
+                    ? 'Conversation is closed'
+                    : 'Type a message…'
+              }
               templates={templatesQuery.data?.templates}
               onSend={async (body, files) => {
                 await sendMutation.mutateAsync({ body, files });
@@ -582,10 +663,10 @@ export function AdminCustomerMessages() {
                   <div className="msg-right-title">Private notes</div>
                   <textarea
                     rows={4}
-                    value={notesDraft || active.privateNotes || ''}
+                    value={notesDraft}
                     onChange={(e) => setNotesDraft(e.target.value)}
                     onBlur={() => {
-                      if ((notesDraft || '') !== (active.privateNotes || '')) {
+                      if (notesDraft !== (active.privateNotes || '')) {
                         updateMutation.mutate({ privateNotes: notesDraft });
                       }
                     }}
