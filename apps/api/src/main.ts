@@ -4,6 +4,7 @@ import { AppModule } from './app.module';
 import { getEnv } from './config/env';
 import { AuthService } from './auth/auth.service';
 import { MulterExceptionFilter } from './common/multer-errors';
+import { ZodExceptionFilter } from './common/zod-exception.filter';
 
 async function bootstrap() {
   const env = getEnv();
@@ -11,7 +12,7 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
   app.use(cookieParser());
-  app.useGlobalFilters(new MulterExceptionFilter());
+  app.useGlobalFilters(new MulterExceptionFilter(), new ZodExceptionFilter());
   app.enableCors({
     origin: env.WEB_ORIGIN,
     credentials: true,

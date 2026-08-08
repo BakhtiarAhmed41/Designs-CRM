@@ -3,6 +3,7 @@ import { useAuth } from '@/context/AuthContext';
 import { STAFF_ROLES } from '@/lib/types';
 import { PortalShell } from '@/components/PortalShell';
 import { AdminShell } from '@/components/AdminShell';
+import { RequireFeature } from '@/components/RequireFeature';
 import { Login } from '@/pages/Login';
 import { PayLink } from '@/pages/PayLink';
 
@@ -101,21 +102,121 @@ export function App() {
         }
       >
         <Route index element={<AdminDashboard />} />
-        <Route path="messages" element={<AdminMessages />} />
-        <Route path="messages/customers" element={<AdminCustomerMessages />} />
-        <Route path="messages/customers/:conversationId" element={<AdminCustomerMessages />} />
-        <Route path="messages/team" element={<AdminTeamMessages />} />
-        <Route path="orders" element={<AdminOrders />} />
-        <Route path="orders/:id" element={<AdminOrderDetail />} />
-        <Route path="quotes" element={<AdminQuotes />} />
-        <Route path="quotes/:id" element={<AdminQuoteDetail />} />
-        <Route path="edits" element={<AdminEdits />} />
-        <Route path="customers" element={<AdminCustomers />} />
-        <Route path="billing" element={<AdminBilling />} />
+        <Route
+          path="messages"
+          element={
+            <RequireFeature
+              anyOf={['messages', 'messages_customer_view', 'messages_team_view']}
+            >
+              <AdminMessages />
+            </RequireFeature>
+          }
+        />
+        <Route
+          path="messages/customers"
+          element={
+            <RequireFeature anyOf={['messages', 'messages_customer_view']}>
+              <AdminCustomerMessages />
+            </RequireFeature>
+          }
+        />
+        <Route
+          path="messages/customers/:conversationId"
+          element={
+            <RequireFeature anyOf={['messages', 'messages_customer_view']}>
+              <AdminCustomerMessages />
+            </RequireFeature>
+          }
+        />
+        <Route
+          path="messages/team"
+          element={
+            <RequireFeature anyOf={['messages', 'messages_team_view']}>
+              <AdminTeamMessages />
+            </RequireFeature>
+          }
+        />
+        <Route
+          path="orders"
+          element={
+            <RequireFeature feature="orders">
+              <AdminOrders />
+            </RequireFeature>
+          }
+        />
+        <Route
+          path="orders/:id"
+          element={
+            <RequireFeature feature="orders">
+              <AdminOrderDetail />
+            </RequireFeature>
+          }
+        />
+        <Route
+          path="quotes"
+          element={
+            <RequireFeature feature="quotes">
+              <AdminQuotes />
+            </RequireFeature>
+          }
+        />
+        <Route
+          path="quotes/:id"
+          element={
+            <RequireFeature feature="quotes">
+              <AdminQuoteDetail />
+            </RequireFeature>
+          }
+        />
+        <Route
+          path="edits"
+          element={
+            <RequireFeature feature="edits">
+              <AdminEdits />
+            </RequireFeature>
+          }
+        />
+        <Route
+          path="customers"
+          element={
+            <RequireFeature feature="customers">
+              <AdminCustomers />
+            </RequireFeature>
+          }
+        />
+        <Route
+          path="billing"
+          element={
+            <RequireFeature feature="billing">
+              <AdminBilling />
+            </RequireFeature>
+          }
+        />
         <Route path="mywork" element={<AdminMyWork />} />
-        <Route path="team" element={<AdminTeam />} />
-        <Route path="roles" element={<AdminRolesUsers />} />
-        <Route path="login-requests" element={<AdminLoginRequests />} />
+        <Route
+          path="team"
+          element={
+            <RequireFeature feature="team">
+              <AdminTeam />
+            </RequireFeature>
+          }
+        />
+        <Route
+          path="roles"
+          element={
+            <RequireFeature feature="roles">
+              <AdminRolesUsers />
+            </RequireFeature>
+          }
+        />
+        <Route
+          path="login-requests"
+          element={
+            <RequireFeature feature="customers">
+              <AdminLoginRequests />
+            </RequireFeature>
+          }
+        />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

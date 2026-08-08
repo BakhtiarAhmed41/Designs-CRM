@@ -77,6 +77,7 @@ type OrderRow = {
   due_date: Date | null;
   internal_notes: string | null;
   rejection_reason: string | null;
+  completed_at: Date | null;
   created_at: Date;
   updated_at: Date;
 };
@@ -219,6 +220,7 @@ export class OrdersService {
       dueDate: o.due_date,
       internalNotes: o.internal_notes,
       rejectionReason: o.rejection_reason,
+      completedAt: o.completed_at,
       createdAt: o.created_at,
       updatedAt: o.updated_at,
       partiallyAccepted: extras?.partiallyAccepted ?? false,
@@ -465,6 +467,7 @@ export class OrdersService {
     }
 
     const id = randomUUID();
+    const humanRef = `LVD-${Date.now().toString(36).toUpperCase()}`;
     const name =
       data.name?.trim() ||
       data.subCategory ||
@@ -472,10 +475,11 @@ export class OrdersService {
       data.serviceType;
     await this.db.execute(
       `INSERT INTO orders
-         (id, customer_id, client_user_id, type, service_type, main_category, sub_category, name, instructions, size, preferences, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, human_ref, customer_id, client_user_id, type, service_type, main_category, sub_category, name, instructions, size, preferences, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
+        humanRef,
         customer.id,
         client.id,
         type,
@@ -740,13 +744,17 @@ export class OrdersService {
 
       await this.ensureDesignsFromQuotationLines(orderId, lines, keepIds);
     } else {
+      const amountCents =
+        latest.amount_cents != null && Number.isFinite(Number(latest.amount_cents))
+          ? Math.round(Number(latest.amount_cents))
+          : null;
       await this.db.execute(
         'UPDATE quotations SET status = ? WHERE id = ?',
         [QuotationStatus.APPROVED, latest.id],
       );
       await this.db.execute(
-        `UPDATE orders SET status = ?, type = ?, approved_at = NOW() WHERE id = ?`,
-        [OrderStatus.IN_PROGRESS, OrderType.ORDER, orderId],
+        `UPDATE orders SET status = ?, type = ?, price_cents = COALESCE(?, price_cents), approved_at = NOW() WHERE id = ?`,
+        [OrderStatus.IN_PROGRESS, OrderType.ORDER, amountCents, orderId],
       );
     }
 
@@ -1012,14 +1020,20 @@ export class OrdersService {
 
     let customerId: string | null = data.customerId?.trim() || null;
     let clientUserId: string | null = null;
+    let accountType: AccountType = AccountType.PAY_PER_ORDER;
 
     if (customerId) {
       const existing = await this.db.queryOne<{
         id: string;
         user_id: string | null;
-      }>('SELECT id, user_id FROM customers WHERE id = ? LIMIT 1', [customerId]);
+        account_type: AccountType;
+      }>(
+        'SELECT id, user_id, account_type FROM customers WHERE id = ? LIMIT 1',
+        [customerId],
+      );
       if (!existing) throw new NotFoundException('Customer not found');
       clientUserId = existing.user_id;
+      accountType = existing.account_type;
     } else {
       if (!customerName) {
         throw new BadRequestException(
@@ -1030,13 +1044,15 @@ export class OrdersService {
         const byEmail = await this.db.queryOne<{
           id: string;
           user_id: string | null;
+          account_type: AccountType;
         }>(
-          'SELECT id, user_id FROM customers WHERE email = ? AND merged_into_id IS NULL LIMIT 1',
+          'SELECT id, user_id, account_type FROM customers WHERE email = ? AND merged_into_id IS NULL LIMIT 1',
           [email],
         );
         if (byEmail) {
           customerId = byEmail.id;
           clientUserId = byEmail.user_id;
+          accountType = byEmail.account_type;
         }
       }
       if (!customerId) {
@@ -1054,6 +1070,7 @@ export class OrdersService {
             source,
           ],
         );
+        accountType = AccountType.PAY_PER_ORDER;
       }
     }
 
@@ -1073,10 +1090,11 @@ export class OrdersService {
         ? Math.min(Math.floor(data.designCount), 50)
         : 0;
 
+    const billPerOrder = accountType !== AccountType.NET_MONTHLY;
     let status: OrderStatus;
     if (data.type === OrderType.ORDER) {
       status =
-        priceCents != null && priceCents > 0
+        priceCents != null && priceCents > 0 && billPerOrder
           ? OrderStatus.PENDING_PAYMENT
           : OrderStatus.CREATED;
     } else {
@@ -1135,7 +1153,8 @@ export class OrdersService {
       data.type === OrderType.ORDER &&
       priceCents != null &&
       priceCents > 0 &&
-      customerId
+      customerId &&
+      billPerOrder
     ) {
       const invoice = await this.billing.createInvoice(user, {
         customerId,
@@ -1181,10 +1200,17 @@ export class OrdersService {
     this.assertAdmin(user);
     const order = await this.getOrderRow(orderId);
     if (!order) throw new NotFoundException('Order not found');
-    await this.db.execute('UPDATE orders SET status = ? WHERE id = ?', [
-      status,
-      orderId,
-    ]);
+    if (status === OrderStatus.COMPLETED) {
+      await this.db.execute(
+        'UPDATE orders SET status = ?, completed_at = COALESCE(completed_at, NOW()) WHERE id = ?',
+        [status, orderId],
+      );
+    } else {
+      await this.db.execute('UPDATE orders SET status = ? WHERE id = ?', [
+        status,
+        orderId,
+      ]);
+    }
     return this.getAdminOrder(user, orderId);
   }
 

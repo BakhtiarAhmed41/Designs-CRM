@@ -49,13 +49,14 @@ export function expandMessagingFeatures(
   if (!features.messages) return features;
   return {
     ...features,
-    messages_customer_view: features.messages_customer_view || true,
-    messages_customer_reply: features.messages_customer_reply || true,
-    messages_customer_start: features.messages_customer_start || true,
-    messages_team_view: features.messages_team_view || true,
-    messages_team_send: features.messages_team_send || true,
-    messages_group: features.messages_group || true,
-    messages_delete: features.messages_delete || true,
+    // Use nullish coalescing so explicit `false` is preserved (|| true always forced true).
+    messages_customer_view: features.messages_customer_view ?? true,
+    messages_customer_reply: features.messages_customer_reply ?? true,
+    messages_customer_start: features.messages_customer_start ?? true,
+    messages_team_view: features.messages_team_view ?? true,
+    messages_team_send: features.messages_team_send ?? true,
+    messages_group: features.messages_group ?? true,
+    messages_delete: features.messages_delete ?? true,
   };
 }
 

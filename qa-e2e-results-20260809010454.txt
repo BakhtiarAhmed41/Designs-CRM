@@ -1,0 +1,97 @@
+﻿[PASS] API health
+[PASS] DB health
+[PASS] Invalid login rejected
+[PASS] Admin login :: admin@example.com
+[PASS] Client login :: sara@client.test
+[PASS] Admin session /users/me
+[PASS] Client blocked from admin orders
+[PASS] Anon blocked from admin
+[PASS] Client register
+[PASS] Pending user cannot login :: status=401
+[PASS] Login request listed :: 4b07cc4c-fd98-4e52-ad69-00a46c5d888a
+[FAIL] Approve login request :: 400 
+[FAIL] Approved user can login :: 401 
+[PASS] Client create quote request :: b78eb7ed-3fa5-4439-bd9f-d07cff3ad6df
+[PASS] Quote initial status :: WAITING_FOR_QUOTATION
+[PASS] Admin sees new quote in list
+[PASS] Admin open quote detail
+[PASS] Admin send quotation :: 4500
+[PASS] Client sees quotation
+[PASS] Client accept quotation :: status=IN_PROGRESS
+[PASS] Designer exists :: dis.3b0ec8@ex.com
+[PASS] Support exists :: support.retest.004538@example.com
+[PASS] Designer login
+[PASS] Assign designer to order
+[PASS] Assigned order in designer mywork :: status=IN_PROGRESS
+[PASS] Find Sara customer :: fd087461-5ef6-49e3-a7b6-08b65496d1c0
+[PASS] Create invoice :: 8dd50eb3-32b0-4d8b-ae73-796ec6c45a7e
+[PASS] Pay invoice CARD
+[PASS] Portal sees paid invoice
+[PASS] Portal pay STORE_CREDIT
+[FAIL] Admin pay LINK :: 400 
+[PASS] Create pay link
+[PASS] Guest open pay link
+[PASS] Guest confirm pay link
+[PASS] Refund AWAITING rejected :: 400
+[PASS] Over-refund blocked
+[PASS] Pay cancelled invoice blocked
+[PASS] Create customer :: 8494546d-d4aa-472e-ba77-4f2cad6c8cb5
+[PASS] Update customer
+[PASS] Customer persistence after update
+[PASS] Search customer
+[PASS] Client start conversation :: ed228370-1d58-418b-ad4f-1a3ed45582b6
+[PASS] Admin reply to conversation
+[FAIL] Client sees staff reply :: bodies=
+[PASS] Designer reply customer msg
+[PASS] Designer start conversation
+[PASS] Client request edit
+[PASS] Admin edits board loads :: count=6
+[PASS] Dashboard stats
+[PASS] Dashboard chart
+[PASS] Global search :: orders=1
+[PASS] Notifications list
+[PASS] Client store credit :: cents=5210
+[PASS] Empty serviceType rejected :: 400
+[FAIL] Unicode order create :: Exception calling "GetBytes" with "1" argument(s): "Array cannot be null.
+Parameter name: chars"
+[PASS] XSS stored as data (verify UI escapes) :: stored literally - UI escape check needed
+[PASS] Duplicate quote creates two records (no idempotency) :: 71f3b7aa-53c3-4075-8d72-7e78949c7a41 vs e964dfdf-f91f-4d12-9700-f2bdb13b2a8e
+[PASS] Disabled user login blocked :: 401
+[PASS] Logout clears session
+[PASS] Client counter-quote
+[PASS] Client reject quotation
+[PASS] Admin set status IN_PROGRESS
+[PASS] Roles list
+[PASS] Team list
+[PASS] Billing summary
+[PASS] Forgot password endpoint
+[PASS] Web route /login
+[PASS] Web route /portal
+[PASS] Web route /admin
+[PASS] Web route /admin/orders
+[PASS] Web route /admin/quotes
+[PASS] Web route /admin/billing
+[PASS] Web route /admin/customers
+[PASS] Web route /admin/messages
+[PASS] Web route /admin/edits
+[PASS] Web route /admin/team
+[PASS] Web route /admin/roles
+[PASS] Web route /admin/mywork
+[PASS] Web route /admin/login-requests
+[PASS] Web route /portal/quotes
+[PASS] Web route /portal/orders
+[PASS] Web route /portal/invoices
+[PASS] Web route /portal/messages
+[PASS] Web route /portal/files
+[PASS] Web route /portal/profile
+[PASS] Web route /portal/quotes/new
+
+PASS=81 FAIL=5 BLOCKED=0
+
+FAILURES:
+Approve login request :: 400 
+Approved user can login :: 401 
+Admin pay LINK :: 400 
+Client sees staff reply :: bodies=
+Unicode order create :: Exception calling "GetBytes" with "1" argument(s): "Array cannot be null.
+Parameter name: chars"

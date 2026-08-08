@@ -34,13 +34,14 @@ function expandMessaging(features: Record<FeatureKey, boolean>) {
   if (!features.messages) return features;
   return {
     ...features,
-    messages_customer_view: features.messages_customer_view || true,
-    messages_customer_reply: features.messages_customer_reply || true,
-    messages_customer_start: features.messages_customer_start || true,
-    messages_team_view: features.messages_team_view || true,
-    messages_team_send: features.messages_team_send || true,
-    messages_group: features.messages_group || true,
-    messages_delete: features.messages_delete || true,
+    // Preserve explicit false; only fill keys that were omitted.
+    messages_customer_view: features.messages_customer_view ?? true,
+    messages_customer_reply: features.messages_customer_reply ?? true,
+    messages_customer_start: features.messages_customer_start ?? true,
+    messages_team_view: features.messages_team_view ?? true,
+    messages_team_send: features.messages_team_send ?? true,
+    messages_group: features.messages_group ?? true,
+    messages_delete: features.messages_delete ?? true,
   };
 }
 
@@ -118,13 +119,8 @@ export function canFeature(
   feature: FeatureKey,
   role?: UserRole,
 ): boolean {
-  if (permissions?.features?.[feature]) return true;
-  // Legacy / partial permission blobs: full messages unlocks granular keys.
-  if (
-    permissions?.features?.messages &&
-    (feature === 'messages' || feature.startsWith('messages_'))
-  ) {
-    return true;
+  if (permissions?.features) {
+    return Boolean(expandMessaging({ ...NONE, ...permissions.features })[feature]);
   }
   if (role) {
     return Boolean(expandMessaging(defaultFeaturesForRole(role))[feature]);

@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { adminCreateOrder, adminUploadAttachments } from '@/lib/orders';
 import { listCustomers, type Customer } from '@/lib/customers';
 import { getErrorMessage } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
+import { canFeature } from '@/lib/permissions';
 
 type Mode = 'ORDER' | 'QUOTE_REQUEST';
 
@@ -42,6 +44,8 @@ export function GenerateOrderModal({
 }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const canListCustomers = canFeature(user?.permissions, 'customers', user?.role);
   const [mode, setMode] = useState<Mode>(defaultMode);
   const [customerName, setCustomerName] = useState('');
   const [customerId, setCustomerId] = useState<string | null>(null);
@@ -64,7 +68,8 @@ export function GenerateOrderModal({
   const customersQ = useQuery({
     queryKey: ['admin-customers-gen'],
     queryFn: () => listCustomers({ pageSize: 500 }),
-    enabled: open,
+    enabled: open && canListCustomers,
+    retry: false,
   });
 
   const customers = customersQ.data?.customers ?? [];

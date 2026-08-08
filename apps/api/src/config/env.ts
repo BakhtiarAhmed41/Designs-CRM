@@ -38,6 +38,9 @@ const envSchema = z.object({
   SEED_ADMIN_EMAIL: z.string().email().optional(),
   SEED_ADMIN_PASSWORD: z.string().min(8).optional(),
 
+  // When true and SMTP did not send, forgot-password may return resetToken (local only).
+  AUTH_EXPOSE_RESET_TOKEN: booleanString.optional().default(false),
+
   // Local disk file storage.
   UPLOAD_DIR: z.string().min(1).default('uploads'),
   STORAGE_SIGNED_URL_TTL_SECONDS: z.coerce

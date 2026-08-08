@@ -10,6 +10,36 @@ import mysql, {
 } from 'mysql2/promise';
 import { getEnv } from '../config/env';
 
+const TRANSIENT_DB_CODES = new Set([
+  'ECONNRESET',
+  'ECONNREFUSED',
+  'PROTOCOL_CONNECTION_LOST',
+  'PROTOCOL_ENQUEUE_AFTER_FATAL_ERROR',
+  'ER_SERVER_SHUTDOWN',
+]);
+
+function isTransientDbError(err: unknown): boolean {
+  const code =
+    err && typeof err === 'object' && 'code' in err
+      ? String((err as { code?: unknown }).code ?? '')
+      : '';
+  return TRANSIENT_DB_CODES.has(code);
+}
+
+async function withRetry<T>(fn: () => Promise<T>, attempts = 2): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (i === attempts - 1 || !isTransientDbError(err)) throw err;
+      await new Promise((r) => setTimeout(r, 40 * (i + 1)));
+    }
+  }
+  throw lastErr;
+}
+
 /**
  * Thin wrapper around a single mysql2 connection pool.
  * All persistence in the app goes through these helpers with hand-written,
@@ -30,9 +60,14 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
         database: env.DB_NAME,
         connectionLimit: env.DB_CONNECTION_LIMIT,
         waitForConnections: true,
+        enableKeepAlive: true,
+        keepAliveInitialDelay: 10_000,
+        idleTimeout: 60_000,
+        maxIdle: Math.min(env.DB_CONNECTION_LIMIT, 5),
         namedPlaceholders: false,
         dateStrings: false,
         supportBigNumbers: true,
+        charset: 'utf8mb4',
       });
     }
     return this._pool;
@@ -62,11 +97,13 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
   /** Run a SELECT and return all rows typed as T. */
   async query<T = RowDataPacket>(sql: string, params: unknown[] = []): Promise<T[]> {
-    const [rows] = await this.pool.query<RowDataPacket[]>(
-      sql,
-      params as QueryValues,
-    );
-    return rows as unknown as T[];
+    return withRetry(async () => {
+      const [rows] = await this.pool.query<RowDataPacket[]>(
+        sql,
+        params as QueryValues,
+      );
+      return rows as unknown as T[];
+    });
   }
 
   /** Run a SELECT and return the first row (or null). */
@@ -80,11 +117,13 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
 
   /** Run an INSERT/UPDATE/DELETE and return the raw result header. */
   async execute(sql: string, params: unknown[] = []): Promise<ResultSetHeader> {
-    const [result] = await this.pool.execute<ResultSetHeader>(
-      sql,
-      params as ExecuteValues,
-    );
-    return result;
+    return withRetry(async () => {
+      const [result] = await this.pool.execute<ResultSetHeader>(
+        sql,
+        params as ExecuteValues,
+      );
+      return result;
+    });
   }
 
   /**
@@ -94,22 +133,24 @@ export class DbService implements OnModuleInit, OnModuleDestroy {
   async withTransaction<T>(
     fn: (tx: DbTransaction) => Promise<T>,
   ): Promise<T> {
-    const conn = await this.pool.getConnection();
-    try {
-      await conn.beginTransaction();
-      const result = await fn(new DbTransaction(conn));
-      await conn.commit();
-      return result;
-    } catch (err) {
+    return withRetry(async () => {
+      const conn = await this.pool.getConnection();
       try {
-        await conn.rollback();
-      } catch {
-        /* ignore rollback errors */
+        await conn.beginTransaction();
+        const result = await fn(new DbTransaction(conn));
+        await conn.commit();
+        return result;
+      } catch (err) {
+        try {
+          await conn.rollback();
+        } catch {
+          /* ignore rollback errors */
+        }
+        throw err;
+      } finally {
+        conn.release();
       }
-      throw err;
-    } finally {
-      conn.release();
-    }
+    });
   }
 }
 

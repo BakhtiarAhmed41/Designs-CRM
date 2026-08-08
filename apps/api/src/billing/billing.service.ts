@@ -379,6 +379,12 @@ export class BillingService {
       // Idempotent: already settled.
       return;
     }
+    if (invoice.status === InvoiceStatus.CANCELLED) {
+      throw new BadRequestException('Cannot pay a cancelled invoice');
+    }
+    if (invoice.status !== InvoiceStatus.AWAITING) {
+      throw new BadRequestException('Invoice is not awaiting payment');
+    }
 
     if (method === PaymentMethod.STORE_CREDIT) {
       await this.db.withTransaction(async (tx) => {
@@ -476,6 +482,10 @@ export class BillingService {
     if (!invoice) throw new NotFoundException('Invoice not found');
     if (invoice.status === InvoiceStatus.PAID)
       throw new BadRequestException('Invoice is already paid');
+    if (invoice.status === InvoiceStatus.CANCELLED)
+      throw new BadRequestException('Cannot create a pay link for a cancelled invoice');
+    if (invoice.status !== InvoiceStatus.AWAITING)
+      throw new BadRequestException('Invoice is not awaiting payment');
 
     const token = randomBytes(24).toString('hex');
     await this.db.execute(
@@ -538,14 +548,26 @@ export class BillingService {
       return { status: InvoiceStatus.PAID };
     }
 
+    const invoice = await this.getInvoiceRow(payment.invoice_id);
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    if (invoice.status === InvoiceStatus.CANCELLED) {
+      throw new BadRequestException('Invoice was cancelled');
+    }
+    if (invoice.status === InvoiceStatus.PAID) {
+      return { status: InvoiceStatus.PAID };
+    }
+    if (invoice.status !== InvoiceStatus.AWAITING) {
+      throw new BadRequestException('Invoice is not awaiting payment');
+    }
+
     await this.db.withTransaction(async (tx) => {
       await tx.execute(
         'UPDATE payments SET status = ?, paid_at = NOW() WHERE id = ?',
         [PaymentStatus.PAID, payment.id],
       );
       await tx.execute(
-        'UPDATE invoices SET status = ?, paid_at = NOW() WHERE id = ? AND status <> ?',
-        [InvoiceStatus.PAID, payment.invoice_id, InvoiceStatus.PAID],
+        'UPDATE invoices SET status = ?, paid_at = NOW() WHERE id = ? AND status = ?',
+        [InvoiceStatus.PAID, payment.invoice_id, InvoiceStatus.AWAITING],
       );
     });
 
@@ -744,11 +766,30 @@ export class BillingService {
     this.assertAdmin(user);
     const invoice = await this.getInvoiceRow(invoiceId);
     if (!invoice) throw new NotFoundException('Invoice not found');
+    if (invoice.status !== InvoiceStatus.PAID) {
+      throw new BadRequestException('Only paid invoices can be refunded');
+    }
     if (!Number.isInteger(data.amountCents) || data.amountCents <= 0)
       throw new BadRequestException('amountCents must be a positive integer');
     const to = this.parseRefundTo(data.to);
 
     await this.db.withTransaction(async (tx) => {
+      const totalRow = await tx.queryOne<{ total: number | string | null }>(
+        `SELECT COALESCE(SUM(amount_cents), 0) AS total
+           FROM payments
+          WHERE invoice_id = ? AND type = ? AND status = ?`,
+        [invoice.id, PaymentType.REFUND, PaymentStatus.PAID],
+      );
+      const alreadyRefunded = Number(totalRow?.total ?? 0);
+      const remaining = invoice.amount_cents - alreadyRefunded;
+      if (data.amountCents > remaining) {
+        throw new BadRequestException(
+          remaining <= 0
+            ? 'Invoice is already fully refunded'
+            : `Refund exceeds remaining amount (${remaining} cents)`,
+        );
+      }
+
       await this.recordRefund(tx, {
         invoiceId: invoice.id,
         orderId: invoice.order_id,
@@ -760,13 +801,7 @@ export class BillingService {
       });
 
       if (invoice.order_id) {
-        const totalRow = await tx.queryOne<{ total: number | string | null }>(
-          `SELECT COALESCE(SUM(amount_cents), 0) AS total
-             FROM payments
-            WHERE invoice_id = ? AND type = ? AND status = ?`,
-          [invoice.id, PaymentType.REFUND, PaymentStatus.PAID],
-        );
-        const refundedTotal = Number(totalRow?.total ?? 0);
+        const refundedTotal = alreadyRefunded + data.amountCents;
         if (refundedTotal >= invoice.amount_cents) {
           await tx.execute(
             'UPDATE orders SET status = ? WHERE id = ? AND status <> ?',
@@ -825,9 +860,17 @@ export class BillingService {
             AND o.price_cents IS NOT NULL
             AND DATE_FORMAT(o.completed_at, '%Y-%m') = ?
             AND o.id NOT IN (
-                  SELECT order_id FROM invoices WHERE order_id IS NOT NULL
+                  SELECT order_id FROM invoices
+                   WHERE order_id IS NOT NULL
+                     AND status IN (?, ?)
                 )`,
-        [customer.id, OrderStatus.COMPLETED, period],
+        [
+          customer.id,
+          OrderStatus.COMPLETED,
+          period,
+          InvoiceStatus.AWAITING,
+          InvoiceStatus.PAID,
+        ],
       );
 
       const amountCents = Number(agg?.total ?? 0);
