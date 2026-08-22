@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import * as argon2 from 'argon2';
+import { hashSecret } from '../auth/password';
 import {
   AccountType,
   CustomerSource,
@@ -224,7 +224,7 @@ export class CustomersService {
     await this.db.withTransaction(async (tx) => {
       if (data.password && email) {
         userId = this.db.uuid();
-        const passwordHash = await argon2.hash(data.password);
+        const passwordHash = await hashSecret(data.password);
         const initials = data.name.slice(0, 2).toUpperCase();
         const nameParts = data.name.trim().split(/\s+/);
         await tx.execute(
@@ -381,7 +381,7 @@ export class CustomersService {
           throw new BadRequestException('Password must be at least 6 characters');
         }
         userSets.push('password_hash = ?');
-        userParams.push(await argon2.hash(data.password));
+        userParams.push(await hashSecret(data.password));
       }
       if (data.phone !== undefined) {
         userSets.push('phone = ?');

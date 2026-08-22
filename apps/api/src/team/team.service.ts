@@ -8,7 +8,7 @@ import {
   Optional,
   forwardRef,
 } from '@nestjs/common';
-import * as argon2 from 'argon2';
+import { hashSecret } from '../auth/password';
 import { OrderStatus, Presence, UserRole } from '../common/enums';
 import { DbService } from '../db/db.service';
 import { MessagingGateway } from '../messaging/messaging.gateway';
@@ -135,7 +135,7 @@ export class TeamService {
     );
     if (existing) throw new ConflictException('Email already exists');
 
-    const passwordHash = await argon2.hash(data.password);
+    const passwordHash = await hashSecret(data.password);
     const id = this.db.uuid();
     const initials = this.computeInitials(email, data.firstName);
     await this.db.execute(

@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import * as argon2 from 'argon2';
+import { hashSecret } from '../auth/password';
 import {
   FEATURE_KEYS,
   LoginStatus,
@@ -275,7 +275,7 @@ export class RolesService {
     }
 
     const id = randomUUID();
-    const passwordHash = await argon2.hash(data.password);
+    const passwordHash = await hashSecret(data.password);
     const initials = (
       data.firstName?.slice(0, 2) ||
       email.slice(0, 2)
@@ -367,7 +367,7 @@ export class RolesService {
         throw new BadRequestException('Password must be at least 6 characters');
       }
       sets.push('password_hash = ?');
-      params.push(await argon2.hash(data.password));
+      params.push(await hashSecret(data.password));
     }
     if (sets.length) {
       params.push(id);

@@ -6,8 +6,8 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import * as argon2 from 'argon2';
 import { createHash, randomBytes, randomUUID } from 'crypto';
+import { hashSecret, verifySecret } from './password';
 import { AccountType, CustomerSource, LoginStatus, UserRole } from '../common/enums';
 import { getEnv } from '../config/env';
 import { DbService } from '../db/db.service';
@@ -106,7 +106,7 @@ export class AuthService {
     const existing = await this.findByEmail(email);
     if (existing) throw new ConflictException('Email already exists');
 
-    const passwordHash = await argon2.hash(params.password);
+    const passwordHash = await hashSecret(params.password);
     const id = randomUUID();
     const initials = name.slice(0, 2).toUpperCase() || email.slice(0, 2).toUpperCase();
     const phone = params.phone?.trim() || null;
@@ -186,7 +186,7 @@ export class AuthService {
   async validateUser(email: string, password: string): Promise<UserRow> {
     const user = await this.findByEmail(email);
     if (!user) throw new UnauthorizedException('Invalid credentials');
-    const ok = await argon2.verify(user.password_hash, password);
+    const ok = await verifySecret(user.password_hash, password);
     if (!ok) throw new UnauthorizedException('Invalid credentials');
     if (user.login_status === LoginStatus.PENDING) {
       throw new UnauthorizedException(
@@ -213,7 +213,7 @@ export class AuthService {
     );
 
     const refreshToken = randomBytes(48).toString('hex');
-    const refreshTokenHash = await argon2.hash(refreshToken);
+    const refreshTokenHash = await hashSecret(refreshToken);
     const expiresAt = new Date(Date.now() + env.JWT_REFRESH_TTL_SECONDS * 1000);
     const id = randomUUID();
 
@@ -242,7 +242,7 @@ export class AuthService {
     );
     if (!rt) throw new UnauthorizedException('Invalid refresh token');
 
-    const ok = await argon2.verify(rt.token_hash, params.refreshToken);
+    const ok = await verifySecret(rt.token_hash, params.refreshToken);
     if (!ok) throw new UnauthorizedException('Invalid refresh token');
 
     const user = await this.findById(rt.user_id);
@@ -267,7 +267,7 @@ export class AuthService {
       [params.refreshTokenId],
     );
     if (!rt) return;
-    const ok = await argon2.verify(rt.token_hash, params.refreshToken);
+    const ok = await verifySecret(rt.token_hash, params.refreshToken);
     if (!ok) return;
     await this.db.execute(
       'UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = ?',
@@ -363,7 +363,7 @@ export class AuthService {
     );
     if (!row) throw new BadRequestException('Invalid or expired reset token');
 
-    const passwordHash = await argon2.hash(password);
+    const passwordHash = await hashSecret(password);
     await this.db.withTransaction(async (tx) => {
       await tx.execute('UPDATE users SET password_hash = ? WHERE id = ?', [
         passwordHash,
@@ -490,8 +490,17 @@ export class AuthService {
     if (!env.SEED_ADMIN_EMAIL || !env.SEED_ADMIN_PASSWORD) return;
     const email = env.SEED_ADMIN_EMAIL.toLowerCase();
     const existing = await this.findByEmail(email);
-    if (existing) return;
-    const passwordHash = await argon2.hash(env.SEED_ADMIN_PASSWORD);
+    if (existing) {
+      // Hostinger cannot compile argon2; rewrite leftover hashes so login still works.
+      if (existing.password_hash.startsWith('$argon2')) {
+        await this.db.execute('UPDATE users SET password_hash = ? WHERE id = ?', [
+          await hashSecret(env.SEED_ADMIN_PASSWORD),
+          existing.id,
+        ]);
+      }
+      return;
+    }
+    const passwordHash = await hashSecret(env.SEED_ADMIN_PASSWORD);
     await this.db.execute(
       `INSERT INTO users (id, email, password_hash, role, login_status, initials, presence)
        VALUES (?, ?, ?, 'SUPER_ADMIN', 'ACTIVE', 'AD', 'ON')`,
