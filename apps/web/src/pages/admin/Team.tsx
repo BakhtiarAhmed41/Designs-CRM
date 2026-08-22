@@ -252,11 +252,29 @@ export function AdminTeam() {
         </div>
       </div>
 
-      <div className="note">
-        <i className="ti ti-info-circle" /> Roles control what each person sees: <b>Super Admin</b> everything ·{' '}
-        <b>Admin</b> operations &amp; money · <b>Support</b> messages &amp; customers (money is a toggle above) ·{' '}
-        <b>Designer</b> only assigned work, no money. Designer files route to you for approval before reaching the
-        customer.
+      <div className="note role-guide">
+        <div className="role-guide-h">
+          <i className="ti ti-info-circle" />
+          Roles control what each person sees
+        </div>
+        <div className="role-guide-grid">
+          <div className="role-guide-item">
+            <span className="role-pill rp-super">Super Admin</span>
+            <p>Full access to everything</p>
+          </div>
+          <div className="role-guide-item">
+            <span className="role-pill rp-admin">Admin</span>
+            <p>Operations and money</p>
+          </div>
+          <div className="role-guide-item">
+            <span className="role-pill rp-support">Support</span>
+            <p>Messages and customers. Money is a toggle above.</p>
+          </div>
+          <div className="role-guide-item">
+            <span className="role-pill rp-designer">Designer</span>
+            <p>Assigned work only, no money. Files come to you for approval before the customer sees them.</p>
+          </div>
+        </div>
       </div>
 
       {showNew && <NewMemberModal onClose={() => setShowNew(false)} />}

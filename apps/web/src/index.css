@@ -222,6 +222,14 @@ button.ghost.icon:hover:not(:disabled){color:var(--navy);background:var(--tint);
 .rp-admin{background:var(--tint);color:var(--navy);}
 .rp-support{background:var(--purple-bg);color:var(--purple);}
 .rp-designer{background:var(--green-bg);color:var(--green);}
+.role-guide{flex-direction:column;gap:12px;}
+.role-guide-h{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--navy);}
+.role-guide-h i{margin-top:0;}
+.role-guide-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;width:100%;}
+.role-guide-item{background:#fff;border-radius:8px;padding:12px 13px;min-width:0;}
+.role-guide-item p{margin:8px 0 0;font-size:12px;line-height:1.45;color:var(--muted);}
+@media(max-width:900px){.role-guide-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:560px){.role-guide-grid{grid-template-columns:1fr;}}
 .pres-txt{font-size:12px;font-weight:500;}
 .pres-on{color:var(--green);}.pres-away{color:#e0a020;}.pres-off{color:#bbb;}
 
