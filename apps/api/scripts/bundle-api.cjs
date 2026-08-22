@@ -5,13 +5,24 @@ const path = require('path');
 
 const apiRoot = path.join(__dirname, '..');
 const tscOut = path.join(apiRoot, '.tsc-out');
+const distDir = path.join(apiRoot, 'dist');
 const publishDir = path.join(apiRoot, 'publish');
 const tscEntry = path.join(tscOut, 'main.js');
-const publishEntry = path.join(publishDir, 'main.js');
+
+function writeBundleDir(dir, bundledFile) {
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(dir, { recursive: true });
+  fs.copyFileSync(bundledFile, path.join(dir, 'main.js'));
+  fs.writeFileSync(
+    path.join(dir, 'package.json'),
+    JSON.stringify({ type: 'commonjs' }),
+  );
+}
 
 fs.rmSync(tscOut, { recursive: true, force: true });
+fs.rmSync(distDir, { recursive: true, force: true });
 fs.rmSync(publishDir, { recursive: true, force: true });
-fs.mkdirSync(publishDir, { recursive: true });
+fs.mkdirSync(tscOut, { recursive: true });
 
 const tscBin = require.resolve('typescript/bin/tsc');
 execFileSync(
@@ -34,6 +45,8 @@ if (!fs.existsSync(tscEntry)) {
   process.exit(1);
 }
 
+const tmpBundle = path.join(tscOut, 'bundle.js');
+
 esbuild
   .build({
     entryPoints: [tscEntry],
@@ -41,7 +54,7 @@ esbuild
     platform: 'node',
     target: 'node22',
     format: 'cjs',
-    outfile: publishEntry,
+    outfile: tmpBundle,
     allowOverwrite: true,
     logLevel: 'error',
     legalComments: 'none',
@@ -53,12 +66,10 @@ esbuild
     ],
   })
   .then(() => {
+    writeBundleDir(distDir, tmpBundle);
+    writeBundleDir(publishDir, tmpBundle);
     fs.rmSync(tscOut, { recursive: true, force: true });
-    fs.writeFileSync(
-      path.join(publishDir, 'package.json'),
-      JSON.stringify({ type: 'commonjs' }),
-    );
-    console.log('Hostinger bundle ready: publish/main.js');
+    console.log('Hostinger bundle ready: dist/main.js');
   })
   .catch((err) => {
     console.error(err);
