@@ -31,3 +31,8 @@ if (!fs.existsSync(nestCore)) {
   console.error('Runtime install failed: @nestjs/core is missing at', nestCore);
   process.exit(1);
 }
+
+const distModules = path.join(cwd, 'dist', 'node_modules');
+fs.rmSync(distModules, { recursive: true, force: true });
+fs.cpSync(path.join(cwd, 'node_modules'), distModules, { recursive: true });
+console.log('Hostinger: copied runtime packages into dist/node_modules');
