@@ -10,8 +10,10 @@ import {
   approveCounter,
   deliverOrder,
   getAdminOrder,
+  listAdminFormatRequests,
   rejectCounter,
   resendOrderFiles,
+  updateAdminFormatRequest,
   updateOrderNotes,
 } from '@/lib/orders';
 import { createAdminEdit, getOrderActivity, type EditKind } from '@/lib/edits';
@@ -30,6 +32,8 @@ import { money, dateShort, statusLabel } from '@/lib/format';
 import { FormPreferencesDisplay } from '@/components/FormPreferencesDisplay';
 import { MessageAttachments } from '@/components/MessageAttachments';
 import type { Order, OrderStatus } from '@/lib/types';
+import { useAuth } from '@/context/AuthContext';
+import { canFeature, canSupport } from '@/lib/permissions';
 
 type AdminOrderFull = Order & {
   assignedDesignerId?: string | null;
@@ -99,6 +103,12 @@ export function AdminOrderDetail() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const showMoney = canFeature(user?.permissions, 'billing', user?.role);
+  const canAssignDesigner =
+    (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') &&
+    canFeature(user?.permissions, 'team', user?.role);
+  const canApproveCounter = canSupport(user?.permissions, 'approve', user?.role);
   const [files, setFiles] = useState<File[]>([]);
   const [msgDraft, setMsgDraft] = useState('');
   const [msgFiles, setMsgFiles] = useState<File[]>([]);
@@ -162,6 +172,12 @@ export function AdminOrderDetail() {
     queryFn: listMessageTemplates,
   });
 
+  const formatReqQ = useQuery({
+    queryKey: ['admin-format-requests', id],
+    queryFn: () => listAdminFormatRequests(id),
+    enabled: !!id,
+  });
+
   const threadQ = useQuery({
     queryKey: ['admin-conversation', convo?.id],
     queryFn: () => getAdminConversation(convo!.id),
@@ -186,13 +202,12 @@ export function AdminOrderDetail() {
         deliveredVia: deliverByEmail ? 'EMAIL' : 'PORTAL',
         designIds: selectedDesignIds.length ? selectedDesignIds : undefined,
         notifyEmail: notifyPortal,
-        notifySms: notifyPortal,
         complete: allSelected,
       });
     },
     onSuccess: (res) => {
       setFiles([]);
-      if (res.partial) setToast('Partial release — order still in progress.');
+      if (res.partial) setToast('Partial release. Order still in progress.');
       else setToast('Files released to customer.');
       invalidate();
     },
@@ -324,7 +339,7 @@ export function AdminOrderDetail() {
   const duplicate = useMutation({
     mutationFn: () => adminDuplicateOrder(id, order?.type),
     onSuccess: (res) => {
-      setToast('Order duplicated — review and update as needed.');
+      setToast('Order duplicated. Review and update as needed.');
       navigate(`/admin/orders/${res.order.id}`);
     },
     onError: (e) => setError(getErrorMessage(e)),
@@ -342,8 +357,8 @@ export function AdminOrderDetail() {
     onError: (e) => setError(getErrorMessage(e)),
   });
 
-  if (isLoading) return <div style={{ padding: 16, color: 'var(--muted)' }}>Loading...</div>;
-  if (!order) return <div style={{ padding: 16, color: 'var(--muted)' }}>Order not found.</div>;
+  if (isLoading) return <div className="empty-state"><div className="empty-state-title">Loading order…</div></div>;
+  if (!order) return <div className="empty-state"><div className="empty-state-title">Order not found</div></div>;
 
   const designs = order.designs ?? [];
   const readyCount = designs.filter((d) => d.status === 'DONE' || d.status === 'DELIVERED').length;
@@ -359,14 +374,15 @@ export function AdminOrderDetail() {
     <div>
       <div className="ph">
         <div>
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            onClick={() => navigate(-1)}
-            style={{ marginBottom: 10 }}
-          >
-            <i className="ti ti-arrow-left" /> Back
-          </button>
+          <nav className="crumbs" aria-label="Breadcrumb">
+            <span className="crumb">
+              <a href="/admin/orders" onClick={(e) => { e.preventDefault(); navigate('/admin/orders'); }}>Orders</a>
+            </span>
+            <span className="crumb">
+              <i className="ti ti-chevron-right" aria-hidden />
+              <span>#{order.humanRef ?? order.id.slice(0, 6)}</span>
+            </span>
+          </nav>
           <h1>
             #{order.humanRef ?? order.id.slice(0, 6)} · {order.name ?? 'Order'}
           </h1>
@@ -434,6 +450,7 @@ export function AdminOrderDetail() {
                 )}
               </b>
             </div>
+            {canApproveCounter ? (
             <div style={{ display: 'flex', gap: 8 }}>
               <button
                 type="button"
@@ -452,11 +469,16 @@ export function AdminOrderDetail() {
                 <i className="ti ti-x" /> Reject counter
               </button>
             </div>
+            ) : (
+              <div className="muted" style={{ fontSize: 13 }}>
+                Waiting for an admin to approve or reject this counter.
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      <div className="od-grid" style={{ marginTop: 16 }}>
+      <div className="od-grid">
         <div>
           <div className="card">
             <div className="card-h">
@@ -500,18 +522,20 @@ export function AdminOrderDetail() {
                   <span key={f} className="fmtchip">
                     {f}
                   </span>
-                )) || '—'}
+                )) || 'None'}
               </span>
             </div>
             <div className="od-line">
               <span className="l">Placement / size</span>
               <span className="v">
-                {order.size ?? (designs.map((d) => d.size).filter(Boolean).join(' · ') || '—')}
+                {order.size ?? (designs.map((d) => d.size).filter(Boolean).join(' · ') || 'None')}
               </span>
             </div>
             <div className="od-line">
               <span className="l">Turnaround</span>
-              <span className="v">Standard (12–24 hrs)</span>
+              <span className="v">
+                {order.turnaroundLabel ?? 'Not set'}
+              </span>
             </div>
             {order.instructions && (
               <div className="od-line">
@@ -568,7 +592,7 @@ export function AdminOrderDetail() {
                   </button>
                   {d.name}
                   {d.placement && (
-                    <span style={{ color: 'var(--muted)', fontWeight: 400 }}> — {d.placement}</span>
+                    <span style={{ color: 'var(--muted)', fontWeight: 400 }}> ({d.placement})</span>
                   )}
                 </span>
                 <span className="v">
@@ -577,10 +601,55 @@ export function AdminOrderDetail() {
               </div>
             ))}
             <div style={{ padding: '8px 16px 12px', fontSize: 11.5, color: 'var(--muted)' }}>
-              <i className="ti ti-info-circle" /> Tick designs to include in the next release — leave some
+              <i className="ti ti-info-circle" /> Tick designs to include in the next release. Leave some
               unchecked for a partial delivery.
             </div>
           </div>
+
+          {(formatReqQ.data?.requests.length ?? 0) > 0 && (
+            <div className="card" style={{ marginTop: 14 }}>
+              <div className="card-h">
+                <span className="ct">
+                  <i className="ti ti-file-export" /> Format requests
+                </span>
+              </div>
+              {formatReqQ.data?.requests.map((r) => (
+                <div key={r.id} className="od-line">
+                  <span className="l">
+                    {r.format}
+                    {r.note ? ` · ${r.note}` : ''}
+                  </span>
+                  <span className="v" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <span className={r.status === 'DONE' ? 'chip c-paid' : 'chip c-prog'}>
+                      {r.status === 'IN_PROGRESS'
+                        ? 'In progress'
+                        : r.status === 'DONE'
+                          ? 'Done'
+                          : r.status === 'CANCELLED'
+                            ? 'Cancelled'
+                            : 'Pending'}
+                    </span>
+                    {r.status !== 'DONE' && r.status !== 'CANCELLED' && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={() =>
+                          void updateAdminFormatRequest(
+                            r.id,
+                            r.status === 'PENDING' ? 'IN_PROGRESS' : 'DONE',
+                          ).then(() =>
+                            qc.invalidateQueries({ queryKey: ['admin-format-requests', id] }),
+                          )
+                        }
+                      >
+                        {r.status === 'PENDING' ? 'Start' : 'Mark done'}
+                      </button>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {(canDeliver || hasDeliveries) && (
             <div className="card role-manager" style={{ marginTop: 14 }}>
@@ -812,9 +881,11 @@ export function AdminOrderDetail() {
             <div style={{ padding: '12px 16px 14px' }}>
               {!assigned && (
                 <div className="note amber" style={{ margin: '0 0 10px' }}>
-                  <i className="ti ti-alert-circle" /> New order — assign a designer to start.
+                  <i className="ti ti-alert-circle" /> New order. Assign a designer to start.
                 </div>
               )}
+              {canAssignDesigner ? (
+                <>
               <select
                 className="stat-select"
                 style={{ width: '100%', marginBottom: 9 }}
@@ -824,7 +895,7 @@ export function AdminOrderDetail() {
                 <option value="">Unassigned</option>
                 {designers.map((d) => (
                   <option key={d.id} value={d.id}>
-                    {d.firstName ?? d.email} — {d.skills.join(', ') || 'Designer'}
+                    {d.firstName ?? d.email} ({d.skills.join(', ') || 'Designer'})
                   </option>
                 ))}
               </select>
@@ -835,8 +906,10 @@ export function AdminOrderDetail() {
                 disabled={!designerId || assign.isPending}
                 onClick={() => assign.mutate()}
               >
-                <i className="ti ti-user-check" /> Assign — moves to their queue
+                <i className="ti ti-user-check" /> Assign. Moves to their queue.
               </button>
+                </>
+              ) : null}
               {assigned && (
                 <div style={{ marginTop: 8, fontSize: 12, color: 'var(--muted)', textAlign: 'center' }}>
                   Assigned to {assigned.firstName ?? assigned.email}
@@ -845,6 +918,7 @@ export function AdminOrderDetail() {
             </div>
           </div>
 
+          {showMoney && (
           <div className="card role-money" style={{ marginTop: 12 }}>
             <div className="card-h">
               <span className="ct">
@@ -891,6 +965,7 @@ export function AdminOrderDetail() {
               </button>
             </div>
           </div>
+          )}
 
           <div className="card" style={{ marginTop: 12 }}>
             <div className="card-h">
@@ -1040,7 +1115,7 @@ function RevisionModal({
     <div className="overlay open" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-h">
-          <span>Create revision — #{orderRef}</span>
+          <span>Create revision #{orderRef}</span>
           <button type="button" className="modal-x" onClick={onClose}>
             &times;
           </button>
@@ -1079,7 +1154,7 @@ function RevisionModal({
           </div>
           {kind === 'PAID' && (
             <div className="ff">
-              <label>Edit price — payment link goes out first</label>
+              <label>Edit price. Payment link goes out first.</label>
               <input
                 type="number"
                 step="0.01"
@@ -1174,7 +1249,7 @@ function RefundModal({
     <div className="overlay open" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-h">
-          <span>Refund — #{orderRef}</span>
+          <span>Refund #{orderRef}</span>
           <button type="button" className="modal-x" onClick={onClose}>
             &times;
           </button>

@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { listMyWork } from '@/lib/team';
 import { dateShort } from '@/lib/format';
 import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
 import type { OrderStatus } from '@/lib/types';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { SkeletonRows } from '@/components/ui/Skeleton';
 
 type WorkFilter = 'active' | 'submitted';
 
@@ -22,6 +25,7 @@ function statusText(status: OrderStatus) {
 }
 
 export function AdminMyWork() {
+  const navigate = useNavigate();
   const [filter, setFilter] = useState<WorkFilter>('active');
 
   const { data, isLoading } = useQuery({
@@ -38,14 +42,10 @@ export function AdminMyWork() {
 
   return (
     <div>
-      <div className="ph">
-        <div>
-          <h1>My work</h1>
-          <div className="sub">
-            Orders assigned to you. Open one to see everything you need, do the design, and submit it for approval.
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="My work"
+        subtitle="What you need to work on right now: assigned, active, and submitted."
+      />
 
       <div className="card" style={{ marginTop: 16 }}>
         <div className="card-h">
@@ -70,51 +70,66 @@ export function AdminMyWork() {
           </div>
         </div>
 
-        {isLoading && <div style={{ padding: 16, color: 'var(--muted)' }}>Loading...</div>}
+        {isLoading && <SkeletonRows rows={4} />}
         {!isLoading && orders.length === 0 && (
-          <div style={{ padding: 16, color: 'var(--muted)' }}>Nothing on your plate right now.</div>
+          <EmptyState
+            icon="ti-briefcase"
+            title={filter === 'submitted' ? 'Nothing submitted' : 'Nothing on your plate'}
+            description={
+              filter === 'submitted'
+                ? 'Jobs you submit for review will show here.'
+                : 'New assignments will appear here. You’re caught up.'
+            }
+          />
         )}
-        {orders.map((o) => (
-          <Link
-            key={o.id}
-            to={`/admin/orders/${o.id}`}
-            className="orow"
-            style={{ textDecoration: 'none', color: 'inherit' }}
-          >
-            <div className={`othumb ${serviceThumbClass('embroidery')}`}>
-              <i className={`ti ${serviceTi('embroidery')}`} />
-            </div>
-            <div className="oinfo">
-              <div className="on">{o.name ?? 'Order'}</div>
-              <div className="om">
-                <span>
-                  <i className="ti ti-hash" style={{ fontSize: 11 }} />
-                  {o.humanRef ?? o.id.slice(0, 6)}
-                </span>
-                <span>{o.customerName ?? 'Customer'}</span>
-                {o.dueDate && <span className="item-date">Due {dateShort(o.dueDate)}</span>}
-              </div>
-            </div>
-            <span
-              className={statusChip(o.status as OrderStatus)}
-              style={
-                o.status !== 'IN_PROGRESS' && o.status !== 'READY_TO_SEND'
-                  ? { background: '#E3F2FD', color: '#1565c0' }
-                  : undefined
-              }
-            >
-              {statusText(o.status as OrderStatus)}
-            </span>
-            <div className="oprice" style={{ fontSize: 11, color: 'var(--faint)', fontWeight: 500 }}>
-              Open
-            </div>
-          </Link>
-        ))}
+        {!isLoading && orders.length > 0 && (
+          <table className="itable">
+            <thead>
+              <tr>
+                <th>Job</th>
+                <th>Customer</th>
+                <th>Due</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map((o) => (
+                <tr key={o.id} className="click-row" onClick={() => navigate(`/admin/orders/${o.id}`)}>
+                  <td>
+                    <div className="cell-main">
+                      <div className={`othumb ${serviceThumbClass(o.serviceType)}`}>
+                        <i className={`ti ${serviceTi(o.serviceType)}`} />
+                      </div>
+                      <div>
+                        <div className="on">{o.name ?? 'Order'}</div>
+                        <div className="om">{o.humanRef ?? o.id.slice(0, 6)}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>{o.customerName ?? 'Customer'}</td>
+                  <td className="muted">{o.dueDate ? dateShort(o.dueDate) : 'None'}</td>
+                  <td>
+                    <span
+                      className={statusChip(o.status as OrderStatus)}
+                      style={
+                        o.status !== 'IN_PROGRESS' && o.status !== 'READY_TO_SEND'
+                          ? { background: 'var(--tint)', color: 'var(--navy)' }
+                          : undefined
+                      }
+                    >
+                      {statusText(o.status as OrderStatus)}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       <div className="note">
         <i className="ti ti-info-circle" /> You see the full order details and files, but not pricing or payment.
-        When your file is ready, submit it — it goes to admin for approval before reaching the customer.
+        When your file is ready, submit it. It goes to admin for approval before reaching the customer.
       </div>
     </div>
   );

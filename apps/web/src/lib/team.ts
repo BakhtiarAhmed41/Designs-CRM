@@ -23,9 +23,8 @@ export type MyWorkOrder = {
   id: string;
   humanRef: string | null;
   name: string | null;
+  serviceType?: string | null;
   status: OrderStatus;
-  priceCents: number | null;
-  currency: string;
   dueDate: string | null;
   createdAt: string;
   customerName: string | null;

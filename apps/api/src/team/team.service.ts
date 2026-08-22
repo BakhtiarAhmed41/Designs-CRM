@@ -253,6 +253,7 @@ export class TeamService {
       id: string;
       human_ref: string | null;
       name: string | null;
+      service_type: string | null;
       status: OrderStatus;
       price_cents: number | null;
       currency: string;
@@ -260,7 +261,7 @@ export class TeamService {
       created_at: Date;
       customer_name: string | null;
     }>(
-      `SELECT o.id, o.human_ref, o.name, o.status, o.price_cents, o.currency,
+      `SELECT o.id, o.human_ref, o.name, o.service_type, o.status, o.price_cents, o.currency,
               o.due_date, o.created_at, c.name AS customer_name
          FROM orders o
          LEFT JOIN customers c ON c.id = o.customer_id
@@ -272,9 +273,8 @@ export class TeamService {
       id: o.id,
       humanRef: o.human_ref,
       name: o.name,
+      serviceType: o.service_type,
       status: o.status,
-      priceCents: o.price_cents,
-      currency: o.currency,
       dueDate: o.due_date,
       createdAt: o.created_at,
       customerName: o.customer_name,
@@ -290,11 +290,22 @@ export class TeamService {
       [orderId],
     );
     if (!order) throw new NotFoundException('Order not found');
-    await this.db.execute(
-      'UPDATE orders SET assigned_designer_id = ? WHERE id = ?',
-      [userId, orderId],
+    const current = await this.db.queryOne<{ status: string; type: string }>(
+      'SELECT status, type FROM orders WHERE id = ? LIMIT 1',
+      [orderId],
     );
-    return { orderId, assignedDesignerId: userId };
+    const startWork =
+      current?.type === 'ORDER' &&
+      (current.status === 'PENDING_PAYMENT' || current.status === 'CREATED');
+    await this.db.execute(
+      startWork
+        ? 'UPDATE orders SET assigned_designer_id = ?, status = ? WHERE id = ?'
+        : 'UPDATE orders SET assigned_designer_id = ? WHERE id = ?',
+      startWork
+        ? [userId, OrderStatus.IN_PROGRESS, orderId]
+        : [userId, orderId],
+    );
+    return { orderId, assignedDesignerId: userId, status: startWork ? OrderStatus.IN_PROGRESS : current?.status };
   }
 
   private async staffAttachments(messageIds: string[], channel: 'DM' | 'GROUP') {

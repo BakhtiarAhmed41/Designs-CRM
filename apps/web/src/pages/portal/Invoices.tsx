@@ -10,6 +10,8 @@ import {
 import { getMyCustomer } from '@/lib/customers';
 import { getErrorMessage } from '@/lib/api';
 import { money, dateShort } from '@/lib/format';
+import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 type InvFilter = 'all' | 'pending' | 'paid';
 
@@ -48,13 +50,9 @@ export function PortalInvoices() {
 
   const runningMonth = useMemo(() => {
     const now = new Date();
+    const period = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
     return invoices
-      .filter(
-        (i) =>
-          i.kind === 'MONTHLY' &&
-          i.periodMonth ===
-            now.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }).replace(' ', '-'),
-      )
+      .filter((i) => i.kind === 'MONTHLY' && i.periodMonth === period)
       .reduce((s, i) => s + i.amountCents, 0);
   }, [invoices]);
 
@@ -77,27 +75,21 @@ export function PortalInvoices() {
 
   return (
     <div>
-      <div className="ph">
-        <div>
-          <h1>Invoices</h1>
-          <div className="sub">
-            {isNet
-              ? "Your monthly statements and their status. This month's running total is shown up top."
-              : 'View your invoices — paid and pending — and download any as a PDF.'}
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Invoices"
+        subtitle={
+          isNet
+            ? "Monthly statements and this month’s running total."
+            : 'Paid and pending invoices. Download a PDF or pay from here.'
+        }
+      />
 
-      {error && (
-        <div className="alert-error" style={{ marginBottom: 14 }}>
-          {error}
-        </div>
-      )}
+      {error && <ErrorBanner>{error}</ErrorBanner>}
 
       {isNet && (
-        <div className="month-banner" style={{ marginTop: 20 }}>
+        <div className="month-banner">
           <div className="mb-l">
-            <div className="ml">This month so far — {monthName}</div>
+            <div className="ml">This month so far ({monthName})</div>
             <div className="mv">{money(runningMonth || lastPending?.amountCents || 0)}</div>
             <div className="md">Statement generates on the 1st of next month</div>
           </div>
@@ -113,7 +105,7 @@ export function PortalInvoices() {
         </div>
       )}
 
-      <div className="stats" style={{ marginTop: 20 }}>
+      <div className="stats">
         {isNet ? (
           <>
             <div className="stat">
@@ -124,7 +116,7 @@ export function PortalInvoices() {
             <div className="stat">
               <div className="sl">Last statement</div>
               <div className="sv">{money(lastPending?.amountCents ?? 0)}</div>
-              <div className="sd">{lastPending?.periodMonth ?? '—'} · pending</div>
+              <div className="sd">{lastPending?.periodMonth ?? 'None'} · pending</div>
             </div>
             <div className="stat">
               <div className="sl">Paid to date</div>
@@ -184,15 +176,17 @@ export function PortalInvoices() {
           </div>
         </div>
 
-        {isLoading && <div className="empty">Loading…</div>}
+        {isLoading && <div className="empty">Loading invoices…</div>}
         {!isLoading && filtered.length === 0 && (
-          <div className="empty">
-            <i className="ti ti-receipt" />
-            <p>You have no invoices yet.</p>
-          </div>
+          <EmptyState
+            icon="ti-receipt"
+            title={filter === 'all' ? 'No invoices yet' : 'Nothing in this filter'}
+            description="Invoices appear after an order is billed."
+          />
         )}
 
         {!isLoading && filtered.length > 0 && (
+          <div className="table-wrap">
           <table className="itable">
             <thead>
               <tr>
@@ -222,8 +216,8 @@ export function PortalInvoices() {
                     <td className="amt">{money(inv.amountCents, inv.currency)}</td>
                     <td style={{ color: 'var(--muted)' }}>
                       {inv.status === 'AWAITING' && chip.label === 'Building'
-                        ? '—'
-                        : dateShort(inv.issuedAt) || '—'}
+                        ? 'Pending'
+                        : dateShort(inv.issuedAt) || 'None'}
                     </td>
                     <td>
                       <span className={chip.cls}>{chip.label}</span>
@@ -233,20 +227,21 @@ export function PortalInvoices() {
                         <button
                           type="button"
                           className="btn btn-primary btn-sm"
-                          disabled={payMut.isPending}
                           title={
                             useCredit
                               ? 'Apply store credit to this invoice'
-                              : 'Mark this invoice paid after settling outside the portal'
+                              : 'Card checkout is not available yet'
                           }
-                          onClick={() =>
+                          disabled={payMut.isPending || !useCredit}
+                          onClick={() => {
+                            if (!useCredit) return;
                             payMut.mutate({
                               id: inv.id,
-                              method: (useCredit ? 'STORE_CREDIT' : 'CARD') as PayMethod,
-                            })
-                          }
+                              method: 'STORE_CREDIT' as PayMethod,
+                            });
+                          }}
                         >
-                          {useCredit ? 'Use credit' : 'Confirm paid'}
+                          {useCredit ? 'Use credit' : 'Payment coming soon'}
                         </button>
                       ) : chip.label === 'Paid' ? (
                         <button
@@ -261,7 +256,7 @@ export function PortalInvoices() {
                           <i className="ti ti-download" /> PDF
                         </button>
                       ) : (
-                        <span style={{ color: 'var(--faint)', fontSize: 12 }}>—</span>
+                        <span style={{ color: 'var(--faint)', fontSize: 12 }}>None</span>
                       )}
                     </td>
                   </tr>
@@ -269,6 +264,7 @@ export function PortalInvoices() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>
