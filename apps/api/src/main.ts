@@ -27,6 +27,10 @@ async function bootstrap() {
   }
 
   const port = Number(process.env.PORT) || env.PORT;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 }
-bootstrap();
+
+bootstrap().catch((err) => {
+  console.error('API failed to start', err);
+  process.exit(1);
+});

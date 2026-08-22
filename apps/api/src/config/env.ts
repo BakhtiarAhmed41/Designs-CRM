@@ -2,14 +2,21 @@ import 'dotenv/config';
 import { z } from 'zod';
 
 const booleanString = z
-  .enum(['true', 'false'])
-  .transform((v) => v === 'true');
+  .union([z.boolean(), z.string()])
+  .transform((v) => {
+    if (typeof v === 'boolean') return v;
+    return ['true', '1', 'yes'].includes(v.toLowerCase());
+  });
 
 const envSchema = z.object({
   NODE_ENV: z
-    .enum(['development', 'test', 'production'])
+    .string()
     .optional()
-    .default('development'),
+    .transform((v) => {
+      const n = (v || 'development').toLowerCase();
+      if (n === 'test' || n === 'development') return n;
+      return 'production';
+    }),
 
   PORT: z.coerce.number().int().positive().optional().default(3001),
 
