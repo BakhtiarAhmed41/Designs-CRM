@@ -7,6 +7,7 @@ node_modules
 # build outputs
 .next
 dist
+publish
 .tsc-out
 coverage
 

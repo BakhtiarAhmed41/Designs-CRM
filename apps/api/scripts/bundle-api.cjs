@@ -5,13 +5,13 @@ const path = require('path');
 
 const apiRoot = path.join(__dirname, '..');
 const tscOut = path.join(apiRoot, '.tsc-out');
-const distDir = path.join(apiRoot, 'dist');
+const publishDir = path.join(apiRoot, 'publish');
 const tscEntry = path.join(tscOut, 'main.js');
-const distEntry = path.join(distDir, 'main.js');
+const publishEntry = path.join(publishDir, 'main.js');
 
 fs.rmSync(tscOut, { recursive: true, force: true });
-fs.rmSync(distDir, { recursive: true, force: true });
-fs.mkdirSync(distDir, { recursive: true });
+fs.rmSync(publishDir, { recursive: true, force: true });
+fs.mkdirSync(publishDir, { recursive: true });
 
 const tscBin = require.resolve('typescript/bin/tsc');
 execFileSync(
@@ -41,7 +41,7 @@ esbuild
     platform: 'node',
     target: 'node22',
     format: 'cjs',
-    outfile: distEntry,
+    outfile: publishEntry,
     allowOverwrite: true,
     logLevel: 'error',
     legalComments: 'none',
@@ -55,14 +55,10 @@ esbuild
   .then(() => {
     fs.rmSync(tscOut, { recursive: true, force: true });
     fs.writeFileSync(
-      path.join(distDir, 'package.json'),
+      path.join(publishDir, 'package.json'),
       JSON.stringify({ type: 'commonjs' }),
     );
-    const leftover = fs.readdirSync(distDir).filter((n) => n !== 'main.js' && n !== 'package.json');
-    for (const name of leftover) {
-      fs.rmSync(path.join(distDir, name), { recursive: true, force: true });
-    }
-    console.log('Hostinger bundle ready: dist/main.js');
+    console.log('Hostinger bundle ready: publish/main.js');
   })
   .catch((err) => {
     console.error(err);

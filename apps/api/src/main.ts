@@ -28,6 +28,7 @@ async function bootstrap() {
 
   const port = Number(process.env.PORT) || env.PORT;
   await app.listen(port, '0.0.0.0');
+  console.log(`Designs CRM API listening on ${port}`);
 }
 
 bootstrap().catch((err) => {
