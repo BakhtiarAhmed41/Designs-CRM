@@ -9,7 +9,7 @@
     "node": "22.x"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json --noCheck",
+    "build": "tsc -p tsconfig.build.json --noCheck && node scripts/install-runtime-deps.cjs",
     "typecheck": "tsc -p tsconfig.build.json --noEmit",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
