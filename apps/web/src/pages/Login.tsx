@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { forgotPassword, resetPassword, verifyEmail } from '@/lib/auth';
+import { confirmEmailChange, forgotPassword, resetPassword, verifyEmail } from '@/lib/auth';
+import { claimQuoteIntent } from '@/lib/orders';
 import { getErrorMessage } from '@/lib/api';
 
 type Mode = 'login' | 'register' | 'forgot' | 'reset';
@@ -33,8 +34,19 @@ export function Login() {
       void verifyEmail(verify)
         .then(() => {
           setInfo(
-            'Email verified. Your login request is pending admin approval — you can sign in after approval.',
+            'Email verified. Your login request is pending admin approval. You can sign in after approval.',
           );
+          setMode('login');
+        })
+        .catch((err) => setError(getErrorMessage(err)))
+        .finally(() => setBusy(false));
+    }
+    const emailChange = searchParams.get('emailChange');
+    if (emailChange) {
+      setBusy(true);
+      void confirmEmailChange(emailChange)
+        .then(() => {
+          setInfo('Email updated. Sign in with your new address.');
           setMode('login');
         })
         .catch((err) => setError(getErrorMessage(err)))
@@ -56,9 +68,20 @@ export function Login() {
           phone: phone || null,
         });
         if (res.pending) {
-          setInfo(
-            'Check your email to verify your address. After verification, an admin will review your login request.',
-          );
+          if (res.emailSent) {
+            setInfo(
+              'Check your email to verify your address. After verification, an admin will review your login request.',
+            );
+          } else if (res.verifyToken) {
+            setInfo(
+              'Account created. SMTP is not configured, so we could not email the verification link. Use this local-only link, then wait for admin approval: ' +
+                `${window.location.origin}/login?verify=${res.verifyToken}`,
+            );
+          } else {
+            setInfo(
+              'Account created. We could not send the verification email because SMTP is not configured. An admin can still approve your login request.',
+            );
+          }
           setMode('login');
           return;
         }
@@ -85,6 +108,21 @@ export function Login() {
         return;
       } else {
         await login(email, password);
+        const claim = searchParams.get('claim');
+        if (claim) {
+          try {
+            const claimed = await claimQuoteIntent(claim);
+            navigate(`/portal/quotes/${claimed.order.id}`, { replace: true });
+            return;
+          } catch (err) {
+            setError(
+              getErrorMessage(err) ||
+                'Signed in, but we could not attach your quote request. Open Quotes to continue.',
+            );
+            navigate('/portal/quotes', { replace: true });
+            return;
+          }
+        }
         navigate('/', { replace: true });
       }
     } catch (err) {

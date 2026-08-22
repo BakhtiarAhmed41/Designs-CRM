@@ -7,9 +7,14 @@ import {
 import { getErrorMessage } from '@/lib/api';
 import { dateShort } from '@/lib/format';
 import { useState } from 'react';
+import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { useAuth } from '@/context/AuthContext';
 
 export function AdminLoginRequests() {
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const canDecide = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
   const [error, setError] = useState<string | null>(null);
   const { data, isLoading } = useQuery({
     queryKey: ['login-requests'],
@@ -38,20 +43,22 @@ export function AdminLoginRequests() {
 
   return (
     <div>
-      <div className="ph">
-        <div>
-          <h1>New login requests</h1>
-          <div className="sub">
-            Approve or delete pending customer registrations before they can sign in.
-          </div>
-        </div>
-      </div>
-      {error && <div className="alert-error" style={{ marginBottom: 12 }}>{error}</div>}
+      <PageHeader
+        title="Login requests"
+        subtitle="Approve new customer accounts so they can sign in."
+      />
+      {error && <ErrorBanner>{error}</ErrorBanner>}
       <div className="card">
-        {isLoading && <div style={{ padding: 16 }}>Loading…</div>}
+        {isLoading && <div style={{ padding: 16, color: 'var(--muted)' }}>Loading…</div>}
         {!isLoading && requests.length === 0 && (
-          <div style={{ padding: 16, color: 'var(--muted)' }}>No pending login requests.</div>
+          <EmptyState
+            icon="ti-user-check"
+            title="No pending requests"
+            description="New registrations will appear here after email verification."
+          />
         )}
+        {requests.length > 0 && (
+        <div className="table-wrap">
         <table className="qtable">
           <thead>
             <tr>
@@ -69,9 +76,11 @@ export function AdminLoginRequests() {
                   <b>{r.name}</b>
                 </td>
                 <td>{r.email}</td>
-                <td>{r.phone || '—'}</td>
+                <td>{r.phone || 'None'}</td>
                 <td>{dateShort(r.createdAt)}</td>
                 <td style={{ display: 'flex', gap: 6 }}>
+                  {canDecide ? (
+                    <>
                   <button
                     type="button"
                     className="btn btn-primary btn-sm"
@@ -82,17 +91,23 @@ export function AdminLoginRequests() {
                   </button>
                   <button
                     type="button"
-                    className="btn btn-ghost btn-sm"
+                    className="btn btn-danger btn-sm"
                     disabled={remove.isPending}
                     onClick={() => remove.mutate(r.id)}
                   >
-                    Delete
+                    Reject
                   </button>
+                    </>
+                  ) : (
+                    <span className="muted">Waiting for an admin</span>
+                  )}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        </div>
+        )}
       </div>
     </div>
   );

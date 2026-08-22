@@ -1,4 +1,4 @@
-import type { FeatureKey, UserPermissions, UserRole } from './types';
+import type { FeatureKey, SupportPermissions, UserPermissions, UserRole } from './types';
 
 const NONE: Record<FeatureKey, boolean> = {
   dashboard: false,
@@ -45,7 +45,7 @@ function expandMessaging(features: Record<FeatureKey, boolean>) {
   };
 }
 
-/** Role defaults used for Super Admin “Viewing as” preview only. */
+/** What this role can do when no custom permission set is stored. */
 export function defaultFeaturesForRole(role: UserRole): Record<FeatureKey, boolean> {
   switch (role) {
     case 'SUPER_ADMIN':
@@ -103,15 +103,37 @@ export function defaultFeaturesForRole(role: UserRole): Record<FeatureKey, boole
   }
 }
 
-export function featuresForNav(
-  actualRole: UserRole,
-  viewAs: UserRole,
+export function featuresForUser(
+  role: UserRole,
   permissions?: UserPermissions,
 ): Record<FeatureKey, boolean> {
-  if (viewAs === actualRole && permissions?.features) {
+  if (permissions?.features) {
     return expandMessaging({ ...NONE, ...permissions.features });
   }
-  return expandMessaging(defaultFeaturesForRole(viewAs));
+  return expandMessaging(defaultFeaturesForRole(role));
+}
+
+/** @deprecated Use featuresForUser. Nav always follows the signed-in user. */
+export function featuresForNav(
+  actualRole: UserRole,
+  _viewAs: UserRole,
+  permissions?: UserPermissions,
+): Record<FeatureKey, boolean> {
+  return featuresForUser(actualRole, permissions);
+}
+
+export function staffLandingPath(
+  role: UserRole | undefined,
+  permissions?: UserPermissions,
+): string {
+  const features = featuresForUser(role ?? 'ADMIN', permissions);
+  if (features.dashboard) return '/admin';
+  if (role === 'DESIGNER') return '/admin/mywork';
+  if (features.orders) return '/admin/orders';
+  if (features.messages || features.messages_customer_view) return '/admin/messages/customers';
+  if (features.messages_team_view) return '/admin/messages/team';
+  if (features.quotes) return '/admin/quotes';
+  return '/admin/mywork';
 }
 
 export function canFeature(
@@ -126,6 +148,15 @@ export function canFeature(
     return Boolean(expandMessaging(defaultFeaturesForRole(role))[feature]);
   }
   return false;
+}
+
+export function canSupport(
+  permissions: UserPermissions | undefined,
+  key: keyof SupportPermissions,
+  role?: UserRole,
+): boolean {
+  if (role === 'SUPER_ADMIN' || role === 'ADMIN') return true;
+  return Boolean(permissions?.support?.[key]);
 }
 
 export function canAnyMessaging(features: Record<FeatureKey, boolean>) {

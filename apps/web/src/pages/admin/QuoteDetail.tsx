@@ -22,6 +22,8 @@ import { money, dateShort, quoteLifecycleChip } from '@/lib/format';
 import { FormPreferencesDisplay } from '@/components/FormPreferencesDisplay';
 import { MessageAttachments } from '@/components/MessageAttachments';
 import type { Order } from '@/lib/types';
+import { useAuth } from '@/context/AuthContext';
+import { canSupport } from '@/lib/permissions';
 
 function designsCountLabel(order: Order): string {
   const prefs = order.preferences as { designs?: unknown[] } | null;
@@ -32,14 +34,15 @@ function designsCountLabel(order: Order): string {
   if (Array.isArray(designs) && designs.length > 0) {
     return String(designs.length);
   }
-  return order.name ? '1+' : '—';
+  return order.name ? '1+' : 'None';
 }
 
 type QuoteLine = {
   name: string;
   note: string;
   price: string;
-  attachedFile: string | null;
+  attachmentId: string | null;
+  attachedName: string | null;
 };
 
 function customerName(order: Order) {
@@ -49,10 +52,12 @@ function customerName(order: Order) {
 }
 
 function emptyLine(): QuoteLine {
-  return { name: '', note: '', price: '', attachedFile: null };
+  return { name: '', note: '', price: '', attachmentId: null, attachedName: null };
 }
 
 export function AdminQuoteDetail() {
+  const { user } = useAuth();
+  const canApproveCounter = canSupport(user?.permissions, 'approve', user?.role);
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -165,7 +170,8 @@ export function AdminQuoteDetail() {
           .filter((l) => l.name.trim())
           .map((l) => ({
             name: l.name.trim(),
-            note: l.note.trim() || l.attachedFile || undefined,
+            note: l.note.trim() || undefined,
+            attachmentId: l.attachmentId,
             priceCents: l.price ? Math.round(parseFloat(l.price) * 100) : undefined,
           })),
       });
@@ -221,10 +227,10 @@ export function AdminQuoteDetail() {
     onError: (e) => setError(getErrorMessage(e)),
   });
 
-  if (isLoading) return <div style={{ padding: 16, color: 'var(--muted)' }}>Loading...</div>;
-  if (!order) return <div style={{ padding: 16, color: 'var(--muted)' }}>Quote not found.</div>;
+  if (isLoading) return <div className="empty-state"><div className="empty-state-title">Loading quote…</div></div>;
+  if (!order) return <div className="empty-state"><div className="empty-state-title">Quote not found</div></div>;
   if (order.type === 'ORDER') {
-    return <div style={{ padding: 16, color: 'var(--muted)' }}>Converted to order — redirecting…</div>;
+    return <div style={{ padding: 16, color: 'var(--muted)' }}>Converted to order. Redirecting…</div>;
   }
 
   const customer = customerQ.data?.customer;
@@ -241,13 +247,17 @@ export function AdminQuoteDetail() {
   return (
     <div>
       <div className="ph">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Link to="/admin/quotes" className="btn btn-ghost btn-sm" style={{ textDecoration: 'none' }}>
-            <i className="ti ti-arrow-left" /> Quotes
-          </Link>
+        <div>
+          <nav className="crumbs" aria-label="Breadcrumb">
+            <span className="crumb"><Link to="/admin/quotes">Quotes</Link></span>
+            <span className="crumb">
+              <i className="ti ti-chevron-right" aria-hidden />
+              <span>Q-{order.humanRef ?? order.id.slice(0, 6)}</span>
+            </span>
+          </nav>
           <div>
-            <h1 style={{ fontSize: 18 }}>
-              Q-{order.humanRef ?? order.id.slice(0, 6)} · {order.name ?? 'Quote request'}
+            <h1>
+              {order.name ?? 'Quote request'}
             </h1>
             <div className="sub">
               {statusChip.label} · requested {dateShort(order.createdAt)}
@@ -259,15 +269,7 @@ export function AdminQuoteDetail() {
 
       {error && <div className="alert-error" style={{ marginBottom: 12 }}>{error}</div>}
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 320px',
-          gap: 16,
-          marginTop: 16,
-          alignItems: 'start',
-        }}
-      >
+      <div className="ws">
         <div>
           <div className="card">
             <div className="card-h">
@@ -277,7 +279,7 @@ export function AdminQuoteDetail() {
             </div>
             <div className="od-line">
               <span className="l">Service</span>
-              <span className="v">{order.serviceType ?? '—'}</span>
+              <span className="v">{order.serviceType ?? 'None'}</span>
             </div>
             <div className="od-line">
               <span className="l">Designs</span>
@@ -285,25 +287,25 @@ export function AdminQuoteDetail() {
             </div>
             <div className="od-line">
               <span className="l">Sizes</span>
-              <span className="v">{order.size ?? '—'}</span>
+              <span className="v">{order.size ?? 'None'}</span>
             </div>
             <div className="od-line">
               <span className="l">Notes from customer</span>
               <span className="v" style={{ fontWeight: 400 }}>
-                {order.instructions ? `"${order.instructions}"` : '—'}
+                {order.instructions ? `"${order.instructions}"` : 'None'}
               </span>
             </div>
           </div>
 
           <FormPreferencesDisplay preferences={order.preferences} />
 
-          <div className="card" style={{ marginTop: 14 }}>
+          <div className="card">
             <div className="card-h">
               <span className="ct">
                 <i className="ti ti-photo" /> Customer&apos;s artwork
               </span>
             </div>
-            <div style={{ padding: '12px 16px', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div className="card-b" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {attachments.length === 0 && (
                 <span style={{ color: 'var(--muted)', fontSize: 12 }}>No artwork uploaded.</span>
               )}
@@ -335,7 +337,7 @@ export function AdminQuoteDetail() {
             </div>
           </div>
 
-          <div className="card" style={{ marginTop: 14 }}>
+          <div className="card">
             <div className="card-h">
               <span className="ct">
                 <i className="ti ti-message" /> Messages on this quote
@@ -385,7 +387,7 @@ export function AdminQuoteDetail() {
               </label>
               <input
                 value={msgDraft}
-                placeholder="Reply — ask a question before pricing if you need to…"
+                placeholder="Reply. Ask a question before pricing if you need to…"
                 onChange={(e) => setMsgDraft(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && (msgDraft.trim() || msgFiles.length > 0)) {
@@ -416,7 +418,7 @@ export function AdminQuoteDetail() {
                   <i className="ti ti-scale" /> Customer counter offer
                 </span>
               </div>
-              <div style={{ padding: '14px 16px' }}>
+              <div className="card-b">
                 <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 6 }}>
                   Latest quotation
                 </div>
@@ -439,6 +441,8 @@ export function AdminQuoteDetail() {
                   <i className="ti ti-info-circle" /> Approve to move the job forward, or reject to
                   send it back.
                 </div>
+                {canApproveCounter ? (
+                  <>
                 <button
                   type="button"
                   className="btn btn-primary"
@@ -459,16 +463,22 @@ export function AdminQuoteDetail() {
                   <i className="ti ti-x" />{' '}
                   {counterReject.isPending ? 'Rejecting…' : 'Reject counter'}
                 </button>
+                  </>
+                ) : (
+                  <div className="muted" style={{ fontSize: 13 }}>
+                    Waiting for an admin to approve or reject this counter.
+                  </div>
+                )}
               </div>
             </div>
           ) : (
             <div className="card" style={{ border: '1.5px solid var(--navy)' }}>
               <div className="card-h">
                 <span className="ct">
-                  <i className="ti ti-currency-dollar" /> Build the quote — price each design
+                  <i className="ti ti-currency-dollar" /> Build the quote. Price each design.
                 </span>
               </div>
-              <div style={{ padding: '14px 16px' }}>
+              <div className="card-b">
                 <div
                   style={{
                     fontSize: 11,
@@ -479,19 +489,19 @@ export function AdminQuoteDetail() {
                     marginBottom: 6,
                   }}
                 >
-                  Customer&apos;s files — tap one, then attach on a line
+                  Customer&apos;s files. Tap one, then attach it on a line.
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
                   {attachments.map((a) => (
                     <button
                       key={a.id}
                       type="button"
-                      className={`odf${selectedFile === a.originalName ? '' : ''}`}
+                      className="odf"
                       style={{
                         cursor: 'pointer',
-                        borderColor: selectedFile === a.originalName ? 'var(--navy)' : undefined,
+                        borderColor: selectedFile === a.id ? 'var(--navy)' : undefined,
                       }}
-                      onClick={() => setSelectedFile(a.originalName)}
+                      onClick={() => setSelectedFile(a.id)}
                     >
                       <i className="ti ti-photo" /> {a.originalName}
                     </button>
@@ -508,7 +518,7 @@ export function AdminQuoteDetail() {
                     marginBottom: 6,
                   }}
                 >
-                  Quote lines — you decide what the job actually is
+                  Quote lines. You decide what the job actually is.
                 </div>
 
                 {lines.map((line, idx) => (
@@ -556,7 +566,15 @@ export function AdminQuoteDetail() {
                         onClick={() =>
                           setLines((prev) =>
                             prev.map((l, i) =>
-                              i === idx ? { ...l, attachedFile: selectedFile } : l,
+                              i === idx
+                                ? {
+                                    ...l,
+                                    attachmentId: selectedFile,
+                                    attachedName:
+                                      attachments.find((a) => a.id === selectedFile)?.originalName ??
+                                      selectedFile,
+                                  }
+                                : l,
                             ),
                           )
                         }
@@ -564,9 +582,9 @@ export function AdminQuoteDetail() {
                         Attach
                       </button>
                     </div>
-                    {line.attachedFile && (
+                    {line.attachedName && (
                       <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-                        Attached: {line.attachedFile}
+                        Attached: {line.attachedName}
                       </div>
                     )}
                   </div>
@@ -598,7 +616,7 @@ export function AdminQuoteDetail() {
                 </div>
 
                 <div className="note" style={{ margin: '0 0 12px' }}>
-                  <i className="ti ti-info-circle" /> Customer can accept or reject each line — they pay only for what
+                  <i className="ti ti-info-circle" /> Customer can accept or reject each line. They pay only for what
                   they keep.
                 </div>
 
@@ -609,7 +627,7 @@ export function AdminQuoteDetail() {
                   disabled={sendQuote.isPending || !lines.some((l) => l.name.trim())}
                   onClick={() => sendQuote.mutate()}
                 >
-                  <i className="ti ti-send" /> {sendQuote.isPending ? 'Sending…' : 'Send quote — per-design approval'}
+                  <i className="ti ti-send" /> {sendQuote.isPending ? 'Sending…' : 'Send quote for per-design approval'}
                 </button>
                 <button
                   type="button"
@@ -642,7 +660,7 @@ export function AdminQuoteDetail() {
             </div>
             <div className="od-line">
               <span className="l">Account</span>
-              <span className="v">{customer?.accountType?.replace('_', ' ') ?? '—'}</span>
+              <span className="v">{customer?.accountType?.replace('_', ' ') ?? 'None'}</span>
             </div>
           </div>
         </div>

@@ -16,6 +16,8 @@ import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import { createMyConversation, listMyConversations } from '@/lib/messaging';
 import type { Design, QuotationLine } from '@/lib/designs';
 import type { Order, Quotation } from '@/lib/types';
+import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 type QuoteWithLines = Quotation & { lines?: QuotationLine[] };
 
@@ -38,6 +40,7 @@ export function PortalOrderDetail() {
   const [counter, setCounter] = useState('');
   const [keepLineIds, setKeepLineIds] = useState<string[] | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['my-order', id],
@@ -82,11 +85,19 @@ export function PortalOrderDetail() {
 
   const accept = useMutation({
     mutationFn: (ids?: string[]) => acceptQuotation(id, ids),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      setActionError(null);
+      invalidate();
+    },
+    onError: (e) => setActionError(getErrorMessage(e)),
   });
   const reject = useMutation({
     mutationFn: () => rejectQuotation(id),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      setActionError(null);
+      invalidate();
+    },
+    onError: (e) => setActionError(getErrorMessage(e)),
   });
   const counterM = useMutation({
     mutationFn: () =>
@@ -94,14 +105,24 @@ export function PortalOrderDetail() {
         amountCents: Math.round(parseFloat(counter || '0') * 100),
       }),
     onSuccess: () => {
+      setActionError(null);
       setCounter('');
       invalidate();
     },
+    onError: (e) => setActionError(getErrorMessage(e)),
   });
 
-  if (isLoading) return <div className="empty">Loading…</div>;
+  if (isLoading) return <EmptyState icon="ti-loader" title="Loading order…" />;
   const order = data?.order as PortalOrderFull | undefined;
-  if (!order) return <div className="empty">Order not found.</div>;
+  if (!order) {
+    return (
+      <EmptyState
+        icon="ti-package-off"
+        title="Order not found"
+        action={<Link to="/portal/orders" className="btn btn-ghost btn-sm">Back to orders</Link>}
+      />
+    );
+  }
 
   const latestQuote = order.quotations?.[0];
   const canDecide = order.status === 'QUOTATION_PROVIDED';
@@ -124,29 +145,22 @@ export function PortalOrderDetail() {
 
   return (
     <div>
-      <div className="ph">
-        <div>
-          <Link to="/portal/orders" className="form-back" style={{ marginBottom: 8 }}>
-            <i className="ti ti-arrow-left" /> Back to orders
-          </Link>
-          <h1>
-            {order.name ?? 'Order'}{' '}
-            <span style={{ color: 'var(--faint)', fontWeight: 500 }}>
-              #{order.humanRef ?? order.id.slice(0, 6)}
-            </span>
-          </h1>
-          <div className="sub">
-            {order.serviceType} · placed {dateShort(order.createdAt)}
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+      <PageHeader
+        title={order.name ?? 'Order'}
+        subtitle={`${order.serviceType ?? 'Order'} · #${order.humanRef ?? order.id.slice(0, 6)} · ${dateShort(order.createdAt)}`}
+        crumbs={[
+          { label: 'Orders', to: '/portal/orders' },
+          { label: order.humanRef ?? 'Order' },
+        ]}
+        actions={
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <button
             type="button"
             className="btn btn-ghost btn-sm"
             disabled={startChat.isPending}
             onClick={() => startChat.mutate()}
           >
-            <i className="ti ti-message" /> Start Chat
+            <i className="ti ti-message" /> Message team
           </button>
           {(() => {
             const chip = lifecycleChip(order.status, 'customer', {
@@ -154,8 +168,11 @@ export function PortalOrderDetail() {
             });
             return <span className={chip.cls}>{chip.label}</span>;
           })()}
-        </div>
-      </div>
+          </div>
+        }
+      />
+
+      {actionError && <ErrorBanner>{actionError}</ErrorBanner>}
 
       <div className="od-grid">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -168,7 +185,7 @@ export function PortalOrderDetail() {
                 </span>
                 <span className="chip c-quote">{latestQuote.status}</span>
               </div>
-              <div style={{ padding: '14px 18px' }}>
+              <div className="card-b">
                 <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--navy)' }}>
                   {money(latestQuote.amountCents, latestQuote.currency)}
                 </div>
@@ -249,7 +266,7 @@ export function PortalOrderDetail() {
                       >
                         <i className="ti ti-check" /> Approve &amp; start
                         {lines.length > 0
-                          ? ` — ${money(selectedTotal, latestQuote.currency)}`
+                          ? ` (${money(selectedTotal, latestQuote.currency)})`
                           : ''}
                       </button>
                       <button
@@ -354,11 +371,11 @@ export function PortalOrderDetail() {
             </div>
             <div className="od-line">
               <span className="l">Service</span>
-              <span className="v">{order.serviceType ?? '—'}</span>
+              <span className="v">{order.serviceType ?? 'None'}</span>
             </div>
             <div className="od-line">
               <span className="l">Size</span>
-              <span className="v">{order.size ?? '—'}</span>
+              <span className="v">{order.size ?? 'None'}</span>
             </div>
             <div className="od-line">
               <span className="l">Price</span>
