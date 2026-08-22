@@ -97,6 +97,16 @@ export class DashboardService {
     );
     const outstandingCents = Number(outstandingRow?.total ?? 0);
 
+    const newOrders = await this.countByStatuses([
+      OrderStatus.CREATED,
+      OrderStatus.PENDING_PAYMENT,
+    ]);
+
+    const unreadRow = await this.db.queryOne<{ n: number }>(
+      'SELECT COALESCE(SUM(unread_admin), 0) AS n FROM conversations',
+    );
+    const unreadMessages = Number(unreadRow?.n ?? 0);
+
     const byStatusRows = await this.db.query<{ status: OrderStatus; count: number }>(
       'SELECT status, COUNT(*) AS count FROM orders GROUP BY status ORDER BY count DESC',
     );
@@ -113,30 +123,56 @@ export class DashboardService {
       deliveredThisMonth,
       revenueThisMonthCents,
       outstandingCents,
+      newOrders,
+      unreadMessages,
       byStatus,
     };
   }
 
-  async getChart(user: AuthUser | undefined, days: number) {
+  async getChart(
+    user: AuthUser | undefined,
+    days: number,
+    from?: string,
+    to?: string,
+  ) {
     this.assertStaff(user);
-    const n = Math.min(Math.max(Math.trunc(days) || 14, 1), 90);
 
-    // created orders per day
+    let start: Date;
+    let end: Date;
+    const fromOk = from && /^\d{4}-\d{2}-\d{2}$/.test(from);
+    const toOk = to && /^\d{4}-\d{2}-\d{2}$/.test(to);
+    if (fromOk && toOk) {
+      start = new Date(`${from}T00:00:00`);
+      end = new Date(`${to}T00:00:00`);
+      if (end < start) {
+        const tmp = start;
+        start = end;
+        end = tmp;
+      }
+    } else {
+      const n = Math.min(Math.max(Math.trunc(days) || 14, 1), 90);
+      end = new Date();
+      start = new Date();
+      start.setDate(end.getDate() - (n - 1));
+    }
+
+    const startKey = dateKey(start);
+    const endKey = dateKey(end);
+
     const ordersRows = await this.db.query<{ d: string; c: number }>(
       `SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS d, COUNT(*) AS c
          FROM orders
-        WHERE created_at >= (CURDATE() - INTERVAL ? DAY)
+        WHERE created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY)
         GROUP BY DATE_FORMAT(created_at, '%Y-%m-%d')`,
-      [n - 1],
+      [startKey, endKey],
     );
-    // delivered value per day (by completion date)
     const deliveredRows = await this.db.query<{ d: string; v: number }>(
       `SELECT DATE_FORMAT(completed_at, '%Y-%m-%d') AS d, COALESCE(SUM(price_cents), 0) AS v
          FROM orders
         WHERE completed_at IS NOT NULL
-          AND completed_at >= (CURDATE() - INTERVAL ? DAY)
+          AND completed_at >= ? AND completed_at < DATE_ADD(?, INTERVAL 1 DAY)
         GROUP BY DATE_FORMAT(completed_at, '%Y-%m-%d')`,
-      [n - 1],
+      [startKey, endKey],
     );
 
     const ordersMap = new Map<string, number>();
@@ -149,16 +185,16 @@ export class DashboardService {
       orders: number;
       deliveredValueCents: number;
     }> = [];
-    const today = new Date();
-    for (let i = n - 1; i >= 0; i--) {
-      const dt = new Date(today);
-      dt.setDate(today.getDate() - i);
-      const key = dateKey(dt);
+    const cursor = new Date(start);
+    const last = new Date(end);
+    while (cursor <= last) {
+      const key = dateKey(cursor);
       series.push({
         date: key,
         orders: ordersMap.get(key) ?? 0,
         deliveredValueCents: deliveredMap.get(key) ?? 0,
       });
+      cursor.setDate(cursor.getDate() + 1);
     }
     return series;
   }

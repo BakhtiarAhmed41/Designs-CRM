@@ -23,7 +23,7 @@ export function TeamChatPanel({
   const { data, isLoading } = useQuery({
     queryKey: ['team-chat', peerId],
     queryFn: () => getTeamChat(peerId),
-    refetchInterval: 5_000,
+    refetchInterval: 30_000,
     enabled: !!peerId,
   });
 
@@ -101,7 +101,7 @@ export function TeamChatPanel({
         {isLoading && <div style={{ color: 'var(--muted)', fontSize: 12 }}>Loading…</div>}
         {!isLoading && messages.length === 0 && (
           <div style={{ color: 'var(--muted)', fontSize: 12 }}>
-            Start a quick team chat — only staff can see this.
+            Start a quick team chat. Only staff can see this.
           </div>
         )}
         {messages.map((m) => (

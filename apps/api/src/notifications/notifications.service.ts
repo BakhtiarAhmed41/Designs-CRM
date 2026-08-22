@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import type { AuthUser } from '../auth/auth.types';
 import { DbService } from '../db/db.service';
+import { NotificationEvents } from './notification.events';
 
 function assertAuthUser(user: AuthUser | undefined): asserts user is AuthUser {
   if (!user) throw new ForbiddenException();
@@ -19,7 +20,10 @@ type NotificationRow = {
 
 @Injectable()
 export class NotificationsService {
-  constructor(private db: DbService) {}
+  constructor(
+    private db: DbService,
+    private events: NotificationEvents,
+  ) {}
 
   async createFor(
     userId: string,
@@ -29,6 +33,7 @@ export class NotificationsService {
       'INSERT INTO notifications (id, user_id, title, body, link) VALUES (?, ?, ?, ?, ?)',
       [randomUUID(), userId, input.title, input.body ?? null, input.link ?? null],
     );
+    this.events.emitCreated(userId);
   }
 
   async createForMany(
@@ -45,6 +50,9 @@ export class NotificationsService {
       `INSERT INTO notifications (id, user_id, title, body, link) VALUES ${values}`,
       params,
     );
+    for (const uid of userIds) {
+      this.events.emitCreated(uid);
+    }
   }
 
   async list(user: AuthUser | undefined) {

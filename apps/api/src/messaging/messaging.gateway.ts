@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Logger, OnModuleInit } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -13,6 +13,7 @@ import { Server, Socket } from 'socket.io';
 import { Presence, STAFF_ROLES } from '../common/enums';
 import { getEnv } from '../config/env';
 import { DbService } from '../db/db.service';
+import { NotificationEvents } from '../notifications/notification.events';
 
 type SocketUser = {
   id: string;
@@ -27,7 +28,7 @@ type SocketUser = {
   },
 })
 export class MessagingGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
+  implements OnGatewayConnection, OnGatewayDisconnect, OnModuleInit
 {
   private readonly logger = new Logger(MessagingGateway.name);
   /** userId → active socket ids */
@@ -41,7 +42,14 @@ export class MessagingGateway
   constructor(
     private jwt: JwtService,
     private db: DbService,
+    private notifications: NotificationEvents,
   ) {}
+
+  onModuleInit() {
+    this.notifications.onCreated((userId) => {
+      this.emitToUser(userId, 'notification:new', { userId });
+    });
+  }
 
   private parseCookieToken(cookieHeader: string | undefined): string | null {
     if (!cookieHeader) return null;
