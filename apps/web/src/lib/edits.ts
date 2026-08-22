@@ -36,12 +36,29 @@ export type ActivityEntry = {
   actorInitials?: string | null;
 };
 
-export function listAdminEdits(status?: EditStatus, search?: string) {
-  const params = new URLSearchParams();
-  if (status) params.set('status', status);
-  if (search) params.set('q', search);
-  const q = params.toString() ? `?${params}` : '';
-  return apiFetch<{ edits: EditRequest[] }>(`/admin/edits${q}`);
+export function listAdminEdits(params?: {
+  status?: EditStatus;
+  kind?: EditKind;
+  assigned?: 'yes' | 'no';
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}) {
+  const q = new URLSearchParams();
+  if (params?.status) q.set('status', params.status);
+  if (params?.kind) q.set('kind', params.kind);
+  if (params?.assigned) q.set('assigned', params.assigned);
+  if (params?.q) q.set('q', params.q);
+  if (params?.page) q.set('page', String(params.page));
+  if (params?.pageSize) q.set('pageSize', String(params.pageSize));
+  const qs = q.toString() ? `?${q}` : '';
+  return apiFetch<{
+    edits: EditRequest[];
+    total?: number;
+    page?: number;
+    pageSize?: number;
+    totalPages?: number;
+  }>(`/admin/edits${qs}`);
 }
 
 export function createAdminEdit(

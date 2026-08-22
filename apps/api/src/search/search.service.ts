@@ -1,5 +1,6 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import type { AuthUser } from '../auth/auth.types';
+import { hasFeature } from '../auth/permissions';
 import { DbService } from '../db/db.service';
 
 function assertAuthUser(user: AuthUser | undefined): asserts user is AuthUser {
@@ -35,33 +36,45 @@ export class SearchService {
       return { orders: [], customers: [], conversations: [] };
     }
     const like = `%${term}%`;
+    const canOrders =
+      hasFeature(user.permissions, 'orders') || hasFeature(user.permissions, 'quotes');
+    const canCustomers = hasFeature(user.permissions, 'customers');
+    const canMessages =
+      hasFeature(user.permissions, 'messages') ||
+      hasFeature(user.permissions, 'messages_customer_view');
 
-    const orders = await this.db.query<OrderHit>(
-      `SELECT id, human_ref, name, status
-         FROM orders
-        WHERE human_ref LIKE ? OR name LIKE ? OR service_type LIKE ?
-        ORDER BY created_at DESC
-        LIMIT 10`,
-      [like, like, like],
-    );
+    const orders = canOrders
+      ? await this.db.query<OrderHit>(
+          `SELECT id, human_ref, name, status
+             FROM orders
+            WHERE human_ref LIKE ? OR name LIKE ? OR service_type LIKE ?
+            ORDER BY created_at DESC
+            LIMIT 10`,
+          [like, like, like],
+        )
+      : [];
 
-    const customers = await this.db.query<CustomerHit>(
-      `SELECT id, name, email
-         FROM customers
-        WHERE name LIKE ? OR email LIKE ?
-        ORDER BY created_at DESC
-        LIMIT 10`,
-      [like, like],
-    );
+    const customers = canCustomers
+      ? await this.db.query<CustomerHit>(
+          `SELECT id, name, email
+             FROM customers
+            WHERE name LIKE ? OR email LIKE ?
+            ORDER BY created_at DESC
+            LIMIT 10`,
+          [like, like],
+        )
+      : [];
 
-    const conversations = await this.db.query<ConversationHit>(
-      `SELECT id, subject
-         FROM conversations
-        WHERE subject LIKE ?
-        ORDER BY last_message_at IS NULL, last_message_at DESC, created_at DESC
-        LIMIT 10`,
-      [like],
-    );
+    const conversations = canMessages
+      ? await this.db.query<ConversationHit>(
+          `SELECT id, subject
+             FROM conversations
+            WHERE subject LIKE ?
+            ORDER BY last_message_at IS NULL, last_message_at DESC, created_at DESC
+            LIMIT 10`,
+          [like],
+        )
+      : [];
 
     return {
       orders: orders.map((o) => ({

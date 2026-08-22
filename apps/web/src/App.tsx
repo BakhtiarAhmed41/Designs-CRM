@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { STAFF_ROLES } from '@/lib/types';
+import { staffLandingPath } from '@/lib/permissions';
 import { PortalShell } from '@/components/PortalShell';
 import { AdminShell } from '@/components/AdminShell';
 import { RequireFeature } from '@/components/RequireFeature';
@@ -35,13 +36,15 @@ import { AdminMyWork } from '@/pages/admin/MyWork';
 import { AdminEdits } from '@/pages/admin/Edits';
 import { AdminRolesUsers } from '@/pages/admin/RolesUsers';
 import { AdminLoginRequests } from '@/pages/admin/LoginRequests';
+import { AdminProfile } from '@/pages/admin/Profile';
 
 function HomeRedirect() {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
-  return (
-    <Navigate to={STAFF_ROLES.includes(user.role) ? '/admin' : '/portal'} replace />
-  );
+  if (!STAFF_ROLES.includes(user.role)) {
+    return <Navigate to="/portal" replace />;
+  }
+  return <Navigate to={staffLandingPath(user.role, user.permissions)} replace />;
 }
 
 function RequireRole({
@@ -54,8 +57,8 @@ function RequireRole({
   const { user, loading } = useAuth();
   if (loading) {
     return (
-      <div className="center-screen">
-        <div className="spinner" />
+      <div className="center-screen" style={{ alignItems: 'center', padding: 24 }}>
+        <div className="spinner" aria-label="Loading" />
       </div>
     );
   }
@@ -101,7 +104,14 @@ export function App() {
           </RequireRole>
         }
       >
-        <Route index element={<AdminDashboard />} />
+        <Route
+          index
+          element={
+            <RequireFeature feature="dashboard">
+              <AdminDashboard />
+            </RequireFeature>
+          }
+        />
         <Route
           path="messages"
           element={
@@ -192,7 +202,15 @@ export function App() {
             </RequireFeature>
           }
         />
-        <Route path="mywork" element={<AdminMyWork />} />
+        <Route
+          path="mywork"
+          element={
+            <RequireFeature feature="orders">
+              <AdminMyWork />
+            </RequireFeature>
+          }
+        />
+        <Route path="profile" element={<AdminProfile />} />
         <Route
           path="team"
           element={

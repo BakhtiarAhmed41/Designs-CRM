@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { adminRejectOrder, listAdminOrders } from '@/lib/orders';
 import {
   createAdminConversation,
@@ -12,6 +12,9 @@ import { money, dateShort, quoteLifecycleChip } from '@/lib/format';
 import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
 import type { Order, OrderStatus } from '@/lib/types';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
+import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { SkeletonRows } from '@/components/ui/Skeleton';
 
 type QuoteFilter = 'all' | 'needs' | 'sent' | 'urgent' | 'declined';
 
@@ -34,6 +37,7 @@ const DECLINED: OrderStatus[] = [
 ];
 
 export function AdminQuotes() {
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const [filter, setFilter] = useState<QuoteFilter>('all');
   const [q, setQ] = useState('');
@@ -50,13 +54,24 @@ export function AdminQuotes() {
     return () => window.clearTimeout(t);
   }, [toast]);
 
+  const tabStatuses =
+    filter === 'needs' || filter === 'urgent'
+      ? NEEDS
+      : filter === 'sent'
+        ? SENT
+        : filter === 'declined'
+          ? DECLINED
+          : undefined;
+
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-quotes', q, status, dateFrom, dateTo, page],
+    queryKey: ['admin-quotes', filter, q, status, dateFrom, dateTo, page],
     queryFn: () =>
       listAdminOrders({
         type: 'QUOTE_REQUEST',
         q: q || undefined,
-        status: status || undefined,
+        status: filter === 'all' ? status || undefined : undefined,
+        statuses: tabStatuses,
+        olderThanDays: filter === 'urgent' ? 2 : undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
         page,
@@ -65,28 +80,21 @@ export function AdminQuotes() {
     refetchInterval: 30_000,
   });
 
-  const allQuotes = useMemo(() => data?.orders ?? [], [data?.orders]);
+  const quotes = data?.orders ?? [];
 
-  const quotes = useMemo(() => {
-    switch (filter) {
-      case 'needs':
-        return allQuotes.filter((o) => NEEDS.includes(o.status));
-      case 'sent':
-        return allQuotes.filter((o) => SENT.includes(o.status));
-      case 'urgent':
-        return allQuotes.filter(
-          (o) => NEEDS.includes(o.status) && daysAgo(o.createdAt) >= 2,
-        );
-      case 'declined':
-        return allQuotes.filter((o) => DECLINED.includes(o.status));
-      default:
-        return allQuotes;
-    }
-  }, [allQuotes, filter]);
-
-  const followUps = allQuotes.filter(
-    (o) => SENT.includes(o.status) && daysAgo(o.updatedAt) >= 2,
-  );
+  const followUpsQ = useQuery({
+    queryKey: ['admin-quotes-followups'],
+    queryFn: () =>
+      listAdminOrders({
+        type: 'QUOTE_REQUEST',
+        statuses: SENT,
+        updatedOlderThanDays: 2,
+        page: 1,
+        pageSize: 20,
+      }),
+    refetchInterval: 30_000,
+  });
+  const followUps = followUpsQ.data?.orders ?? [];
 
   function invalidateQuotes() {
     qc.invalidateQueries({ queryKey: ['admin-quotes'] });
@@ -112,7 +120,7 @@ export function AdminQuotes() {
       const amount = order.priceCents != null ? money(order.priceCents) : 'your quote';
       return sendAdminMessage(
         convo.id,
-        `Just checking in — did you have any questions about quote Q-${quoteRef} (${amount})? Happy to adjust if needed.`,
+        `Just checking in. Did you have any questions about quote Q-${quoteRef} (${amount})? Happy to adjust if needed.`,
       );
     },
     onSuccess: () => {
@@ -139,16 +147,12 @@ export function AdminQuotes() {
 
   return (
     <div>
-      <div className="ph">
-        <div>
-          <h1>Quotes</h1>
-          <div className="sub">
-            Requests waiting for your price, and quotes you&apos;ve sent that are waiting on the customer.
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Quotes"
+        subtitle="Needs pricing, sent, urgent, and declined in one pipeline."
+      />
 
-      {error && <div className="alert-error" style={{ marginBottom: 12 }}>{error}</div>}
+      {error && <ErrorBanner>{error}</ErrorBanner>}
 
       <ListToolbar
         search={q}
@@ -184,62 +188,76 @@ export function AdminQuotes() {
         }}
       />
 
-      <div style={{ margin: '0 0 10px' }}>
+      <div>
         <div className="filters">
-          <button type="button" className={filter === 'all' ? 'on' : ''} onClick={() => setFilter('all')}>
+          <button type="button" className={filter === 'all' ? 'on' : ''} onClick={() => { setFilter('all'); setPage(1); }}>
             All
           </button>
-          <button type="button" className={filter === 'needs' ? 'on' : ''} onClick={() => setFilter('needs')}>
+          <button type="button" className={filter === 'needs' ? 'on' : ''} onClick={() => { setFilter('needs'); setPage(1); }}>
             Needs pricing
           </button>
-          <button type="button" className={filter === 'sent' ? 'on' : ''} onClick={() => setFilter('sent')}>
-            Sent — awaiting customer
+          <button type="button" className={filter === 'sent' ? 'on' : ''} onClick={() => { setFilter('sent'); setPage(1); }}>
+            Sent, awaiting customer
           </button>
-          <button type="button" className={filter === 'declined' ? 'on' : ''} onClick={() => setFilter('declined')}>
+          <button type="button" className={filter === 'declined' ? 'on' : ''} onClick={() => { setFilter('declined'); setPage(1); }}>
             Declined
           </button>
-          <button type="button" className={filter === 'urgent' ? 'on' : ''} onClick={() => setFilter('urgent')}>
+          <button type="button" className={filter === 'urgent' ? 'on' : ''} onClick={() => { setFilter('urgent'); setPage(1); }}>
             Urgent
           </button>
         </div>
       </div>
 
-      <div className="card">
-        {isLoading && <div style={{ padding: 16, color: 'var(--muted)' }}>Loading...</div>}
+      <div className="card table-card">
+        {isLoading && <SkeletonRows rows={5} />}
         {!isLoading && quotes.length === 0 && (
-          <div style={{ padding: 16, color: 'var(--muted)' }}>No quotes match this filter.</div>
+          <EmptyState
+            icon="ti-file-invoice"
+            title="No quotes in this view"
+            description="Try another tab or search, or generate a quote from the dashboard."
+          />
         )}
-        {quotes.map((o) => (
-          <Link
-            key={o.id}
-            to={`/admin/quotes/${o.id}`}
-            className="orow"
-            style={{ textDecoration: 'none', color: 'inherit' }}
-          >
-
-            <div className={`othumb ${serviceThumbClass(o.serviceType)}`}>
-              <i className={`ti ${serviceTi(o.serviceType)}`} />
-            </div>
-            <div className="oinfo">
-              <div className="on">{o.name ?? 'Quote request'}</div>
-              <div className="om">
-                <span>
-                  <i className="ti ti-hash" style={{ fontSize: 11 }} />
-                  Q-{o.humanRef ?? o.id.slice(0, 6)}
-                </span>
-                <span>{customerLabel(o)}</span>
-                <span className="item-date">{dateShort(o.createdAt)}</span>
-              </div>
-            </div>
-            {(() => {
-              const chip = quoteLifecycleChip(o.status, 'admin', {
-                partiallyAccepted: o.partiallyAccepted,
-              });
-              return <span className={chip.cls}>{chip.label}</span>;
-            })()}
-            <div className="oprice">{money(o.priceCents)}</div>
-          </Link>
-        ))}
+        {!isLoading && quotes.length > 0 && (
+          <table className="itable">
+            <thead>
+              <tr>
+                <th>Quote</th>
+                <th>Customer</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th className="num">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {quotes.map((o) => {
+                const chip = quoteLifecycleChip(o.status, 'admin', {
+                  partiallyAccepted: o.partiallyAccepted,
+                });
+                return (
+                  <tr key={o.id} className="click-row" onClick={() => navigate(`/admin/quotes/${o.id}`)}>
+                    <td>
+                      <div className="cell-main">
+                        <div className={`othumb ${serviceThumbClass(o.serviceType)}`}>
+                          <i className={`ti ${serviceTi(o.serviceType)}`} />
+                        </div>
+                        <div>
+                          <div className="on">{o.name ?? 'Quote request'}</div>
+                          <div className="om">Q-{o.humanRef ?? o.id.slice(0, 6)}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>{customerLabel(o)}</td>
+                    <td>
+                      <span className={chip.cls}>{chip.label}</span>
+                    </td>
+                    <td className="muted">{dateShort(o.createdAt)}</td>
+                    <td className="num">{money(o.priceCents)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
 
       <PaginationBar

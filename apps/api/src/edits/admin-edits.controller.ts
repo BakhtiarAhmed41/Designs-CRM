@@ -54,16 +54,33 @@ export class AdminEditsController {
   async list(
     @CurrentUser() user: AuthUser | undefined,
     @Query('status') status: string | undefined,
+    @Query('kind') kind: string | undefined,
+    @Query('assigned') assigned: string | undefined,
     @Query('q') q: string | undefined,
+    @Query('page') page: string | undefined,
+    @Query('pageSize') pageSize: string | undefined,
   ) {
     const statuses = Object.values(EditStatus) as string[];
+    const kinds = Object.values(EditKind) as string[];
     const parsed =
       status && statuses.includes(status) ? (status as EditStatus) : undefined;
-    const edits = await this.edits.listEdits(user, {
+    const parsedKind =
+      kind && kinds.includes(kind) ? (kind as EditKind) : undefined;
+    const result = await this.edits.listEdits(user, {
       status: parsed,
+      kind: parsedKind,
+      assigned: assigned === 'yes' || assigned === 'no' ? assigned : undefined,
       q: q?.trim() || undefined,
+      page: page ? Number(page) : undefined,
+      pageSize: pageSize ? Number(pageSize) : undefined,
     });
-    return { edits };
+    return {
+      edits: result.items,
+      total: result.total,
+      page: result.page,
+      pageSize: result.pageSize,
+      totalPages: result.totalPages,
+    };
   }
 
   @Patch('edits/:id')

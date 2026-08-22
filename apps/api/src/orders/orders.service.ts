@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import type { AuthUser } from '../auth/auth.types';
-import { hasSupportPerm } from '../auth/permissions';
+import { hasFeature, hasSupportPerm } from '../auth/permissions';
 import {
   AccountType,
   CustomerSource,
@@ -25,6 +25,7 @@ import {
   parseDateBound,
 } from '../common/pagination';
 import { DbService } from '../db/db.service';
+import { MailService } from '../mail/mail.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { LocalStorageService } from '../storage/local-storage.service';
 
@@ -47,6 +48,17 @@ function toServiceType(value?: string | null): ServiceType | null {
   return (Object.values(ServiceType) as string[]).includes(upper)
     ? (upper as ServiceType)
     : null;
+}
+
+async function settingValue(
+  db: DbService,
+  key: string,
+): Promise<string | null> {
+  const row = await db.queryOne<{ setting_value: string }>(
+    'SELECT setting_value FROM app_settings WHERE setting_key = ? LIMIT 1',
+    [key],
+  );
+  return row?.setting_value?.trim() || null;
 }
 
 function formatLabelFromName(name: string): string | null {
@@ -75,6 +87,9 @@ type OrderRow = {
   assigned_designer_id: string | null;
   parent_order_id: string | null;
   due_date: Date | null;
+  turnaround_key: string | null;
+  turnaround_label: string | null;
+  turnaround_hours: number | null;
   internal_notes: string | null;
   rejection_reason: string | null;
   completed_at: Date | null;
@@ -133,7 +148,81 @@ export class OrdersService {
     private storage: LocalStorageService,
     private notifications: NotificationsService,
     private billing: BillingService,
+    private mail: MailService,
   ) {}
+
+  private async resolveTurnaround(key: string | null | undefined) {
+    const normalized =
+      key === 'urgent' || key === 'rush' ? 'urgent' : key === 'standard' ? 'standard' : null;
+    if (!normalized) {
+      return { key: null as string | null, label: null as string | null, hours: null as number | null };
+    }
+    const label = await settingValue(this.db, `turnaround.${normalized}.label`);
+    const hoursRaw = await settingValue(this.db, `turnaround.${normalized}.hours`);
+    const hours = hoursRaw ? Number.parseInt(hoursRaw, 10) : NaN;
+    return {
+      key: normalized,
+      label,
+      hours: Number.isFinite(hours) ? hours : null,
+    };
+  }
+
+  async listTurnaroundOptions() {
+    const rows = await this.db.query<{ setting_key: string; setting_value: string }>(
+      `SELECT setting_key, setting_value FROM app_settings WHERE setting_key LIKE 'turnaround.%'`,
+    );
+    const byKey = new Map<
+      string,
+      { key: string; label: string | null; hours: number | null }
+    >();
+    for (const r of rows) {
+      const m = r.setting_key.match(/^turnaround\.([^.]+)\.(label|hours)$/);
+      if (!m) continue;
+      const key = m[1];
+      const field = m[2];
+      const cur = byKey.get(key) ?? { key, label: null, hours: null };
+      if (field === 'label') cur.label = r.setting_value;
+      if (field === 'hours') {
+        const n = Number.parseInt(r.setting_value, 10);
+        cur.hours = Number.isFinite(n) ? n : null;
+      }
+      byKey.set(key, cur);
+    }
+    return { options: Array.from(byKey.values()) };
+  }
+
+  private async designCountsFor(orderIds: string[]) {
+    const map = new Map<string, number>();
+    if (orderIds.length === 0) return map;
+    const ph = orderIds.map(() => '?').join(',');
+    const rows = await this.db.query<{ order_id: string; n: number }>(
+      `SELECT order_id, COUNT(*) AS n FROM order_designs WHERE order_id IN (${ph}) GROUP BY order_id`,
+      orderIds,
+    );
+    for (const r of rows) map.set(r.order_id, Number(r.n));
+    return map;
+  }
+
+  private async customerEmailForOrder(order: {
+    customer_id: string | null;
+    client_user_id: string | null;
+  }) {
+    if (order.client_user_id) {
+      const u = await this.db.queryOne<{ email: string }>(
+        'SELECT email FROM users WHERE id = ? LIMIT 1',
+        [order.client_user_id],
+      );
+      if (u?.email) return u.email;
+    }
+    if (order.customer_id) {
+      const c = await this.db.queryOne<{ email: string | null }>(
+        'SELECT email FROM customers WHERE id = ? LIMIT 1',
+        [order.customer_id],
+      );
+      return c?.email ?? null;
+    }
+    return null;
+  }
 
   private async convertQuoteChatToOrderChat(orderId: string) {
     await this.db.execute(
@@ -198,6 +287,40 @@ export class OrdersService {
 
   // --- mapping helpers -----------------------------------------------------
 
+  private canSeeMoney(user: AuthUser) {
+    return hasFeature(user.permissions, 'billing');
+  }
+
+  private stripMoney<T extends Record<string, unknown>>(order: T): T {
+    const quotations = order.quotations;
+    const designs = order.designs;
+    return {
+      ...order,
+      priceCents: null,
+      quotations: Array.isArray(quotations)
+        ? quotations.map((q: Record<string, unknown>) => ({
+            ...q,
+            amountCents: null,
+            lines: Array.isArray(q.lines)
+              ? q.lines.map((l: Record<string, unknown>) => ({
+                  ...l,
+                  priceCents: null,
+                  sizes: Array.isArray(l.sizes)
+                    ? l.sizes.map((s: Record<string, unknown>) => ({
+                        ...s,
+                        priceCents: 0,
+                      }))
+                    : l.sizes,
+                }))
+              : q.lines,
+          }))
+        : quotations,
+      designs: Array.isArray(designs)
+        ? designs.map((d: Record<string, unknown>) => ({ ...d, priceCents: null }))
+        : designs,
+    };
+  }
+
   private orderDto(o: OrderRow, extras?: { partiallyAccepted?: boolean }) {
     return {
       id: o.id,
@@ -211,6 +334,9 @@ export class OrdersService {
       name: o.name,
       instructions: o.instructions,
       size: o.size,
+      turnaroundKey: o.turnaround_key ?? null,
+      turnaroundLabel: o.turnaround_label ?? null,
+      turnaroundHours: o.turnaround_hours ?? null,
       preferences: o.preferences ?? null,
       status: o.status,
       priceCents: o.price_cents,
@@ -288,8 +414,8 @@ export class OrdersService {
   }
 
   private async getQuotationLines(quotationId: string) {
-    const lines = await this.db.query<QuotationLineRow>(
-      `SELECT id, quotation_id, name, note, price_cents, sort_order,
+    const lines = await this.db.query<QuotationLineRow & { attachment_id?: string | null }>(
+      `SELECT id, quotation_id, name, note, attachment_id, price_cents, sort_order,
               COALESCE(client_decision, 'PENDING') AS client_decision
          FROM quotation_lines WHERE quotation_id = ? ORDER BY sort_order ASC`,
       [quotationId],
@@ -304,6 +430,7 @@ export class OrdersService {
         id: l.id,
         name: l.name,
         note: l.note,
+        attachmentId: l.attachment_id ?? null,
         priceCents: l.price_cents,
         sortOrder: l.sort_order,
         clientDecision: l.client_decision ?? 'PENDING',
@@ -419,6 +546,7 @@ export class OrdersService {
       instructions?: string | null;
       size?: string | null;
       preferences?: unknown;
+      turnaroundKey?: string | null;
     },
   ) {
     assertAuthUser(client);
@@ -473,10 +601,14 @@ export class OrdersService {
       data.subCategory ||
       data.mainCategory ||
       data.serviceType;
+    const prefs = data.preferences as { turnaround?: string } | null;
+    const turnaround = await this.resolveTurnaround(
+      data.turnaroundKey ?? prefs?.turnaround ?? null,
+    );
     await this.db.execute(
       `INSERT INTO orders
-         (id, human_ref, customer_id, client_user_id, type, service_type, main_category, sub_category, name, instructions, size, preferences, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, human_ref, customer_id, client_user_id, type, service_type, main_category, sub_category, name, instructions, size, turnaround_key, turnaround_label, turnaround_hours, preferences, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         humanRef,
@@ -489,6 +621,9 @@ export class OrdersService {
         name,
         data.instructions ?? null,
         data.size ?? null,
+        turnaround.key,
+        turnaround.label,
+        turnaround.hours,
         data.preferences ? JSON.stringify(data.preferences) : null,
         OrderStatus.WAITING_FOR_QUOTATION,
       ],
@@ -516,22 +651,115 @@ export class OrdersService {
     };
   }
 
-  async listMyOrders(user: AuthUser | undefined) {
+  async listMyOrders(
+    user: AuthUser | undefined,
+    filters?: {
+      type?: OrderType;
+      status?: OrderStatus;
+      lifecycle?: 'active' | 'delivered';
+      q?: string;
+      dateFrom?: string | null;
+      dateTo?: string | null;
+      page?: number;
+      pageSize?: number;
+    },
+  ) {
     assertAuthUser(user);
-    const rows = await this.db.query<OrderRow>(
-      'SELECT * FROM orders WHERE client_user_id = ? ORDER BY created_at DESC',
-      [user.id],
+    const where = ['client_user_id = ?'];
+    const params: unknown[] = [user.id];
+    if (filters?.type) {
+      where.push('type = ?');
+      params.push(filters.type);
+    }
+    if (filters?.status) {
+      where.push('status = ?');
+      params.push(filters.status);
+    }
+    if (filters?.lifecycle === 'active') {
+      where.push(
+        `status NOT IN ('COMPLETED','CLOSED','CANCELLED','REFUNDED','REJECTED')`,
+      );
+    }
+    if (filters?.lifecycle === 'delivered') {
+      where.push(`status IN ('COMPLETED','CLOSED')`);
+    }
+    if (filters?.q) {
+      const like = `%${filters.q}%`;
+      where.push('(name LIKE ? OR human_ref LIKE ?)');
+      params.push(like, like);
+    }
+    const from = parseDateBound(filters?.dateFrom);
+    const to = parseDateBound(filters?.dateTo);
+    if (from) {
+      where.push('DATE(created_at) >= ?');
+      params.push(from);
+    }
+    if (to) {
+      where.push('DATE(created_at) <= ?');
+      params.push(to);
+    }
+    const whereSql = `WHERE ${where.join(' AND ')}`;
+    const paginated = filters?.page != null || filters?.pageSize != null;
+    const { page, pageSize, offset } = paginated
+      ? normalizePage({ page: filters?.page, pageSize: filters?.pageSize ?? 10 })
+      : { page: 1, pageSize: 500, offset: 0 };
+    const count = await this.db.queryOne<{
+      n: number | string;
+      delivered: number | string;
+      total: number | string;
+    }>(
+      `SELECT COUNT(*) AS n,
+              SUM(CASE WHEN status IN ('COMPLETED','CLOSED') THEN 1 ELSE 0 END) AS delivered,
+              COALESCE(SUM(price_cents), 0) AS total
+         FROM orders ${whereSql}`,
+      params,
     );
-    const out = [];
+    const designAgg = await this.db.queryOne<{ n: number | string }>(
+      `SELECT COUNT(*) AS n FROM order_designs
+        WHERE order_id IN (SELECT id FROM orders ${whereSql})`,
+      params,
+    );
+    const rows = await this.db.query<OrderRow>(
+      `SELECT * FROM orders ${whereSql} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
+      [...params, pageSize, offset],
+    );
+    const ids = rows.map((r) => r.id);
+    const designCounts = await this.designCountsFor(ids);
+    const items = [];
     for (const r of rows) {
       const partiallyAccepted = await this.orderPartialFlag(r.id);
-      out.push({
+      const quotations = await this.getQuotations(r.id);
+      const lineCount =
+        (quotations[0] as { lines?: unknown[] } | undefined)?.lines?.length ?? 0;
+      items.push({
         ...this.orderDto(r, { partiallyAccepted }),
+        designCount: designCounts.get(r.id) || lineCount,
         attachments: await this.getAttachments(r.id),
-        quotations: await this.getQuotations(r.id),
+        quotations,
       });
     }
-    return out;
+    return {
+      ...pageResult(items, Number(count?.n ?? 0), page, pageSize),
+      delivered: Number(count?.delivered ?? 0),
+      totalCents: Number(count?.total ?? 0),
+      designs: Number(designAgg?.n ?? 0),
+    };
+  }
+
+  async myOrderSummary(user: AuthUser | undefined) {
+    assertAuthUser(user);
+    const rows = await this.db.query<{ status: string; type: string; n: number }>(
+      `SELECT status, type, COUNT(*) AS n FROM orders WHERE client_user_id = ? GROUP BY status, type`,
+      [user.id],
+    );
+    let awaitingQuote = 0;
+    let beingPriced = 0;
+    for (const r of rows) {
+      const n = Number(r.n);
+      if (r.status === OrderStatus.QUOTATION_PROVIDED) awaitingQuote += n;
+      if (r.status === OrderStatus.WAITING_FOR_QUOTATION) beingPriced += n;
+    }
+    return { awaitingQuote, beingPriced };
   }
 
   async getMyOrder(user: AuthUser | undefined, orderId: string) {
@@ -857,6 +1085,9 @@ export class OrdersService {
     user: AuthUser | undefined,
     filters: {
       status?: OrderStatus;
+      statuses?: OrderStatus[];
+      olderThanDays?: number;
+      updatedOlderThanDays?: number;
       clientId?: string;
       type?: OrderType;
       q?: string;
@@ -870,9 +1101,20 @@ export class OrdersService {
     const { page, pageSize, offset } = normalizePage(filters);
     const where: string[] = [];
     const params: unknown[] = [];
-    if (filters.status) {
+    if (filters.statuses && filters.statuses.length > 0) {
+      where.push(`o.status IN (${filters.statuses.map(() => '?').join(',')})`);
+      params.push(...filters.statuses);
+    } else if (filters.status) {
       where.push('o.status = ?');
       params.push(filters.status);
+    }
+    if (filters.olderThanDays && filters.olderThanDays > 0) {
+      where.push('o.created_at <= DATE_SUB(NOW(), INTERVAL ? DAY)');
+      params.push(filters.olderThanDays);
+    }
+    if (filters.updatedOlderThanDays && filters.updatedOlderThanDays > 0) {
+      where.push('o.updated_at <= DATE_SUB(NOW(), INTERVAL ? DAY)');
+      params.push(filters.updatedOlderThanDays);
     }
     if (filters.clientId) {
       where.push('o.client_user_id = ?');
@@ -927,9 +1169,10 @@ export class OrdersService {
       [...params, pageSize, offset],
     );
     const out = [];
+    const hideMoney = !this.canSeeMoney(user);
     for (const r of rows) {
       const partiallyAccepted = await this.orderPartialFlag(r.id);
-      out.push({
+      const item = {
         ...this.orderDto(r, { partiallyAccepted }),
         customerName: r.customer_name,
         client: r.client_user_id
@@ -942,7 +1185,8 @@ export class OrdersService {
           : null,
         attachments: await this.getAttachments(r.id),
         quotations: await this.getQuotations(r.id),
-      });
+      };
+      out.push(hideMoney ? this.stripMoney(item) : item);
     }
     return pageResult(out, Number(count?.n ?? 0), page, pageSize);
   }
@@ -1224,6 +1468,10 @@ export class OrdersService {
       throw new BadRequestException('No deliverables on this order yet');
     }
 
+    const fileNames = deliveries
+      .flatMap((d) => d.files ?? [])
+      .map((f) => f.originalName)
+      .filter(Boolean);
     if (order.client_user_id) {
       await this.notifications.createFor(order.client_user_id, {
         title: 'Your files are ready',
@@ -1231,8 +1479,17 @@ export class OrdersService {
         link: `/portal/orders/${orderId}`,
       });
     }
+    const email = await this.customerEmailForOrder(order);
+    if (email) {
+      await this.mail.sendFilesReady(
+        email,
+        order.name ?? 'your order',
+        orderId,
+        fileNames,
+      );
+    }
 
-    return { ok: true as const };
+    return { ok: true as const, emailSent: Boolean(email) };
   }
 
   async getAdminOrder(user: AuthUser | undefined, orderId: string) {
@@ -1252,7 +1509,7 @@ export class OrdersService {
         [row.client_user_id],
       );
     }
-    return {
+    const assembled = {
       ...this.orderDto(row),
       client: client
         ? {
@@ -1268,6 +1525,7 @@ export class OrdersService {
       quotations: await this.getQuotations(orderId),
       deliveries: await this.getDeliveries(orderId),
     };
+    return this.canSeeMoney(user) ? assembled : this.stripMoney(assembled);
   }
 
   async adminProposeQuotation(
@@ -1611,6 +1869,17 @@ export class OrdersService {
         link: `/portal/orders/${orderId}`,
       });
     }
+    if (notifyEmail) {
+      const email = await this.customerEmailForOrder(order);
+      if (email) {
+        await this.mail.sendFilesReady(
+          email,
+          order.name ?? 'your order',
+          orderId,
+          files.map((f) => f.originalname),
+        );
+      }
+    }
 
     return {
       order: this.orderDto((await this.getOrderRow(orderId))!),
@@ -1767,6 +2036,7 @@ export class OrdersService {
       lines: Array<{
         name: string;
         note?: string | null;
+        attachmentId?: string | null;
         priceCents?: number | null;
         sizes?: Array<{ label: string; priceCents: number }>;
       }>;
@@ -1829,13 +2099,14 @@ export class OrdersService {
         const lineId = randomUUID();
         await tx.execute(
           `INSERT INTO quotation_lines
-             (id, quotation_id, name, note, price_cents, sort_order)
-           VALUES (?, ?, ?, ?, ?, ?)`,
+             (id, quotation_id, name, note, attachment_id, price_cents, sort_order)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
           [
             lineId,
             qId,
             line.name.trim(),
             line.note?.trim() || null,
+            line.attachmentId?.trim() || null,
             typeof line.priceCents === 'number' ? line.priceCents : null,
             lineSort++,
           ],
@@ -1901,6 +2172,10 @@ export class OrdersService {
       'SELECT * FROM quotations WHERE id = ? LIMIT 1',
       [quotationId],
     );
+    const email = await this.customerEmailForOrder(order);
+    if (email) {
+      await this.mail.sendQuoteReady(email, order.name ?? 'your quote', orderId);
+    }
     return {
       ...this.quotationDto(row!),
       lines: await this.getQuotationLines(quotationId),
@@ -1938,5 +2213,192 @@ export class OrdersService {
       formatLabel: r.format_label,
       deliveredAt: r.delivered_at,
     }));
+  }
+
+  async saveQuoteDraft(
+    user: AuthUser | undefined,
+    serviceKey: string,
+    payload: unknown,
+  ) {
+    assertAuthUser(user);
+    if (user.role !== UserRole.CLIENT) throw new ForbiddenException();
+    const key = serviceKey.trim().toLowerCase();
+    if (!key) throw new BadRequestException('serviceKey is required');
+    const existing = await this.db.queryOne<{ id: string }>(
+      'SELECT id FROM quote_drafts WHERE user_id = ? AND service_key = ? LIMIT 1',
+      [user.id, key],
+    );
+    if (existing) {
+      await this.db.execute(
+        'UPDATE quote_drafts SET payload = ? WHERE id = ?',
+        [JSON.stringify(payload ?? {}), existing.id],
+      );
+      return { id: existing.id, serviceKey: key };
+    }
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO quote_drafts (id, user_id, service_key, payload)
+       VALUES (?, ?, ?, ?)`,
+      [id, user.id, key, JSON.stringify(payload ?? {})],
+    );
+    return { id, serviceKey: key };
+  }
+
+  async getQuoteDraft(user: AuthUser | undefined, serviceKey: string) {
+    assertAuthUser(user);
+    const row = await this.db.queryOne<{
+      payload: unknown;
+      updated_at: Date;
+    }>(
+      'SELECT payload, updated_at FROM quote_drafts WHERE user_id = ? AND service_key = ? LIMIT 1',
+      [user.id, serviceKey.trim().toLowerCase()],
+    );
+    return { draft: row ? { payload: row.payload, updatedAt: row.updated_at } : null };
+  }
+
+  async createQuoteIntent(serviceKey: string, payload: unknown) {
+    const token = randomUUID().replace(/-/g, '') + randomUUID().replace(/-/g, '').slice(0, 16);
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO quote_intents (id, claim_token, service_key, payload, expires_at)
+       VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 7 DAY))`,
+      [id, token, serviceKey.trim().toLowerCase() || 'unknown', JSON.stringify(payload ?? {})],
+    );
+    return { token, expiresInDays: 7 };
+  }
+
+  async claimQuoteIntent(user: AuthUser | undefined, token: string) {
+    assertAuthUser(user);
+    if (user.role !== UserRole.CLIENT) throw new ForbiddenException();
+    const row = await this.db.queryOne<{
+      id: string;
+      service_key: string;
+      payload: unknown;
+      claimed_at: Date | null;
+    }>(
+      `SELECT id, service_key, payload, claimed_at FROM quote_intents
+        WHERE claim_token = ? AND expires_at > NOW() LIMIT 1`,
+      [token],
+    );
+    if (!row) throw new NotFoundException('Quote draft not found or expired');
+    if (row.claimed_at) throw new BadRequestException('This draft was already submitted');
+    const payload =
+      typeof row.payload === 'string' ? JSON.parse(row.payload) : (row.payload as Record<string, unknown>) ?? {};
+    const collected = (payload.collected ?? payload) as {
+      designName?: string;
+      instructions?: string;
+      size?: string | null;
+      turnaround?: string | null;
+    };
+    const serviceType =
+      String(payload.serviceType ?? row.service_key ?? 'EMBROIDERY').toUpperCase();
+    const order = await this.createOrder(user, {
+      type: 'QUOTE_REQUEST',
+      serviceType,
+      name: collected.designName ?? null,
+      instructions: collected.instructions ?? null,
+      size: collected.size ?? null,
+      preferences: payload,
+      turnaroundKey: collected.turnaround ?? null,
+    });
+    await this.db.execute(
+      'UPDATE quote_intents SET claimed_by = ?, claimed_at = NOW(), order_id = ? WHERE id = ?',
+      [user.id, order.id, row.id],
+    );
+    return { order };
+  }
+
+  async requestFormat(
+    user: AuthUser | undefined,
+    orderId: string,
+    data: { format: string; deliveryFileId?: string | null; note?: string | null },
+  ) {
+    assertAuthUser(user);
+    const order = await this.getOrderRow(orderId);
+    if (!order) throw new NotFoundException('Order not found');
+    const isStaff = isAdminRole(user.role);
+    if (!isStaff && order.client_user_id !== user.id) throw new ForbiddenException();
+    const format = data.format.trim();
+    if (!format) throw new BadRequestException('Format is required');
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO format_requests
+         (id, customer_id, order_id, delivery_file_id, requested_format, note, created_by_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        order.customer_id,
+        orderId,
+        data.deliveryFileId ?? null,
+        format,
+        data.note?.trim() || null,
+        user.id,
+      ],
+    );
+    const ref = order.human_ref ?? order.name ?? orderId.slice(0, 6);
+    const email = await this.customerEmailForOrder(order);
+    if (email) await this.mail.sendFormatRequestReceived(email, format, ref);
+    const admins = await this.db.query<{ email: string }>(
+      `SELECT email FROM users WHERE role IN ('SUPER_ADMIN','ADMIN') AND login_status = 'ACTIVE'`,
+    );
+    await Promise.all(
+      admins.map((a) => this.mail.sendFormatRequestToStaff(a.email, format, ref, orderId)),
+    );
+    await this.notifyAdmins({
+      title: 'Format request',
+      body: `${format} export requested for ${ref}`,
+      link: `/admin/orders/${orderId}`,
+    });
+    return { id, status: 'PENDING' as const };
+  }
+
+  async listFormatRequests(user: AuthUser | undefined, orderId?: string) {
+    this.assertAdmin(user);
+    const rows = await this.db.query<{
+      id: string;
+      order_id: string;
+      requested_format: string;
+      note: string | null;
+      status: string;
+      created_at: Date;
+      human_ref: string | null;
+      order_name: string | null;
+    }>(
+      `SELECT f.id, f.order_id, f.requested_format, f.note, f.status, f.created_at,
+              o.human_ref, o.name AS order_name
+         FROM format_requests f
+         JOIN orders o ON o.id = f.order_id
+        ${orderId ? 'WHERE f.order_id = ?' : ''}
+        ORDER BY f.created_at DESC`,
+      orderId ? [orderId] : [],
+    );
+    return rows.map((r) => ({
+      id: r.id,
+      orderId: r.order_id,
+      format: r.requested_format,
+      note: r.note,
+      status: r.status,
+      createdAt: r.created_at,
+      humanRef: r.human_ref,
+      orderName: r.order_name,
+    }));
+  }
+
+  async updateFormatRequest(
+    user: AuthUser | undefined,
+    id: string,
+    status: 'PENDING' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED',
+  ) {
+    this.assertAdmin(user);
+    const row = await this.db.queryOne<{ id: string }>(
+      'SELECT id FROM format_requests WHERE id = ? LIMIT 1',
+      [id],
+    );
+    if (!row) throw new NotFoundException('Format request not found');
+    await this.db.execute(
+      `UPDATE format_requests SET status = ?, resolved_at = CASE WHEN ? IN ('DONE','CANCELLED') THEN NOW() ELSE resolved_at END WHERE id = ?`,
+      [status, status, id],
+    );
+    return { id, status };
   }
 }

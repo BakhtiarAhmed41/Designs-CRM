@@ -58,6 +58,14 @@ export class AdminTeamController {
   constructor(private team: TeamService) {}
 
   @Get('team')
+  @RequireFeatures(
+    'team',
+    'orders',
+    'quotes',
+    'edits',
+    'messages',
+    'messages_team_view',
+  )
   async list() {
     const members = await this.team.list();
     return { members };
@@ -82,6 +90,7 @@ export class AdminTeamController {
   }
 
   @Get('mywork')
+  @RequireFeatures('orders')
   async myWork(@CurrentUser() user: AuthUser) {
     const orders = await this.team.myWork(user.id);
     return { orders };

@@ -4,7 +4,9 @@ import {
   Get,
   Param,
   Post,
+  Put,
   Patch,
+  Query,
   UseGuards,
   UseInterceptors,
   UploadedFiles,
@@ -16,6 +18,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { AuthUser } from '../auth/auth.types';
 import { OrdersService } from './orders.service';
+import { OrderStatus, OrderType } from '../common/enums';
 
 const createOrderSchema = z.object({
   type: z.enum(['ORDER', 'QUOTE_REQUEST', 'QUOTATION_REQUEST']).optional(),
@@ -26,6 +29,18 @@ const createOrderSchema = z.object({
   instructions: z.string().optional().nullable(),
   size: z.string().optional().nullable(),
   preferences: z.any().optional(),
+  turnaroundKey: z.string().optional().nullable(),
+});
+
+const draftSchema = z.object({
+  serviceKey: z.string().min(1),
+  payload: z.any(),
+});
+
+const formatRequestSchema = z.object({
+  format: z.string().min(1).max(60),
+  deliveryFileId: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
 });
 
 const acceptQuotationSchema = z.object({
@@ -55,15 +70,87 @@ export class OrdersController {
   }
 
   @Get()
-  async listMine(@CurrentUser() user: AuthUser | undefined) {
-    const orders = await this.orders.listMyOrders(user);
-    return { orders };
+  async listMine(
+    @CurrentUser() user: AuthUser | undefined,
+    @Query('type') type?: string,
+    @Query('status') status?: string,
+    @Query('lifecycle') lifecycle?: string,
+    @Query('q') q?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    const types = Object.values(OrderType) as string[];
+    const statuses = Object.values(OrderStatus) as string[];
+    const result = await this.orders.listMyOrders(user, {
+      type: type && types.includes(type) ? (type as OrderType) : undefined,
+      status: status && statuses.includes(status) ? (status as OrderStatus) : undefined,
+      lifecycle:
+        lifecycle === 'active' || lifecycle === 'delivered' ? lifecycle : undefined,
+      q: q?.trim() || undefined,
+      dateFrom: dateFrom || null,
+      dateTo: dateTo || null,
+      page: page ? Number(page) : undefined,
+      pageSize: pageSize ? Number(pageSize) : undefined,
+    });
+    return {
+      orders: result.items,
+      total: result.total,
+      page: result.page,
+      pageSize: result.pageSize,
+      totalPages: result.totalPages,
+      delivered: result.delivered,
+      totalCents: result.totalCents,
+      designs: result.designs,
+    };
+  }
+
+  @Get('summary')
+  async mySummary(@CurrentUser() user: AuthUser | undefined) {
+    return this.orders.myOrderSummary(user);
   }
 
   @Get('my-files')
   async myFiles(@CurrentUser() user: AuthUser | undefined) {
     const files = await this.orders.listMyFiles(user);
     return { files };
+  }
+
+  @Get('drafts/:serviceKey')
+  async getDraft(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('serviceKey') serviceKey: string,
+  ) {
+    return this.orders.getQuoteDraft(user, serviceKey);
+  }
+
+  @Put('drafts/:serviceKey')
+  async saveDraft(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('serviceKey') serviceKey: string,
+    @Body() body: unknown,
+  ) {
+    const data = draftSchema.omit({ serviceKey: true }).parse(body ?? {});
+    return this.orders.saveQuoteDraft(user, serviceKey, data.payload);
+  }
+
+  @Post('intents/:token/claim')
+  async claimIntent(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('token') token: string,
+  ) {
+    return this.orders.claimQuoteIntent(user, token);
+  }
+
+  @Post(':id/format-requests')
+  async requestFormat(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    const data = formatRequestSchema.parse(body);
+    return this.orders.requestFormat(user, id, data);
   }
 
   @Get(':id')

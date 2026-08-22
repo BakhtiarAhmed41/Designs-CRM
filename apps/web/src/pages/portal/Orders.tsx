@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { createOrder, getMyOrder, listMyOrders } from '@/lib/orders';
@@ -9,6 +9,9 @@ import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import type { Design } from '@/lib/designs';
 import type { Order } from '@/lib/types';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { SkeletonRows } from '@/components/ui/Skeleton';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 type OrderFilter = 'all' | 'active' | 'delivered';
 
@@ -226,7 +229,7 @@ function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
           <div key={d.id} className="line">
             <span className="ln">
               <i className={`ti ${ic.icon}`} style={{ color: ic.color }} /> {d.name}
-              {d.size ? ` — ${d.size}` : ''}
+              {d.size ? ` (${d.size})` : ''}
             </span>
             <span className={chip.cls}>{chip.label}</span>
             <span className="lp">{money(d.priceCents)}</span>
@@ -249,77 +252,56 @@ export function PortalOrders() {
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
 
+  const months = useMemo(() => {
+    const now = new Date();
+    const keys = ['all'];
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      keys.push(monthKey(d));
+    }
+    return keys;
+  }, []);
+
+  const monthFrom = month === 'all' ? dateFrom : `${month}-01`;
+  const monthTo =
+    month === 'all'
+      ? dateTo
+      : (() => {
+          const [y, m] = month.split('-').map(Number);
+          const last = new Date(y, m, 0).getDate();
+          return `${month}-${String(last).padStart(2, '0')}`;
+        })();
+
   const { data, isLoading } = useQuery({
-    queryKey: ['my-orders'],
-    queryFn: listMyOrders,
+    queryKey: ['my-orders', q, status, filter, month, dateFrom, dateTo, page],
+    queryFn: () =>
+      listMyOrders({
+        type: 'ORDER',
+        status: status || undefined,
+        lifecycle: filter === 'all' ? undefined : filter,
+        q: q.trim() || undefined,
+        dateFrom: monthFrom || undefined,
+        dateTo: monthTo || undefined,
+        page,
+        pageSize: 10,
+      }),
   });
 
-  const orders = useMemo(
-    () =>
-      (data?.orders ?? [])
-        .filter((o) => o.type === 'ORDER')
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-    [data],
-  );
-
-  const months = useMemo(() => {
-    const keys = new Set<string>();
-    for (const o of orders) {
-      keys.add(monthKey(new Date(o.createdAt)));
-    }
-    return ['all', ...Array.from(keys).sort().reverse()];
-  }, [orders]);
-
-  const filtered = useMemo(() => {
-    let list = orders;
-    if (month !== 'all') {
-      list = list.filter((o) => monthKey(new Date(o.createdAt)) === month);
-    }
-    if (filter === 'active') {
-      list = list.filter((o) => !DONE.includes(o.status));
-    }
-    if (filter === 'delivered') {
-      list = list.filter((o) => DONE.includes(o.status));
-    }
-    if (status) list = list.filter((o) => o.status === status);
-    if (q.trim()) {
-      const term = q.trim().toLowerCase();
-      list = list.filter(
-        (o) =>
-          (o.name ?? '').toLowerCase().includes(term) ||
-          (o.humanRef ?? '').toLowerCase().includes(term),
-      );
-    }
-    if (dateFrom) list = list.filter((o) => o.createdAt.slice(0, 10) >= dateFrom);
-    if (dateTo) list = list.filter((o) => o.createdAt.slice(0, 10) <= dateTo);
-    return list;
-  }, [orders, month, filter, status, q, dateFrom, dateTo]);
-
-  const pageSize = 10;
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pageItems = filtered.slice((page - 1) * pageSize, page * pageSize);
-  const summary = useMemo(() => {
-    let designs = 0;
-    let delivered = 0;
-    let total = 0;
-    for (const o of filtered) {
-      total += o.priceCents ?? 0;
-      if (DONE.includes(o.status)) delivered++;
-    }
-    return { count: filtered.length, designs, delivered, total };
-  }, [filtered]);
+  const pageItems = data?.orders ?? [];
+  const totalPages = data?.totalPages ?? 1;
+  const summary = {
+    count: data?.total ?? 0,
+    designs: data?.designs ?? 0,
+    delivered: data?.delivered ?? 0,
+    total: data?.totalCents ?? 0,
+  };
 
   return (
     <div>
-      <div className="ph">
-        <div>
-          <h1>Orders</h1>
-          <div className="sub">
-            Your active and completed orders. Filter by month to review your business over any
-            period.
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Orders"
+        subtitle="Active production and delivered work. Filter by month or status."
+      />
 
       <ListToolbar
         search={q}
@@ -362,7 +344,10 @@ export function PortalOrders() {
               key={m}
               type="button"
               className={`mpill${m === 'all' ? ' all' : ''}${month === m ? ' on' : ''}`}
-              onClick={() => setMonth(m)}
+              onClick={() => {
+                setMonth(m);
+                setPage(1);
+              }}
             >
               {monthLabel(m)}
             </button>
@@ -377,7 +362,7 @@ export function PortalOrders() {
         </div>
         <div className="psum">
           <div className="pl">Designs</div>
-          <div className="pv">{summary.designs || '—'}</div>
+          <div className="pv">{summary.designs || 'None'}</div>
         </div>
         <div className="psum">
           <div className="pl">Delivered</div>
@@ -392,7 +377,7 @@ export function PortalOrders() {
       <div className="card">
         <div className="card-h">
           <span className="ct">
-            {monthLabel(month)} — {filtered.length} order{filtered.length === 1 ? '' : 's'}
+            {monthLabel(month)} ({summary.count} order{summary.count === 1 ? '' : 's'})
           </span>
           <div className="filters">
             {(
@@ -406,7 +391,10 @@ export function PortalOrders() {
                 key={k}
                 type="button"
                 className={filter === k ? 'on' : undefined}
-                onClick={() => setFilter(k)}
+                onClick={() => {
+                  setFilter(k);
+                  setPage(1);
+                }}
               >
                 {label}
               </button>
@@ -414,52 +402,83 @@ export function PortalOrders() {
           </div>
         </div>
 
-        {isLoading && <div className="empty">Loading…</div>}
+        {isLoading && <SkeletonRows rows={5} />}
         {!isLoading && pageItems.length === 0 && (
-          <div className="empty">
-            <i className="ti ti-package" />
-            <p>No orders in this period.</p>
-          </div>
+          <EmptyState
+            icon="ti-package"
+            title="No orders in this view"
+            description="Try another period or status, or start with a new quote."
+          />
         )}
 
-        {pageItems.map((o) => {
-          const open = expanded === o.id;
-          const chip = orderChip(o);
-          return (
-            <div key={o.id}>
-              <div
-                className="orow"
-                onClick={() => {
-                  navigate(`/portal/orders/${o.id}`);
-                }}
-                onDoubleClick={() => setExpanded((prev) => (prev === o.id ? null : o.id))}
-              >
-                <div className={`thumb${serviceThumbClass(o.serviceType) ? ' m' : ''}`}>
-                  <i className={`ti ${serviceTi(o.serviceType)}`} />
-                </div>
-                <div className="oinfo">
-                  <div className="on">{o.name ?? o.serviceType ?? 'Order'}</div>
-                  <div className="om">
-                    <span>
-                      <i className="ti ti-hash" style={{ fontSize: 12 }} />
-                      {o.humanRef ?? o.id.slice(0, 6)}
-                    </span>
-                    <span>{dateShort(o.createdAt)}</span>
-                  </div>
-                </div>
-                <span className={chip.cls}>{chip.label}</span>
-                <div className="oprice">{money(o.priceCents)}</div>
-              </div>
-              <OrderBatch orderId={o.id} open={open} />
-            </div>
-          );
-        })}
+        {!isLoading && pageItems.length > 0 && (
+          <table className="itable">
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th className="num">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pageItems.map((o) => {
+                const open = expanded === o.id;
+                const chip = orderChip(o);
+                return (
+                  <Fragment key={o.id}>
+                    <tr className="click-row" onClick={() => navigate(`/portal/orders/${o.id}`)}>
+                      <td>
+                        <div className="cell-main">
+                          <div className={`thumb${serviceThumbClass(o.serviceType) ? ' m' : ''}`}>
+                            <i className={`ti ${serviceTi(o.serviceType)}`} />
+                          </div>
+                          <div>
+                            <div className="on">{o.name ?? o.serviceType ?? 'Order'}</div>
+                            <div className="om">{o.humanRef ?? o.id.slice(0, 6)}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span className={chip.cls}>{chip.label}</span>
+                      </td>
+                      <td className="muted">{dateShort(o.createdAt)}</td>
+                      <td className="num">
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+                          {money(o.priceCents)}
+                          <button
+                            type="button"
+                            className="icon-btn"
+                            aria-label={open ? 'Hide details' : 'Show details'}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpanded((prev) => (prev === o.id ? null : o.id));
+                            }}
+                          >
+                            <i className={`ti ${open ? 'ti-chevron-up' : 'ti-chevron-down'}`} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {open && (
+                      <tr className="expand-row">
+                        <td colSpan={4}>
+                          <OrderBatch orderId={o.id} open={open} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
 
       <PaginationBar
         page={page}
         totalPages={totalPages}
-        total={filtered.length}
+        total={data?.total ?? summary.count}
         onPage={setPage}
       />
     </div>

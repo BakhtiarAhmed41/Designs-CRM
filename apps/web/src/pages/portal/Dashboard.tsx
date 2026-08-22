@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { QuoteBuilderModal } from '@/components/QuoteBuilderModal';
-import { NotificationBell } from '@/components/NotificationBell';
 import { listMyOrders } from '@/lib/orders';
 import { listMyInvoices } from '@/lib/billing';
 import { listMyConversations } from '@/lib/messaging';
@@ -11,6 +10,8 @@ import { useAuth } from '@/context/AuthContext';
 import { money, statusChipClass, statusLabel } from '@/lib/format';
 import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import type { Order } from '@/lib/types';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { SkeletonRows } from '@/components/ui/Skeleton';
 
 const DONE = ['COMPLETED', 'CLOSED', 'REJECTED', 'CANCELLED'];
 
@@ -30,7 +31,7 @@ export function PortalDashboard() {
 
   const { data: ordersData, isLoading } = useQuery({
     queryKey: ['my-orders'],
-    queryFn: listMyOrders,
+    queryFn: () => listMyOrders(),
   });
   const { data: invoicesData } = useQuery({
     queryKey: ['my-invoices'],
@@ -55,13 +56,13 @@ export function PortalDashboard() {
     (n, c) => n + (c.unreadClient ?? 0),
     0,
   );
-  const monthSpend = orders
-    .filter((o) => {
-      const d = new Date(o.createdAt);
-      const now = new Date();
-      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-    })
-    .reduce((s, o) => s + (o.priceCents ?? 0), 0);
+  const monthKey = (() => {
+    const now = new Date();
+    return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+  })();
+  const monthSpend = (invoicesData?.invoices ?? [])
+    .filter((i) => (i.issuedAt ?? '').slice(0, 7) === monthKey)
+    .reduce((s, i) => s + (i.amountCents ?? 0), 0);
 
   const attention = useMemo(() => {
     const rows: Array<{
@@ -75,45 +76,38 @@ export function PortalDashboard() {
       action?: { label: string; to: string };
     }> = [];
 
-    const waiting = activeOrders.find((o) =>
-      ['REVISION_REQUESTED', 'PENDING_PAYMENT'].includes(o.status),
-    );
-    if (waiting) {
+    for (const o of quotesReady) {
       rows.push({
-        key: waiting.id,
-        thumb: 'ti-alert-circle',
+        key: `q-${o.id}`,
+        thumb: serviceTi(o.serviceType),
         thumbMar: true,
-        title: waiting.name ?? 'Order needs your input',
-        meta: `Order #${waiting.humanRef ?? waiting.id.slice(0, 6)}`,
-        chip: 'chip c-wait',
-        chipLabel: 'Action needed',
-        action: { label: 'Reply', to: '/portal/messages' },
-      });
-    }
-
-    if (quotesReady[0]) {
-      const q = quotesReady[0];
-      rows.push({
-        key: q.id,
-        thumb: 'ti-file-invoice',
-        thumbMar: true,
-        title: `Quote ready — ${q.name ?? 'your request'}`,
-        meta: `#${q.humanRef ?? q.id.slice(0, 6)} · ${money(q.quotations?.[0]?.amountCents ?? null)}`,
+        title: o.name ?? 'Quote ready',
+        meta: o.humanRef ?? o.id.slice(0, 6),
         chip: 'chip c-quote',
-        chipLabel: 'Approve to start',
-        action: { label: 'Review', to: '/portal/quotes' },
+        chipLabel: 'Approve quote',
+        action: { label: 'Review', to: `/portal/quotes/${o.id}` },
       });
     }
-
-    if (unpaidInvoices[0]) {
-      const inv = unpaidInvoices[0];
+    for (const o of activeOrders.slice(0, 4)) {
       rows.push({
-        key: inv.id,
+        key: `o-${o.id}`,
+        thumb: serviceTi(o.serviceType),
+        title: o.name ?? o.serviceType ?? 'Order',
+        meta: o.humanRef ?? o.id.slice(0, 6),
+        chip: statusChipClass(o.status),
+        chipLabel: statusLabel(o.status),
+        action: { label: 'Open', to: `/portal/orders/${o.id}` },
+      });
+    }
+    for (const inv of unpaidInvoices.slice(0, 3)) {
+      rows.push({
+        key: `i-${inv.id}`,
         thumb: 'ti-receipt',
-        title: inv.coversText ?? 'Invoice pending payment',
-        meta: `${money(inv.amountCents, inv.currency)} · ${inv.periodMonth ?? 'Due soon'}`,
-        chip: 'chip c-unpaid',
-        chipLabel: 'Pending',
+        thumbMar: true,
+        title: inv.coversText ?? 'Invoice due',
+        meta: money(inv.amountCents),
+        chip: 'chip c-review',
+        chipLabel: 'Unpaid',
         action: { label: 'Pay now', to: '/portal/invoices' },
       });
     }
@@ -121,176 +115,135 @@ export function PortalDashboard() {
     return rows;
   }, [activeOrders, quotesReady, unpaidInvoices]);
 
-  const recent = orders.filter((o) => !isQuote(o)).slice(0, 4);
+  const recent = orders.filter((o) => !isQuote(o)).slice(0, 6);
+  const unpaidTotal = unpaidInvoices.reduce((s, i) => s + i.amountCents, 0);
+  const firstName = user?.firstName || 'there';
 
   return (
     <div>
-      <div className="ph">
+      <div className="hero">
         <div>
-          <h1>Welcome back, {user?.firstName || 'there'}</h1>
-          <div className="sub">Here&apos;s where everything stands right now.</div>
+          <h2>Welcome back, {firstName}</h2>
+          <p>Quotes, orders, invoices, and messages in one place to keep work moving.</p>
         </div>
-        <div className="topbar">
-          <button type="button" className="btn btn-primary" onClick={() => setQuoteOpen(true)}>
-            <i className="ti ti-plus" /> New order
-          </button>
-          <NotificationBell />
-        </div>
+        <button type="button" className="btn btn-primary" onClick={() => setQuoteOpen(true)}>
+          <i className="ti ti-plus" /> Start new quote
+        </button>
       </div>
 
-      <div className="tasks">
-        <div className="task" onClick={() => navigate('/portal/orders')} role="button" tabIndex={0}>
-          <div className="tt">
-            <i className="ti ti-package" style={{ color: 'var(--navy)' }} /> Active orders
-            {activeOrders.length > 0 && <span className="badge">{activeOrders.length}</span>}
+      <div className="metric-row">
+        <button type="button" className="metric" onClick={() => navigate('/portal/orders')}>
+          <div className="ml">Active orders</div>
+          <div className="mv">{activeOrders.length}</div>
+          <div className="md">
+            {quotesPending.length > 0
+              ? `${quotesPending.length} quote${quotesPending.length === 1 ? '' : 's'} being priced`
+              : 'In production now'}
           </div>
-          <div className="tb">
-            <b>{activeOrders.length} in progress</b>
-            {quotesPending.length > 0 && ` · ${quotesPending.length} awaiting quote`}
-          </div>
-        </div>
-
+        </button>
         {isNet ? (
-          <>
-            <div className="task" onClick={() => navigate('/portal/invoices')} role="button" tabIndex={0}>
-              <div className="tt">
-                <i className="ti ti-cash" style={{ color: 'var(--maroon)' }} /> This month
-              </div>
-              <div className="tb">
-                <b>{money(monthSpend)}</b> so far · statement generates next month
-              </div>
-            </div>
-            <div className="task" onClick={() => navigate('/portal/invoices')} role="button" tabIndex={0}>
-              <div className="tt">
-                <i className="ti ti-file-invoice" style={{ color: 'var(--maroon)' }} /> Statement due
-              </div>
-              <div className="tb">
-                {unpaidInvoices[0] ? (
-                  <>
-                    <b>{money(unpaidInvoices[0].amountCents)}</b> pending
-                  </>
-                ) : (
-                  <b>Nothing due</b>
-                )}
-              </div>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="task" onClick={() => navigate('/portal/quotes')} role="button" tabIndex={0}>
-              <div className="tt">
-                <i className="ti ti-file-invoice" style={{ color: 'var(--maroon)' }} /> Quote to approve
-                {quotesReady.length > 0 && <span className="badge">{quotesReady.length}</span>}
-              </div>
-              <div className="tb">
-                {quotesReady.length > 0 ? (
-                  <b>Ready to review</b>
-                ) : (
-                  <b>Nothing waiting on you</b>
-                )}
-              </div>
-            </div>
-            <div className="task" onClick={() => navigate('/portal/invoices')} role="button" tabIndex={0}>
-              <div className="tt">
-                <i className="ti ti-credit-card" style={{ color: 'var(--maroon)' }} /> Balance due
-              </div>
-              <div className="tb">
-                {unpaidInvoices.length > 0 ? (
-                  <b>{money(unpaidInvoices.reduce((s, i) => s + i.amountCents, 0))}</b>
-                ) : (
-                  <b>All paid</b>
-                )}
-              </div>
-            </div>
-          </>
-        )}
-
-        <div className="task" onClick={() => navigate('/portal/messages')} role="button" tabIndex={0}>
-          <div className="tt">
-            <i className="ti ti-message" style={{ color: 'var(--navy)' }} /> Messages
-            {msgUnread > 0 && <span className="badge">{msgUnread}</span>}
-          </div>
-          <div className="tb">
-            {msgUnread > 0 ? (
-              <b>{msgUnread} unread</b>
-            ) : (
-              <b>No unread messages</b>
-            )}{' '}
-            from our team
-          </div>
-        </div>
-      </div>
-
-      <div className="card">
-        <div className="card-h">
-          <span className="ct">Needs your attention</span>
-        </div>
-        {isLoading && <div className="empty">Loading…</div>}
-        {!isLoading && attention.length === 0 && (
-          <div className="empty">
-            <i className="ti ti-circle-check" />
-            <p>All caught up — nothing needs your attention.</p>
-          </div>
-        )}
-        {attention.map((row) => (
-          <div key={row.key} className="orow">
-            <div className={`thumb${row.thumbMar ? ' m' : ''}`}>
-              <i className={`ti ${row.thumb}`} />
-            </div>
-            <div className="oinfo">
-              <div className="on">{row.title}</div>
-              <div className="om">
-                <span>{row.meta}</span>
-              </div>
-            </div>
-            <span className={row.chip}>{row.chipLabel}</span>
-            <div className="oprice">
-              {row.action && (
-                <Link to={row.action.to} className="btn btn-primary btn-sm">
-                  {row.action.label}
-                </Link>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="card">
-        <div className="card-h">
-          <span className="ct">Recent activity</span>
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => navigate('/portal/orders')}>
-            View all orders
+          <button type="button" className="metric" onClick={() => navigate('/portal/invoices')}>
+            <div className="ml">This month</div>
+            <div className="mv">{money(monthSpend)}</div>
+            <div className="md">Statement generates next month</div>
           </button>
-        </div>
-        {!isLoading && recent.length === 0 && (
-          <div className="empty">
-            <p>No orders yet. Start with a new quote.</p>
-          </div>
+        ) : (
+          <button type="button" className="metric" onClick={() => navigate('/portal/quotes')}>
+            <div className="ml">Quotes to approve</div>
+            <div className={`mv${quotesReady.length ? ' alert' : ''}`}>{quotesReady.length}</div>
+            <div className="md">{quotesReady.length ? 'Ready for your review' : 'Nothing waiting on you'}</div>
+          </button>
         )}
-        {recent.map((o) => (
-          <Link
-            key={o.id}
-            to={`/portal/orders/${o.id}`}
-            className="orow"
-            style={{ textDecoration: 'none', color: 'inherit' }}
-          >
-            <div className={`thumb${serviceThumbClass(o.serviceType) ? ' m' : ''}`}>
-              <i className={`ti ${serviceTi(o.serviceType)}`} />
-            </div>
-            <div className="oinfo">
-              <div className="on">{o.name ?? o.serviceType ?? 'Order'}</div>
-              <div className="om">
-                <span>
-                  <i className="ti ti-hash" style={{ fontSize: 12 }} />
-                  {o.humanRef ?? o.id.slice(0, 6)}
-                </span>
-                <span>{o.serviceType}</span>
+        <button type="button" className="metric" onClick={() => navigate('/portal/invoices')}>
+          <div className="ml">{isNet ? 'Statement due' : 'Balance due'}</div>
+          <div className={`mv${unpaidTotal ? ' alert' : ''}`}>{money(unpaidTotal)}</div>
+          <div className="md">
+            {unpaidInvoices.length
+              ? `${unpaidInvoices.length} open invoice${unpaidInvoices.length === 1 ? '' : 's'}`
+              : 'All paid'}
+          </div>
+        </button>
+        <button type="button" className="metric" onClick={() => navigate('/portal/messages')}>
+          <div className="ml">Messages</div>
+          <div className={`mv${msgUnread ? ' alert' : ''}`}>{msgUnread}</div>
+          <div className="md">{msgUnread ? 'Unread from our team' : 'Inbox is clear'}</div>
+        </button>
+      </div>
+
+      <div className="board">
+        <div className="panel">
+          <div className="panel-h">
+            <h3>Needs your attention</h3>
+          </div>
+          {isLoading && <SkeletonRows rows={3} />}
+          {!isLoading && attention.length === 0 && (
+            <EmptyState
+              icon="ti-circle-check"
+              title="All caught up"
+              description="Nothing needs you right now. Start a new quote when you’re ready."
+              action={
+                <button type="button" className="btn btn-primary btn-sm" onClick={() => setQuoteOpen(true)}>
+                  Start new quote
+                </button>
+              }
+            />
+          )}
+          {attention.map((row) => (
+            <div key={row.key} className="orow">
+              <div className={`thumb${row.thumbMar ? ' m' : ''}`}>
+                <i className={`ti ${row.thumb}`} />
+              </div>
+              <div className="oinfo">
+                <div className="on">{row.title}</div>
+                <div className="om">
+                  <span>{row.meta}</span>
+                </div>
+              </div>
+              <span className={row.chip}>{row.chipLabel}</span>
+              <div className="oprice">
+                {row.action && (
+                  <Link to={row.action.to} className="btn btn-primary btn-sm">
+                    {row.action.label}
+                  </Link>
+                )}
               </div>
             </div>
-            <span className={statusChipClass(o.status)}>{statusLabel(o.status)}</span>
-            <div className="oprice">{money(o.priceCents)}</div>
-          </Link>
-        ))}
+          ))}
+        </div>
+
+        <div className="panel">
+          <div className="panel-h">
+            <h3>Recent orders</h3>
+            <Link to="/portal/orders">View all</Link>
+          </div>
+          {!isLoading && recent.length === 0 && (
+            <EmptyState
+              icon="ti-package"
+              title="No orders yet"
+              description="Approve a quote and it will show up here."
+            />
+          )}
+          {recent.map((o) => (
+            <Link
+              key={o.id}
+              to={`/portal/orders/${o.id}`}
+              className="orow"
+              style={{ textDecoration: 'none', color: 'inherit' }}
+            >
+              <div className={`thumb${serviceThumbClass(o.serviceType) ? ' m' : ''}`}>
+                <i className={`ti ${serviceTi(o.serviceType)}`} />
+              </div>
+              <div className="oinfo">
+                <div className="on">{o.name ?? o.serviceType ?? 'Order'}</div>
+                <div className="om">
+                  <span>{o.humanRef ?? o.id.slice(0, 6)}</span>
+                </div>
+              </div>
+              <span className={statusChipClass(o.status)}>{statusLabel(o.status)}</span>
+              <div className="oprice">{money(o.priceCents)}</div>
+            </Link>
+          ))}
+        </div>
       </div>
 
       <QuoteBuilderModal open={quoteOpen} onClose={() => setQuoteOpen(false)} />

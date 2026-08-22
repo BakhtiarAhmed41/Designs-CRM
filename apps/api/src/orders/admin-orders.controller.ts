@@ -143,6 +143,7 @@ const quoteBuilderSchema = z.object({
       z.object({
         name: z.string().min(1),
         note: z.string().optional().nullable(),
+        attachmentId: z.string().optional().nullable(),
         priceCents: z.number().int().nonnegative().optional().nullable(),
         sizes: z
           .array(
@@ -177,6 +178,9 @@ export class AdminOrdersController {
   async list(
     @CurrentUser() user: AuthUser | undefined,
     @Query('status') status: string | undefined,
+    @Query('statuses') statusesRaw: string | undefined,
+    @Query('olderThanDays') olderThanDays: string | undefined,
+    @Query('updatedOlderThanDays') updatedOlderThanDays: string | undefined,
     @Query('clientId') clientId: string | undefined,
     @Query('type') type: string | undefined,
     @Query('q') q: string | undefined,
@@ -193,8 +197,17 @@ export class AdminOrdersController {
     const types = Object.values(OrderType) as string[];
     const parsedType =
       type && types.includes(type) ? (type as OrderType) : undefined;
+    const parsedStatuses = (statusesRaw ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => statuses.includes(s)) as OrderStatus[];
+    const older = olderThanDays ? Number(olderThanDays) : undefined;
+    const updatedOlder = updatedOlderThanDays ? Number(updatedOlderThanDays) : undefined;
     const result = await this.orders.listAdminOrders(user, {
       status: parsedStatus,
+      statuses: parsedStatuses.length ? parsedStatuses : undefined,
+      olderThanDays: Number.isFinite(older) ? older : undefined,
+      updatedOlderThanDays: Number.isFinite(updatedOlder) ? updatedOlder : undefined,
       clientId: clientId || undefined,
       type: parsedType,
       q: q?.trim() || undefined,
@@ -211,6 +224,27 @@ export class AdminOrdersController {
       pageSize: result.pageSize,
       totalPages: result.totalPages,
     };
+  }
+
+  @Get('format-requests')
+  async formatRequests(
+    @CurrentUser() user: AuthUser | undefined,
+    @Query('orderId') orderId: string | undefined,
+  ) {
+    const requests = await this.orders.listFormatRequests(user, orderId);
+    return { requests };
+  }
+
+  @Patch('format-requests/:requestId')
+  async updateFormatRequest(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('requestId') requestId: string,
+    @Body() body: unknown,
+  ) {
+    const data = z
+      .object({ status: z.enum(['PENDING', 'IN_PROGRESS', 'DONE', 'CANCELLED']) })
+      .parse(body);
+    return this.orders.updateFormatRequest(user, requestId, data.status);
   }
 
   @Post()

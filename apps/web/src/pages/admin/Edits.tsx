@@ -6,6 +6,9 @@ import { listTeam } from '@/lib/team';
 import { getErrorMessage } from '@/lib/api';
 import { money, dateShort } from '@/lib/format';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { SkeletonRows } from '@/components/ui/Skeleton';
 
 type FilterId = '' | EditStatus | 'FREE' | 'PAID' | 'IN_PROGRESS';
 
@@ -28,11 +31,23 @@ export function AdminEdits() {
   const [filter, setFilter] = useState<FilterId>('');
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
-  const statusFilter = filter === 'PENDING' || filter === 'DONE' ? filter : undefined;
+  const queryParams = useMemo(() => {
+    const base = { q: q.trim() || undefined, page, pageSize: 20 };
+    if (filter === 'FREE') return { ...base, kind: 'FREE' as const };
+    if (filter === 'PAID') return { ...base, kind: 'PAID' as const };
+    if (filter === 'IN_PROGRESS') {
+      return { ...base, status: 'PENDING' as const, assigned: 'yes' as const };
+    }
+    if (filter === 'PENDING') {
+      return { ...base, status: 'PENDING' as const, assigned: 'no' as const };
+    }
+    if (filter === 'DONE') return { ...base, status: 'DONE' as const };
+    return base;
+  }, [filter, q, page]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-edits', statusFilter ?? '', q],
-    queryFn: () => listAdminEdits(statusFilter, q || undefined),
+    queryKey: ['admin-edits', queryParams],
+    queryFn: () => listAdminEdits(queryParams),
     refetchInterval: 30_000,
   });
 
@@ -43,18 +58,8 @@ export function AdminEdits() {
 
   const designers = (teamQ.data?.members ?? []).filter((m) => m.role === 'DESIGNER');
 
-  const editsAll = useMemo(() => {
-    let list = data?.edits ?? [];
-    if (filter === 'FREE') list = list.filter((e) => e.kind === 'FREE');
-    if (filter === 'PAID') list = list.filter((e) => e.kind === 'PAID');
-    if (filter === 'IN_PROGRESS') list = list.filter((e) => e.status === 'PENDING' && !!e.assignedDesignerId);
-    if (filter === 'PENDING') list = list.filter((e) => e.status === 'PENDING' && !e.assignedDesignerId);
-    return list;
-  }, [data?.edits, filter]);
-
-  const pageSize = 20;
-  const totalPages = Math.max(1, Math.ceil(editsAll.length / pageSize));
-  const edits = editsAll.slice((page - 1) * pageSize, page * pageSize);
+  const edits = data?.edits ?? [];
+  const totalPages = data?.totalPages ?? 1;
 
   const sections = useMemo(() => {
     const waiting = edits.filter((e) => sectionFor(e) === 'waiting');
@@ -69,14 +74,10 @@ export function AdminEdits() {
 
   return (
     <div>
-      <div className="ph">
-        <div>
-          <h1>Edits &amp; revisions</h1>
-          <div className="sub">
-            Every edit request ever — pending ones need action, done ones stay here as history.
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Edits & revisions"
+        subtitle="Waiting, in progress, and done. Assign a designer from the row."
+      />
 
       <ListToolbar
         search={q}
@@ -97,7 +98,7 @@ export function AdminEdits() {
         ]}
       />
 
-      <div style={{ margin: '0 0 10px' }}>
+      <div>
         <div className="filters">
           {FILTERS.map((f) => (
             <button
@@ -116,9 +117,13 @@ export function AdminEdits() {
       </div>
 
       <div className="card">
-        {isLoading && <div style={{ padding: 16, color: 'var(--muted)' }}>Loading...</div>}
+        {isLoading && <SkeletonRows rows={5} />}
         {!isLoading && edits.length === 0 && (
-          <div style={{ padding: 16, color: 'var(--muted)' }}>No edit requests match this filter.</div>
+          <EmptyState
+            icon="ti-refresh"
+            title="No edits in this view"
+            description="Revision requests will appear here when customers ask for changes."
+          />
         )}
         {sections.map((sec) => (
           <div key={sec.key}>
@@ -134,7 +139,7 @@ export function AdminEdits() {
       <PaginationBar
         page={page}
         totalPages={totalPages}
-        total={editsAll.length}
+        total={data?.total ?? edits.length}
         onPage={setPage}
       />
     </div>

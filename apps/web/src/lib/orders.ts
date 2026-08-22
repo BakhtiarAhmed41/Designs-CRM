@@ -11,6 +11,7 @@ export function createOrder(data: {
   instructions?: string | null;
   size?: string | null;
   preferences?: unknown;
+  turnaroundKey?: string | null;
 }) {
   return apiFetch<{ order: Order }>('/orders', {
     method: 'POST',
@@ -18,8 +19,40 @@ export function createOrder(data: {
   });
 }
 
-export function listMyOrders() {
-  return apiFetch<{ orders: Order[] }>('/orders');
+export function listMyOrders(params?: {
+  type?: string;
+  status?: string;
+  lifecycle?: 'active' | 'delivered';
+  q?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  page?: number;
+  pageSize?: number;
+}) {
+  const q = new URLSearchParams();
+  if (params?.type) q.set('type', params.type);
+  if (params?.status) q.set('status', params.status);
+  if (params?.lifecycle) q.set('lifecycle', params.lifecycle);
+  if (params?.q) q.set('q', params.q);
+  if (params?.dateFrom) q.set('dateFrom', params.dateFrom);
+  if (params?.dateTo) q.set('dateTo', params.dateTo);
+  if (params?.page) q.set('page', String(params.page));
+  if (params?.pageSize) q.set('pageSize', String(params.pageSize));
+  const qs = q.toString();
+  return apiFetch<{
+    orders: Order[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+    delivered?: number;
+    totalCents?: number;
+    designs?: number;
+  }>(qs ? `/orders?${qs}` : '/orders');
+}
+
+export function listMyOrderSummary() {
+  return apiFetch<{ awaitingQuote: number; beingPriced: number }>('/orders/summary');
 }
 
 export function getMyOrder(id: string) {
@@ -71,6 +104,9 @@ export function counterQuotation(
 // --- admin ----------------------------------------------------------------
 export function listAdminOrders(params?: {
   status?: string;
+  statuses?: string[];
+  olderThanDays?: number;
+  updatedOlderThanDays?: number;
   clientId?: string;
   type?: string;
   q?: string;
@@ -81,6 +117,10 @@ export function listAdminOrders(params?: {
 }) {
   const q = new URLSearchParams();
   if (params?.status) q.set('status', params.status);
+  if (params?.statuses?.length) q.set('statuses', params.statuses.join(','));
+  if (params?.olderThanDays) q.set('olderThanDays', String(params.olderThanDays));
+  if (params?.updatedOlderThanDays)
+    q.set('updatedOlderThanDays', String(params.updatedOlderThanDays));
   if (params?.clientId) q.set('clientId', params.clientId);
   if (params?.type) q.set('type', params.type);
   if (params?.q) q.set('q', params.q);
@@ -225,6 +265,68 @@ export function myAttachmentUrl(orderId: string, attachmentId: string) {
 }
 export function myDeliveryFileUrl(orderId: string, fileId: string) {
   return `/orders/${orderId}/delivery-files/${fileId}/signed-url`;
+}
+
+export function saveQuoteDraft(serviceKey: string, payload: unknown) {
+  return apiFetch<{ id: string }>(`/orders/drafts/${encodeURIComponent(serviceKey)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ payload }),
+  });
+}
+
+export function getQuoteDraft(serviceKey: string) {
+  return apiFetch<{ draft: { payload: unknown; updatedAt: string } | null }>(
+    `/orders/drafts/${encodeURIComponent(serviceKey)}`,
+  );
+}
+
+export function createQuoteIntent(serviceKey: string, payload: unknown) {
+  return apiFetch<{ token: string }>(
+    '/public/quote-intents',
+    { method: 'POST', body: JSON.stringify({ serviceKey, payload }) },
+  );
+}
+
+export function claimQuoteIntent(token: string) {
+  return apiFetch<{ order: Order }>(`/orders/intents/${encodeURIComponent(token)}/claim`, {
+    method: 'POST',
+  });
+}
+
+export function requestFormat(
+  orderId: string,
+  data: { format: string; deliveryFileId?: string | null; note?: string | null },
+) {
+  return apiFetch<{ id: string; status: string }>(
+    `/orders/${orderId}/format-requests`,
+    { method: 'POST', body: JSON.stringify(data) },
+  );
+}
+
+export type FormatRequest = {
+  id: string;
+  orderId: string;
+  format: string;
+  note: string | null;
+  status: 'PENDING' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED';
+  createdAt: string;
+  humanRef: string | null;
+  orderName: string | null;
+};
+
+export function listAdminFormatRequests(orderId?: string) {
+  const q = orderId ? `?orderId=${encodeURIComponent(orderId)}` : '';
+  return apiFetch<{ requests: FormatRequest[] }>(`/admin/orders/format-requests${q}`);
+}
+
+export function updateAdminFormatRequest(
+  id: string,
+  status: FormatRequest['status'],
+) {
+  return apiFetch<{ id: string; status: string }>(
+    `/admin/orders/format-requests/${id}`,
+    { method: 'PATCH', body: JSON.stringify({ status }) },
+  );
 }
 export function adminAttachmentUrl(orderId: string, attachmentId: string) {
   return `/admin/orders/${orderId}/attachments/${attachmentId}/signed-url`;

@@ -1,15 +1,18 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { QuoteBuilderModal } from '@/components/QuoteBuilderModal';
-import { acceptQuotation, listMyOrders, rejectQuotation } from '@/lib/orders';
+import { acceptQuotation, listMyOrderSummary, listMyOrders, myAttachmentUrl, rejectQuotation } from '@/lib/orders';
 import { createMyConversation, listMyConversations } from '@/lib/messaging';
-import { getErrorMessage } from '@/lib/api';
+import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import { money, dateShort, quoteLifecycleChip } from '@/lib/format';
 import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import type { Order, Quotation } from '@/lib/types';
 import type { QuotationLine } from '@/lib/designs';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
+import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
+import { SkeletonRows } from '@/components/ui/Skeleton';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 type QuoteWithLines = Quotation & { lines?: QuotationLine[] };
 
@@ -46,37 +49,27 @@ export function PortalQuotes() {
   const [page, setPage] = useState(1);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['my-orders'],
-    queryFn: listMyOrders,
+    queryKey: ['my-quotes', q, status, dateFrom, dateTo, page],
+    queryFn: () =>
+      listMyOrders({
+        type: 'QUOTE_REQUEST',
+        status: status || undefined,
+        q: q.trim() || undefined,
+        dateFrom: dateFrom || undefined,
+        dateTo: dateTo || undefined,
+        page,
+        pageSize: 10,
+      }),
+  });
+  const summaryQ = useQuery({
+    queryKey: ['my-orders-summary'],
+    queryFn: listMyOrderSummary,
   });
 
-  const quotesAll = useMemo(() => {
-    let list = (data?.orders ?? []).filter(
-      (o) => o.type === 'QUOTE_REQUEST' && isQuoteOrder(o),
-    );
-    if (status) list = list.filter((o) => o.status === status);
-    if (q.trim()) {
-      const term = q.trim().toLowerCase();
-      list = list.filter(
-        (o) =>
-          (o.name ?? '').toLowerCase().includes(term) ||
-          (o.humanRef ?? '').toLowerCase().includes(term),
-      );
-    }
-    if (dateFrom) {
-      list = list.filter((o) => o.createdAt.slice(0, 10) >= dateFrom);
-    }
-    if (dateTo) {
-      list = list.filter((o) => o.createdAt.slice(0, 10) <= dateTo);
-    }
-    return list;
-  }, [data?.orders, q, status, dateFrom, dateTo]);
-
-  const pageSize = 10;
-  const totalPages = Math.max(1, Math.ceil(quotesAll.length / pageSize));
-  const quotes = quotesAll.slice((page - 1) * pageSize, page * pageSize);
-  const awaiting = quotesAll.filter((o) => o.status === 'QUOTATION_PROVIDED').length;
-  const pricing = quotesAll.filter((o) => o.status === 'WAITING_FOR_QUOTATION').length;
+  const quotes = (data?.orders ?? []).filter((o) => isQuoteOrder(o));
+  const totalPages = data?.totalPages ?? 1;
+  const awaiting = summaryQ.data?.awaitingQuote ?? 0;
+  const pricing = summaryQ.data?.beingPriced ?? 0;
 
   const approveMut = useMutation({
     mutationFn: ({ orderId, keepLineIds }: { orderId: string; keepLineIds?: string[] }) =>
@@ -148,35 +141,28 @@ export function PortalQuotes() {
 
   return (
     <div>
-      <div className="ph">
-        <div>
-          <h1>Quotes</h1>
-          <div className="sub">
-            Requests you&apos;ve submitted. See our price, then approve to start production or
-            message us to adjust.
-          </div>
-        </div>
-        <button type="button" className="btn btn-primary" onClick={() => setQuoteOpen(true)}>
-          <i className="ti ti-plus" /> Request a quote
-        </button>
-      </div>
+      <PageHeader
+        title="Quotes"
+        subtitle="See our price, then approve to start, or message us to adjust."
+        actions={
+          <button type="button" className="btn btn-primary" onClick={() => setQuoteOpen(true)}>
+            <i className="ti ti-plus" /> Request a quote
+          </button>
+        }
+      />
 
-      {error && (
-        <div className="alert-error" style={{ marginBottom: 14 }}>
-          {error}
-        </div>
-      )}
+      {error && <ErrorBanner>{error}</ErrorBanner>}
 
-      <div className="stats" style={{ marginBottom: 18 }}>
-        <div className="stat">
-          <div className="sl">Awaiting your approval</div>
-          <div className="sv maroon">{awaiting}</div>
-          <div className="sd">Ready to review</div>
+      <div className="metric-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
+        <div className="metric" style={{ cursor: 'default' }}>
+          <div className="ml">Awaiting your approval</div>
+          <div className={`mv${awaiting ? ' alert' : ''}`}>{awaiting}</div>
+          <div className="md">Ready to review</div>
         </div>
-        <div className="stat">
-          <div className="sl">Being priced by us</div>
-          <div className="sv">{pricing}</div>
-          <div className="sd">We&apos;ll get back within a few hours</div>
+        <div className="metric" style={{ cursor: 'default' }}>
+          <div className="ml">Being priced by us</div>
+          <div className="mv">{pricing}</div>
+          <div className="md">We’ll get back within a few hours</div>
         </div>
       </div>
 
@@ -215,12 +201,18 @@ export function PortalQuotes() {
         <div className="card-h">
           <span className="ct">Your quotes</span>
         </div>
-        {isLoading && <div className="empty">Loading…</div>}
+        {isLoading && <SkeletonRows rows={4} />}
         {!isLoading && quotes.length === 0 && (
-          <div className="empty">
-            <i className="ti ti-file-invoice" />
-            <p>No quote requests yet.</p>
-          </div>
+          <EmptyState
+            icon="ti-file-invoice"
+            title="No quotes yet"
+            description="Request a quote and we’ll price it. Approve to start production."
+            action={
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => setQuoteOpen(true)}>
+                Request a quote
+              </button>
+            }
+          />
         )}
         {quotes.map((o) => {
           const chip = quoteLifecycleChip(o.status, 'customer', {
@@ -238,7 +230,13 @@ export function PortalQuotes() {
             <div key={o.id}>
               <div
                 className="orow"
-                onClick={() => navigate(`/portal/quotes/${o.id}`)}
+                onClick={() => {
+                  if (canApprove || lines.length > 0) {
+                    toggle(o.id);
+                    return;
+                  }
+                  navigate(`/portal/quotes/${o.id}`);
+                }}
                 style={{ cursor: 'pointer' }}
               >
                 <div className={`thumb${serviceThumbClass(o.serviceType) ? ' m' : ''}`}>
@@ -265,7 +263,9 @@ export function PortalQuotes() {
                   {total != null ? (
                     <>
                       {money(total, quote?.currency)}
-                      {lines.length > 0 && <div className="os">tap to see breakdown</div>}
+                      {lines.length > 0 && (
+                        <div className="os">{open ? 'tap to close' : 'tap to see breakdown'}</div>
+                      )}
                     </>
                   ) : (
                     <span style={{ color: 'var(--faint)', fontWeight: 500 }}>Pending</span>
@@ -303,6 +303,21 @@ export function PortalQuotes() {
                             {l.note}
                           </span>
                         )}
+                        {l.attachmentId && (
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void downloadSignedFile(
+                                myAttachmentUrl(o.id, l.attachmentId!),
+                                l.name,
+                              );
+                            }}
+                          >
+                            <i className="ti ti-download" /> File
+                          </button>
+                        )}
                         <span
                           className="lp"
                           style={{ opacity: canApprove && !checked ? 0.4 : 1 }}
@@ -322,6 +337,16 @@ export function PortalQuotes() {
                         flexWrap: 'wrap',
                       }}
                     >
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/portal/quotes/${o.id}`);
+                        }}
+                      >
+                        Open quote
+                      </button>
                       <button
                         type="button"
                         className="btn btn-ghost btn-sm"
@@ -358,7 +383,7 @@ export function PortalQuotes() {
                           });
                         }}
                       >
-                        <i className="ti ti-check" /> Approve &amp; start —{' '}
+                        <i className="ti ti-check" /> Approve and start{' '}
                         {money(payTotal, quote?.currency)}
                       </button>
                     </div>
@@ -373,7 +398,7 @@ export function PortalQuotes() {
       <PaginationBar
         page={page}
         totalPages={totalPages}
-        total={quotesAll.length}
+        total={data?.total ?? quotes.length}
         onPage={setPage}
       />
 

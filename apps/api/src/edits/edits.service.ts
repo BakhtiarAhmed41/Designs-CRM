@@ -6,6 +6,7 @@ import {
 import { randomUUID } from 'crypto';
 import type { AuthUser } from '../auth/auth.types';
 import { EditKind, EditStatus, OrderStatus, OrderType, UserRole } from '../common/enums';
+import { normalizePage, pageResult } from '../common/pagination';
 import { DbService } from '../db/db.service';
 
 function assertAuthUser(user: AuthUser | undefined): asserts user is AuthUser {
@@ -258,14 +259,31 @@ export class EditsService {
 
   async listEdits(
     user: AuthUser | undefined,
-    filters: { status?: EditStatus; q?: string },
+    filters: {
+      status?: EditStatus;
+      kind?: EditKind;
+      assigned?: 'yes' | 'no';
+      q?: string;
+      page?: number;
+      pageSize?: number;
+    },
   ) {
     this.assertStaff(user);
+    const { page, pageSize, offset } = normalizePage(filters);
     const where: string[] = [];
     const params: unknown[] = [];
     if (filters.status) {
       where.push('e.status = ?');
       params.push(filters.status);
+    }
+    if (filters.kind) {
+      where.push('e.kind = ?');
+      params.push(filters.kind);
+    }
+    if (filters.assigned === 'yes') {
+      where.push('e.assigned_designer_id IS NOT NULL');
+    } else if (filters.assigned === 'no') {
+      where.push('e.assigned_designer_id IS NULL');
     }
     if (filters.q) {
       where.push(
@@ -275,20 +293,31 @@ export class EditsService {
       params.push(like, like, like, like);
     }
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
-    const rows = await this.db.query<EditJoinRow>(
-      `SELECT e.*, o.human_ref AS order_ref, o.name AS order_name, o.currency AS order_currency,
-              ro.human_ref AS revision_ref,
-              d.initials AS designer_initials, d.first_name AS designer_first
-         FROM edit_requests e
+    const fromSql = `FROM edit_requests e
          JOIN orders o ON o.id = e.order_id
          LEFT JOIN customers c ON c.id = o.customer_id
          LEFT JOIN orders ro ON ro.id = e.revision_order_id
          LEFT JOIN users d ON d.id = e.assigned_designer_id
-         ${whereSql}
-         ORDER BY e.created_at DESC`,
+         ${whereSql}`;
+    const countRow = await this.db.queryOne<{ n: number }>(
+      `SELECT COUNT(*) AS n ${fromSql}`,
       params,
     );
-    return rows.map((r) => this.editDto(r));
+    const rows = await this.db.query<EditJoinRow>(
+      `SELECT e.*, o.human_ref AS order_ref, o.name AS order_name, o.currency AS order_currency,
+              ro.human_ref AS revision_ref,
+              d.initials AS designer_initials, d.first_name AS designer_first
+         ${fromSql}
+         ORDER BY e.created_at DESC
+         LIMIT ? OFFSET ?`,
+      [...params, pageSize, offset],
+    );
+    return pageResult(
+      rows.map((r) => this.editDto(r)),
+      Number(countRow?.n ?? 0),
+      page,
+      pageSize,
+    );
   }
 
   async updateEdit(
