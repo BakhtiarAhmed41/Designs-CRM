@@ -41,6 +41,15 @@ const envSchema = z.object({
   // When true and SMTP did not send, forgot-password may return resetToken (local only).
   AUTH_EXPOSE_RESET_TOKEN: booleanString.optional().default(false),
 
+  SMTP_HOST: z.string().optional().default(''),
+  SMTP_PORT: z.coerce.number().int().positive().optional().default(587),
+  SMTP_SECURE: booleanString.optional().default(false),
+  SMTP_USER: z.string().optional().default(''),
+  SMTP_PASS: z.string().optional().default(''),
+  SMTP_PASSWORD: z.string().optional().default(''),
+  SMTP_FROM: z.string().optional().default(''),
+  SMTP_FROM_ADDRESS: z.string().optional().default(''),
+
   // Local disk file storage.
   UPLOAD_DIR: z.string().min(1).default('uploads'),
   STORAGE_SIGNED_URL_TTL_SECONDS: z.coerce

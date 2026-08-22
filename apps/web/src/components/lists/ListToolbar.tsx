@@ -26,36 +26,21 @@ export function ListToolbar({
   children,
 }: Props) {
   return (
-    <div
-      className="list-toolbar"
-      style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: 10,
-        alignItems: 'center',
-        margin: '12px 0 14px',
-      }}
-    >
+    <div className="list-toolbar">
       <div className="searchbar" style={{ flex: '1 1 220px', maxWidth: 360 }}>
-        <i className="ti ti-search si" />
+        <i className="ti ti-search si" aria-hidden />
         <input
           value={search}
           onChange={(e) => onSearch(e.target.value)}
           placeholder={searchPlaceholder}
+          aria-label={searchPlaceholder}
         />
       </div>
       {statusOptions && onStatus && (
         <select
           value={status ?? ''}
           onChange={(e) => onStatus(e.target.value)}
-          style={{
-            border: '0.5px solid var(--line)',
-            borderRadius: 10,
-            padding: '8px 12px',
-            fontSize: 13,
-            background: '#fff',
-            fontFamily: 'inherit',
-          }}
+          aria-label="Filter by status"
         >
           {statusOptions.map((o) => (
             <option key={o.value || 'all'} value={o.value}>
@@ -70,26 +55,14 @@ export function ListToolbar({
             type="date"
             value={dateFrom ?? ''}
             onChange={(e) => onDateFrom(e.target.value)}
-            style={{
-              border: '0.5px solid var(--line)',
-              borderRadius: 10,
-              padding: '8px 10px',
-              fontSize: 12.5,
-              fontFamily: 'inherit',
-            }}
+            aria-label="From date"
           />
           <span style={{ color: 'var(--faint)', fontSize: 12 }}>to</span>
           <input
             type="date"
             value={dateTo ?? ''}
             onChange={(e) => onDateTo(e.target.value)}
-            style={{
-              border: '0.5px solid var(--line)',
-              borderRadius: 10,
-              padding: '8px 10px',
-              fontSize: 12.5,
-              fontFamily: 'inherit',
-            }}
+            aria-label="To date"
           />
         </>
       )}
@@ -111,18 +84,7 @@ export function PaginationBar({
 }) {
   if (totalPages <= 1 && total <= 20) return null;
   return (
-    <div
-      className="pager"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 10,
-        marginTop: 12,
-        fontSize: 12.5,
-        color: 'var(--muted)',
-      }}
-    >
+    <div className="pager">
       <span>
         {total} result{total === 1 ? '' : 's'} · page {page} of {totalPages}
       </span>

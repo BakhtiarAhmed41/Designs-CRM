@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { getEnv } from '../../config/env';
@@ -41,11 +41,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       id: string;
       email: string;
       role: UserRole;
+      login_status: string;
       permissions: unknown;
       custom_role_id: string | null;
       cr_permissions: unknown | null;
     }>(
-      `SELECT u.id, u.email, u.role, u.permissions, u.custom_role_id,
+      `SELECT u.id, u.email, u.role, u.login_status, u.permissions, u.custom_role_id,
               r.permissions AS cr_permissions
          FROM users u
          LEFT JOIN custom_roles r ON r.id = u.custom_role_id
@@ -54,16 +55,20 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       [payload.sub],
     );
 
+    if (!row || row.login_status !== 'ACTIVE') {
+      throw new UnauthorizedException('Account is not active');
+    }
+
     const permissions = resolvePermissions({
-      role: row?.role ?? role,
-      userPermissions: row?.permissions,
-      customRolePermissions: row?.cr_permissions ?? null,
+      role: row.role ?? role,
+      userPermissions: row.permissions,
+      customRolePermissions: row.cr_permissions ?? null,
     });
 
     return {
-      id: payload.sub,
-      email: row?.email ?? payload.email,
-      role: row?.role ?? role,
+      id: row.id,
+      email: row.email ?? payload.email,
+      role: row.role ?? role,
       permissions,
     };
   }

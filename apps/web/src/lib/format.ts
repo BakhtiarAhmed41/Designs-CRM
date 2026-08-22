@@ -131,7 +131,7 @@ export function lifecycleChip(
       }
       return {
         cls: 'chip c-done',
-        label: isAdmin || isCustomer ? 'Accepted — in progress' : 'In progress',
+        label: isAdmin || isCustomer ? 'Accepted, in progress' : 'In progress',
       };
     case 'COMPLETED':
     case 'CLOSED':

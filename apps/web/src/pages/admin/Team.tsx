@@ -66,6 +66,7 @@ export function AdminTeam() {
   const canManage = Boolean(user?.permissions?.features?.team);
   const [filter, setFilter] = useState<TeamFilter>('');
   const [showNew, setShowNew] = useState(false);
+  const [editing, setEditing] = useState<TeamMember | null>(null);
   const [supportPerms, setSupportPerms] = useState({
     money: false,
     approve: false,
@@ -125,9 +126,7 @@ export function AdminTeam() {
       <div className="ph">
         <div>
           <h1>Team</h1>
-          <div className="sub">
-            Team accounts, roles, skills and who&apos;s online right now. Assign work to designers by skill.
-          </div>
+          <div className="sub">People, roles, presence, and assigned work.</div>
         </div>
         {canManage && (
           <button type="button" className="btn btn-primary" onClick={() => setShowNew(true)}>
@@ -136,7 +135,7 @@ export function AdminTeam() {
         )}
       </div>
 
-      <div style={{ margin: '16px 0 10px' }}>
+      <div>
         <div className="filters">
           <button type="button" className={filter === '' ? 'on' : ''} onClick={() => setFilter('')}>
             All
@@ -173,6 +172,7 @@ export function AdminTeam() {
       </div>
 
       <div className="card">
+        <div className="table-wrap">
         <table className="qtable">
           <thead>
             <tr>
@@ -193,16 +193,23 @@ export function AdminTeam() {
               </tr>
             )}
             {members.map((m) => (
-              <TeamRow key={m.id} member={m} canManage={canManage} isMe={m.id === user?.id} />
+              <TeamRow
+                key={m.id}
+                member={m}
+                canManage={canManage}
+                isMe={m.id === user?.id}
+                onEdit={() => setEditing(m)}
+              />
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       <div className="card" style={{ marginTop: 14 }}>
         <div className="card-h">
           <span className="ct">
-            <i className="ti ti-adjustments" /> Support role — permissions
+            <i className="ti ti-adjustments" /> Support role permissions
           </span>
           <span style={{ fontSize: 11, color: 'var(--faint)' }}>what Support can do</span>
         </div>
@@ -215,13 +222,13 @@ export function AdminTeam() {
           />
           <PermRow
             title="Approve & release designer files"
-            desc="Off by default — approvals stay with you"
+            desc="Off by default. Approvals stay with you."
             checked={supportPerms.approve}
             onChange={(v) => setSupportPerms((p) => ({ ...p, approve: v }))}
           />
           <PermRow
             title="Grant net-monthly terms"
-            desc="Off by default — you decide who gets credit"
+            desc="Off by default. You decide who gets credit."
             checked={supportPerms.netTerms}
             onChange={(v) => setSupportPerms((p) => ({ ...p, netTerms: v }))}
           />
@@ -253,6 +260,7 @@ export function AdminTeam() {
       </div>
 
       {showNew && <NewMemberModal onClose={() => setShowNew(false)} />}
+      {editing && <EditMemberModal member={editing} onClose={() => setEditing(null)} />}
     </div>
   );
 }
@@ -261,10 +269,12 @@ function TeamRow({
   member: m,
   canManage,
   isMe,
+  onEdit,
 }: {
   member: TeamMember;
   canManage: boolean;
   isMe: boolean;
+  onEdit: () => void;
 }) {
   const qc = useQueryClient();
   const name = [m.firstName, m.lastName].filter(Boolean).join(' ') || m.email;
@@ -296,7 +306,7 @@ function TeamRow({
             {s}
           </span>
         ))}
-        {m.skills.length === 0 && <span style={{ color: 'var(--faint)' }}>—</span>}
+        {m.skills.length === 0 && <span style={{ color: 'var(--faint)' }}>None</span>}
       </td>
       <td>
         {isMe ? (
@@ -322,7 +332,13 @@ function TeamRow({
           {m.workload}
         </span>
       </td>
-      {canManage && <td />}
+      {canManage && (
+        <td>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onEdit}>
+            Edit
+          </button>
+        </td>
+      )}
     </tr>
   );
 }
@@ -438,6 +454,79 @@ function NewMemberModal({ onClose }: { onClose: () => void }) {
             disabled={create.isPending || !form.email.trim() || form.password.length < 8}
           >
             {create.isPending ? 'Creating…' : 'Create member'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EditMemberModal({ member, onClose }: { member: TeamMember; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
+  const [firstName, setFirstName] = useState(member.firstName ?? '');
+  const [lastName, setLastName] = useState(member.lastName ?? '');
+  const [role, setRole] = useState<UserRole>(member.role);
+  const [skillsText, setSkillsText] = useState(member.skills.join(', '));
+
+  const save = useMutation({
+    mutationFn: () =>
+      updateTeamMember(member.id, {
+        firstName: firstName.trim() || null,
+        lastName: lastName.trim() || null,
+        role,
+        skills: skillsText
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['admin-team'] });
+      onClose();
+    },
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
+  return (
+    <div className="overlay open" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-h">
+          <span>Edit {member.email}</span>
+          <button type="button" className="modal-x" onClick={onClose}>
+            &times;
+          </button>
+        </div>
+        <div className="modal-b">
+          {error && <div className="alert-error" style={{ marginBottom: 12 }}>{error}</div>}
+          <div className="ff">
+            <label>First name</label>
+            <input value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+          </div>
+          <div className="ff">
+            <label>Last name</label>
+            <input value={lastName} onChange={(e) => setLastName(e.target.value)} />
+          </div>
+          <div className="ff">
+            <label>Role</label>
+            <select value={role} onChange={(e) => setRole(e.target.value as UserRole)}>
+              {STAFF_ROLES.map((r) => (
+                <option key={r} value={r}>
+                  {roleLabel(r)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="ff">
+            <label>Skills (comma separated)</label>
+            <input value={skillsText} onChange={(e) => setSkillsText(e.target.value)} />
+          </div>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={save.isPending}
+            onClick={() => save.mutate()}
+          >
+            {save.isPending ? 'Saving…' : 'Save'}
           </button>
         </div>
       </div>

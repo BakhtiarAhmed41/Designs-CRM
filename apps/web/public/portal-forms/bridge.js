@@ -278,48 +278,204 @@
     return files;
   };
 
-  function restoreDraft(svc) {
-    try {
-      var raw = localStorage.getItem('lvd_quote_draft_' + svc);
-      if (!raw) return false;
-      var draft = JSON.parse(raw);
-      if (!draft || typeof draft !== 'object') return false;
-
-      if (draft.designName) {
-        var nameInputs = document.querySelectorAll('.cb > .ff input[type="text"]');
-        if (nameInputs[0] && !nameInputs[0].value) nameInputs[0].value = draft.designName;
-      }
-      if (draft.formats && draft.formats.length) applyFormats(draft.formats);
-      if (draft.instructions) {
-        var ta = document.querySelector('.mode-body.vis textarea') || document.querySelector('textarea');
-        if (ta && !ta.value) ta.value = draft.instructions;
-      }
-      return true;
-    } catch (err) {
-      return false;
+  function apiBase() {
+    if (window.LVD_API_BASE) return String(window.LVD_API_BASE).replace(/\/+$/, '');
+    if (location.port === '5173' || location.port === '8003') {
+      return location.protocol + '//' + location.hostname + ':3001/api';
     }
+    return '/api';
+  }
+
+  function inIframe() {
+    try {
+      return window.parent && window.parent !== window;
+    } catch (err) {
+      return true;
+    }
+  }
+
+  function applyDraft(draft) {
+    if (!draft || typeof draft !== 'object') return false;
+    if (draft.designName) {
+      var nameInputs = document.querySelectorAll('.cb > .ff input[type="text"]');
+      if (nameInputs[0] && !nameInputs[0].value) nameInputs[0].value = draft.designName;
+    }
+    if (draft.formats && draft.formats.length) applyFormats(draft.formats);
+    if (draft.instructions) {
+      var ta = document.querySelector('.mode-body.vis textarea') || document.querySelector('textarea');
+      if (ta && !ta.value) ta.value = draft.instructions;
+    }
+    return true;
+  }
+
+  function restoreDraft(svc) {
+    fetch(apiBase() + '/orders/drafts/' + encodeURIComponent(svc), {
+      credentials: 'include',
+    })
+      .then(function (res) {
+        return res.ok ? res.json() : null;
+      })
+      .then(function (data) {
+        if (data && data.draft && data.draft.payload) applyDraft(data.draft.payload);
+      })
+      .catch(function () {
+        /* not signed in */
+      });
+    return false;
+  }
+
+  function submitStandalone(svc) {
+    var collected = window.LVD_COLLECT ? window.LVD_COLLECT() : {};
+    fetch(apiBase() + '/users/me', { credentials: 'include' })
+      .then(function (res) {
+        if (!res.ok) throw new Error('auth');
+        return res.json();
+      })
+      .then(function () {
+        return fetch(apiBase() + '/orders', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            type: 'QUOTE_REQUEST',
+            serviceType: svc.toUpperCase() === 'LASER' ? 'CNC_LASER' : svc.toUpperCase(),
+            name: collected.designName || null,
+            instructions: collected.instructions || null,
+            size: collected.size || null,
+            preferences: collected,
+            turnaroundKey: collected.turnaround || null,
+          }),
+        });
+      })
+      .then(function (res) {
+        if (!res.ok) throw new Error('submit');
+        return res.json();
+      })
+      .then(function (data) {
+        var id = data && data.order && data.order.id;
+        location.href = id ? '/portal/quotes/' + id : '/portal/quotes';
+      })
+      .catch(function () {
+        return fetch(apiBase() + '/public/quote-intents', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ serviceKey: svc, payload: { collected: collected, serviceType: svc } }),
+        })
+          .then(function (res) {
+            return res.json();
+          })
+          .then(function (data) {
+            if (data && data.token) {
+              location.href = '/login?claim=' + encodeURIComponent(data.token);
+              return;
+            }
+            alert('Sign in to send this quote request.');
+            location.href = '/login';
+          });
+      });
+  }
+
+  function saveStandaloneDraft(svc) {
+    var collected = window.LVD_COLLECT ? window.LVD_COLLECT() : {};
+    fetch(apiBase() + '/orders/drafts/' + encodeURIComponent(svc), {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ payload: collected }),
+    })
+      .then(function (res) {
+        if (res.ok) {
+          alert('Draft saved to your account.');
+          return;
+        }
+        return fetch(apiBase() + '/public/quote-intents', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ serviceKey: svc, payload: { collected: collected, serviceType: svc } }),
+        })
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (data) {
+            if (data && data.token) {
+              location.href = '/login?claim=' + encodeURIComponent(data.token);
+              return;
+            }
+            alert('Sign in to save this draft.');
+          });
+      })
+      .catch(function () {
+        alert('Could not save the draft. Try again after signing in.');
+      });
+  }
+
+  function applyTurnaroundLabels(options) {
+    if (!options || !options.length) return;
+    function setLabel(id, label, suffix) {
+      var el = document.getElementById(id);
+      if (!el || !label) return;
+      var icon = el.querySelector('i');
+      el.textContent = '';
+      if (icon) el.appendChild(icon);
+      el.appendChild(document.createTextNode(' ' + label + (suffix || '')));
+    }
+    var std = null;
+    var urg = null;
+    options.forEach(function (o) {
+      if (o.key === 'standard') std = o;
+      if (o.key === 'urgent') urg = o;
+    });
+    if (std && std.label) {
+      setLabel('rq-std', std.label, ' : included');
+      setLabel('r-std', std.label, ' : included');
+    }
+    if (urg && urg.label) {
+      setLabel('rq-rush', urg.label, " : I'll contact you first");
+      setLabel('r-rush', urg.label, " : I'll contact you first");
+    }
+    document.querySelectorAll('select').forEach(function (sel) {
+      Array.prototype.forEach.call(sel.options, function (opt) {
+        if (std && std.label && /standard/i.test(opt.text)) opt.text = std.label;
+        if (urg && urg.label && /urgent|rush/i.test(opt.text)) opt.text = urg.label;
+      });
+    });
+  }
+
+  function loadTurnaroundLabels() {
+    fetch(apiBase() + '/public/turnaround')
+      .then(function (res) {
+        return res.ok ? res.json() : null;
+      })
+      .then(function (data) {
+        if (data && data.options) applyTurnaroundLabels(data.options);
+      })
+      .catch(function () {});
   }
 
   document.addEventListener('DOMContentLoaded', function () {
     var svc = serviceKey();
     var restored = restoreDraft(svc);
+    loadTurnaroundLabels();
 
     document.querySelectorAll('.btn-p').forEach(function (btn) {
       btn.addEventListener('click', function (e) {
         e.preventDefault();
-        parent.postMessage({ type: 'lvd-quote-submit' }, '*');
+        if (inIframe()) {
+          parent.postMessage({ type: 'lvd-quote-submit' }, '*');
+        } else {
+          submitStandalone(svc);
+        }
       });
     });
 
     document.querySelectorAll('.btn-s').forEach(function (btn) {
       btn.addEventListener('click', function (e) {
         e.preventDefault();
-        try {
-          localStorage.setItem('lvd_quote_draft_' + svc, JSON.stringify(window.LVD_COLLECT()));
-        } catch (err) {
-          /* ignore quota errors */
+        if (inIframe()) {
+          parent.postMessage({ type: 'lvd-draft-saved' }, '*');
+        } else {
+          saveStandaloneDraft(svc);
         }
-        parent.postMessage({ type: 'lvd-draft-saved' }, '*');
       });
     });
 
@@ -336,6 +492,10 @@
   window.addEventListener('message', function (ev) {
     var data = ev.data;
     if (!data || typeof data !== 'object') return;
+    if (data.type === 'lvd-restore-draft') {
+      applyDraft(data.draft);
+      return;
+    }
     if (data.type === 'lvd-apply-prefs') {
       window.LVD_APPLY_PREFS(data.prefs);
     }

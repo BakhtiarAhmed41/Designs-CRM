@@ -148,7 +148,7 @@ export function NotificationBell() {
                   <div>
                     <div className="ntx">
                       <b>{n.title}</b>
-                      {n.body ? ` — ${n.body}` : ''}
+                      {n.body ? `: ${n.body}` : ''}
                     </div>
                     <div className="ntm">{relativeTime(n.createdAt)}</div>
                   </div>

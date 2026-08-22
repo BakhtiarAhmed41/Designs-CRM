@@ -140,7 +140,7 @@ function truncateTitle(text: string, max = 72) {
   return `${t.slice(0, max - 1).trimEnd()}…`;
 }
 
-/** Display title for a conversation — prefers real subject / order ref over "General". */
+/** Display title for a conversation. Prefers real subject / order ref over "General". */
 export function conversationTitle(c: {
   chatType?: ChatType;
   subject?: string | null;

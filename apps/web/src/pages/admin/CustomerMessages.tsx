@@ -13,6 +13,9 @@ import {
   getAdminConversation,
   getCustomerMessagingContext,
   listAdminConversations,
+  createMessageTemplate,
+  deleteAdminMessage,
+  deleteMessageTemplate,
   listMessageTemplates,
   sendAdminMessage,
   updateAdminConversation,
@@ -536,7 +539,21 @@ export function AdminCustomerMessages() {
                 </button>
               </div>
             </div>
-            <ConversationThread messages={active.messages ?? []} mineDirection="OUTBOUND" />
+            <ConversationThread
+              messages={active.messages ?? []}
+              mineDirection="OUTBOUND"
+              onDelete={
+                canFeature(user?.permissions, 'messages_delete', user?.role)
+                  ? (messageId) => {
+                      void deleteAdminMessage(messageId).then(() => {
+                        void qc.invalidateQueries({
+                          queryKey: ['admin-conversation', activeConversationId],
+                        });
+                      });
+                    }
+                  : undefined
+              }
+            />
             {error && <div className="err" style={{ margin: '0 12px' }}>{error}</div>}
             {!canReply && active.status === 'OPEN' && (
               <div className="muted" style={{ margin: '0 12px 8px', fontSize: 12.5 }}>
@@ -553,6 +570,14 @@ export function AdminCustomerMessages() {
                     : 'Type a message…'
               }
               templates={templatesQuery.data?.templates}
+              onCreateTemplate={async (title, body) => {
+                await createMessageTemplate({ title, body });
+                void qc.invalidateQueries({ queryKey: ['message-templates'] });
+              }}
+              onDeleteTemplate={async (templateId) => {
+                await deleteMessageTemplate(templateId);
+                void qc.invalidateQueries({ queryKey: ['message-templates'] });
+              }}
               onSend={async (body, files) => {
                 await sendMutation.mutateAsync({ body, files });
               }}
@@ -572,8 +597,8 @@ export function AdminCustomerMessages() {
               <div className="msg-right-section">
                 <div className="msg-right-title">Customer Information</div>
                 <div className="msg-kv"><span>Name</span><b>{contextQuery.data.customer.name}</b></div>
-                <div className="msg-kv"><span>Phone</span><b>{contextQuery.data.customer.phone || '—'}</b></div>
-                <div className="msg-kv"><span>Email</span><b>{contextQuery.data.customer.email || '—'}</b></div>
+                <div className="msg-kv"><span>Phone</span><b>{contextQuery.data.customer.phone || 'None'}</b></div>
+                <div className="msg-kv"><span>Email</span><b>{contextQuery.data.customer.email || 'None'}</b></div>
                 <div className="msg-kv">
                   <span>Customer since</span>
                   <b>{dateShort(contextQuery.data.customer.customerSince)}</b>

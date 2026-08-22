@@ -1,17 +1,16 @@
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import type { ReactNode } from 'react';
+import { cloneElement, useEffect, useState } from 'react';
+import type { ReactElement, ReactNode } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { NotificationBell } from './NotificationBell';
+import { AccountMenu } from './AccountMenu';
 
-/** Dashboards place the bell in their own page header row. */
-function isDashboardPath(pathname: string) {
-  return (
-    pathname === '/admin' ||
-    pathname === '/admin/' ||
-    pathname === '/portal' ||
-    pathname === '/portal/'
-  );
-}
+export type MobileNavItem = {
+  to: string;
+  label: string;
+  icon: string;
+  end?: boolean;
+};
 
 function isMessagingPath(pathname: string) {
   return pathname.includes('/messages');
@@ -20,28 +19,99 @@ function isMessagingPath(pathname: string) {
 export function Shell({
   rolebar,
   sidebar,
+  mobileItems,
+  brandLabel = 'Las Vegas Designs',
+  topbarSearch,
+  contextLabel,
 }: {
   rolebar?: ReactNode;
   sidebar: ReactNode;
+  mobileItems?: MobileNavItem[];
+  brandLabel?: string;
+  topbarSearch?: ReactNode;
+  contextLabel?: string;
 }) {
   const { pathname } = useLocation();
-  const showGlobalBell = !isDashboardPath(pathname);
+  const [navOpen, setNavOpen] = useState(false);
   const messaging = isMessagingPath(pathname);
+
+  useEffect(() => {
+    setNavOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setNavOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [navOpen]);
+
+  const side = cloneElement(sidebar as ReactElement<{ className?: string }>, {
+    className: [((sidebar as ReactElement<{ className?: string }>).props.className ?? ''), navOpen ? 'open' : '']
+      .filter(Boolean)
+      .join(' '),
+  });
 
   return (
     <div className={`app-frame${rolebar ? ' with-rolebar' : ''}`}>
       {rolebar}
+      <header className="mobile-top">
+        <button
+          type="button"
+          className="icon-btn"
+          aria-label="Open menu"
+          aria-expanded={navOpen}
+          onClick={() => setNavOpen(true)}
+        >
+          <i className="ti ti-menu-2" />
+        </button>
+        <div className="brand-mini">{brandLabel}</div>
+        <div className="mobile-top-right">
+          <NotificationBell />
+          <AccountMenu contextLabel={contextLabel} />
+        </div>
+      </header>
+      <div
+        className={`side-backdrop${navOpen ? ' open' : ''}`}
+        onClick={() => setNavOpen(false)}
+        aria-hidden={!navOpen}
+      />
       <div className="shell">
-        {sidebar}
-        <main className={`main${messaging ? ' main-messaging' : ''}`}>
-          {showGlobalBell && (
-            <div className="shell-bell">
+        {side}
+        <div className="workspace-col">
+          <header className="app-topbar">
+            {topbarSearch ? <div className="top-search">{topbarSearch}</div> : <div className="top-spacer" />}
+            <div className="top-right">
               <NotificationBell />
+              <AccountMenu contextLabel={contextLabel} />
             </div>
-          )}
-          <Outlet />
-        </main>
+          </header>
+          <main className={`main${messaging ? ' main-messaging' : ''}`}>
+            <Outlet />
+          </main>
+        </div>
       </div>
+      {mobileItems && mobileItems.length > 0 && (
+        <nav className="bottom-nav" aria-label="Primary">
+          {mobileItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className={({ isActive }) => (isActive ? 'on' : undefined)}
+            >
+              <i className={`ti ${item.icon}`} />
+              {item.label}
+            </NavLink>
+          ))}
+          <button type="button" onClick={() => setNavOpen(true)}>
+            <i className="ti ti-dots" />
+            More
+          </button>
+        </nav>
+      )}
     </div>
   );
 }
@@ -69,9 +139,9 @@ export function useShellUser() {
 export function Brand({ subtitle }: { subtitle: string }) {
   return (
     <div className="brand">
-      <img src="/lvd-logo.png" alt="LVD" style={{ height: 34, width: 'auto', flexShrink: 0 }} />
+      <img src="/lvd-logo.png" alt="Las Vegas Designs USA" />
       <div>
-        <div className="bt">Las Vegas Designs USA</div>
+        <div className="bt">Las Vegas Designs</div>
         <div className="bs">{subtitle}</div>
       </div>
     </div>
@@ -82,6 +152,7 @@ export function LogoutLink({ onClick }: { onClick: () => void }) {
   return (
     <a
       className="logout-link"
+      href="#logout"
       onClick={(e) => {
         e.preventDefault();
         onClick();

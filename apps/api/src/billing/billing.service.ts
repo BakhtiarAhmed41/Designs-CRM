@@ -18,6 +18,7 @@ import {
   UserRole,
 } from '../common/enums';
 import { DbService, DbTransaction } from '../db/db.service';
+import { MailService } from '../mail/mail.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
 function assertAuthUser(user: AuthUser | undefined): asserts user is AuthUser {
@@ -110,6 +111,7 @@ export class BillingService {
   constructor(
     private db: DbService,
     private notifications: NotificationsService,
+    private mail: MailService,
   ) {}
 
   // --- mappers -------------------------------------------------------------
@@ -365,6 +367,16 @@ export class BillingService {
       body: `Your invoice for ${invoice.covers_text ?? 'your order'} is still awaiting payment.`,
       link: payLink.url,
     });
+    const customer = await this.getCustomerRow(invoice.customer_id);
+    if (customer?.email) {
+      const amountLabel = `${(invoice.amount_cents / 100).toFixed(2)} ${invoice.currency}`;
+      await this.mail.sendInvoiceReminder(
+        customer.email,
+        invoice.covers_text ?? 'your invoice',
+        amountLabel,
+        payLink.url,
+      );
+    }
 
     return { ...payLink, invoiceId };
   }
@@ -431,7 +443,8 @@ export class BillingService {
         );
       });
     } else {
-      // CARD: record a manual/external card payment (no processor integrated).
+      // Staff bookkeeping: record money received outside the portal.
+      // TODO(payment): integrate Stripe once keys are provided
       await this.db.execute(
         `INSERT INTO payments
            (id, invoice_id, order_id, customer_id, amount_cents, currency, method, type, status, paid_at)
@@ -453,6 +466,17 @@ export class BillingService {
         [InvoiceStatus.PAID, invoice.id],
       );
     }
+
+    await this.advanceOrderAfterPayment(invoice.order_id);
+  }
+
+  private async advanceOrderAfterPayment(orderId: string | null) {
+    if (!orderId) return;
+    await this.db.execute(
+      `UPDATE orders SET status = ?
+        WHERE id = ? AND status = ?`,
+      [OrderStatus.IN_PROGRESS, orderId, OrderStatus.PENDING_PAYMENT],
+    );
   }
 
   async payInvoiceAsAdmin(
@@ -535,7 +559,7 @@ export class BillingService {
     };
   }
 
-  /** PUBLIC: confirm payment via a pay-link (manual settlement). Idempotent. */
+  /** PUBLIC: card checkout is not live. Do not mark the invoice paid here. */
   async payViaPayLink(token: string) {
     const payment = await this.db.queryOne<PaymentRow>(
       'SELECT * FROM payments WHERE pay_link_token = ? LIMIT 1',
@@ -543,42 +567,10 @@ export class BillingService {
     );
     if (!payment || !payment.invoice_id)
       throw new NotFoundException('Payment link not found');
-
-    if (payment.status === PaymentStatus.PAID) {
-      return { status: InvoiceStatus.PAID };
-    }
-
-    const invoice = await this.getInvoiceRow(payment.invoice_id);
-    if (!invoice) throw new NotFoundException('Invoice not found');
-    if (invoice.status === InvoiceStatus.CANCELLED) {
-      throw new BadRequestException('Invoice was cancelled');
-    }
-    if (invoice.status === InvoiceStatus.PAID) {
-      return { status: InvoiceStatus.PAID };
-    }
-    if (invoice.status !== InvoiceStatus.AWAITING) {
-      throw new BadRequestException('Invoice is not awaiting payment');
-    }
-
-    await this.db.withTransaction(async (tx) => {
-      await tx.execute(
-        'UPDATE payments SET status = ?, paid_at = NOW() WHERE id = ?',
-        [PaymentStatus.PAID, payment.id],
-      );
-      await tx.execute(
-        'UPDATE invoices SET status = ?, paid_at = NOW() WHERE id = ? AND status = ?',
-        [InvoiceStatus.PAID, payment.invoice_id, InvoiceStatus.AWAITING],
-      );
-    });
-
-    if (payment.customer_id) {
-      await this.notifyCustomerUser(payment.customer_id, {
-        title: 'Payment received',
-        body: 'Thank you — your invoice has been marked as paid.',
-        link: '/portal/invoices',
-      });
-    }
-    return { status: InvoiceStatus.PAID };
+    // TODO(payment): integrate Stripe once keys are provided
+    throw new BadRequestException(
+      'Payment integration coming soon. This link does not charge a card or mark the invoice paid.',
+    );
   }
 
   // --- store credit (admin) ------------------------------------------------
@@ -967,6 +959,12 @@ export class BillingService {
     if (!invoice || invoice.customer_id !== customer.id)
       throw new NotFoundException('Invoice not found');
     const m = this.parsePayMethod(method);
+    if (m === PaymentMethod.CARD) {
+      // TODO(payment): integrate Stripe once keys are provided
+      throw new BadRequestException(
+        'Payment integration coming soon. Use store credit, or ask the team to record an outside payment.',
+      );
+    }
     await this.payInvoiceInternal(invoice, m);
     const updated = await this.db.queryOne<
       InvoiceRow & { customer_name: string | null }

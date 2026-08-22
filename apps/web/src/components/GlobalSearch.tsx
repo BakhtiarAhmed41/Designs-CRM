@@ -7,7 +7,7 @@ import { globalSearch } from '@/lib/messaging';
  * Admin global search matching prototype `.searchbar` chrome.
  */
 export function GlobalSearch({
-  placeholder = 'Search orders, customers, quotes… then message them',
+  placeholder = 'search here',
 }: {
   placeholder?: string;
 }) {
@@ -99,7 +99,7 @@ export function GlobalSearch({
                 <div
                   key={c.id}
                   className="sd-item"
-                  onClick={() => go('/admin/customers')}
+                  onClick={() => go(`/admin/customers?open=${c.id}`)}
                 >
                   <div>
                     <div className="sd-t">{c.name || 'Customer'}</div>

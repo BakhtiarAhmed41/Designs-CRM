@@ -26,11 +26,15 @@ export class DashboardController {
   async chart(
     @CurrentUser() user: AuthUser | undefined,
     @Query('days') days: string | undefined,
+    @Query('from') from: string | undefined,
+    @Query('to') to: string | undefined,
   ) {
     const parsed = days ? Number.parseInt(days, 10) : 14;
     const series = await this.dashboard.getChart(
       user,
       Number.isFinite(parsed) ? parsed : 14,
+      from,
+      to,
     );
     return { series };
   }

@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SVG & Cut Files — Quote Request</title>
+<title>SVG & Cut Files : Quote Request</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -165,7 +165,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
 <body>
 <div class="wrap">
 <div class="card">
-  <div class="ch"><i class="ti ti-vector-triangle"></i><span class="ct">Custom SVG and Cut files — quote request</span></div>
+  <div class="ch"><i class="ti ti-vector-triangle"></i><span class="ct">Custom SVG and Cut files : quote request</span></div>
   <div class="cb">
 
     <!-- MODE TABS -->
@@ -216,7 +216,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
     <div class="mode-body vis" id="mode-q">
       <div class="sl" style="margin-top:14px;">Tell us about your design</div>
       <div class="qbig">
-        <textarea placeholder="e.g. I need a full color SVG of my eagle logo for Cricut, no gradients, transparent background — that's all we need, our team handles the rest. You can also paste a link here if you want us to see a reference."></textarea>
+        <textarea placeholder="e.g. I need a full color SVG of my eagle logo for Cricut, no gradients, transparent background : that's all we need, our team handles the rest. You can also paste a link here if you want us to see a reference."></textarea>
       </div>
       <div class="fg" style="margin-top:11px;">
         <div class="ff"><label>Color type</label>
@@ -224,16 +224,16 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
             <option value="">Select...</option>
             <option value="single">Single color</option>
             <option value="multi">Multi color</option>
-            <option value="ns">Not sure — let team decide</option>
+            <option value="ns">Not sure : let team decide</option>
           </select>
         </div>
         <div class="ff" id="q-use-wrap" style="display:none;"><label>What will you use it for?</label>
           <select id="q-use" onchange="qColorNote()">
             <option value="">Select...</option>
-            <option value="cut">Cutting machine — Cricut, Silhouette, vinyl</option>
-            <option value="print">Printing — DTF, sublimation, stickers</option>
+            <option value="cut">Cutting machine : Cricut, Silhouette, vinyl</option>
+            <option value="print">Printing : DTF, sublimation, stickers</option>
             <option value="both">Both cutting and printing</option>
-            <option value="ns">Not sure — let team decide</option>
+            <option value="ns">Not sure : let team decide</option>
           </select>
         </div>
         
@@ -242,19 +242,19 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
 
       <div class="sl" style="margin-top:14px;">Turnaround</div>
       <div class="rush-row">
-        <div class="ropt sel-s" id="rq-std" onclick="selRushQ('std')"><i class="ti ti-clock" style="font-size:13px"></i> Standard (12–24 hrs) — included</div>
-        <div class="ropt" id="rq-rush" onclick="selRushQ('rush')"><i class="ti ti-bolt" style="font-size:13px"></i> Urgent — contact us before placing an order</div>
+        <div class="ropt sel-s" id="rq-std" onclick="selRushQ('std')"><i class="ti ti-clock" style="font-size:13px"></i> Standard (12–24 hrs) : included</div>
+        <div class="ropt" id="rq-rush" onclick="selRushQ('rush')"><i class="ti ti-bolt" style="font-size:13px"></i> Urgent : contact us before placing an order</div>
       </div>
       <div class="ibox" id="rq-note" style="display:none;"><i class="ti ti-message-circle"></i> For urgent orders, please text or email us first so we can confirm the timeline before you place the order.</div>
 
-      <div class="ibox"><i class="ti ti-info-circle"></i> Don't worry about other technical details — layers, formats and cut settings can all be sorted after you submit. Switch to Detailed request if you already know your specs.</div>
+      <div class="ibox"><i class="ti ti-info-circle"></i> Don't worry about other technical details : layers, formats and cut settings can all be sorted after you submit. Switch to Detailed request if you already know your specs.</div>
     </div>
 
     <!-- DETAILED MODE -->
     <div class="mode-body" id="mode-d">
       <div style="display:flex;gap:9px;align-items:flex-start;background:#EAF0F5;border-radius:10px;padding:11px 14px;margin-top:14px;font-size:12.5px;color:#143F65;line-height:1.5;">
         <i class="ti ti-heart-handshake" style="font-size:16px;margin-top:1px;"></i>
-        <span><b>Not sure about a field? Leave it blank.</b> We'll figure it out from your artwork — every field here is optional and just helps us quote faster.</span>
+        <span><b>Not sure about a field? Leave it blank.</b> We'll figure it out from your artwork : every field here is optional and just helps us quote faster.</span>
       </div>
 
       <div class="sl" style="margin-top:14px;">How many designs?</div>
@@ -265,7 +265,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
 
       <!-- MULTIPLE DESIGNS -->
       <div id="sec-multi" style="display:none;margin-top:14px;">
-        <div class="ibox info" style="margin-bottom:10px;"><i class="ti ti-info-circle"></i> Add a row per design — each can have its own type and settings.</div>
+        <div class="ibox info" style="margin-bottom:10px;"><i class="ti ti-info-circle"></i> Add a row per design : each can have its own type and settings.</div>
         <div id="multi-rows">
           <div class="drow" id="mr-1">
             <div class="drow-head"><span class="drow-num"><i class="ti ti-file" style="font-size:13px;"></i> Design 1</span></div>
@@ -308,12 +308,12 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
         </div>
       </div>
 
-      <!-- style selector — changes per service -->
-      <div class="sl" style="margin-top:14px;">Style preference <span style="font-size:11px;font-weight:400;color:#aaa;">— click the style closest to what you want</span></div>
+      <!-- style selector : changes per service -->
+      <div class="sl" style="margin-top:14px;">Style preference <span style="font-size:11px;font-weight:400;color:#aaa;">  click the style closest to what you want</span></div>
       <div class="style-grid" id="style-grid">
         <!-- rendered by JS -->
       </div>
-      <div class="ibox" style="margin-top:8px;"><i class="ti ti-info-circle"></i> Not sure? Upload a reference image above showing the style you like — that works even better.</div>
+      <div class="ibox" style="margin-top:8px;"><i class="ti ti-info-circle"></i> Not sure? Upload a reference image above showing the style you like : that works even better.</div>
 
       <!-- intended use -->
       <div class="sl" style="margin-top:14px;">What will you use this for?</div>
@@ -331,7 +331,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
         <div class="sl" style="margin-top:14px;">Cutting machine details</div>
         <div class="fg">
           <div class="ff"><label>Machine</label><select><option>Cricut (any model)</option><option>Silhouette Cameo</option><option>Silhouette Portrait</option><option>Brother ScanNcut</option><option>Other cutter</option><option>Not sure</option></select></div>
-          <div class="ff"><label>Material to cut</label><select><option>Adhesive vinyl</option><option>HTV (heat transfer vinyl)</option><option>Glitter / specialty vinyl</option><option>Paper / cardstock</option><option>Fabric</option><option>Not sure — let team decide</option></select></div>
+          <div class="ff"><label>Material to cut</label><select><option>Adhesive vinyl</option><option>HTV (heat transfer vinyl)</option><option>Glitter / specialty vinyl</option><option>Paper / cardstock</option><option>Fabric</option><option>Not sure : let team decide</option></select></div>
           <div class="ff"><label>Cut type</label><select><option>Single layer cut</option><option>Multi layer cut</option><option>Print then cut</option><option>Not sure</option></select></div>
           <div class="ff"><label>Output size</label><div style="display:grid;grid-template-columns:1fr 14px 1fr;align-items:center;gap:3px;"><input type="number" placeholder="W" min="0" step="0.1"><span style="text-align:center;font-size:12px;color:#aaa;">×</span><input type="number" placeholder="H" min="0" step="0.1"></div></div>
         </div>
@@ -341,10 +341,10 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
       <div id="dyn-dtf" class="dyn-sec">
         <div class="sl" style="margin-top:14px;">DTF / screen print details</div>
         <div class="fg">
-          <div class="ff"><label>Number of colors</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6+</option><option>Not sure — let team decide</option></select></div>
+          <div class="ff"><label>Number of colors</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6+</option><option>Not sure : let team decide</option></select></div>
           <div class="ff"><label>Print size</label><div style="display:grid;grid-template-columns:1fr 14px 1fr;align-items:center;gap:3px;"><input type="number" placeholder="W" min="0" step="0.1"><span style="text-align:center;font-size:12px;color:#aaa;">×</span><input type="number" placeholder="H" min="0" step="0.1"></div></div>
-          <div class="ff"><label>Color separation needed?</label><select><option>No — SVG file only</option><option>Yes — include color separation</option><option>Not sure</option></select></div>
-          <div class="ff"><label>Gradient</label><select><option>No gradient — flat colors only</option><option>Yes — preserve gradients</option><option>Not sure</option></select></div>
+          <div class="ff"><label>Color separation needed?</label><select><option>No : SVG file only</option><option>Yes : include color separation</option><option>Not sure</option></select></div>
+          <div class="ff"><label>Gradient</label><select><option>No gradient : flat colors only</option><option>Yes : preserve gradients</option><option>Not sure</option></select></div>
         </div>
       </div>
 
@@ -352,7 +352,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
         <div class="ibox info" style="margin-top:14px;"><i class="ti ti-info-circle"></i> We'll create a clean vector SVG ready for digitizing. Once you receive it you can order our embroidery digitizing service to convert it to a stitch file.</div>
         <div class="fg" style="margin-top:10px;">
           <div class="ff"><label>Number of colors</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6+</option><option>Not sure</option></select></div>
-          <div class="ff"><label>Simplify for embroidery?</label><select><option>Yes — remove details too small to stitch</option><option>No — keep all details</option><option>Not sure — let team decide</option></select></div>
+          <div class="ff"><label>Simplify for embroidery?</label><select><option>Yes : remove details too small to stitch</option><option>No : keep all details</option><option>Not sure : let team decide</option></select></div>
         </div>
       </div>
 
@@ -361,7 +361,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
         <div class="fg">
           <div class="ff"><label>Background</label><select><option>Transparent</option><option>White background</option><option>Custom color</option></select></div>
           <div class="ff"><label>Color mode</label><select><option>RGB (screen/web)</option><option>CMYK (print)</option><option>Not sure</option></select></div>
-          <div class="ff"><label>Dimensions needed?</label><select><option>No specific size</option><option>Yes — I'll specify</option></select></div>
+          <div class="ff"><label>Dimensions needed?</label><select><option>No specific size</option><option>Yes : I'll specify</option></select></div>
         </div>
       </div>
 
@@ -370,7 +370,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
         <div class="fg">
           <div class="ff"><label>Number of colors</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6+</option><option>Not sure</option></select></div>
           <div class="ff"><label>Background</label><select><option>Transparent</option><option>White</option><option>Custom color</option></select></div>
-          <div class="ff"><label>Gradient</label><select><option>No gradient — flat colors</option><option>Yes — preserve gradients</option><option>Not sure</option></select></div>
+          <div class="ff"><label>Gradient</label><select><option>No gradient : flat colors</option><option>Yes : preserve gradients</option><option>Not sure</option></select></div>
         </div>
       </div>
 
@@ -382,11 +382,11 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
       </div><!-- /single-wrap -->
 
       <!-- shared fields -->
-      <div class="sl" style="margin-top:14px;">Output formats <span style="font-size:11px;font-weight:400;color:#aaa;">— select all you need</span></div>
+      <div class="sl" style="margin-top:14px;">Output formats <span style="font-size:11px;font-weight:400;color:#aaa;">  select all you need</span></div>
       <div class="fmt-grid">
         <div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-vector-bezier icon"></i><span class="fname">AI</span><span class="fext">Illustrator</span></div><div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-file-type-pdf icon"></i><span class="fname">PDF</span><span class="fext">Print ready</span></div><div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-file-3d icon"></i><span class="fname">DXF</span><span class="fext">CNC / laser</span></div><div class="fmt-chip sel" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-file-type-svg icon"></i><span class="fname">SVG</span><span class="fext">Vector</span></div><div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-file-vector icon"></i><span class="fname">EPS</span><span class="fext">Vector</span></div><div class="fmt-chip sel" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-photo icon"></i><span class="fname">PNG</span><span class="fext">Transparent</span></div><div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-pentagon icon"></i><span class="fname">CDR</span><span class="fext">CorelDRAW</span></div>
       </div>
-      <div class="ibox" style="margin-top:8px;"><i class="ti ti-info-circle"></i> Not sure? SVG + PNG covers most uses — we can always export other formats on request.</div>
+      <div class="ibox" style="margin-top:8px;"><i class="ti ti-info-circle"></i> Not sure? SVG + PNG covers most uses : we can always export other formats on request.</div>
 
       <div class="single-wrap">
       <!-- 1 color specific -->
@@ -394,15 +394,15 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
         <div class="sl" style="margin-top:14px;">One color options</div>
         <div class="fg">
           <div class="ff"><label>Color preference</label><select><option>Keep original color</option><option>Black</option><option>White</option><option>I'll specify in notes</option></select></div>
-          <div class="ff"><label>Background</label><select><option>Transparent</option><option>White</option><option>Colored — I'll specify</option></select></div>
+          <div class="ff"><label>Background</label><select><option>Transparent</option><option>White</option><option>Colored : I'll specify</option></select></div>
         </div>
       </div>
 
       <div id="sec-full" class="dyn-sec">
         <div class="sl" style="margin-top:14px;">Full color options</div>
         <div class="fg">
-          <div class="ff"><label>Color matching</label><select><option>Match original exactly</option><option>Simplify / flatten colors</option><option>Stylize / recolor</option><option>Not sure — let team decide</option></select></div>
-          <div class="ff"><label>Gradient</label><select><option>No gradient — flat colors only</option><option>Preserve gradients</option><option>Not sure</option></select></div>
+          <div class="ff"><label>Color matching</label><select><option>Match original exactly</option><option>Simplify / flatten colors</option><option>Stylize / recolor</option><option>Not sure : let team decide</option></select></div>
+          <div class="ff"><label>Gradient</label><select><option>No gradient : flat colors only</option><option>Preserve gradients</option><option>Not sure</option></select></div>
           <div class="ff"><label>Number of colors</label><select><option>Up to 3</option><option>Up to 5</option><option>Up to 8</option><option>10+</option><option>Match original exactly</option></select></div>
         </div>
       </div>
@@ -410,7 +410,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
       <div id="sec-line" class="dyn-sec">
         <div class="sl" style="margin-top:14px;">Line art options</div>
         <div class="fg">
-          <div class="ff"><label>Line weight</label><select><option>Thin / fine line</option><option>Medium</option><option>Bold / thick</option><option>Mixed — varies per element</option><option>Not sure</option></select></div>
+          <div class="ff"><label>Line weight</label><select><option>Thin / fine line</option><option>Medium</option><option>Bold / thick</option><option>Mixed : varies per element</option><option>Not sure</option></select></div>
           <div class="ff"><label>Color</label><select><option>Black only</option><option>Single color</option><option>Multi-color outlines</option><option>I'll specify in notes</option></select></div>
           <div class="ff"><label>Detail level</label><select><option>Simple / minimal</option><option>Medium detail</option><option>Highly detailed</option><option>Match reference image</option></select></div>
         </div>
@@ -422,15 +422,15 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
           <div class="ff"><label>Machine</label><select><option>Cricut</option><option>Silhouette</option><option>Both</option><option>Not sure</option></select></div>
           <div class="ff"><label>Layers</label><select><option>Single layer</option><option>Multi layer (layered colors)</option><option>Not sure</option></select></div>
         </div>
-        <div class="ibox warn" style="margin-top:8px;"><i class="ti ti-alert-triangle"></i> Cut files must use flat solid colors — no gradients or effects.</div>
+        <div class="ibox warn" style="margin-top:8px;"><i class="ti ti-alert-triangle"></i> Cut files must use flat solid colors : no gradients or effects.</div>
       </div>
       </div><!-- /single-wrap -->
 
       <!-- rush -->
       <div class="sl" style="margin-top:14px;">Turnaround</div>
       <div class="rush-row">
-        <div class="ropt sel-s" id="r-std" onclick="selRush('std')"><i class="ti ti-clock" style="font-size:13px"></i> Standard (12–24 hrs) — included</div>
-        <div class="ropt" id="r-rush" onclick="selRush('rush')"><i class="ti ti-bolt" style="font-size:13px"></i> Urgent — contact us before placing an order</div>
+        <div class="ropt sel-s" id="r-std" onclick="selRush('std')"><i class="ti ti-clock" style="font-size:13px"></i> Standard (12–24 hrs) : included</div>
+        <div class="ropt" id="r-rush" onclick="selRush('rush')"><i class="ti ti-bolt" style="font-size:13px"></i> Urgent : contact us before placing an order</div>
       </div>
       <div class="ibox" id="rush-note" style="display:none;"><i class="ti ti-message-circle"></i> For urgent orders, please text or email us first so we can confirm the timeline before you place the order.</div>
 
@@ -459,7 +459,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
 
     
       <div class="sl" style="margin-top:14px;">Anything else we should know?</div>
-      <div class="qbig"><textarea style="min-height:64px;" placeholder="Deadlines, special requests, context — anything that didn&#39;t fit the fields above."></textarea></div>
+      <div class="qbig"><textarea style="min-height:64px;" placeholder="Deadlines, special requests, context : anything that didn&#39;t fit the fields above."></textarea></div>
 
     </div>
 
@@ -467,7 +467,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
       <i class="ti ti-messages"></i>
       <div style="flex:1;">
         <div class="mc-t">Prefer to message us directly?</div>
-        <div class="mc-s">Skip the form — chat with our team from your account, attach your image and send your details. We'll set up the order for you.</div>
+        <div class="mc-s">Skip the form : chat with our team from your account, attach your image and send your details. We'll set up the order for you.</div>
       </div>
       <a class="mc-btn" href="#">Message our team</a>
     </div>
@@ -599,18 +599,18 @@ function qColorNote(){
   uw.style.display=(c==='multi')?'flex':'none';
   var msg='',warn=false;
   if(c==='single'){
-    msg='One clean single-color vector — great for vinyl cutting, engraving, stencils and one-color prints.';
+    msg='One clean single-color vector : great for vinyl cutting, engraving, stencils and one-color prints.';
   }else if(c==='ns'){
-    msg='No problem — describe your project above and we\u2019ll recommend the right file type.';
+    msg='No problem : describe your project above and we\u2019ll recommend the right file type.';
   }else if(c==='multi'){
     if(u==='cut'){
-      msg='Heads up: cut files use flat solid colors only — no gradients or shading. Each color becomes its own layer for your machine to cut.';warn=true;
+      msg='Heads up: cut files use flat solid colors only : no gradients or shading. Each color becomes its own layer for your machine to cut.';warn=true;
     }else if(u==='print'){
-      msg='For printing, gradients and shading are fine — we\u2019ll deliver a full color file ready for DTF, sublimation or stickers.';
+      msg='For printing, gradients and shading are fine : we\u2019ll deliver a full color file ready for DTF, sublimation or stickers.';
     }else if(u==='both'){
       msg='We\u2019ll prepare a flat-color version for cutting (no gradients) and can keep the shading in your print version.';
     }else if(u==='ns'){
-      msg='No problem — tell us a bit about your project above and we\u2019ll recommend cut-ready, print-ready, or both.';
+      msg='No problem : tell us a bit about your project above and we\u2019ll recommend cut-ready, print-ready, or both.';
     }
   }
   if(msg){

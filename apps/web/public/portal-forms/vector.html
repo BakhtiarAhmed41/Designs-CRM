@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Vector & Print Files — Quote Request</title>
+<title>Vector & Print Files : Quote Request</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -160,7 +160,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
 <body>
 <div class="wrap">
 <div class="card">
-  <div class="ch"><i class="ti ti-vector-triangle"></i><span class="ct">Custom Vector and Print Files — quote request</span></div>
+  <div class="ch"><i class="ti ti-vector-triangle"></i><span class="ct">Custom Vector and Print Files : quote request</span></div>
   <div class="cb">
 
     <div class="redirect"><i class="ti ti-info-circle"></i><span>Need a <strong>cut file for Cricut, Silhouette or vinyl?</strong> Use our <a href="#" style="color:#185fa5;font-weight:500;">Custom SVG &amp; Cut files Form →</a></span></div>
@@ -186,15 +186,15 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
         <div class="upload-area">
           <div class="utrg" onclick="document.getElementById('fu-main').click()">
             <i class="ti ti-cloud-upload"></i>
-            <p>Click to upload — multiple files allowed</p>
-            <span>PNG, JPG, PDF, AI, EPS, SVG — max 20MB each</span>
+            <p>Click to upload : multiple files allowed</p>
+            <span>PNG, JPG, PDF, AI, EPS, SVG : max 20MB each</span>
             <input type="file" id="fu-main" multiple style="display:none" onchange="handleFiles('fl-main',this)">
           </div>
           <div class="flist" id="fl-main"></div>
         </div>
       </div>
       <div>
-        <div class="sl">Reference image <span style="font-size:11px;font-weight:400;color:#aaa;">(optional — won't be redrawn)</span></div>
+        <div class="sl">Reference image <span style="font-size:11px;font-weight:400;color:#aaa;">(optional : won't be redrawn)</span></div>
         <div class="upload-area">
           <div class="utrg" onclick="document.getElementById('fu-ref').click()">
             <i class="ti ti-photo" style="color:#BA7517;"></i>
@@ -211,7 +211,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
     <div class="mode-body vis" id="mode-q">
       <div class="sl" style="margin-top:0;">Tell us about your project</div>
       <div class="qbig">
-        <textarea placeholder="e.g. Could you make these three tractors into a logo for a shirt? I want black and white plus a color version, screen print ready — that's all we need, our team handles the rest. You can also paste a link here if you want us to see a reference."></textarea>
+        <textarea placeholder="e.g. Could you make these three tractors into a logo for a shirt? I want black and white plus a color version, screen print ready : that's all we need, our team handles the rest. You can also paste a link here if you want us to see a reference."></textarea>
       </div>
       <div class="fg" style="margin-top:11px;">
         
@@ -219,19 +219,19 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
 
       <div class="sl" style="margin-top:14px;">Turnaround</div>
       <div class="rush-row">
-        <div class="ropt sel-s" id="rq-std" onclick="selRushQ('std')"><i class="ti ti-clock" style="font-size:13px"></i> Standard (12–24 hrs) — included</div>
-        <div class="ropt" id="rq-rush" onclick="selRushQ('rush')"><i class="ti ti-bolt" style="font-size:13px"></i> Urgent — contact us before placing an order</div>
+        <div class="ropt sel-s" id="rq-std" onclick="selRushQ('std')"><i class="ti ti-clock" style="font-size:13px"></i> Standard (12–24 hrs) : included</div>
+        <div class="ropt" id="rq-rush" onclick="selRushQ('rush')"><i class="ti ti-bolt" style="font-size:13px"></i> Urgent : contact us before placing an order</div>
       </div>
       <div class="ibox" id="rq-note" style="display:none;"><i class="ti ti-message-circle"></i> For urgent orders, please text or email us first so we can confirm the timeline before you place the order.</div>
 
-      <div class="ibox"><i class="ti ti-info-circle"></i> Don't worry about other technical details — formats, color modes and separations can all be sorted after you submit. Switch to Detailed request if you already know your specs.</div>
+      <div class="ibox"><i class="ti ti-info-circle"></i> Don't worry about other technical details : formats, color modes and separations can all be sorted after you submit. Switch to Detailed request if you already know your specs.</div>
     </div>
 
     <!-- DETAILED MODE -->
     <div class="mode-body" id="mode-d">
       <div style="display:flex;gap:9px;align-items:flex-start;background:#EAF0F5;border-radius:10px;padding:11px 14px;margin-top:14px;font-size:12.5px;color:#143F65;line-height:1.5;">
         <i class="ti ti-heart-handshake" style="font-size:16px;margin-top:1px;"></i>
-        <span><b>Not sure about a field? Leave it blank.</b> We'll figure it out from your artwork — every field here is optional and just helps us quote faster.</span>
+        <span><b>Not sure about a field? Leave it blank.</b> We'll figure it out from your artwork : every field here is optional and just helps us quote faster.</span>
       </div>
 
       <div class="sl">How many designs?</div>
@@ -254,12 +254,12 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
         <div class="sl" style="margin-top:0;">What do you need?</div>
         <div class="ff" style="margin-bottom:12px;">
           <select id="svc-sel" onchange="setSvc(this.value)">
-            <option value="vector">Image to vector — redraw as clean vector art</option>
-            <option value="dtf">DTF print file — print ready PNG / SVG</option>
+            <option value="vector">Image to vector : redraw as clean vector art</option>
+            <option value="dtf">DTF print file : print ready PNG / SVG</option>
             <option value="screen">Screen print / color separation</option>
-            <option value="complex">Complex artwork — portrait, pet, vehicle, illustration</option>
-            <option value="pattern">Seamless pattern — repeat pattern for fabric / print</option>
-            <option value="other">Something else — I'll describe below</option>
+            <option value="complex">Complex artwork : portrait, pet, vehicle, illustration</option>
+            <option value="pattern">Seamless pattern : repeat pattern for fabric / print</option>
+            <option value="other">Something else : I'll describe below</option>
           </select>
         </div>
 
@@ -270,7 +270,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
             <div class="ff"><label>Number of colors</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>Full color</option><option>Not sure</option></select></div>
             <div class="ff"><label>Background</label><select><option>Transparent</option><option>White</option><option>Black</option><option>Custom color</option></select></div>
             <div class="ff"><label>Intended use</label><select><option>Print on apparel</option><option>Logo / branding</option><option>General print (stickers, banners)</option><option>Embroidery later</option><option>Web / digital</option><option>Edit / modify myself</option><option>Not sure</option></select></div>
-            <div class="ff"><label>Size needed <span style="font-weight:400;color:#aaa;">(optional — vector scales, but tell us if exact)</span></label><div style="display:grid;grid-template-columns:1fr 14px 1fr 74px;align-items:center;gap:4px;"><input type="number" placeholder="W" min="0" step="0.1"><span style="text-align:center;font-size:12px;color:#aaa;">×</span><input type="number" placeholder="H" min="0" step="0.1"><select><option>inches</option><option>cm</option><option>px</option></select></div></div>
+            <div class="ff"><label>Size needed <span style="font-weight:400;color:#aaa;">(optional : vector scales, but tell us if exact)</span></label><div style="display:grid;grid-template-columns:1fr 14px 1fr 74px;align-items:center;gap:4px;"><input type="number" placeholder="W" min="0" step="0.1"><span style="text-align:center;font-size:12px;color:#aaa;">×</span><input type="number" placeholder="H" min="0" step="0.1"><select><option>inches</option><option>cm</option><option>px</option></select></div></div>
           </div>
         </div>
 
@@ -280,7 +280,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
             <div class="ff"><label>Print size (W × H inches)</label><div class="size-r"><input type="number" placeholder="W" min="0" step="0.1"><span class="sep-x">×</span><input type="number" placeholder="H" min="0" step="0.1"></div></div>
             <div class="ff"><label>Number of colors</label><select><option>Full color</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>Not sure</option></select></div>
             <div class="ff"><label>Background</label><select><option>Transparent</option><option>White</option><option>Black</option></select></div>
-            <div class="ff"><label>Gang sheet?</label><select><option>No — single design</option><option>Yes — arrange on gang sheet</option><option>Not sure</option></select></div>
+            <div class="ff"><label>Gang sheet?</label><select><option>No : single design</option><option>Yes : arrange on gang sheet</option><option>Not sure</option></select></div>
           </div>
           <div class="ibox info" style="margin-top:8px;"><i class="ti ti-info-circle"></i> DTF files delivered as high resolution PNG with white underbase layer included as standard.</div>
         </div>
@@ -289,9 +289,9 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
         <div id="sf-screen" class="svc-fields">
           <div class="fg">
             <div class="ff"><label>Number of colors / screens</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6+</option><option>Not sure</option></select></div>
-            <div class="ff"><label>Separation type</label><select><option>Spot color</option><option>CMYK</option><option>Simulated process</option><option>Not sure — let team decide</option></select></div>
-            <div class="ff"><label>Underbase</label><select><option>Yes — white underbase</option><option>No underbase</option><option>Not sure</option></select></div>
-            <div class="ff"><label>Halftone</label><select><option>No — solid colors only</option><option>Yes — halftone separations</option><option>Not sure</option></select></div>
+            <div class="ff"><label>Separation type</label><select><option>Spot color</option><option>CMYK</option><option>Simulated process</option><option>Not sure : let team decide</option></select></div>
+            <div class="ff"><label>Underbase</label><select><option>Yes : white underbase</option><option>No underbase</option><option>Not sure</option></select></div>
+            <div class="ff"><label>Halftone</label><select><option>No : solid colors only</option><option>Yes : halftone separations</option><option>Not sure</option></select></div>
           </div>
         </div>
 
@@ -303,13 +303,13 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
             <div class="ff"><label>Number of colors</label><select><option>Full color</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5+</option><option>Not sure</option></select></div>
             <div class="ff"><label>Intended use</label><select><option>Print on apparel</option><option>Logo / branding</option><option>Wall art / poster</option><option>Gift / keepsake</option><option>DTF / screen print</option><option>Not sure</option></select></div>
           </div>
-          <div class="ibox info" style="margin-top:8px;"><i class="ti ti-info-circle"></i> Complex artwork is priced after reviewing your image — we'll quote within 2 hours.</div>
+          <div class="ibox info" style="margin-top:8px;"><i class="ti ti-info-circle"></i> Complex artwork is priced after reviewing your image : we'll quote within 2 hours.</div>
         </div>
 
         <!-- pattern fields -->
         <div id="sf-pattern" class="svc-fields">
           <div class="fg">
-            <div class="ff"><label>Repeat type</label><select><option>Square repeat</option><option>Half-drop repeat</option><option>Brick repeat</option><option>Not sure — let team decide</option></select></div>
+            <div class="ff"><label>Repeat type</label><select><option>Square repeat</option><option>Half-drop repeat</option><option>Brick repeat</option><option>Not sure : let team decide</option></select></div>
             <div class="ff"><label>Intended use</label><select><option>Fabric / textile printing</option><option>Sublimation</option><option>Wallpaper / background</option><option>Branding / packaging</option><option>Web / digital</option></select></div>
             <div class="ff"><label>Tile size (W × H inches)</label><div class="size-r"><input type="number" placeholder="W" min="0" step="0.1"><span class="sep-x">×</span><input type="number" placeholder="H" min="0" step="0.1"></div></div>
             <div class="ff"><label>Number of colors</label><select><option>2</option><option>3</option><option>4</option><option>5</option><option>Full color</option><option>Not sure</option></select></div>
@@ -325,7 +325,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
 
       <!-- MULTIPLE -->
       <div id="sec-multi" class="sec">
-        <div class="ibox info" style="margin-bottom:10px;"><i class="ti ti-info-circle"></i> Add a row per design — each can have its own service type and settings.</div>
+        <div class="ibox info" style="margin-bottom:10px;"><i class="ti ti-info-circle"></i> Add a row per design : each can have its own service type and settings.</div>
         <div id="multi-rows">
           <div class="drow" id="mr-1">
             <div class="drow-head"><span class="drow-num"><i class="ti ti-file" style="font-size:13px;"></i> Design 1</span></div>
@@ -341,7 +341,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
                   <option value="screen">Screen print / color sep</option>
                   <option value="complex">Complex artwork</option>
                   <option value="pattern">Seamless pattern</option>
-                  <option value="other">Other — describe below</option>
+                  <option value="other">Other : describe below</option>
                 </select>
               </div>
               <div class="ff"><label>Colors</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>Full color</option><option>Not sure</option></select></div>
@@ -351,14 +351,14 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
         </div>
         <button class="add-btn" onclick="addRow()"><i class="ti ti-plus"></i> Add another design</button>
         <div class="fg">
-          <div class="ff"><label>Shared output format</label><select><option>Same for all designs</option><option>Different per design — I'll specify in notes</option></select></div>
-          <div class="ff"><label>Shared turnaround</label><select><option>Standard (12–24 hrs)</option><option>Urgent — I'll contact you first before ordering</option></select></div>
+          <div class="ff"><label>Shared output format</label><select><option>Same for all designs</option><option>Different per design : I'll specify in notes</option></select></div>
+          <div class="ff"><label>Shared turnaround</label><select><option>Standard (12–24 hrs)</option><option>Urgent : I'll contact you first before ordering</option></select></div>
         </div>
       </div>
 
 
       <!-- output formats -->
-      <div class="sl" style="margin-top:14px;">Output formats <span style="font-size:11px;font-weight:400;color:#aaa;">— select all you need</span></div>
+      <div class="sl" style="margin-top:14px;">Output formats <span style="font-size:11px;font-weight:400;color:#aaa;">  select all you need</span></div>
       <div class="fmt-grid">
         <div class="fmt-chip sel" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-photo icon"></i><span class="fname">PNG</span><span class="fext">300 DPI</span></div>
         <div class="fmt-chip sel" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-file-type-svg icon"></i><span class="fname">SVG</span><span class="fext">Vector</span></div>
@@ -372,7 +372,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
 
       <!-- color mode -->
       <div class="fg" style="margin-top:12px;">
-        <div class="ff"><label>Color mode</label><select><option>RGB (screen / DTF / web)</option><option>CMYK (screen print / offset)</option><option>Not sure — let team decide</option></select></div>
+        <div class="ff"><label>Color mode</label><select><option>RGB (screen / DTF / web)</option><option>CMYK (screen print / offset)</option><option>Not sure : let team decide</option></select></div>
       </div>
 
       <!-- variations -->
@@ -393,8 +393,8 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
       <div id="rush-single">
         <div class="sl" style="margin-top:14px;">Turnaround</div>
       <div class="rush-row">
-        <div class="ropt sel-s" id="r-std" onclick="selRush('std')"><i class="ti ti-clock" style="font-size:13px"></i> Standard (12–24 hrs) — included</div>
-        <div class="ropt" id="r-rush" onclick="selRush('rush')"><i class="ti ti-bolt" style="font-size:13px"></i> Urgent — contact us before placing an order</div>
+        <div class="ropt sel-s" id="r-std" onclick="selRush('std')"><i class="ti ti-clock" style="font-size:13px"></i> Standard (12–24 hrs) : included</div>
+        <div class="ropt" id="r-rush" onclick="selRush('rush')"><i class="ti ti-bolt" style="font-size:13px"></i> Urgent : contact us before placing an order</div>
       </div>
       <div class="ibox" id="rush-note" style="display:none;"><i class="ti ti-message-circle"></i> For urgent orders, please text or email us first so we can confirm the timeline before you place the order.</div>
       </div>
@@ -452,7 +452,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
 
     
       <div class="sl" style="margin-top:14px;">Anything else we should know?</div>
-      <div class="qbig"><textarea style="min-height:64px;" placeholder="Deadlines, special requests, context — anything that didn&#39;t fit the fields above."></textarea></div>
+      <div class="qbig"><textarea style="min-height:64px;" placeholder="Deadlines, special requests, context : anything that didn&#39;t fit the fields above."></textarea></div>
 
     </div>
 
@@ -460,7 +460,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
       <i class="ti ti-messages"></i>
       <div style="flex:1;">
         <div class="mc-t">Prefer to message us directly?</div>
-        <div class="mc-s">Skip the form — chat with our team from your account, attach your image and send your details. We'll set up the order for you.</div>
+        <div class="mc-s">Skip the form : chat with our team from your account, attach your image and send your details. We'll set up the order for you.</div>
       </div>
       <a class="mc-btn" href="#">Message our team</a>
     </div>

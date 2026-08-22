@@ -210,8 +210,9 @@ export function PortalMessages() {
             </button>
           ))}
           {!convosQuery.isLoading && conversations.length === 0 && (
-            <div className="msg-empty">
-              No conversations yet. Start a topic chat or open chat from an order/quote.
+            <div className="msg-empty-state">
+              <div className="empty-state-title">No conversations yet</div>
+              <p className="empty-state-desc">Start a topic or open chat from an order or quote.</p>
             </div>
           )}
         </div>

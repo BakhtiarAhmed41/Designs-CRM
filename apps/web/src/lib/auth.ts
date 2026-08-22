@@ -14,7 +14,12 @@ export function register(data: {
   name: string;
   phone?: string | null;
 }) {
-  return apiFetch<{ user: CurrentUser; pending: boolean }>('/auth/register', {
+  return apiFetch<{
+    user: CurrentUser;
+    pending: boolean;
+    emailSent?: boolean;
+    verifyToken?: string | null;
+  }>('/auth/register', {
     method: 'POST',
     body: JSON.stringify(data),
   });
@@ -61,6 +66,20 @@ export function updateProfile(data: {
   return apiFetch<{ user: CurrentUser }>('/users/me', {
     method: 'PATCH',
     body: JSON.stringify(data),
+  });
+}
+
+export function requestEmailChange(email: string) {
+  return apiFetch<{ ok: boolean; emailSent: boolean; pendingEmail: string }>(
+    '/users/me/email',
+    { method: 'POST', body: JSON.stringify({ email }) },
+  );
+}
+
+export function confirmEmailChange(token: string) {
+  return apiFetch<{ ok: boolean }>('/auth/confirm-email-change', {
+    method: 'POST',
+    body: JSON.stringify({ token }),
   });
 }
 

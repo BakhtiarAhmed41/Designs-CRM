@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { QuoteBuilderModal } from '@/components/QuoteBuilderModal';
 import { acceptQuotation, listMyOrderSummary, listMyOrders, myAttachmentUrl, rejectQuotation } from '@/lib/orders';
 import { createMyConversation, listMyConversations } from '@/lib/messaging';
@@ -37,10 +37,18 @@ function lineTotal(l: QuotationLine) {
 
 export function PortalQuotes() {
   const navigate = useNavigate();
+  const location = useLocation();
   const qc = useQueryClient();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const incoming = (location.state as { claimError?: string } | null)?.claimError;
+    if (!incoming) return;
+    setError(incoming);
+    navigate('.', { replace: true, state: {} });
+  }, [location.state, navigate]);
   const [keptByOrder, setKeptByOrder] = useState<Record<string, string[]>>({});
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');

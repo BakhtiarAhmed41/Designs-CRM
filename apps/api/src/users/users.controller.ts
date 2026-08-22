@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -26,6 +26,13 @@ export class UsersController {
   async updateMe(@CurrentUser() user: AuthUser, @Body() body: unknown) {
     const dto = updateProfileSchema.parse(body);
     return { user: await this.users.updateProfile(user.id, dto) };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('me/email')
+  async changeEmail(@CurrentUser() user: AuthUser, @Body() body: unknown) {
+    const dto = z.object({ email: z.string().email() }).parse(body);
+    return this.users.requestEmailChange(user.id, dto.email);
   }
 }
 

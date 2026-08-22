@@ -1,6 +1,6 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { canFeature } from '@/lib/permissions';
+import { canFeature, staffLandingPath } from '@/lib/permissions';
 import type { FeatureKey } from '@/lib/types';
 
 /** Blocks admin child routes when the signed-in user lacks a feature. */
@@ -29,10 +29,7 @@ export function RequireFeature({
     keys.some((key) => canFeature(user?.permissions, key, user?.role));
 
   if (!allowed) {
-    // Prefer My work for designers / staff without the requested feature.
-    const fallback =
-      user?.role === 'DESIGNER' ? '/admin/mywork' : '/admin';
-    return <Navigate to={fallback} replace />;
+    return <Navigate to={staffLandingPath(user?.role, user?.permissions)} replace />;
   }
 
   return <>{children}</>;

@@ -115,6 +115,12 @@ export class AuthController {
     return this.auth.verifyEmail(token);
   }
 
+  @Post('confirm-email-change')
+  async confirmEmailChange(@Body() body: unknown) {
+    const { token } = parseBody(verifySchema, body);
+    return this.auth.confirmEmailChange(token);
+  }
+
   @Post('refresh')
   async refresh(@Res({ passthrough: true }) res: Response) {
     const req = res.req as { cookies?: Record<string, string> };

@@ -3,14 +3,18 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   acceptQuotation,
+  counterQuotation,
   getMyOrder,
+  myAttachmentUrl,
   rejectQuotation,
 } from '@/lib/orders';
 import { createMyConversation, listMyConversations } from '@/lib/messaging';
-import { getErrorMessage } from '@/lib/api';
+import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import { dateShort, money, quoteLifecycleChip } from '@/lib/format';
 import type { QuotationLine } from '@/lib/designs';
 import type { Order, Quotation } from '@/lib/types';
+import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 type QuoteWithLines = Quotation & { lines?: QuotationLine[] };
 
@@ -24,6 +28,8 @@ export function PortalQuoteDetail() {
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [kept, setKept] = useState<string[] | null>(null);
+  const [counterAmount, setCounterAmount] = useState('');
+  const [counterNote, setCounterNote] = useState('');
 
   const { data, isLoading } = useQuery({
     queryKey: ['my-order', id],
@@ -68,6 +74,22 @@ export function PortalQuoteDetail() {
     onError: (e) => setError(getErrorMessage(e)),
   });
 
+  const counterMut = useMutation({
+    mutationFn: () =>
+      counterQuotation(id, {
+        amountCents: counterAmount
+          ? Math.round(parseFloat(counterAmount) * 100)
+          : undefined,
+        comment: counterNote.trim() || undefined,
+      }),
+    onSuccess: () => {
+      setError(null);
+      void qc.invalidateQueries({ queryKey: ['my-order', id] });
+      void qc.invalidateQueries({ queryKey: ['my-orders'] });
+    },
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
   const startChat = useMutation({
     mutationFn: async () => {
       const listed = await listMyConversations();
@@ -89,22 +111,31 @@ export function PortalQuoteDetail() {
   });
 
   if (isLoading) {
-    return <div style={{ padding: 16, color: 'var(--muted)' }}>Loading…</div>;
+    return <EmptyState icon="ti-loader" title="Loading quote…" />;
   }
   if (!order) {
-    return <div style={{ padding: 16, color: 'var(--muted)' }}>Quote not found.</div>;
+    return (
+      <EmptyState
+        icon="ti-file-off"
+        title="Quote not found"
+        description="It may have been removed or the link is outdated."
+        action={<Link to="/portal/quotes" className="btn btn-ghost btn-sm">Back to quotes</Link>}
+      />
+    );
   }
 
   if (order.type === 'ORDER') {
     return (
-      <div style={{ padding: 16 }}>
-        <div className="muted" style={{ marginBottom: 10 }}>
-          This quote was accepted and converted to an order.
-        </div>
-        <Link to={`/portal/orders/${order.id}`} className="btn btn-primary">
-          Open order
-        </Link>
-      </div>
+      <EmptyState
+        icon="ti-circle-check"
+        title="This quote is now an order"
+        description="You accepted the price. Track production from the order workspace."
+        action={
+          <Link to={`/portal/orders/${order.id}`} className="btn btn-primary">
+            Open order
+          </Link>
+        }
+      />
     );
   }
 
@@ -115,32 +146,31 @@ export function PortalQuoteDetail() {
 
   return (
     <div>
-      <div className="ph">
-        <div>
-          <Link to="/portal/quotes" className="muted" style={{ fontSize: 13 }}>
-            ← Back to quotes
-          </Link>
-          <h1 style={{ marginTop: 6 }}>{order.name ?? 'Quote request'}</h1>
-          <div className="sub">
-            Q-{order.humanRef ?? order.id.slice(0, 6)} · {dateShort(order.createdAt)}
+      <PageHeader
+        title={order.name ?? 'Quote request'}
+        subtitle={`Q-${order.humanRef ?? order.id.slice(0, 6)} · ${dateShort(order.createdAt)}`}
+        crumbs={[
+          { label: 'Quotes', to: '/portal/quotes' },
+          { label: order.humanRef ?? 'Quote' },
+        ]}
+        actions={
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span className={statusChip.cls}>{statusChip.label}</span>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={startChat.isPending}
+              onClick={() => startChat.mutate()}
+            >
+              <i className="ti ti-message" /> Message team
+            </button>
           </div>
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <span className={statusChip.cls}>{statusChip.label}</span>
-          <button
-            type="button"
-            className="btn btn-ghost"
-            disabled={startChat.isPending}
-            onClick={() => startChat.mutate()}
-          >
-            <i className="ti ti-message" /> Message about this quote
-          </button>
-        </div>
-      </div>
+        }
+      />
 
-      {error && <div className="alert-error" style={{ marginBottom: 12 }}>{error}</div>}
+      {error && <ErrorBanner>{error}</ErrorBanner>}
 
-      <div className="card" style={{ padding: 18 }}>
+      <div className="card card-pad">
         {lines.length === 0 ? (
           <div className="muted">
             {order.status === 'WAITING_FOR_QUOTATION' || order.status === 'CREATED'
@@ -154,14 +184,8 @@ export function PortalQuoteDetail() {
               return (
                 <label
                   key={l.id}
-                  style={{
-                    display: 'flex',
-                    gap: 12,
-                    alignItems: 'flex-start',
-                    padding: '12px 0',
-                    borderBottom: '0.5px solid var(--line)',
-                    cursor: canDecide ? 'pointer' : 'default',
-                  }}
+                  className="quote-line"
+                  style={{ cursor: canDecide ? 'pointer' : 'default' }}
                 >
                   {canDecide && (
                     <input
@@ -180,6 +204,23 @@ export function PortalQuoteDetail() {
                   <div style={{ flex: 1 }}>
                     <div style={{ fontWeight: 600 }}>{l.name}</div>
                     {l.note && <div className="muted" style={{ fontSize: 12.5 }}>{l.note}</div>}
+                    {l.attachmentId && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        style={{ marginTop: 6 }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          void downloadSignedFile(
+                            myAttachmentUrl(id, l.attachmentId!),
+                            l.name,
+                          );
+                        }}
+                      >
+                        <i className="ti ti-download" /> Download file
+                      </button>
+                    )}
                     {l.sizes.length > 0 && (
                       <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
                         {l.sizes.map((s) => `${s.label}: ${money(s.priceCents)}`).join(' · ')}
@@ -190,14 +231,7 @@ export function PortalQuoteDetail() {
                 </label>
               );
             })}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginTop: 16,
-              }}
-            >
+            <div className="quote-total">
               <div>
                 <div className="muted" style={{ fontSize: 12 }}>Selected total</div>
                 <div style={{ fontSize: 22, fontWeight: 700 }}>{money(total)}</div>
@@ -219,6 +253,34 @@ export function PortalQuoteDetail() {
                     onClick={() => acceptMut.mutate()}
                   >
                     Accept &amp; convert to order
+                  </button>
+                </div>
+              )}
+              {canDecide && (
+                <div style={{ marginTop: 16, display: 'grid', gap: 8 }}>
+                  <div className="muted" style={{ fontSize: 12 }}>
+                    Suggest a different total if you want to counter this quote.
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Counter amount"
+                    value={counterAmount}
+                    onChange={(e) => setCounterAmount(e.target.value)}
+                  />
+                  <input
+                    placeholder="Note for the team"
+                    value={counterNote}
+                    onChange={(e) => setCounterNote(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={counterMut.isPending || !counterAmount}
+                    onClick={() => counterMut.mutate()}
+                  >
+                    Send counter-offer
                   </button>
                 </div>
               )}

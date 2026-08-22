@@ -209,7 +209,7 @@ export async function openInvoicePrint(id: string, admin = false) {
   if (!res.ok) throw new Error('Could not load invoice for printing');
   const html = await res.text();
   const w = window.open('', '_blank');
-  if (!w) throw new Error('Popup blocked — allow popups to print invoices');
+  if (!w) throw new Error('Popup blocked. Allow popups to print invoices');
   w.document.open();
   w.document.write(html);
   w.document.close();

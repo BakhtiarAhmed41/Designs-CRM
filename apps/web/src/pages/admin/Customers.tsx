@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createCustomer,
@@ -18,6 +18,9 @@ import { getErrorMessage } from '@/lib/api';
 import { money, dateShort, statusChipClass, statusLabel } from '@/lib/format';
 import type { OrderStatus } from '@/lib/types';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { SkeletonRows } from '@/components/ui/Skeleton';
 
 type FilterId = '' | 'NET_MONTHLY' | 'PAY_PER_ORDER' | 'top';
 
@@ -37,10 +40,18 @@ function accountLabel(type: AccountType) {
 }
 
 export function AdminCustomers() {
+  const [searchParams] = useSearchParams();
   const [filter, setFilter] = useState<FilterId>('');
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    searchParams.get('open'),
+  );
+
+  useEffect(() => {
+    const openId = searchParams.get('open');
+    if (openId) setSelectedId(openId);
+  }, [searchParams]);
   const [showNew, setShowNew] = useState(false);
   const [showMerge, setShowMerge] = useState(false);
 
@@ -66,22 +77,20 @@ export function AdminCustomers() {
 
   return (
     <div>
-      <div className="ph">
-        <div>
-          <h1>Customers</h1>
-          <div className="sub">
-            Every account with full history and lifetime value. Grant net-monthly terms here.
-          </div>
-        </div>
+      <PageHeader
+        title="Customers"
+        subtitle="Accounts, payment terms, lifetime value, and last activity."
+        actions={
         <div style={{ display: 'flex', gap: 8 }}>
           <button type="button" className="btn btn-ghost" onClick={() => setShowMerge(true)}>
-            <i className="ti ti-arrows-join" /> Merge duplicates
+            <i className="ti ti-arrows-join" /> Merge
           </button>
           <button type="button" className="btn btn-primary" onClick={() => setShowNew(true)}>
             <i className="ti ti-plus" /> Add customer
           </button>
         </div>
-      </div>
+        }
+      />
 
       <ListToolbar
         search={q}
@@ -92,7 +101,7 @@ export function AdminCustomers() {
         searchPlaceholder="Search customers by name, email, phone…"
       />
 
-      <div style={{ margin: '0 0 10px' }}>
+      <div>
         <div className="filters">
           <button type="button" className={filter === '' ? 'on' : ''} onClick={() => setFilter('')}>
             All
@@ -121,48 +130,62 @@ export function AdminCustomers() {
         </div>
       </div>
 
-      <div className="card">
-        {isLoading && <div style={{ padding: 16, color: 'var(--muted)' }}>Loading...</div>}
+      <div className="card table-card">
+        {isLoading && <SkeletonRows rows={6} />}
         {!isLoading && customers.length === 0 && (
-          <div style={{ padding: 16, color: 'var(--muted)' }}>No customers match this filter.</div>
+          <EmptyState
+            icon="ti-users"
+            title="No customers match"
+            description="Try another filter or add a customer."
+          />
         )}
-        {customers.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            className="crow"
-            onClick={() => setSelectedId(c.id)}
-            style={{
-              width: '100%',
-              textAlign: 'left',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-            }}
-          >
-            <div className={`othumb ${c.accountType === 'NET_MONTHLY' ? 'm' : ''}`}>
-              {c.name.slice(0, 2).toUpperCase()}
-            </div>
-            <div className="oinfo">
-              <div className="on">{c.name}</div>
-            <div className="om">
-              <span>{c.email ?? 'No email'}</span>
-              <span>{c.ordersCount} orders</span>
-              <span>{c.runningOrders ?? 0} running</span>
-              {c.netTerms && <span>{c.netTerms.replace('_', ' ')}</span>}
-            </div>
-          </div>
-            <span className={accountChip(c.accountType)}>{accountLabel(c.accountType)}</span>
-            <div className="oprice">
-              {money(c.ltvCents)}
-              {c.storeCreditCents > 0 && (
-                <div style={{ fontSize: 11, color: 'var(--green)' }}>
-                  {money(c.storeCreditCents)} credit
-                </div>
-              )}
-            </div>
-          </button>
-        ))}
+        {!isLoading && customers.length > 0 && (
+          <table className="itable">
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th>Account</th>
+                <th>Orders</th>
+                <th className="num">Lifetime</th>
+              </tr>
+            </thead>
+            <tbody>
+              {customers.map((c) => (
+                <tr key={c.id} className="click-row" onClick={() => setSelectedId(c.id)}>
+                  <td>
+                    <div className="cell-main">
+                      <div className={`othumb ${c.accountType === 'NET_MONTHLY' ? 'm' : ''}`}>
+                        {c.name.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="on">{c.name}</div>
+                        <div className="om">{c.email ?? 'No email'}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span className={accountChip(c.accountType)}>{accountLabel(c.accountType)}</span>
+                    {c.netTerms && (
+                      <div className="om" style={{ marginTop: 4 }}>{c.netTerms.replace('_', ' ')}</div>
+                    )}
+                  </td>
+                  <td>
+                    {c.ordersCount} total
+                    <div className="om">{c.runningOrders ?? 0} running</div>
+                  </td>
+                  <td className="num">
+                    {money(c.ltvCents)}
+                    {c.storeCreditCents > 0 && (
+                      <div style={{ fontSize: 11, color: 'var(--green)', fontWeight: 600 }}>
+                        {money(c.storeCreditCents)} credit
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
       <PaginationBar
         page={data?.page ?? 1}
@@ -343,7 +366,7 @@ function CustomerDetailModal({
                       })
                     }
                   >
-                    <option value="">—</option>
+                    <option value="">None</option>
                     {NET_TERMS.map((n) => (
                       <option key={n} value={n}>
                         {n.replace('_', ' ')}

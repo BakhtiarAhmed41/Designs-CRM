@@ -26,6 +26,7 @@ export type QuotationLine = {
   id: string;
   name: string;
   note: string | null;
+  attachmentId?: string | null;
   priceCents: number | null;
   sortOrder: number;
   clientDecision?: 'PENDING' | 'KEPT' | 'DROPPED';
@@ -45,6 +46,7 @@ export type MyFile = {
 export type QuoteBuilderLineInput = {
   name: string;
   note?: string | null;
+  attachmentId?: string | null;
   priceCents?: number | null;
   sizes?: Array<{ label: string; priceCents: number }>;
 };

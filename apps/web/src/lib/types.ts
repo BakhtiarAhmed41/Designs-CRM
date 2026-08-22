@@ -45,6 +45,7 @@ export type UserPermissions = {
 export type CurrentUser = {
   id: string;
   email: string;
+  pendingEmail?: string | null;
   role: UserRole;
   loginStatus?: 'PENDING' | 'ACTIVE' | 'DISABLED';
   firstName: string | null;
@@ -115,8 +116,12 @@ export type Order = {
   name: string | null;
   instructions: string | null;
   size: string | null;
+  turnaroundKey?: string | null;
+  turnaroundLabel?: string | null;
+  turnaroundHours?: number | null;
   preferences: unknown;
   status: OrderStatus;
+  designCount?: number;
   priceCents: number | null;
   currency: string;
   assignedDesignerId?: string | null;

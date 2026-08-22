@@ -402,6 +402,7 @@ export class AdminOrdersController {
   }
 
   @Patch(':id/quotations/counter/reject')
+  @RequireSupport('approve')
   async rejectCounter(
     @CurrentUser() user: AuthUser | undefined,
     @Param('id') id: string,

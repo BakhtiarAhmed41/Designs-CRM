@@ -9,7 +9,7 @@ import { SearchService } from './search.service';
 
 @Controller('admin/search')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.ADMIN, UserRole.SUPPORT, UserRole.DESIGNER)
+@Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.SUPPORT, UserRole.DESIGNER)
 export class SearchController {
   constructor(private search: SearchService) {}
 

@@ -150,9 +150,9 @@ export function AdminBilling() {
     <div>
       <div className="ph">
         <div>
-          <h1>Billing &amp; invoices</h1>
+          <h1>Billing</h1>
           <div className="sub">
-            Money in, outstanding, and the month-end run for your net-monthly trade accounts.
+            Revenue, outstanding balances, invoices, refunds, and month-end statements.
           </div>
         </div>
         <button type="button" className="btn btn-primary" onClick={() => setCreateOpen(true)}>
@@ -176,28 +176,26 @@ export function AdminBilling() {
         ]}
       />
 
-      <div className="stats" style={{ marginTop: 16 }}>
-        <div className="stats-grid">
-          <div className="sc">
-            <div className="scl">Received this month</div>
-            <div className="scv m">{money(s?.paidThisMonthCents ?? 0)}</div>
-            <div className="scd">paid invoices</div>
-          </div>
-          <div className="sc">
-            <div className="scl">Outstanding</div>
-            <div className="scv">{money(s?.outstandingCents ?? 0)}</div>
-            <div className="scd">{unpaidLinks.length} unpaid</div>
-          </div>
-          <div className="sc">
-            <div className="scl">Net-monthly unbilled</div>
-            <div className="scv">{money(s?.storeCreditOutstandingCents ?? 0)}</div>
-            <div className="scd">{monthlyStatements.length} trade accounts</div>
-          </div>
-          <div className="sc">
-            <div className="scl">Avg order value</div>
-            <div className="scv">{money(avgOrder)}</div>
-            <div className="scd">this month</div>
-          </div>
+      <div className="metric-row">
+        <div className="metric" style={{ cursor: 'default' }}>
+          <div className="ml">Received this month</div>
+          <div className="mv alert">{money(s?.paidThisMonthCents ?? 0)}</div>
+          <div className="md">Paid invoices</div>
+        </div>
+        <div className="metric" style={{ cursor: 'default' }}>
+          <div className="ml">Outstanding</div>
+          <div className="mv">{money(s?.outstandingCents ?? 0)}</div>
+          <div className="md">{unpaidLinks.length} unpaid</div>
+        </div>
+        <div className="metric" style={{ cursor: 'default' }}>
+          <div className="ml">Net-monthly unbilled</div>
+          <div className="mv">{money(s?.storeCreditOutstandingCents ?? 0)}</div>
+          <div className="md">{monthlyStatements.length} trade accounts</div>
+        </div>
+        <div className="metric" style={{ cursor: 'default' }}>
+          <div className="ml">Avg order value</div>
+          <div className="mv">{money(avgOrder)}</div>
+          <div className="md">This month</div>
         </div>
       </div>
 
@@ -263,7 +261,7 @@ export function AdminBilling() {
       <div className="card">
         <div className="card-h">
           <span className="ct">
-            <i className="ti ti-file-invoice" /> Monthly statements — net-monthly accounts
+            <i className="ti ti-file-invoice" /> Monthly statements for net-monthly accounts
           </span>
           <button
             type="button"
@@ -276,7 +274,7 @@ export function AdminBilling() {
         </div>
         <div className="note" style={{ margin: '14px 16px' }}>
           <i className="ti ti-info-circle" /> On the 1st, all unbilled logos for each trade account roll into one
-          statement. Review here — nothing sends until you approve.
+          statement. Review here. Nothing sends until you approve.
         </div>
         {monthlyStatements.length === 0 && (
           <div style={{ padding: '0 16px 16px', color: 'var(--muted)' }}>No statements ready.</div>
@@ -517,7 +515,7 @@ function MonthEndModal({ result, onClose }: { result: MonthEndResult; onClose: (
     <div className="overlay open" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-h">
-          <span>Month-end — {result.periodMonth}</span>
+          <span>Month-end {result.periodMonth}</span>
           <button type="button" className="modal-x" onClick={onClose}>
             &times;
           </button>
@@ -635,7 +633,7 @@ function StoreCreditModal({
     <div className="overlay open" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-h">
-          <span>Store credit — {customerName ?? 'Customer'}</span>
+          <span>Store credit for {customerName ?? 'Customer'}</span>
           <button type="button" className="modal-x" onClick={onClose}>
             &times;
           </button>

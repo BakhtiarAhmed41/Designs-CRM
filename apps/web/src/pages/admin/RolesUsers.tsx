@@ -134,11 +134,11 @@ export function AdminRolesUsers() {
         <div>
           <h1>Roles &amp; users</h1>
           <div className="sub">
-            Create roles with feature permissions, then create users and assign roles.
+            Roles, staff users, and grouped permissions. View, create, and manage admin access.
           </div>
         </div>
       </div>
-      <div className="filters" style={{ marginBottom: 14 }}>
+      <div className="filters">
         <button type="button" className={tab === 'roles' ? 'on' : ''} onClick={() => setTab('roles')}>
           Roles
         </button>
@@ -200,7 +200,7 @@ function RolesPanel() {
                     {Object.entries(r.permissions)
                       .filter(([, v]) => v)
                       .map(([k]) => k)
-                      .join(', ') || '—'}
+                      .join(', ') || 'None'}
                   </td>
                   <td style={{ whiteSpace: 'nowrap' }}>
                     <button
@@ -288,6 +288,12 @@ function RoleFormModal({
 
   const messagingFeatures = features.filter((f) => MESSAGING_KEYS.includes(f.key));
   const otherFeatures = features.filter((f) => !MESSAGING_KEYS.includes(f.key));
+  const opsKeys = new Set(['dashboard', 'orders', 'quotes', 'edits']);
+  const moneyKeys = new Set(['customers', 'billing']);
+  const adminKeys = new Set(['team', 'roles']);
+  const leftoverFeatures = otherFeatures.filter(
+    (f) => !opsKeys.has(f.key) && !moneyKeys.has(f.key) && !adminKeys.has(f.key),
+  );
 
   const toggle = (key: FeatureKey, checked: boolean) => {
     setPermissions((p) => {
@@ -366,16 +372,34 @@ function RoleFormModal({
           </div>
 
           <div style={{ fontWeight: 600, fontSize: 12, margin: '10px 0 6px', color: 'var(--muted)' }}>
-            Screens
+            Operations
           </div>
           <FeatureCheckboxGrid
-            items={otherFeatures}
+            items={otherFeatures.filter((f) => opsKeys.has(f.key))}
             permissions={permissions}
             onToggle={toggle}
           />
 
           <div style={{ fontWeight: 600, fontSize: 12, margin: '12px 0 6px', color: 'var(--muted)' }}>
-            Messaging
+            Customers &amp; money
+          </div>
+          <FeatureCheckboxGrid
+            items={otherFeatures.filter((f) => moneyKeys.has(f.key))}
+            permissions={permissions}
+            onToggle={toggle}
+          />
+
+          <div style={{ fontWeight: 600, fontSize: 12, margin: '12px 0 6px', color: 'var(--muted)' }}>
+            Administration
+          </div>
+          <FeatureCheckboxGrid
+            items={otherFeatures.filter((f) => adminKeys.has(f.key))}
+            permissions={permissions}
+            onToggle={toggle}
+          />
+
+          <div style={{ fontWeight: 600, fontSize: 12, margin: '12px 0 6px', color: 'var(--muted)' }}>
+            Messages
           </div>
           <div style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 6 }}>
             Grant Customer Messages, Team Messages, group chat, and delete separately.
@@ -385,6 +409,19 @@ function RoleFormModal({
             permissions={permissions}
             onToggle={toggle}
           />
+
+          {leftoverFeatures.length > 0 && (
+            <>
+              <div style={{ fontWeight: 600, fontSize: 12, margin: '12px 0 6px', color: 'var(--muted)' }}>
+                Other
+              </div>
+              <FeatureCheckboxGrid
+                items={leftoverFeatures}
+                permissions={permissions}
+                onToggle={toggle}
+              />
+            </>
+          )}
 
           <button
             type="button"
@@ -643,7 +680,7 @@ function UserFormModal({
               value={form.customRoleId}
               onChange={(e) => setForm({ ...form, customRoleId: e.target.value })}
             >
-              <option value="">— None (use system role) —</option>
+              <option value="">None (use system role)</option>
               {roles.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.name}

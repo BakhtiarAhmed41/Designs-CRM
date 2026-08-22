@@ -133,6 +133,28 @@ async function main() {
     );
   }
 
+  if (!(await columnExists('users', 'pending_email'))) {
+    console.log('Adding users.pending_email column ...');
+    await conn.query('ALTER TABLE users ADD COLUMN pending_email VARCHAR(255) NULL');
+  }
+
+  if (!(await columnExists('orders', 'turnaround_key'))) {
+    console.log('Adding orders.turnaround columns ...');
+    await conn.query(
+      `ALTER TABLE orders
+         ADD COLUMN turnaround_key VARCHAR(40) NULL,
+         ADD COLUMN turnaround_label VARCHAR(120) NULL,
+         ADD COLUMN turnaround_hours INT NULL`,
+    );
+  }
+
+  if (!(await columnExists('quotation_lines', 'attachment_id'))) {
+    console.log('Adding quotation_lines.attachment_id column ...');
+    await conn.query(
+      'ALTER TABLE quotation_lines ADD COLUMN attachment_id CHAR(36) NULL',
+    );
+  }
+
   if (existsSync(migrationsDir)) {
     const applied = new Set(
       (

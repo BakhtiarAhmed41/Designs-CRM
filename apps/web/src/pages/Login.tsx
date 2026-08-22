@@ -115,11 +115,14 @@ export function Login() {
             navigate(`/portal/quotes/${claimed.order.id}`, { replace: true });
             return;
           } catch (err) {
-            setError(
-              getErrorMessage(err) ||
-                'Signed in, but we could not attach your quote request. Open Quotes to continue.',
-            );
-            navigate('/portal/quotes', { replace: true });
+            navigate('/portal/quotes', {
+              replace: true,
+              state: {
+                claimError:
+                  getErrorMessage(err) ||
+                  'Signed in, but we could not attach your quote request. Open Quotes to continue.',
+              },
+            });
             return;
           }
         }

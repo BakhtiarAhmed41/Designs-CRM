@@ -324,8 +324,8 @@ export class AuthService {
     });
 
     if (user && user.login_status === LoginStatus.PENDING) {
-      const admins = await this.db.query<{ id: string }>(
-        `SELECT id FROM users WHERE role IN ('SUPER_ADMIN','ADMIN') AND login_status = 'ACTIVE'`,
+      const admins = await this.db.query<{ id: string; email: string }>(
+        `SELECT id, email FROM users WHERE role IN ('SUPER_ADMIN','ADMIN') AND login_status = 'ACTIVE'`,
       );
       const name =
         [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email;
@@ -336,6 +336,11 @@ export class AuthService {
           body: `${name} (${user.email}) verified their email and requested portal access`,
           link: '/admin/login-requests',
         },
+      );
+      await Promise.all(
+        admins.map((a) =>
+          this.mail.sendLoginRequestToAdmin(a.email, name, user.email),
+        ),
       );
     }
 
@@ -374,6 +379,44 @@ export class AuthService {
       );
     });
     return { ok: true };
+  }
+
+  async confirmEmailChange(token: string) {
+    if (!token?.trim()) throw new BadRequestException('Token is required');
+    const row = await this.db.queryOne<{ id: string; user_id: string }>(
+      `SELECT id, user_id FROM password_reset_tokens
+        WHERE token_hash = ? AND used_at IS NULL AND expires_at > NOW()
+        LIMIT 1`,
+      [hashToken(`email-change:${token}`)],
+    );
+    if (!row) throw new BadRequestException('Invalid or expired confirmation link');
+    const user = await this.db.queryOne<{ pending_email: string | null }>(
+      'SELECT pending_email FROM users WHERE id = ? LIMIT 1',
+      [row.user_id],
+    );
+    if (!user?.pending_email) {
+      throw new BadRequestException('No email change is pending');
+    }
+    const taken = await this.db.queryOne<{ id: string }>(
+      'SELECT id FROM users WHERE email = ? AND id <> ? LIMIT 1',
+      [user.pending_email, row.user_id],
+    );
+    if (taken) throw new ConflictException('That email is already in use');
+    await this.db.withTransaction(async (tx) => {
+      await tx.execute(
+        'UPDATE users SET email = ?, pending_email = NULL, email_verified_at = NOW() WHERE id = ?',
+        [user.pending_email, row.user_id],
+      );
+      await tx.execute(
+        'UPDATE customers SET email = ? WHERE user_id = ?',
+        [user.pending_email, row.user_id],
+      );
+      await tx.execute(
+        'UPDATE password_reset_tokens SET used_at = NOW() WHERE id = ?',
+        [row.id],
+      );
+    });
+    return { ok: true as const };
   }
 
   async listPendingClients() {
@@ -422,6 +465,7 @@ export class AuthService {
         body: 'Your account has been approved. You can sign in now.',
         link: '/login',
       });
+      await this.mail.sendAccountApproved(user.email);
     }
     return { ok: true, loginStatus: status };
   }

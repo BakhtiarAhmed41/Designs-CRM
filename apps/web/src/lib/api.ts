@@ -38,7 +38,9 @@ export function resolveFileUrl(url: string): string {
 export function getErrorMessage(err: unknown): string {
   if (err instanceof ApiError) {
     if (err.status === 401) {
-      return 'Session expired or not authorized — please log in again.';
+      return err.message && err.message !== 'Unauthorized'
+        ? err.message
+        : 'Session expired or not authorized. Please log in again.';
     }
     if (err.status === 403) {
       return err.message && err.message !== 'Forbidden'

@@ -3,42 +3,25 @@ import { NavLink, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Brand, LogoutLink, Shell, useShellUser } from './Shell';
 import { TeamChatPanel } from './TeamChatPanel';
+import { GlobalSearch } from './GlobalSearch';
 import { listLoginRequests } from '@/lib/auth';
 import { getTeamChatOwner, getTeamUnreadSummary, listTeam, type Presence } from '@/lib/team';
 import { getAdminUnreadSummary } from '@/lib/messaging';
-import { canAnyMessaging, featuresForNav } from '@/lib/permissions';
+import { canAnyMessaging, featuresForUser } from '@/lib/permissions';
 import type { FeatureKey, UserRole } from '@/lib/types';
 import { useMessagingSocket } from '@/hooks/useMessagingSocket';
 
-type ViewRole = 'SUPER_ADMIN' | 'ADMIN' | 'SUPPORT' | 'DESIGNER';
-
 const ROLE_META: Record<
-  ViewRole,
-  { label: string; sideSub: string; footRole: string }
+  'SUPER_ADMIN' | 'ADMIN' | 'SUPPORT' | 'DESIGNER',
+  { label: string; sideSub: string }
 > = {
-  SUPER_ADMIN: {
-    label: 'Super Admin',
-    sideSub: 'Command center',
-    footRole: 'Owner · Super Admin',
-  },
-  ADMIN: {
-    label: 'Admin',
-    sideSub: 'Operations',
-    footRole: 'Admin · Operations',
-  },
-  SUPPORT: {
-    label: 'Support',
-    sideSub: 'Support desk',
-    footRole: 'Support',
-  },
-  DESIGNER: {
-    label: 'Designer',
-    sideSub: 'Designer workspace',
-    footRole: 'Designer',
-  },
+  SUPER_ADMIN: { label: 'Super Admin', sideSub: 'Command center' },
+  ADMIN: { label: 'Admin', sideSub: 'Operations' },
+  SUPPORT: { label: 'Support', sideSub: 'Support desk' },
+  DESIGNER: { label: 'Designer', sideSub: 'Designer workspace' },
 };
 
-function roleKey(role: UserRole): ViewRole {
+function roleKey(role: UserRole): keyof typeof ROLE_META {
   if (role === 'SUPER_ADMIN' || role === 'ADMIN' || role === 'SUPPORT' || role === 'DESIGNER') {
     return role;
   }
@@ -56,15 +39,10 @@ function memberLabel(m: { firstName: string | null; lastName: string | null; ema
 }
 
 export function AdminShell() {
-  const { user, initials, name, onLogout } = useShellUser();
+  const { user, onLogout } = useShellUser();
   const [searchParams, setSearchParams] = useSearchParams();
-  const actual = roleKey(user?.role ?? 'ADMIN');
-  const [viewAs, setViewAs] = useState<ViewRole>(actual);
+  const role = roleKey(user?.role ?? 'ADMIN');
   const [chatPeerId, setChatPeerId] = useState<string | null>(null);
-
-  useEffect(() => {
-    setViewAs(actual);
-  }, [actual]);
 
   const teamParam = searchParams.get('team');
   useEffect(() => {
@@ -85,15 +63,15 @@ export function AdminShell() {
   });
   const members = (teamData?.members ?? []).filter((m) => m.id !== user?.id);
   const onlineCount = (teamData?.members ?? []).filter((m) => m.presence === 'ON').length;
-  const meta = ROLE_META[viewAs];
-  const features = featuresForNav(actual, viewAs, user?.permissions);
+  const meta = ROLE_META[role];
+  const features = featuresForUser(role, user?.permissions);
   const can = (key: FeatureKey) => Boolean(features[key]);
-  const isDesignerView = viewAs === 'DESIGNER';
+  const isDesigner = role === 'DESIGNER';
   const showMessages = canAnyMessaging(features);
   const showCustomerMessages = can('messages') || can('messages_customer_view');
   const showTeamMessages = can('messages') || can('messages_team_view');
-  const showOwnerChat =
-    viewAs !== 'SUPER_ADMIN' && (showTeamMessages || isDesignerView);
+  const showMyWork = isDesigner || (!can('dashboard') && can('orders'));
+  const showOwnerChat = role !== 'SUPER_ADMIN' && (showTeamMessages || isDesigner);
 
   const { data: customerUnread } = useQuery({
     queryKey: ['admin-unread-messages'],
@@ -120,35 +98,8 @@ export function AdminShell() {
     },
   });
   const customerBadge = customerUnread?.unreadConversations ?? 0;
-  const teamBadge =
-    (teamUnread?.dmUnread ?? 0) + (teamUnread?.groupUnread ?? 0);
+  const teamBadge = (teamUnread?.dmUnread ?? 0) + (teamUnread?.groupUnread ?? 0);
   const loginRequestBadge = loginRequests?.requests?.length ?? 0;
-
-  const rolebar =
-    actual === 'SUPER_ADMIN' ? (
-      <div className="rolebar">
-        <div className="rb-l">
-          Preview nav as
-          <div className="seg">
-            {(Object.keys(ROLE_META) as ViewRole[]).map((r) => (
-              <button
-                key={r}
-                type="button"
-                className={viewAs === r ? 'on' : ''}
-                onClick={() => setViewAs(r)}
-              >
-                {ROLE_META[r].label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="rb-r">
-          <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>
-            Sidebar only · {onlineCount} online
-          </span>
-        </div>
-      </div>
-    ) : undefined;
 
   const sidebar = (
     <aside className="side">
@@ -159,7 +110,7 @@ export function AdminShell() {
             <i className="ti ti-home" /> Dashboard
           </NavLink>
         )}
-        {isDesignerView && (
+        {showMyWork && (
           <NavLink to="/admin/mywork" className={({ isActive }) => (isActive ? 'on' : undefined)}>
             <i className="ti ti-briefcase" /> My work
           </NavLink>
@@ -276,19 +227,6 @@ export function AdminShell() {
         )}
       </nav>
       <div className="foot">
-        <div className="me">
-          <div className="av" id="me-av">
-            {initials}
-          </div>
-          <div>
-            <div className="mn" id="me-name">
-              {name}
-            </div>
-            <div className="mr" id="me-role">
-              {ROLE_META[actual].footRole}
-            </div>
-          </div>
-        </div>
         <LogoutLink onClick={() => void onLogout()} />
       </div>
     </aside>
@@ -296,7 +234,36 @@ export function AdminShell() {
 
   return (
     <>
-      <Shell rolebar={rolebar} sidebar={sidebar} />
+      <Shell
+        sidebar={sidebar}
+        brandLabel={meta.sideSub}
+        contextLabel={meta.label}
+        topbarSearch={<GlobalSearch />}
+        mobileItems={[
+          ...(can('dashboard')
+            ? [{ to: '/admin', label: 'Home', icon: 'ti-home', end: true }]
+            : []),
+          ...(showMyWork
+            ? [{ to: '/admin/mywork', label: 'Work', icon: 'ti-briefcase' }]
+            : can('orders')
+              ? [{ to: '/admin/orders', label: 'Orders', icon: 'ti-package' }]
+              : []),
+          ...(can('quotes')
+            ? [{ to: '/admin/quotes', label: 'Quotes', icon: 'ti-file-invoice' }]
+            : []),
+          ...(showMessages
+            ? [
+                {
+                  to: showCustomerMessages
+                    ? '/admin/messages/customers'
+                    : '/admin/messages/team',
+                  label: 'Inbox',
+                  icon: 'ti-message-circle',
+                },
+              ]
+            : []),
+        ]}
+      />
       {chatPeerId && (
         <TeamChatPanel peerId={chatPeerId} onClose={() => setChatPeerId(null)} />
       )}

@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CNC &amp; Laser Cut Files — Quote Request</title>
+<title>CNC &amp; Laser Cut Files : Quote Request</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -125,7 +125,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
 <body>
 <div class="wrap">
 <div class="card">
-  <div class="ch"><i class="ti ti-router"></i><span class="ct">Custom CNC and Laser Cut files — quote request</span></div>
+  <div class="ch"><i class="ti ti-router"></i><span class="ct">Custom CNC and Laser Cut files : quote request</span></div>
   <div class="cb">
 
     <!-- MODE TABS -->
@@ -152,7 +152,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
           <div class="utrg" onclick="document.getElementById('fu-main').click()">
             <i class="ti ti-cloud-upload"></i>
             <p>Upload artwork</p>
-            <span>JPG, PNG, PDF, AI, EPS, SVG — max 20MB. Photos for engraving: highest quality you have.</span>
+            <span>JPG, PNG, PDF, AI, EPS, SVG : max 20MB. Photos for engraving: highest quality you have.</span>
             <input type="file" id="fu-main" multiple style="display:none" onchange="handleFiles('flist-main',this)">
           </div>
           <div class="flist" id="flist-main"></div>
@@ -188,7 +188,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
     <div class="mode-body vis" id="mode-q">
       <div class="sl" style="margin-top:14px;">Tell us about your project</div>
       <div class="qbig">
-        <textarea placeholder="e.g. I want this deer photo turned into an engraving file for my Glowforge, engraving on 1/4 inch birch plywood, roughly 8 x 10 inches — that's all we need, our team handles the rest"></textarea>
+        <textarea placeholder="e.g. I want this deer photo turned into an engraving file for my Glowforge, engraving on 1/4 inch birch plywood, roughly 8 x 10 inches : that's all we need, our team handles the rest"></textarea>
       </div>
       <div class="fg" style="margin-top:11px;">
         <div class="ff"><label>Material (optional)</label>
@@ -199,19 +199,19 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
 
       <div class="sl" style="margin-top:14px;">Turnaround</div>
       <div class="rush-row">
-        <div class="ropt sel-s" id="rq-std" onclick="selRushQ('std')"><i class="ti ti-clock" style="font-size:13px"></i> Standard (12–24 hrs) — included</div>
-        <div class="ropt" id="rq-rush" onclick="selRushQ('rush')"><i class="ti ti-bolt" style="font-size:13px"></i> Urgent — contact us before placing an order</div>
+        <div class="ropt sel-s" id="rq-std" onclick="selRushQ('std')"><i class="ti ti-clock" style="font-size:13px"></i> Standard (12–24 hrs) : included</div>
+        <div class="ropt" id="rq-rush" onclick="selRushQ('rush')"><i class="ti ti-bolt" style="font-size:13px"></i> Urgent : contact us before placing an order</div>
       </div>
       <div class="ibox" id="rq-note" style="display:none;"><i class="ti ti-message-circle"></i> For urgent orders, please text or email us first so we can confirm the timeline before you place the order.</div>
 
-      <div class="ibox"><i class="ti ti-info-circle"></i> Don't worry about other technical details — file format, kerf, bridges and sizing can all be sorted after you submit. Switch to Detailed request if you already know your specs.</div>
+      <div class="ibox"><i class="ti ti-info-circle"></i> Don't worry about other technical details : file format, kerf, bridges and sizing can all be sorted after you submit. Switch to Detailed request if you already know your specs.</div>
     </div>
 
     <!-- ============ DETAILED MODE ============ -->
     <div class="mode-body" id="mode-d">
       <div style="display:flex;gap:9px;align-items:flex-start;background:#EAF0F5;border-radius:10px;padding:11px 14px;margin-top:14px;font-size:12.5px;color:#143F65;line-height:1.5;">
         <i class="ti ti-heart-handshake" style="font-size:16px;margin-top:1px;"></i>
-        <span><b>Not sure about a field? Leave it blank.</b> We'll figure it out from your artwork — every field here is optional and just helps us quote faster.</span>
+        <span><b>Not sure about a field? Leave it blank.</b> We'll figure it out from your artwork : every field here is optional and just helps us quote faster.</span>
       </div>
 
       <div class="sl" style="margin-top:14px;">How many designs?</div>
@@ -222,7 +222,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
 
       <!-- MULTIPLE DESIGNS -->
       <div id="sec-multi" style="display:none;margin-top:14px;">
-        <div class="ibox" style="margin-bottom:10px;"><i class="ti ti-info-circle"></i> Add a row per design — each can have its own service and size. Machine and material below apply to all.</div>
+        <div class="ibox" style="margin-bottom:10px;"><i class="ti ti-info-circle"></i> Add a row per design : each can have its own service and size. Machine and material below apply to all.</div>
         <div id="multi-rows">
           <div class="drow" id="mr-1">
             <div class="drow-head"><span class="drow-num"><i class="ti ti-file" style="font-size:13px;"></i> Design 1</span></div>
@@ -242,22 +242,22 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
       <div class="fg">
         <div class="ff"><label>Your machine</label>
           <select onchange="toggleOther('oth-mach',this)">
-            <option>CO₂ laser (e.g. Glowforge, OMTech)</option><option>Diode laser (e.g. xTool)</option><option>Fiber laser</option><option>CNC router</option><option>Plasma cutter</option><option>Cricut / Silhouette</option><option>Other — I'll specify</option><option>Not sure — let team decide</option>
+            <option>CO₂ laser (e.g. Glowforge, OMTech)</option><option>Diode laser (e.g. xTool)</option><option>Fiber laser</option><option>CNC router</option><option>Plasma cutter</option><option>Cricut / Silhouette</option><option>Other : I'll specify</option><option>Not sure : let team decide</option>
           </select>
           <div class="other-inp" id="oth-mach"><input type="text" placeholder="Machine brand / model"></div>
         </div>
         <div class="ff"><label>Material</label>
           <select onchange="toggleOther('oth-mat',this)">
-            <option>Wood / plywood</option><option>MDF</option><option>Acrylic</option><option>Metal — steel</option><option>Metal — aluminum</option><option>Leather</option><option>Glass</option><option>Plastic / mylar</option><option>Other — I'll specify</option><option>Not sure — let team decide</option>
+            <option>Wood / plywood</option><option>MDF</option><option>Acrylic</option><option>Metal : steel</option><option>Metal : aluminum</option><option>Leather</option><option>Glass</option><option>Plastic / mylar</option><option>Other : I'll specify</option><option>Not sure : let team decide</option>
           </select>
           <div class="other-inp" id="oth-mat"><input type="text" placeholder="e.g. slate, cork, bamboo..."></div>
         </div>
         <div class="ff"><label>Material thickness</label>
-          <select><option>Not sure / not needed</option><option>1/8" (3mm)</option><option>1/4" (6mm)</option><option>3/8" (9–10mm)</option><option>1/2" (12mm)</option><option>3/4" (18mm)</option><option>Other — noted in instructions</option></select>
+          <select><option>Not sure / not needed</option><option>1/8" (3mm)</option><option>1/4" (6mm)</option><option>3/8" (9–10mm)</option><option>1/2" (12mm)</option><option>3/4" (18mm)</option><option>Other : noted in instructions</option></select>
         </div>
       </div>
 
-      <div class="sl">File formats <span style="font-size:11px;font-weight:400;color:#aaa;">— select all you need</span></div>
+      <div class="sl">File formats <span style="font-size:11px;font-weight:400;color:#aaa;">  select all you need</span></div>
       <div class="fmt-grid">
         <div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-vector-bezier icon"></i><span class="fname">AI</span><span class="fext">Illustrator</span></div><div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-file-type-pdf icon"></i><span class="fname">PDF</span><span class="fext">Print / cut</span></div><div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-file-3d icon"></i><span class="fname">DXF</span><span class="fext">CNC / CAD</span></div><div class="fmt-chip sel" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-file-type-svg icon"></i><span class="fname">SVG</span><span class="fext">Vector</span></div><div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-file-vector icon"></i><span class="fname">EPS</span><span class="fext">Vector</span></div><div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-photo icon"></i><span class="fname">PNG</span><span class="fext">Engraving</span></div>
       </div>
@@ -281,13 +281,13 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
         <div class="cond-t"><i class="ti ti-puzzle"></i> Laser cut options</div>
         <div class="fg">
           <div class="ff"><label>Cut style</label>
-            <select><option>Standard cut-out</option><option>Puzzle / interlocking pieces</option><option>Layered / multi-layer art</option><option>Living hinge</option><option>Not sure — let team decide</option></select>
+            <select><option>Standard cut-out</option><option>Puzzle / interlocking pieces</option><option>Layered / multi-layer art</option><option>Living hinge</option><option>Not sure : let team decide</option></select>
           </div>
           <div class="ff"><label>Kerf compensation</label>
-            <select><option>Not sure — let team decide</option><option>Yes — for tight-fit pieces</option><option>No — standard paths</option></select>
+            <select><option>Not sure : let team decide</option><option>Yes : for tight-fit pieces</option><option>No : standard paths</option></select>
           </div>
         </div>
-        <div class="ibox"><i class="ti ti-info-circle"></i> For interlocking pieces we need the exact material thickness above — that's what makes the fit snug with no gaps.</div>
+        <div class="ibox"><i class="ti ti-info-circle"></i> For interlocking pieces we need the exact material thickness above : that's what makes the fit snug with no gaps.</div>
       </div>
 
       <!-- Conditional: ENGRAVING -->
@@ -295,7 +295,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
         <div class="cond-t"><i class="ti ti-writing"></i> Engraving options</div>
         <div class="fg">
           <div class="ff"><label>Engraving style</label>
-            <select><option>Line engraving (vector score)</option><option>Fill engraving (raster)</option><option>Photo-realistic shading</option><option>Deep engraving / carving</option><option>Not sure — let team decide</option></select>
+            <select><option>Line engraving (vector score)</option><option>Fill engraving (raster)</option><option>Photo-realistic shading</option><option>Deep engraving / carving</option><option>Not sure : let team decide</option></select>
           </div>
           <div class="ff"><label>Combine with cutting?</label>
             <select><option>Engrave only</option><option>Engrave + cut outline</option><option>Not sure</option></select>
@@ -308,7 +308,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
         <div class="cond-t"><i class="ti ti-brush"></i> Stencil options</div>
         <div class="fg">
           <div class="ff"><label>Stencil bridges</label>
-            <select><option>Yes — add bridges (recommended)</option><option>No bridges — separate pieces OK</option><option>Not sure — let team decide</option></select>
+            <select><option>Yes : add bridges (recommended)</option><option>No bridges : separate pieces OK</option><option>Not sure : let team decide</option></select>
           </div>
           <div class="ff"><label>Reusable or one-time?</label>
             <select><option>Reusable (mylar / acrylic)</option><option>One-time (vinyl / card)</option><option>Not sure</option></select>
@@ -321,7 +321,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
         <div class="cond-t"><i class="ti ti-flame"></i> Plasma options</div>
         <div class="fg">
           <div class="ff"><label>Bridges / tabs</label>
-            <select><option>Yes — add where needed (recommended)</option><option>No — keep original artwork</option><option>Not sure — let team decide</option></select>
+            <select><option>Yes : add where needed (recommended)</option><option>No : keep original artwork</option><option>Not sure : let team decide</option></select>
           </div>
           <div class="ff"><label>Project type</label>
             <select><option>Metal sign</option><option>Gate / panel insert</option><option>Outdoor art</option><option>Fire pit</option><option>Other</option></select>
@@ -331,12 +331,12 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
       </div>
 
       <div class="sl" style="margin-top:14px;">Anything else?</div>
-      <div class="ff"><textarea placeholder="Special instructions, fonts, elements to remove, exact fit requirements — you can also paste a link here if you want us to see a reference..."></textarea></div>
+      <div class="ff"><textarea placeholder="Special instructions, fonts, elements to remove, exact fit requirements : you can also paste a link here if you want us to see a reference..."></textarea></div>
 
       <div class="sl" style="margin-top:14px;">Turnaround</div>
       <div class="rush-row">
-        <div class="ropt sel-s" id="r-std" onclick="selRush('std')"><i class="ti ti-clock" style="font-size:13px"></i> Standard (12–24 hrs) — included</div>
-        <div class="ropt" id="r-rush" onclick="selRush('rush')"><i class="ti ti-bolt" style="font-size:13px"></i> Urgent — contact us before placing an order</div>
+        <div class="ropt sel-s" id="r-std" onclick="selRush('std')"><i class="ti ti-clock" style="font-size:13px"></i> Standard (12–24 hrs) : included</div>
+        <div class="ropt" id="r-rush" onclick="selRush('rush')"><i class="ti ti-bolt" style="font-size:13px"></i> Urgent : contact us before placing an order</div>
       </div>
       <div class="ibox" id="rush-note" style="display:none;"><i class="ti ti-message-circle"></i> For urgent orders, please text or email us first so we can confirm the timeline before you place the order.</div>
 
@@ -371,7 +371,7 @@ body{font-family:system-ui,sans-serif;background:#f5f5f3;padding:24px;font-size:
       <i class="ti ti-messages"></i>
       <div style="flex:1;">
         <div class="mc-t">Prefer to message us directly?</div>
-        <div class="mc-s">Skip the form — chat with our team from your account, attach your image and send your details. We'll set up the order for you.</div>
+        <div class="mc-s">Skip the form : chat with our team from your account, attach your image and send your details. We'll set up the order for you.</div>
       </div>
       <a class="mc-btn" href="#">Message our team</a>
     </div>
@@ -430,7 +430,7 @@ function setSvc(s){
     document.getElementById('s-'+k).className='svc'+(k===s?' sel':'');
     if(condMap[k]) document.getElementById(condMap[k]).className='cond'+(k===s?' show':'');
   });
-  // portrait implies engraving info too — show engrave block alongside portrait
+  // portrait implies engraving info too : show engrave block alongside portrait
   if(s==='engcut') document.getElementById('c-laser').className='cond show';
 }
 function toggleOther(id,sel){

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { createOrder, uploadAttachments } from '@/lib/orders';
+import { createOrder, getQuoteDraft, saveQuoteDraft, uploadAttachments } from '@/lib/orders';
 import { getErrorMessage } from '@/lib/api';
 import { getMyCustomer } from '@/lib/customers';
 
@@ -32,7 +32,7 @@ const SERVICES: Array<{
     key: 'embroidery',
     serviceType: 'EMBROIDERY',
     label: 'Embroidery digitizing',
-    desc: 'Turn your logo into a stitch file — DST, PES and more.',
+    desc: 'Turn your logo into a stitch file. DST, PES and more.',
     icon: 'ti-needle-thread',
   },
   {
@@ -146,6 +146,7 @@ export function QuoteBuilderModal({
         subCategory: collected.designName,
         instructions: collected.instructions || null,
         size: collected.size,
+        turnaroundKey: collected.turnaround,
         preferences: {
           service: service.key,
           serviceType: service.serviceType,
@@ -165,7 +166,7 @@ export function QuoteBuilderModal({
 
       await qc.invalidateQueries({ queryKey: ['my-orders'] });
       await qc.invalidateQueries({ queryKey: ['portal-orders-nav'] });
-      setToast('Quote submitted — added to your Quotes as “Being priced.”');
+      setToast('Quote submitted. Added to your Quotes as “Being priced.”');
       onSubmitted?.(order.id);
       window.setTimeout(() => onClose(), 500);
     } catch (e) {
@@ -188,15 +189,26 @@ export function QuoteBuilderModal({
         if (win && customerPrefs) {
           win.postMessage({ type: 'lvd-apply-prefs', prefs: customerPrefs }, '*');
         }
-        if (data.restoredDraft) {
-          setToast('Restored draft from this device.');
+        if (service) {
+          void getQuoteDraft(service.key).then((res) => {
+            if (res.draft && win) {
+              win.postMessage({ type: 'lvd-restore-draft', draft: res.draft.payload }, '*');
+              setToast('Restored your saved draft.');
+            }
+          });
         }
       }
       if (data.type === 'lvd-quote-submit') {
         void submitFromIframe();
       }
       if (data.type === 'lvd-quote-draft' || data.type === 'lvd-draft-saved') {
-        setToast('Draft saved on this device.');
+        const win = iframeRef.current?.contentWindow;
+        const collected = win?.LVD_COLLECT?.();
+        if (service && collected) {
+          void saveQuoteDraft(service.key, collected)
+            .then(() => setToast('Draft saved to your account.'))
+            .catch((e) => setError(getErrorMessage(e)));
+        }
       }
       if (data.type === 'lvd-open-messages') {
         onClose();
@@ -205,7 +217,7 @@ export function QuoteBuilderModal({
     }
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
-  }, [open, submitFromIframe, onClose, navigate, customerPrefs]);
+  }, [open, submitFromIframe, onClose, navigate, customerPrefs, service]);
 
   if (!open) return null;
 
@@ -221,7 +233,7 @@ export function QuoteBuilderModal({
           <div className="modal-h">
             <div className="mh-t">
               <i className={`ti ${service ? 'ti-file-pencil' : 'ti-plus'}`} />
-              {service ? `${service.label} — quote request` : 'Start a new quote'}
+              {service ? `${service.label} quote request` : 'Start a new quote'}
             </div>
             <button type="button" className="modal-x" onClick={onClose} aria-label="Close">
               <i className="ti ti-x" />
@@ -234,11 +246,15 @@ export function QuoteBuilderModal({
               </div>
             )}
 
+            <div className="steps" aria-hidden>
+              <div className={`step${service ? '' : ' on'}`} />
+              <div className={`step${service ? ' on' : ''}`} />
+            </div>
+
             {!service && (
               <>
                 <div className="pick-intro">
-                  What kind of file do you need? Pick a service and we&apos;ll open the right form.
-                  Your account details are already attached — no need to re-enter them.
+                  Step 1 of 2. Pick a service. Your account details are already attached.
                 </div>
                 <div className="pick-grid">
                   {SERVICES.map((s) => (

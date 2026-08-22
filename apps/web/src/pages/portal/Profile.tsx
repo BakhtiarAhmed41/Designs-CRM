@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
-import { updateProfile } from '@/lib/auth';
+import { requestEmailChange, updateProfile } from '@/lib/auth';
 import { getMyCustomer, updateMyCustomer } from '@/lib/customers';
 import { getErrorMessage } from '@/lib/api';
+import { ErrorBanner, SuccessBanner } from '@/components/ui/EmptyState';
+import { PageHeader } from '@/components/ui/PageHeader';
 
 type Prefs = {
   services: string[];
@@ -144,7 +146,7 @@ export function PortalProfile() {
     const payload: Prefs = { ...prefs, placement };
     try {
       await updateMyCustomer({ preferences: payload });
-      setPrefMsg('Preferences saved — applied to new quote requests.');
+      setPrefMsg('Preferences saved. Applied to new quote requests.');
     } catch (err) {
       setPrefError(getErrorMessage(err));
     } finally {
@@ -178,27 +180,14 @@ export function PortalProfile() {
 
   return (
     <div>
-      <div className="ph">
-        <div>
-          <h1>Profile</h1>
-          <div className="sub">
-            Your contact details and default settings. Set defaults once and your reorders come
-            pre-filled.
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Profile"
+        subtitle="Contact details, payment terms, and defaults used on new quotes."
+      />
 
-      <div className="card" style={{ marginTop: 20, padding: 20 }}>
-        {msg && (
-          <div className="note" style={{ marginBottom: 12 }}>
-            <i className="ti ti-check" /> {msg}
-          </div>
-        )}
-        {error && (
-          <div className="alert-error" style={{ marginBottom: 12 }}>
-            {error}
-          </div>
-        )}
+      <div className="card card-pad">
+        {msg && <SuccessBanner>{msg}</SuccessBanner>}
+        {error && <ErrorBanner>{error}</ErrorBanner>}
         <form onSubmit={(e) => void onSaveProfile(e)}>
           <div className="pform">
             <div className="pf">
@@ -207,7 +196,28 @@ export function PortalProfile() {
             </div>
             <div className="pf">
               <label>Email</label>
-              <input value={email} disabled style={{ color: 'var(--faint)' }} />
+              <input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                style={{ marginTop: 8 }}
+                onClick={() => {
+                  void requestEmailChange(email)
+                    .then((res) =>
+                      setMsg(
+                        res.emailSent
+                          ? `Check ${res.pendingEmail} for a confirmation link.`
+                          : `We saved a pending change to ${res.pendingEmail}. Email sending is off until SMTP is configured.`,
+                      ),
+                    )
+                    .catch((err) => setError(getErrorMessage(err)));
+                }}
+              >
+                Send confirmation to new email
+              </button>
             </div>
             <div className="pf">
               <label>Phone</label>
@@ -239,13 +249,13 @@ export function PortalProfile() {
         </form>
       </div>
 
-      <div className="card" style={{ marginTop: 16, padding: 20 }}>
+      <div className="card card-pad">
         <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
           <i className="ti ti-settings" style={{ color: 'var(--navy)' }} /> My setup &amp; file
           preferences
         </div>
         <div style={{ fontSize: 12.5, color: 'var(--muted)', marginBottom: 14 }}>
-          Tell us once what you work with — every order and delivery uses this automatically, so you
+          Tell us once what you work with. Every order and delivery uses this automatically, so you
           never have to repeat it.
         </div>
 
@@ -347,7 +357,7 @@ export function PortalProfile() {
               Embroidery formats I always need
             </label>
             <div style={{ fontSize: 12, color: 'var(--muted)', margin: '4px 0 8px' }}>
-              Tap to select — every embroidery delivery includes all of these.
+              Tap to select. Every embroidery delivery includes all of these.
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
               {EMB_FORMATS.map((f) => (

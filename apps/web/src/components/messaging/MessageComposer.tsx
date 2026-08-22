@@ -5,6 +5,8 @@ type Props = {
   placeholder?: string;
   onSend: (body: string, files: File[]) => Promise<void> | void;
   templates?: Array<{ id: string; title: string; body: string }>;
+  onCreateTemplate?: (title: string, body: string) => Promise<void> | void;
+  onDeleteTemplate?: (id: string) => Promise<void> | void;
 };
 
 export function MessageComposer({
@@ -12,6 +14,8 @@ export function MessageComposer({
   placeholder = 'Type a message…',
   onSend,
   templates,
+  onCreateTemplate,
+  onDeleteTemplate,
 }: Props) {
   const [draft, setDraft] = useState('');
   const [files, setFiles] = useState<File[]>([]);
@@ -49,18 +53,44 @@ export function MessageComposer({
           ))}
         </div>
       )}
-      {templates && templates.length > 0 && (
+      {(templates?.length || onCreateTemplate) && (
         <div className="msg-templates">
-          {templates.slice(0, 6).map((t) => (
+          {(templates ?? []).slice(0, 8).map((t) => (
+            <span key={t.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => setDraft((d) => (d ? `${d}\n${t.body}` : t.body))}
+              >
+                {t.title}
+              </button>
+              {onDeleteTemplate && (
+                <button
+                  type="button"
+                  className="ghost"
+                  title="Delete template"
+                  onClick={() => void onDeleteTemplate(t.id)}
+                >
+                  ×
+                </button>
+              )}
+            </span>
+          ))}
+          {onCreateTemplate && (
             <button
-              key={t.id}
               type="button"
               className="ghost"
-              onClick={() => setDraft((d) => (d ? `${d}\n${t.body}` : t.body))}
+              onClick={() => {
+                const title = window.prompt('Template title');
+                if (!title?.trim()) return;
+                const body = draft.trim() || window.prompt('Template body') || '';
+                if (!body.trim()) return;
+                void onCreateTemplate(title.trim(), body.trim());
+              }}
             >
-              {t.title}
+              Save as template
             </button>
-          ))}
+          )}
         </div>
       )}
       <div className="msg-composer-row">

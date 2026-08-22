@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { GenerateOrderModal } from '@/components/GenerateOrderModal';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { SkeletonRows } from '@/components/ui/Skeleton';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { listAdminOrders } from '@/lib/orders';
 import { money, dateShort, lifecycleChip } from '@/lib/format';
 import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
@@ -30,6 +33,7 @@ function customerLabel(o: Order & { customerName?: string | null }) {
 }
 
 export function AdminOrders() {
+  const navigate = useNavigate();
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -55,15 +59,15 @@ export function AdminOrders() {
 
   return (
     <div>
-      <div className="ph">
-        <div>
-          <h1>Orders</h1>
-          <div className="sub">Search, filter and manage production orders.</div>
-        </div>
-        <button type="button" className="btn btn-primary" onClick={() => setGenOpen(true)}>
-          <i className="ti ti-plus" /> Create new order
-        </button>
-      </div>
+      <PageHeader
+        title="Orders"
+        subtitle="Find a job in seconds. Search, filter, then open the workspace."
+        actions={
+          <button type="button" className="btn btn-primary" onClick={() => setGenOpen(true)}>
+            <i className="ti ti-plus" /> Create order
+          </button>
+        }
+      />
 
       <ListToolbar
         search={q}
@@ -90,33 +94,61 @@ export function AdminOrders() {
         }}
       />
 
-      <div className="card">
-        {isLoading && <div style={{ padding: 16, color: 'var(--muted)' }}>Loading…</div>}
+      <div className="card table-card">
+        {isLoading && <SkeletonRows rows={6} />}
         {!isLoading && orders.length === 0 && (
-          <div style={{ padding: 16, color: 'var(--muted)' }}>No orders match.</div>
+          <EmptyState
+            icon="ti-package"
+            title="No orders match"
+            description="Adjust search or filters, or create a new order."
+            action={
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => setGenOpen(true)}>
+                Create order
+              </button>
+            }
+          />
         )}
-        {orders.map((o) => (
-          <Link key={o.id} to={`/admin/orders/${o.id}`} className="crow" style={{ textDecoration: 'none' }}>
-            <div className={`othumb ${serviceThumbClass(o.serviceType)}`}>
-              <i className={`ti ${serviceTi(o.serviceType)}`} />
-            </div>
-            <div className="oinfo">
-              <div className="on">{o.name || o.humanRef || 'Order'}</div>
-              <div className="om">
-                <span>{o.humanRef || o.id.slice(0, 8)}</span>
-                <span>{customerLabel(o)}</span>
-                <span>{dateShort(o.createdAt)}</span>
-              </div>
-            </div>
-            {(() => {
-              const chip = lifecycleChip(o.status as OrderStatus, 'admin', {
-                partiallyAccepted: o.partiallyAccepted,
-              });
-              return <span className={chip.cls}>{chip.label}</span>;
-            })()}
-            <div className="oprice">{money(o.priceCents)}</div>
-          </Link>
-        ))}
+        {!isLoading && orders.length > 0 && (
+          <table className="itable">
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>Customer</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th className="num">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map((o) => {
+                const chip = lifecycleChip(o.status as OrderStatus, 'admin', {
+                  partiallyAccepted: o.partiallyAccepted,
+                });
+                return (
+                  <tr key={o.id} className="click-row" onClick={() => navigate(`/admin/orders/${o.id}`)}>
+                    <td>
+                      <div className="cell-main">
+                        <div className={`othumb ${serviceThumbClass(o.serviceType)}`}>
+                          <i className={`ti ${serviceTi(o.serviceType)}`} />
+                        </div>
+                        <div>
+                          <div className="on">{o.name || o.humanRef || 'Order'}</div>
+                          <div className="om">{o.humanRef || o.id.slice(0, 8)}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>{customerLabel(o)}</td>
+                    <td>
+                      <span className={chip.cls}>{chip.label}</span>
+                    </td>
+                    <td className="muted">{dateShort(o.createdAt)}</td>
+                    <td className="num">{money(o.priceCents)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
 
       <PaginationBar

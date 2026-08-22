@@ -13,8 +13,9 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
   app.use(cookieParser());
   app.useGlobalFilters(new MulterExceptionFilter(), new ZodExceptionFilter());
+  const webOrigins = env.WEB_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean);
   app.enableCors({
-    origin: env.WEB_ORIGIN,
+    origin: webOrigins.length === 1 ? webOrigins[0] : webOrigins,
     credentials: true,
   });
 

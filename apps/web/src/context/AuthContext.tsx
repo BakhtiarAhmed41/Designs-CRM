@@ -22,7 +22,12 @@ type AuthState = {
   user: CurrentUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<CurrentUser>;
-  register: (data: RegisterInput) => Promise<{ user: CurrentUser; pending: boolean }>;
+  register: (data: RegisterInput) => Promise<{
+    user: CurrentUser;
+    pending: boolean;
+    emailSent?: boolean;
+    verifyToken?: string | null;
+  }>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 };
