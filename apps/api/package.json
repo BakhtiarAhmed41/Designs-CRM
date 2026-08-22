@@ -9,7 +9,7 @@
     "node": "22.x"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json --noCheck && node scripts/install-runtime-deps.cjs",
+    "build": "tsc -p tsconfig.build.json --noCheck && node scripts/bundle-api.cjs",
     "typecheck": "tsc -p tsconfig.build.json --noEmit",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
@@ -45,11 +45,11 @@
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.4.1",
+    "esbuild": "^0.25.9",
     "mysql2": "^3.23.2",
     "nodemailer": "^9.0.3",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
-    "prisma": "file:vendor/prisma-stub",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "socket.io": "^4.8.3",

@@ -26,6 +26,7 @@ async function bootstrap() {
     console.warn('Seed admin skipped (DB not reachable yet).', err);
   }
 
-  await app.listen(env.PORT);
+  const port = Number(process.env.PORT) || env.PORT;
+  await app.listen(port);
 }
 bootstrap();
