@@ -539,26 +539,39 @@ export class BillingService {
     } else {
       // Staff bookkeeping: record money received outside the portal.
       // TODO(payment): integrate Stripe once keys are provided
-      await this.db.execute(
-        `INSERT INTO payments
-           (id, invoice_id, order_id, customer_id, amount_cents, currency, method, type, status, paid_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-        [
-          randomUUID(),
-          invoice.id,
-          invoice.order_id,
-          invoice.customer_id,
-          invoice.amount_cents,
-          invoice.currency,
-          PaymentMethod.CARD,
-          PaymentType.CHARGE,
-          PaymentStatus.PAID,
-        ],
-      );
-      await this.db.execute(
-        'UPDATE invoices SET status = ?, paid_at = NOW() WHERE id = ?',
-        [InvoiceStatus.PAID, invoice.id],
-      );
+      await this.db.withTransaction(async (tx) => {
+        const locked = await tx.queryOne<{ status: InvoiceStatus }>(
+          'SELECT status FROM invoices WHERE id = ? LIMIT 1 FOR UPDATE',
+          [invoice.id],
+        );
+        if (!locked || locked.status === InvoiceStatus.PAID) return;
+        if (locked.status === InvoiceStatus.CANCELLED) {
+          throw new BadRequestException('Cannot pay a cancelled invoice');
+        }
+        if (locked.status !== InvoiceStatus.AWAITING) {
+          throw new BadRequestException('Invoice is not awaiting payment');
+        }
+        await tx.execute(
+          `INSERT INTO payments
+             (id, invoice_id, order_id, customer_id, amount_cents, currency, method, type, status, paid_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+          [
+            randomUUID(),
+            invoice.id,
+            invoice.order_id,
+            invoice.customer_id,
+            invoice.amount_cents,
+            invoice.currency,
+            PaymentMethod.CARD,
+            PaymentType.CHARGE,
+            PaymentStatus.PAID,
+          ],
+        );
+        await tx.execute(
+          'UPDATE invoices SET status = ?, paid_at = NOW() WHERE id = ?',
+          [InvoiceStatus.PAID, invoice.id],
+        );
+      });
     }
 
     await this.advanceOrderAfterPayment(invoice.order_id);
@@ -604,6 +617,17 @@ export class BillingService {
       throw new BadRequestException('Cannot create a pay link for a cancelled invoice');
     if (invoice.status !== InvoiceStatus.AWAITING)
       throw new BadRequestException('Invoice is not awaiting payment');
+
+    const existingLink = await this.db.queryOne<{ pay_link_token: string }>(
+      `SELECT pay_link_token FROM payments
+        WHERE invoice_id = ? AND method = ? AND status = ? AND pay_link_token IS NOT NULL
+        ORDER BY created_at DESC
+        LIMIT 1`,
+      [invoiceId, PaymentMethod.LINK, PaymentStatus.PENDING],
+    );
+    if (existingLink?.pay_link_token) {
+      return { token: existingLink.pay_link_token, url: `/pay/${existingLink.pay_link_token}` };
+    }
 
     const token = randomBytes(24).toString('hex');
     await this.db.execute(
@@ -796,6 +820,24 @@ export class BillingService {
     const to = this.parseRefundTo(data.to);
 
     await this.db.withTransaction(async (tx) => {
+      const totalRow = await tx.queryOne<{ total: number | string | null }>(
+        `SELECT COALESCE(SUM(amount_cents), 0) AS total
+           FROM payments
+          WHERE order_id = ? AND type = ? AND status = ?`,
+        [order.id, PaymentType.REFUND, PaymentStatus.PAID],
+      );
+      const alreadyRefunded = Number(totalRow?.total ?? 0);
+      if (order.price_cents != null) {
+        const remaining = order.price_cents - alreadyRefunded;
+        if (data.amountCents > remaining) {
+          throw new BadRequestException(
+            remaining <= 0
+              ? 'This order is already fully refunded'
+              : `Refund exceeds remaining amount (${remaining} cents)`,
+          );
+        }
+      }
+
       await this.recordRefund(tx, {
         invoiceId: null,
         orderId: order.id,
@@ -806,13 +848,7 @@ export class BillingService {
         reason: data.reason,
       });
 
-      const totalRow = await tx.queryOne<{ total: number | string | null }>(
-        `SELECT COALESCE(SUM(amount_cents), 0) AS total
-           FROM payments
-          WHERE order_id = ? AND type = ? AND status = ?`,
-        [order.id, PaymentType.REFUND, PaymentStatus.PAID],
-      );
-      const refundedTotal = Number(totalRow?.total ?? 0);
+      const refundedTotal = alreadyRefunded + data.amountCents;
       if (
         order.price_cents != null &&
         refundedTotal >= order.price_cents &&
@@ -926,11 +962,11 @@ export class BillingService {
     }> = [];
 
     for (const customer of customers) {
-      const existing = await this.db.queryOne<{ id: string }>(
-        'SELECT id FROM invoices WHERE customer_id = ? AND kind = ? AND period_month = ? LIMIT 1',
+      const existing = await this.db.queryOne<{ id: string; status: string }>(
+        'SELECT id, status FROM invoices WHERE customer_id = ? AND kind = ? AND period_month = ? LIMIT 1',
         [customer.id, InvoiceKind.MONTHLY, period],
       );
-      if (existing) continue; // guard double-run
+      if (existing && existing.status !== InvoiceStatus.CANCELLED) continue;
 
       const agg = await this.db.queryOne<{
         total: number | string | null;

@@ -1554,6 +1554,15 @@ export class OrdersService {
     }
 
     const latest = await this.getLatestQuotation(orderId);
+    const nextAmount =
+      typeof input.amountCents === 'number' ? input.amountCents : null;
+    if (
+      latest &&
+      latest.status === QuotationStatus.PROPOSED &&
+      Number(latest.amount_cents ?? 0) === Number(nextAmount ?? 0)
+    ) {
+      return this.quotationDto(latest);
+    }
     const nextVersion = (latest?.version ?? 0) + 1;
     const id = randomUUID();
     await this.db.execute(
@@ -1880,16 +1889,21 @@ export class OrdersService {
       designs.every((d) => d.status === DesignStatus.DELIVERED);
     const partial = release && !allDelivered && designs.length > 0 && !wantsComplete;
 
+    const alreadyReleased = existing.some((d) => Boolean(d.releasedAt));
+    const isNewUpload = incoming.length > 0;
+
     if (!release) {
       await this.db.execute('UPDATE orders SET status = ? WHERE id = ?', [
         OrderStatus.READY_TO_SEND,
         orderId,
       ]);
-      await this.notifyAdmins({
-        title: 'Files submitted for approval',
-        body: `${order.name ?? 'An order'} is ready to release to the customer.`,
-        link: `/admin/orders/${orderId}`,
-      });
+      if (isNewUpload || order.status !== OrderStatus.READY_TO_SEND) {
+        await this.notifyAdmins({
+          title: 'Files submitted for approval',
+          body: `${order.name ?? 'An order'} is ready to release to the customer.`,
+          link: `/admin/orders/${orderId}`,
+        });
+      }
     } else if (allDelivered || wantsComplete) {
       await this.db.execute(
         'UPDATE orders SET status = ?, completed_at = NOW() WHERE id = ?',
@@ -1902,7 +1916,8 @@ export class OrdersService {
       ]);
     }
 
-    const shouldNotify = release && (notifyEmail || notifySms);
+    const shouldNotify =
+      release && (notifyEmail || notifySms) && (isNewUpload || !alreadyReleased);
     if (shouldNotify && order.client_user_id) {
       await this.notifications.createFor(order.client_user_id, {
         title: 'Your files are ready',
@@ -1912,7 +1927,7 @@ export class OrdersService {
         link: `/portal/orders/${orderId}`,
       });
     }
-    if (release && notifyEmail) {
+    if (release && notifyEmail && (isNewUpload || !alreadyReleased)) {
       const email = await this.customerEmailForOrder(order);
       const fileNames = (await this.getDeliveries(orderId)).flatMap((d) =>
         d.files.map((f) => f.originalName),
@@ -2116,6 +2131,20 @@ export class OrdersService {
     }
 
     const currency = order.currency || 'USD';
+
+    const latestProposed = await this.db.queryOne<QuotationRow>(
+      `SELECT * FROM quotations
+        WHERE order_id = ? AND status = ?
+        ORDER BY version DESC
+        LIMIT 1`,
+      [orderId, QuotationStatus.PROPOSED],
+    );
+    if (latestProposed && Number(latestProposed.amount_cents ?? 0) === total) {
+      return {
+        ...this.quotationDto(latestProposed),
+        lines: await this.getQuotationLines(latestProposed.id),
+      };
+    }
 
     const quotationId = await this.db.withTransaction(async (tx) => {
       const latest = await tx.queryOne<{ version: number }>(
@@ -2367,6 +2396,15 @@ export class OrdersService {
     if (!isStaff && order.client_user_id !== user.id) throw new ForbiddenException();
     const format = data.format.trim();
     if (!format) throw new BadRequestException('Format is required');
+
+    const openReq = await this.db.queryOne<{ id: string }>(
+      `SELECT id FROM format_requests
+        WHERE order_id = ? AND requested_format = ? AND status IN ('PENDING','IN_PROGRESS')
+        LIMIT 1`,
+      [orderId, format],
+    );
+    if (openReq) return { id: openReq.id, status: 'PENDING' as const };
+
     const id = randomUUID();
     await this.db.execute(
       `INSERT INTO format_requests

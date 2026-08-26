@@ -184,10 +184,28 @@ export class EditsService {
           : 0
         : null;
 
+    const openEdit = await this.db.queryOne<{ id: string }>(
+      `SELECT id FROM edit_requests
+        WHERE order_id = ? AND status = ?
+        ORDER BY created_at ASC
+        LIMIT 1`,
+      [orderId, EditStatus.PENDING],
+    );
+    if (openEdit) {
+      const existing = await this.loadEdit(openEdit.id);
+      if (existing) return existing;
+    }
+
     const editId = await this.db.withTransaction(async (tx) => {
       // Create a linked "-R" revision child order.
       const revisionOrderId = randomUUID();
-      const revisionRef = `${order.human_ref ?? ''}-R`;
+      const prior = await tx.queryOne<{ n: number | string }>(
+        'SELECT COUNT(*) AS n FROM orders WHERE parent_order_id = ?',
+        [order.id],
+      );
+      const seq = Number(prior?.n ?? 0) + 1;
+      const base = order.human_ref ?? 'REV';
+      const revisionRef = seq === 1 ? `${base}-R` : `${base}-R${seq}`;
       await tx.execute(
         `INSERT INTO orders
            (id, human_ref, customer_id, client_user_id, type, service_type, name, status, price_cents, currency, parent_order_id)
@@ -414,6 +432,23 @@ export class EditsService {
       throw new NotFoundException('Order not found');
 
     const note = input.note.trim();
+
+    const openEdit = await this.db.queryOne<{ id: string }>(
+      `SELECT id FROM edit_requests
+        WHERE order_id = ? AND status = ?
+        ORDER BY created_at ASC
+        LIMIT 1`,
+      [orderId, EditStatus.PENDING],
+    );
+    if (openEdit) {
+      if (note) {
+        await this.db.execute('UPDATE edit_requests SET note = ? WHERE id = ?', [
+          note,
+          openEdit.id,
+        ]);
+      }
+      return this.loadEdit(openEdit.id);
+    }
 
     const editId = await this.db.withTransaction(async (tx) => {
       const id = randomUUID();
