@@ -1,4 +1,5 @@
 import { apiFetch } from './api';
+import { authorizationHeader } from './session';
 
 // --- shared types ---------------------------------------------------------
 export type InvoiceKind = 'PER_ORDER' | 'MONTHLY';
@@ -203,9 +204,15 @@ export function payMyInvoice(id: string, method: PayMethod) {
 
 /** Opens printable invoice HTML in a new tab (uses session cookie). */
 export async function openInvoicePrint(id: string, admin = false) {
-  const base = (import.meta.env.VITE_API_BASE_URL as string).replace(/\/+$/, '');
+  const base = ((import.meta.env.VITE_API_BASE_URL as string | undefined) || '/api').replace(
+    /\/+$/,
+    '',
+  );
   const path = admin ? `/admin/invoices/${id}/print` : `/invoices/${id}/print`;
-  const res = await fetch(`${base}${path}`, { credentials: 'include' });
+  const res = await fetch(`${base}${path}`, {
+    credentials: 'include',
+    headers: authorizationHeader(),
+  });
   if (!res.ok) throw new Error('Could not load invoice for printing');
   const html = await res.text();
   const w = window.open('', '_blank');

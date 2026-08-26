@@ -1,3 +1,9 @@
+import {
+  authorizationHeader,
+  getRefreshTokens,
+  setSessionTokens,
+} from './session';
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL as string | undefined;
 
 export class ApiError extends Error {
@@ -78,14 +84,25 @@ async function refreshSession(): Promise<boolean> {
   if (refreshInFlight) return refreshInFlight;
   refreshInFlight = (async () => {
     try {
+      const stored = getRefreshTokens();
       const res = await fetch(`${getBase()}/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          refreshToken: stored?.token,
+          refreshTokenId: stored?.id,
+        }),
       });
       if (!res.ok) return false;
-      const data = (await res.json().catch(() => null)) as { ok?: boolean } | null;
-      return Boolean(data?.ok);
+      const data = (await res.json().catch(() => null)) as {
+        ok?: boolean;
+        accessToken?: string;
+        refreshToken?: string;
+        refreshTokenId?: string;
+      } | null;
+      if (data?.accessToken) setSessionTokens(data);
+      return Boolean(data?.ok || data?.accessToken);
     } catch {
       return false;
     }
@@ -124,6 +141,7 @@ export async function apiFetch<T>(
       credentials: 'include',
       headers: {
         'content-type': 'application/json',
+        ...authorizationHeader(),
         ...(init.headers ?? {}),
       },
     }),
@@ -142,6 +160,10 @@ export async function apiFetchForm<T>(
       ...init,
       body: form,
       credentials: 'include',
+      headers: {
+        ...authorizationHeader(),
+        ...(init.headers ?? {}),
+      },
     }),
   );
   return parseOk<T>(res);

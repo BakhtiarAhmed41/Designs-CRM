@@ -1,10 +1,20 @@
 import { apiFetch } from './api';
+import { clearSessionTokens, getRefreshTokens, setSessionTokens } from './session';
 import type { CurrentUser } from './types';
 
+type AuthTokens = {
+  accessToken?: string;
+  refreshToken?: string;
+  refreshTokenId?: string;
+};
+
 export function login(email: string, password: string) {
-  return apiFetch<{ user: CurrentUser }>('/auth/login', {
+  return apiFetch<{ user: CurrentUser } & AuthTokens>('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
+  }).then((res) => {
+    setSessionTokens(res);
+    return res;
   });
 }
 
@@ -47,11 +57,31 @@ export function verifyEmail(token: string) {
 }
 
 export function refresh() {
-  return apiFetch<{ ok: boolean }>('/auth/refresh', { method: 'POST' });
+  const stored = getRefreshTokens();
+  return apiFetch<{ ok: boolean } & AuthTokens>('/auth/refresh', {
+    method: 'POST',
+    body: JSON.stringify({
+      refreshToken: stored?.token,
+      refreshTokenId: stored?.id,
+    }),
+  }).then((res) => {
+    if (res.ok || res.accessToken) setSessionTokens(res);
+    else clearSessionTokens();
+    return res;
+  });
 }
 
 export function logout() {
-  return apiFetch<{ ok: boolean }>('/auth/logout', { method: 'POST' });
+  const stored = getRefreshTokens();
+  return apiFetch<{ ok: boolean }>('/auth/logout', {
+    method: 'POST',
+    body: JSON.stringify({
+      refreshToken: stored?.token,
+      refreshTokenId: stored?.id,
+    }),
+  }).finally(() => {
+    clearSessionTokens();
+  });
 }
 
 export function getMe() {

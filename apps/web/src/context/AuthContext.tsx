@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { ApiError } from '@/lib/api';
 import * as authApi from '@/lib/auth';
+import { clearSessionTokens } from '@/lib/session';
 import type { CurrentUser } from '@/lib/types';
 
 type RegisterInput = {
@@ -55,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           /* ignore */
         }
       }
+      clearSessionTokens();
       setUser(null);
     }
   }, []);

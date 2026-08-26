@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { io, type Socket } from 'socket.io-client';
 import { apiOrigin } from '@/lib/api';
+import { getAccessToken } from '@/lib/session';
 
 type Handler = (payload: unknown) => void;
 
@@ -14,6 +15,7 @@ function getSocket() {
     withCredentials: true,
     transports: ['websocket', 'polling'],
     autoConnect: false,
+    auth: (cb) => cb({ token: getAccessToken() || '' }),
   });
   return shared;
 }

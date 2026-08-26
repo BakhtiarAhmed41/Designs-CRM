@@ -88,7 +88,9 @@ export class AuthController {
         maxAge: env.JWT_REFRESH_TTL_SECONDS * 1000,
       });
 
-      return { user: result.user };
+      // Also return tokens so the website can send Authorization when
+      // cross-site cookies are blocked (Vercel site + Belmo API).
+      return { user: result.user, ...result.tokens };
     } catch (err) {
       if (err instanceof HttpException) throw err;
       throw new InternalServerErrorException(
@@ -122,10 +124,16 @@ export class AuthController {
   }
 
   @Post('refresh')
-  async refresh(@Res({ passthrough: true }) res: Response) {
+  async refresh(@Body() body: unknown, @Res({ passthrough: true }) res: Response) {
     const req = res.req as { cookies?: Record<string, string> };
-    const refreshToken = req.cookies?.refresh_token;
-    const refreshTokenId = req.cookies?.refresh_token_id;
+    const fromBody = z
+      .object({
+        refreshToken: z.string().min(1).optional(),
+        refreshTokenId: z.string().min(1).optional(),
+      })
+      .safeParse(body ?? {});
+    const refreshToken = req.cookies?.refresh_token || fromBody.data?.refreshToken;
+    const refreshTokenId = req.cookies?.refresh_token_id || fromBody.data?.refreshTokenId;
     if (!refreshToken || !refreshTokenId) return { ok: false };
 
     const next = await this.auth.refresh({ refreshToken, refreshTokenId });
@@ -145,15 +153,21 @@ export class AuthController {
       maxAge: env.JWT_REFRESH_TTL_SECONDS * 1000,
     });
 
-    return { ok: true };
+    return { ok: true, ...next };
   }
 
   @Post('logout')
-  async logout(@Res({ passthrough: true }) res: Response) {
+  async logout(@Body() body: unknown, @Res({ passthrough: true }) res: Response) {
     const req = res.req as { cookies?: Record<string, string> };
+    const fromBody = z
+      .object({
+        refreshToken: z.string().min(1).optional(),
+        refreshTokenId: z.string().min(1).optional(),
+      })
+      .safeParse(body ?? {});
     await this.auth.logout({
-      refreshToken: req.cookies?.refresh_token,
-      refreshTokenId: req.cookies?.refresh_token_id,
+      refreshToken: req.cookies?.refresh_token || fromBody.data?.refreshToken,
+      refreshTokenId: req.cookies?.refresh_token_id || fromBody.data?.refreshTokenId,
     });
 
     const base = getCookieBaseOptions();

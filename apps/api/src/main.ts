@@ -12,11 +12,20 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
   app.use(cookieParser());
+  const expressApp = app.getHttpAdapter().getInstance() as { set?: (k: string, v: unknown) => void };
+  expressApp.set?.('trust proxy', 1);
   app.useGlobalFilters(new MulterExceptionFilter(), new ZodExceptionFilter());
   const webOrigins = env.WEB_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean);
   app.enableCors({
-    origin: webOrigins.length === 1 ? webOrigins[0] : webOrigins,
+    origin: (origin, cb) => {
+      if (!origin) {
+        cb(null, true);
+        return;
+      }
+      cb(null, webOrigins.includes(origin));
+    },
     credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   try {
