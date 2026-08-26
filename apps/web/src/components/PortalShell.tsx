@@ -5,7 +5,6 @@ import { Brand, LogoutLink, Shell, useShellUser } from './Shell';
 import { listMyOrderSummary } from '@/lib/orders';
 import { listMyInvoices } from '@/lib/billing';
 import { listMyConversations } from '@/lib/messaging';
-import { getMyCustomer } from '@/lib/customers';
 import { useMessagingSocket } from '@/hooks/useMessagingSocket';
 
 type NavEntry = {
@@ -41,24 +40,11 @@ export function PortalShell() {
     queryFn: listMyConversations,
     refetchInterval: 20_000,
   });
-  const { data: meCustomer } = useQuery({
-    queryKey: ['portal-customer-me'],
-    queryFn: getMyCustomer,
-  });
-
   const quoteCount = quoteSummary?.awaitingQuote ?? 0;
   const invoiceCount = (invoicesData?.invoices ?? []).filter(
     (i) => i.status === 'AWAITING',
   ).length;
   const msgUnread = (convos?.conversations ?? []).some((t) => (t.unreadClient ?? 0) > 0);
-
-  const accountType = meCustomer?.customer?.accountType ?? 'PAY_PER_ORDER';
-  const badgeLabel =
-    accountType === 'NET_MONTHLY'
-      ? meCustomer?.customer?.netTerms === 'NET_30'
-        ? 'Net-30'
-        : 'Net-monthly'
-      : 'Pay per order';
 
   const items: NavEntry[] = [
     {
@@ -137,7 +123,7 @@ export function PortalShell() {
     <Shell
       sidebar={sidebar}
       brandLabel="Customer portal"
-      contextLabel={badgeLabel}
+      contextLabel="Customer"
       mobileItems={[
         { to: '/portal', label: 'Home', icon: 'ti-layout-dashboard', end: true },
         { to: '/portal/quotes', label: 'Quotes', icon: 'ti-file-invoice' },
