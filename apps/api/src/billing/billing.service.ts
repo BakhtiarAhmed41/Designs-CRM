@@ -216,12 +216,16 @@ export class BillingService {
     filters: { status?: string; customerId?: string; q?: string },
   ) {
     this.assertAdmin(user);
+    await this.collapseOrderInvoiceDupes();
     const where: string[] = [];
     const params: unknown[] = [];
     const statuses = Object.values(InvoiceStatus) as string[];
     if (filters.status && statuses.includes(filters.status)) {
       where.push('i.status = ?');
       params.push(filters.status);
+    } else {
+      where.push('i.status <> ?');
+      params.push(InvoiceStatus.CANCELLED);
     }
     if (filters.customerId) {
       where.push('i.customer_id = ?');
@@ -270,6 +274,21 @@ export class BillingService {
       );
       if (!order) throw new NotFoundException('Order not found');
       currency = order.currency || 'USD';
+
+      const existing = await this.reuseOrderInvoice(data.orderId);
+      if (existing) {
+        if (
+          existing.status === InvoiceStatus.AWAITING &&
+          (existing.amount_cents !== data.amountCents ||
+            (data.coversText?.trim() && data.coversText.trim() !== existing.covers_text))
+        ) {
+          await this.db.execute(
+            'UPDATE invoices SET amount_cents = ?, covers_text = COALESCE(?, covers_text) WHERE id = ?',
+            [data.amountCents, data.coversText?.trim() || null, existing.id],
+          );
+        }
+        return this.getInvoiceDetail(user, existing.id);
+      }
     }
 
     const id = randomUUID();
@@ -296,6 +315,81 @@ export class BillingService {
     });
 
     return this.getInvoiceDetail(user, id);
+  }
+
+  /** One open (or already paid) per-order invoice. Extra awaiting copies are cancelled. */
+  private async reuseOrderInvoice(orderId: string): Promise<InvoiceRow | null> {
+    await this.collapseOrderInvoiceDupes(undefined, orderId);
+    const paid = await this.db.queryOne<InvoiceRow>(
+      `SELECT * FROM invoices
+        WHERE order_id = ? AND kind = ? AND status = ?
+        ORDER BY paid_at DESC, issued_at DESC
+        LIMIT 1`,
+      [orderId, InvoiceKind.PER_ORDER, InvoiceStatus.PAID],
+    );
+    if (paid) return paid;
+    return this.db.queryOne<InvoiceRow>(
+      `SELECT * FROM invoices
+        WHERE order_id = ? AND kind = ? AND status = ?
+        ORDER BY issued_at ASC
+        LIMIT 1`,
+      [orderId, InvoiceKind.PER_ORDER, InvoiceStatus.AWAITING],
+    );
+  }
+
+  /**
+   * If an order is already paid, cancel leftover pending copies.
+   * If several pending copies exist, keep the oldest and cancel the rest.
+   */
+  private async collapseOrderInvoiceDupes(customerId?: string, orderId?: string) {
+    const where = ['kind = ?', 'order_id IS NOT NULL', 'status IN (?, ?)'];
+    const params: unknown[] = [
+      InvoiceKind.PER_ORDER,
+      InvoiceStatus.AWAITING,
+      InvoiceStatus.PAID,
+    ];
+    if (customerId) {
+      where.push('customer_id = ?');
+      params.push(customerId);
+    }
+    if (orderId) {
+      where.push('order_id = ?');
+      params.push(orderId);
+    }
+
+    const rows = await this.db.query<{
+      id: string;
+      order_id: string;
+      status: string;
+    }>(
+      `SELECT id, order_id, status FROM invoices
+        WHERE ${where.join(' AND ')}
+        ORDER BY issued_at ASC`,
+      params,
+    );
+
+    const byOrder = new Map<string, { id: string; status: string }[]>();
+    for (const r of rows) {
+      const list = byOrder.get(r.order_id) ?? [];
+      list.push({ id: r.id, status: r.status });
+      byOrder.set(r.order_id, list);
+    }
+
+    const cancelIds: string[] = [];
+    for (const list of byOrder.values()) {
+      const paid = list.filter((i) => i.status === InvoiceStatus.PAID);
+      const awaiting = list.filter((i) => i.status === InvoiceStatus.AWAITING);
+      if (paid.length > 0) {
+        cancelIds.push(...awaiting.map((i) => i.id));
+      } else if (awaiting.length > 1) {
+        cancelIds.push(...awaiting.slice(1).map((i) => i.id));
+      }
+    }
+    if (cancelIds.length === 0) return;
+    await this.db.execute(
+      `UPDATE invoices SET status = ? WHERE id IN (${cancelIds.map(() => '?').join(',')})`,
+      [InvoiceStatus.CANCELLED, ...cancelIds],
+    );
   }
 
   async getInvoiceDetail(user: AuthUser | undefined, id: string) {
@@ -908,6 +1002,7 @@ export class BillingService {
 
   async billingSummary(user: AuthUser | undefined) {
     this.assertAdmin(user);
+    await this.collapseOrderInvoiceDupes();
     const period = currentPeriodMonth();
 
     const outstanding = await this.db.queryOne<{ total: number | string | null }>(
@@ -935,16 +1030,24 @@ export class BillingService {
 
   async listMyInvoices(user: AuthUser | undefined) {
     const customer = await this.resolveMyCustomer(user);
+    await this.collapseOrderInvoiceDupes(customer.id);
     const rows = await this.db.query<InvoiceRow & { customer_name: string | null }>(
       `SELECT i.*, c.name AS customer_name
          FROM invoices i
          LEFT JOIN customers c ON c.id = i.customer_id
-        WHERE i.customer_id = ?
+        WHERE i.customer_id = ? AND i.status <> ?
         ORDER BY i.issued_at DESC`,
-      [customer.id],
+      [customer.id, InvoiceStatus.CANCELLED],
     );
+    const seenOrders = new Set<string>();
+    const invoices = rows.filter((r) => {
+      if (r.kind !== InvoiceKind.PER_ORDER || !r.order_id) return true;
+      if (seenOrders.has(r.order_id)) return false;
+      seenOrders.add(r.order_id);
+      return true;
+    });
     return {
-      invoices: rows.map((r) => this.invoiceDto(r)),
+      invoices: invoices.map((r) => this.invoiceDto(r)),
       storeCreditCents: customer.store_credit_cents,
     };
   }
@@ -959,12 +1062,6 @@ export class BillingService {
     if (!invoice || invoice.customer_id !== customer.id)
       throw new NotFoundException('Invoice not found');
     const m = this.parsePayMethod(method);
-    if (m === PaymentMethod.CARD) {
-      // TODO(payment): integrate Stripe once keys are provided
-      throw new BadRequestException(
-        'Payment integration coming soon. Use store credit, or ask the team to record an outside payment.',
-      );
-    }
     await this.payInvoiceInternal(invoice, m);
     const updated = await this.db.queryOne<
       InvoiceRow & { customer_name: string | null }

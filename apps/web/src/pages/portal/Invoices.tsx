@@ -223,27 +223,26 @@ export function PortalInvoices() {
                       <span className={chip.cls}>{chip.label}</span>
                     </td>
                     <td style={{ textAlign: 'right' }}>
-                      {canPay && chip.label !== 'Building' ? (
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-sm"
-                          title={
-                            useCredit
-                              ? 'Apply store credit to this invoice'
-                              : 'Card checkout is not available yet'
-                          }
-                          disabled={payMut.isPending || !useCredit}
-                          onClick={() => {
-                            if (!useCredit) return;
-                            payMut.mutate({
-                              id: inv.id,
-                              method: 'STORE_CREDIT' as PayMethod,
-                            });
-                          }}
-                        >
-                          {useCredit ? 'Use credit' : 'Payment coming soon'}
-                        </button>
-                      ) : chip.label === 'Paid' ? (
+                      <div style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        {canPay && chip.label !== 'Building' && (
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm"
+                            disabled={payMut.isPending}
+                            onClick={() => {
+                              const method: PayMethod = useCredit ? 'STORE_CREDIT' : 'CARD';
+                              const ok = window.confirm(
+                                useCredit
+                                  ? `Pay ${money(inv.amountCents, inv.currency)} from your store credit?`
+                                  : `Mark this ${money(inv.amountCents, inv.currency)} invoice as paid? Use this if you have already sent payment. Card checkout is not live yet.`,
+                              );
+                              if (!ok) return;
+                              payMut.mutate({ id: inv.id, method });
+                            }}
+                          >
+                            {useCredit ? 'Use credit' : 'Pay now'}
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="btn btn-ghost btn-sm"
@@ -255,9 +254,7 @@ export function PortalInvoices() {
                         >
                           <i className="ti ti-download" /> PDF
                         </button>
-                      ) : (
-                        <span style={{ color: 'var(--faint)', fontSize: 12 }}>None</span>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 );

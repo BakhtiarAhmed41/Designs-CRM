@@ -1412,8 +1412,10 @@ export class OrdersService {
         amountCents: priceCents,
         coversText: name,
       });
-      const payLink = await this.billing.createPayLink(user, invoice.id);
-      payLinkUrl = payLink.url;
+      if (invoice.status === 'AWAITING') {
+        const payLink = await this.billing.createPayLink(user, invoice.id);
+        payLinkUrl = payLink.url;
+      }
     }
 
     if (data.type === OrderType.QUOTE_REQUEST) {

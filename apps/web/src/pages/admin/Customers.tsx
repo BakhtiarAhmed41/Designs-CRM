@@ -263,7 +263,7 @@ function CustomerDetailModal({
 
   return (
     <div className="overlay open" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal customer-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-h">
           <span>{customer?.name ?? 'Customer'}</span>
           <button type="button" className="modal-x" onClick={onClose}>
@@ -318,122 +318,120 @@ function CustomerDetailModal({
                 </label>
               )}
 
-              <div className="ff">
-                <label>Name</label>
-                <input
-                  value={effective.name}
-                  onChange={(e) => setForm({ ...effective, name: e.target.value })}
-                />
-              </div>
-              <div className="ff">
-                <label>Email</label>
-                <input
-                  value={effective.email ?? ''}
-                  onChange={(e) => setForm({ ...effective, email: e.target.value || null })}
-                />
-              </div>
-              <div className="ff">
-                <label>Phone</label>
-                <input
-                  value={effective.phone ?? ''}
-                  onChange={(e) => setForm({ ...effective, phone: e.target.value || null })}
-                />
-              </div>
-              <div className="ff">
-                <label>Account type</label>
-                <select
-                  value={effective.accountType}
-                  onChange={(e) =>
-                    setForm({ ...effective, accountType: e.target.value as AccountType })
-                  }
-                >
-                  {ACCOUNT_TYPES.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {effective.accountType === 'NET_MONTHLY' && (
+              <div className="customer-form-grid">
+                <div className="ff full">
+                  <label>Name</label>
+                  <input
+                    value={effective.name}
+                    onChange={(e) => setForm({ ...effective, name: e.target.value })}
+                  />
+                </div>
                 <div className="ff">
-                  <label>Net terms</label>
+                  <label>Email</label>
+                  <input
+                    value={effective.email ?? ''}
+                    onChange={(e) => setForm({ ...effective, email: e.target.value || null })}
+                  />
+                </div>
+                <div className="ff">
+                  <label>Phone</label>
+                  <input
+                    value={effective.phone ?? ''}
+                    onChange={(e) => setForm({ ...effective, phone: e.target.value || null })}
+                  />
+                </div>
+                <div className="ff">
+                  <label>Account type</label>
                   <select
-                    value={effective.netTerms ?? ''}
+                    value={effective.accountType}
                     onChange={(e) =>
-                      setForm({
-                        ...effective,
-                        netTerms: (e.target.value || null) as NetTerms | null,
-                      })
+                      setForm({ ...effective, accountType: e.target.value as AccountType })
                     }
                   >
-                    <option value="">None</option>
-                    {NET_TERMS.map((n) => (
-                      <option key={n} value={n}>
-                        {n.replace('_', ' ')}
+                    {ACCOUNT_TYPES.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.label}
                       </option>
                     ))}
                   </select>
                 </div>
-              )}
-              <div className="ff">
-                <label>Source</label>
-                <select
-                  value={effective.source}
-                  onChange={(e) =>
-                    setForm({ ...effective, source: e.target.value as CustomerSource })
-                  }
-                >
-                  {SOURCES.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
+                <div className="ff">
+                  <label>Source</label>
+                  <select
+                    value={effective.source}
+                    onChange={(e) =>
+                      setForm({ ...effective, source: e.target.value as CustomerSource })
+                    }
+                  >
+                    {SOURCES.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {effective.accountType === 'NET_MONTHLY' && (
+                  <div className="ff full">
+                    <label>Net terms</label>
+                    <select
+                      value={effective.netTerms ?? ''}
+                      onChange={(e) =>
+                        setForm({
+                          ...effective,
+                          netTerms: (e.target.value || null) as NetTerms | null,
+                        })
+                      }
+                    >
+                      <option value="">None</option>
+                      {NET_TERMS.map((n) => (
+                        <option key={n} value={n}>
+                          {n.replace('_', ' ')}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div className="customer-actions">
                 <button
                   type="button"
                   className="btn btn-primary"
                   onClick={() => save.mutate()}
                   disabled={save.isPending || !effective.name.trim()}
                 >
-                  {save.isPending ? 'Saving…' : 'Save / edit'}
+                  {save.isPending ? 'Saving…' : 'Save changes'}
                 </button>
                 <button
                   type="button"
-                  className="btn btn-ghost"
+                  className="icon-btn danger"
+                  aria-label="Delete customer"
+                  title="Delete customer"
                   onClick={() => {
                     if (window.confirm('Delete this customer?')) remove.mutate();
                   }}
                   disabled={remove.isPending}
                 >
-                  Delete
+                  <i className="ti ti-trash" />
                 </button>
               </div>
 
-              <div style={{ marginTop: 20 }}>
-                <div className="card-h" style={{ border: 'none', padding: '0 0 8px' }}>
-                  <span className="ct">Recent orders</span>
-                </div>
-                {customer.recentOrders.length === 0 && <div className="note">No orders yet.</div>}
+              <div className="cust-orders">
+                <div className="cust-orders-h">Recent orders</div>
+                {customer.recentOrders.length === 0 && (
+                  <div className="muted" style={{ fontSize: 13 }}>No orders yet.</div>
+                )}
                 {customer.recentOrders.map((o) => (
-                  <Link
-                    key={o.id}
-                    to={`/admin/orders/${o.id}`}
-                    className="orow"
-                    style={{ textDecoration: 'none', color: 'inherit' }}
-                  >
-                    <div className="oinfo">
-                      <div className="on">{o.name ?? 'Order'}</div>
-                      <div className="om">
-                        <span>#{o.humanRef ?? o.id.slice(0, 6)}</span>
-                        <span>{dateShort(o.createdAt)}</span>
-                      </div>
+                  <Link key={o.id} to={`/admin/orders/${o.id}`} className="cust-order">
+                    <div className="cust-order-top">
+                      <div className="cust-order-name">{o.name ?? 'Order'}</div>
+                      <div className="cust-order-price">{money(o.priceCents, o.currency)}</div>
+                    </div>
+                    <div className="cust-order-meta">
+                      #{o.humanRef ?? o.id.slice(0, 6)} · {dateShort(o.createdAt)}
                     </div>
                     <span className={statusChipClass(o.status as OrderStatus)}>
                       {statusLabel(o.status as OrderStatus)}
                     </span>
-                    <div className="oprice">{money(o.priceCents, o.currency)}</div>
                   </Link>
                 ))}
               </div>

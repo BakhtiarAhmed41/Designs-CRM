@@ -233,8 +233,12 @@ export function AdminOrderDetail() {
         coversText: order.name ?? undefined,
       });
     },
-    onSuccess: () => {
-      setToast('Invoice created.');
+    onSuccess: (res) => {
+      setToast(
+        res.invoice.status === 'PAID'
+          ? 'This order already has a paid invoice.'
+          : 'Invoice is ready for the customer.',
+      );
       invalidate();
     },
     onError: (e) => setError(getErrorMessage(e)),
@@ -331,9 +335,14 @@ export function AdminOrderDetail() {
         amountCents: order.priceCents,
         coversText: order.name ?? undefined,
       });
+      if (inv.invoice.status === 'PAID') return { alreadyPaid: true };
       await payInvoice(inv.invoice.id, 'CARD');
+      return { alreadyPaid: false };
     },
-    onSuccess: invalidate,
+    onSuccess: (res) => {
+      setToast(res.alreadyPaid ? 'This order is already marked paid.' : 'Payment recorded.');
+      invalidate();
+    },
     onError: (e) => setError(getErrorMessage(e)),
   });
 
@@ -398,14 +407,46 @@ export function AdminOrderDetail() {
             {dateShort(order.createdAt)}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="ph-actions">
+          <select
+            className="status-fit"
+            value={order.status}
+            disabled={updateStatus.isPending}
+            title="Fix the status only if something is wrong. Assign, pay, and release files update this for you."
+            aria-label="Order status"
+            onChange={(e) => {
+              const next = e.target.value as OrderStatus;
+              const label = statusLabel(next, 'admin');
+              const ok = window.confirm(
+                `Change status to “${label}”? Use this only to fix a mistake. Normal work updates the status for you.`,
+              );
+              if (!ok) {
+                e.target.value = order.status;
+                return;
+              }
+              updateStatus.mutate(next);
+            }}
+          >
+            {ADMIN_STATUS_OPTIONS.map((s) => (
+              <option key={s} value={s}>
+                {statusLabel(s, 'admin')}
+              </option>
+            ))}
+          </select>
           <button
             type="button"
             className="btn btn-ghost btn-sm"
             disabled={duplicate.isPending}
-            onClick={() => duplicate.mutate()}
+            title="Starts a new order for the same customer with the same name and details. Files and payment are not copied."
+            onClick={() => {
+              const ok = window.confirm(
+                'Copy this as a new order for the same customer? Files and payment are not copied.',
+              );
+              if (!ok) return;
+              duplicate.mutate();
+            }}
           >
-            <i className="ti ti-copy" /> {duplicate.isPending ? 'Duplicating…' : 'Duplicate'}
+            <i className="ti ti-copy" /> {duplicate.isPending ? 'Copying…' : 'Copy as new order'}
           </button>
           <button
             type="button"
@@ -422,18 +463,6 @@ export function AdminOrderDetail() {
           >
             <i className="ti ti-refresh" /> Create revision
           </button>
-          <select
-            className="stat-select"
-            value={order.status}
-            disabled={updateStatus.isPending}
-            onChange={(e) => updateStatus.mutate(e.target.value as OrderStatus)}
-          >
-            {ADMIN_STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {statusLabel(s, 'admin')}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
 
