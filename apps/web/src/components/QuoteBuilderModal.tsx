@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { createOrder, getQuoteDraft, saveQuoteDraft, uploadAttachments } from '@/lib/orders';
 import { getErrorMessage } from '@/lib/api';
 import { getMyCustomer } from '@/lib/customers';
+import { useAuth } from '@/context/AuthContext';
 
 type ServiceKey = 'embroidery' | 'svg' | 'vector' | 'laser';
 
@@ -78,9 +79,14 @@ export function QuoteBuilderModal({
 }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const { user } = useAuth();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [service, setService] = useState<(typeof SERVICES)[number] | null>(null);
-  const [accountName, setAccountName] = useState('Your account');
+  const fallbackName =
+    [user?.firstName, user?.lastName].filter(Boolean).join(' ') ||
+    user?.email ||
+    'Your account';
+  const [accountName, setAccountName] = useState(fallbackName);
   const [customerPrefs, setCustomerPrefs] = useState<Record<string, unknown> | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -97,19 +103,20 @@ export function QuoteBuilderModal({
       resetPicker();
       return;
     }
+    setAccountName(fallbackName);
     void getMyCustomer()
       .then((res) => {
-        setAccountName(res.customer?.name ?? 'Your account');
+        setAccountName(res.customer?.name?.trim() || fallbackName);
         const prefs = res.customer?.preferences;
         setCustomerPrefs(
           prefs && typeof prefs === 'object' ? (prefs as Record<string, unknown>) : null,
         );
       })
       .catch(() => {
-        setAccountName('Your account');
+        setAccountName(fallbackName);
         setCustomerPrefs(null);
       });
-  }, [open, resetPicker]);
+  }, [open, resetPicker, fallbackName]);
 
   useEffect(() => {
     if (!toast) return;

@@ -280,9 +280,6 @@
 
   function apiBase() {
     if (window.LVD_API_BASE) return String(window.LVD_API_BASE).replace(/\/+$/, '');
-    if (location.port === '5173' || location.port === '8003') {
-      return location.protocol + '//' + location.hostname + ':3001/api';
-    }
     return '/api';
   }
 
