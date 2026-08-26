@@ -61,11 +61,12 @@ export function ConversationThread({
               {onDelete && mine && !deleted && (
                 <button
                   type="button"
-                  className="btn btn-ghost btn-sm"
-                  style={{ marginLeft: 8, fontSize: 11 }}
+                  className="msg-del"
+                  aria-label="Delete message"
+                  title="Delete"
                   onClick={() => onDelete(m.id)}
                 >
-                  Delete
+                  <i className="ti ti-trash" />
                 </button>
               )}
             </div>

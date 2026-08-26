@@ -148,6 +148,16 @@ async function main() {
     );
   }
 
+  if (!(await columnExists('deliveries', 'released_at'))) {
+    console.log('Adding deliveries.released_at column ...');
+    await conn.query(
+      'ALTER TABLE deliveries ADD COLUMN released_at DATETIME NULL',
+    );
+    await conn.query(
+      'UPDATE deliveries SET released_at = created_at WHERE released_at IS NULL',
+    );
+  }
+
   if (!(await columnExists('quotation_lines', 'attachment_id'))) {
     console.log('Adding quotation_lines.attachment_id column ...');
     await conn.query(

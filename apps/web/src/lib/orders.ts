@@ -242,6 +242,7 @@ export function deliverOrder(
     notifyEmail?: boolean;
     notifySms?: boolean;
     complete?: boolean;
+    release?: boolean;
   },
 ) {
   const form = new FormData();
@@ -254,6 +255,7 @@ export function deliverOrder(
     form.append('notifySms', String(options.notifySms));
   if (options?.complete !== undefined)
     form.append('complete', String(options.complete));
+  if (options?.release !== undefined) form.append('release', String(options.release));
   return apiFetchForm<{ order: Order; partial?: boolean }>(
     `/admin/orders/${orderId}/deliveries`,
     form,

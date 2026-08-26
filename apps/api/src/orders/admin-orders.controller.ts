@@ -377,6 +377,7 @@ export class AdminOrdersController {
       notifyEmail: parseBool(body?.notifyEmail, true),
       notifySms: parseBool(body?.notifySms, true),
       complete: parseBool(body?.complete, true),
+      release: parseBool(body?.release, true),
     });
   }
 

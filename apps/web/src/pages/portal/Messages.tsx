@@ -83,11 +83,6 @@ export function PortalMessages() {
   });
 
   const active = threadQuery.data?.conversation;
-  const linkedSummary = useMemo(() => {
-    if (!active) return null;
-    if (active.chatType === 'GENERAL') return 'Topic';
-    return `${chatTypeLabel(active.chatType)}${active.orderRef ? ` · ${active.orderRef}` : ''}`;
-  }, [active]);
 
   const sendMutation = useMutation({
     mutationFn: ({ body, files }: { body: string; files: File[] }) =>
@@ -227,8 +222,7 @@ export function PortalMessages() {
                   {conversationTitle(active)}
                 </div>
                 <div className="muted" style={{ fontSize: 12.5, marginTop: 3 }}>
-                  {linkedSummary}
-                  {active.status ? ` · ${active.status === 'OPEN' ? 'Open' : 'Closed'}` : ''}
+                  {active.status === 'OPEN' ? 'Open' : 'Closed'}
                 </div>
               </div>
             </div>

@@ -482,8 +482,10 @@ export class OrdersService {
       version: number;
       delivered_via: string;
       created_at: Date;
+      released_at: Date | null;
     }>(
-      'SELECT id, order_id, version, delivered_via, created_at FROM deliveries WHERE order_id = ? ORDER BY version DESC',
+      `SELECT id, order_id, version, delivered_via, created_at, released_at
+         FROM deliveries WHERE order_id = ? ORDER BY version DESC`,
       [orderId],
     );
     const out = [];
@@ -505,6 +507,7 @@ export class OrdersService {
         version: d.version,
         deliveredVia: d.delivered_via,
         createdAt: d.created_at,
+        releasedAt: d.released_at,
         files: files.map((f) => ({
           id: f.id,
           originalName: f.original_name,
@@ -638,16 +641,19 @@ export class OrdersService {
     return this.assembleOrder(id);
   }
 
-  private async assembleOrder(id: string) {
+  private async assembleOrder(id: string, opts?: { releasedOnly?: boolean }) {
     const row = await this.getOrderRow(id);
     if (!row) throw new NotFoundException('Order not found');
     const partiallyAccepted = await this.orderPartialFlag(id);
+    const deliveries = await this.getDeliveries(id);
     return {
       ...this.orderDto(row, { partiallyAccepted }),
       designs: await this.getDesigns(id),
       attachments: await this.getAttachments(id),
       quotations: await this.getQuotations(id),
-      deliveries: await this.getDeliveries(id),
+      deliveries: opts?.releasedOnly
+        ? deliveries.filter((d) => d.releasedAt)
+        : deliveries,
     };
   }
 
@@ -767,7 +773,7 @@ export class OrdersService {
     const row = await this.getOrderRow(orderId);
     if (!row || row.client_user_id !== user.id)
       throw new NotFoundException('Order not found');
-    return this.assembleOrder(orderId);
+    return this.assembleOrder(orderId, { releasedOnly: true });
   }
 
   private async persistOrderAttachments(
@@ -1753,11 +1759,12 @@ export class OrdersService {
       notifyEmail?: boolean;
       notifySms?: boolean;
       complete?: boolean;
+      release?: boolean;
     },
   ) {
     this.assertAdmin(user);
-    if (!files || files.length === 0)
-      throw new BadRequestException('No files uploaded');
+    const release = options?.release !== false;
+    const incoming = files ?? [];
 
     const order = await this.getOrderRow(orderId);
     if (!order) throw new NotFoundException('Order not found');
@@ -1770,13 +1777,18 @@ export class OrdersService {
       );
     }
     if (
+      release &&
       user.role === UserRole.SUPPORT &&
-      order.status === OrderStatus.READY_TO_SEND &&
       !hasSupportPerm(user.role, user.permissions, 'approve')
     ) {
       throw new ForbiddenException(
         'Support cannot release designer files without approve permission',
       );
+    }
+
+    const existing = await this.getDeliveries(orderId);
+    if (incoming.length === 0 && existing.length === 0) {
+      throw new BadRequestException('Upload finished files first');
     }
 
     const deliveredVia =
@@ -1788,7 +1800,7 @@ export class OrdersService {
     const notifySms = options?.notifySms !== false;
     const wantsComplete = options?.complete !== false;
 
-    if (designIds.length) {
+    if (designIds.length && release) {
       for (const designId of designIds) {
         await this.db.execute(
           `UPDATE order_designs SET status = ?
@@ -1798,46 +1810,65 @@ export class OrdersService {
       }
     }
 
-    const latest = await this.db.queryOne<{ version: number }>(
-      'SELECT version FROM deliveries WHERE order_id = ? ORDER BY version DESC LIMIT 1',
-      [orderId],
-    );
-    const nextVersion = (latest?.version ?? 0) + 1;
-    const deliveryId = randomUUID();
-    await this.db.execute(
-      `INSERT INTO deliveries
-         (id, order_id, version, delivered_via, created_by_admin_id)
-       VALUES (?, ?, ?, ?, ?)`,
-      [deliveryId, orderId, nextVersion, deliveredVia, user.id],
-    );
+    let deliveryId: string | null = null;
+    let nextVersion = existing[0]?.version ?? 0;
 
-    for (let i = 0; i < files.length; i++) {
-      const f = files[i];
-      const key = this.storage.newObjectKey(
-        ['orders', orderId, 'deliveries', String(nextVersion)],
-        f.originalname,
+    if (incoming.length > 0) {
+      const latest = await this.db.queryOne<{ version: number }>(
+        'SELECT version FROM deliveries WHERE order_id = ? ORDER BY version DESC LIMIT 1',
+        [orderId],
       );
-      await this.storage.uploadObject({
-        key,
-        body: f.buffer,
-        contentType: f.mimetype,
-      });
-      const designId =
-        designIds.length > 0 ? designIds[i % designIds.length] : null;
+      nextVersion = (latest?.version ?? 0) + 1;
+      deliveryId = randomUUID();
       await this.db.execute(
-        `INSERT INTO delivery_files
-           (id, delivery_id, design_id, format_label, original_name, mime_type, byte_size, storage_key)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO deliveries
+           (id, order_id, version, delivered_via, created_by_admin_id, released_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
         [
-          randomUUID(),
           deliveryId,
-          designId,
-          formatLabelFromName(f.originalname),
-          f.originalname,
-          f.mimetype || null,
-          typeof f.size === 'number' ? f.size : null,
-          key,
+          orderId,
+          nextVersion,
+          deliveredVia,
+          user.id,
+          release ? new Date() : null,
         ],
+      );
+
+      for (let i = 0; i < incoming.length; i++) {
+        const f = incoming[i];
+        const key = this.storage.newObjectKey(
+          ['orders', orderId, 'deliveries', String(nextVersion)],
+          f.originalname,
+        );
+        await this.storage.uploadObject({
+          key,
+          body: f.buffer,
+          contentType: f.mimetype,
+        });
+        const designId =
+          designIds.length > 0 ? designIds[i % designIds.length] : null;
+        await this.db.execute(
+          `INSERT INTO delivery_files
+             (id, delivery_id, design_id, format_label, original_name, mime_type, byte_size, storage_key)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            randomUUID(),
+            deliveryId,
+            designId,
+            formatLabelFromName(f.originalname),
+            f.originalname,
+            f.mimetype || null,
+            typeof f.size === 'number' ? f.size : null,
+            key,
+          ],
+        );
+      }
+    }
+
+    if (release) {
+      await this.db.execute(
+        'UPDATE deliveries SET released_at = COALESCE(released_at, NOW()) WHERE order_id = ?',
+        [orderId],
       );
     }
 
@@ -1845,9 +1876,19 @@ export class OrdersService {
     const allDelivered =
       designs.length === 0 ||
       designs.every((d) => d.status === DesignStatus.DELIVERED);
-    const partial = !allDelivered && designs.length > 0 && !wantsComplete;
+    const partial = release && !allDelivered && designs.length > 0 && !wantsComplete;
 
-    if (allDelivered || wantsComplete) {
+    if (!release) {
+      await this.db.execute('UPDATE orders SET status = ? WHERE id = ?', [
+        OrderStatus.READY_TO_SEND,
+        orderId,
+      ]);
+      await this.notifyAdmins({
+        title: 'Files submitted for approval',
+        body: `${order.name ?? 'An order'} is ready to release to the customer.`,
+        link: `/admin/orders/${orderId}`,
+      });
+    } else if (allDelivered || wantsComplete) {
       await this.db.execute(
         'UPDATE orders SET status = ?, completed_at = NOW() WHERE id = ?',
         [OrderStatus.COMPLETED, orderId],
@@ -1859,33 +1900,37 @@ export class OrdersService {
       ]);
     }
 
-    const shouldNotify = notifyEmail || notifySms;
+    const shouldNotify = release && (notifyEmail || notifySms);
     if (shouldNotify && order.client_user_id) {
       await this.notifications.createFor(order.client_user_id, {
-        title: 'Order delivered',
+        title: 'Your files are ready',
         body: partial
-          ? `Partial deliverables uploaded - v${nextVersion}`
-          : `Deliverables uploaded - v${nextVersion}`,
+          ? `Some files for ${order.name ?? 'your order'} are ready to download.`
+          : `Your files for ${order.name ?? 'your order'} are ready to download.`,
         link: `/portal/orders/${orderId}`,
       });
     }
-    if (notifyEmail) {
+    if (release && notifyEmail) {
       const email = await this.customerEmailForOrder(order);
+      const fileNames = (await this.getDeliveries(orderId)).flatMap((d) =>
+        d.files.map((f) => f.originalName),
+      );
       if (email) {
         await this.mail.sendFilesReady(
           email,
           order.name ?? 'your order',
           orderId,
-          files.map((f) => f.originalname),
+          fileNames,
         );
       }
     }
 
+    const deliveries = await this.getDeliveries(orderId);
     return {
       order: this.orderDto((await this.getOrderRow(orderId))!),
-      delivery: (await this.getDeliveries(orderId)).find(
-        (d) => d.id === deliveryId,
-      ),
+      delivery: deliveryId
+        ? deliveries.find((d) => d.id === deliveryId)
+        : deliveries[0],
       partial,
     };
   }
@@ -2200,7 +2245,7 @@ export class OrdersService {
          FROM delivery_files df
          JOIN deliveries d ON d.id = df.delivery_id
          JOIN orders o ON o.id = d.order_id
-        WHERE o.client_user_id = ?
+        WHERE o.client_user_id = ? AND d.released_at IS NOT NULL
         ORDER BY df.created_at DESC`,
       [user.id],
     );

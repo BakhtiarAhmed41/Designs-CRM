@@ -237,7 +237,7 @@ export function PortalQuoteDetail() {
                 <div style={{ fontSize: 22, fontWeight: 700 }}>{money(total)}</div>
               </div>
               {canDecide && (
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div className="quote-total-actions">
                   <button
                     type="button"
                     className="btn btn-ghost"
@@ -256,35 +256,55 @@ export function PortalQuoteDetail() {
                   </button>
                 </div>
               )}
-              {canDecide && (
-                <div style={{ marginTop: 16, display: 'grid', gap: 8 }}>
-                  <div className="muted" style={{ fontSize: 12 }}>
-                    Suggest a different total if you want to counter this quote.
+            </div>
+            {canDecide && (
+              <div className="quote-counter">
+                <div className="quote-counter-head">
+                  <i className="ti ti-scale" aria-hidden />
+                  <div>
+                    <strong>Counter this quote</strong>
+                    <p>Suggest a different total. We’ll review it and reply.</p>
                   </div>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="Counter amount"
-                    value={counterAmount}
-                    onChange={(e) => setCounterAmount(e.target.value)}
-                  />
-                  <input
-                    placeholder="Note for the team"
-                    value={counterNote}
-                    onChange={(e) => setCounterNote(e.target.value)}
-                  />
+                </div>
+                <div className="quote-counter-grid">
+                  <label className="quote-counter-field">
+                    <span>Your amount</span>
+                    <div className="quote-counter-amount">
+                      <span aria-hidden>$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        value={counterAmount}
+                        onChange={(e) => setCounterAmount(e.target.value)}
+                      />
+                    </div>
+                  </label>
+                  <label className="quote-counter-field">
+                    <span>Note for the team</span>
+                    <textarea
+                      rows={2}
+                      placeholder="Optional — why this price works for you"
+                      value={counterNote}
+                      onChange={(e) => setCounterNote(e.target.value)}
+                    />
+                  </label>
+                </div>
+                <div className="quote-counter-actions">
                   <button
                     type="button"
-                    className="btn btn-ghost"
+                    className="btn btn-primary"
                     disabled={counterMut.isPending || !counterAmount}
                     onClick={() => counterMut.mutate()}
                   >
-                    Send counter-offer
+                    <i className="ti ti-send" />
+                    {counterMut.isPending ? 'Sending…' : 'Send counter-offer'}
                   </button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </>
         )}
       </div>

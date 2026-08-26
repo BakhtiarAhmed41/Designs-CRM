@@ -514,10 +514,6 @@ export function AdminCustomerMessages() {
                   className="muted"
                   style={{ fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}
                 >
-                  <span>
-                    {chatTypeLabel(active.chatType)}
-                    {active.orderRef ? ` · ${active.orderRef}` : ''}
-                  </span>
                   <span className={`chip ${active.status === 'OPEN' ? 'c-done' : 'c-wait'}`}>
                     {active.status === 'OPEN' ? 'Open' : 'Closed'}
                   </span>

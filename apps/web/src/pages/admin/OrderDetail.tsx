@@ -194,21 +194,28 @@ export function AdminOrderDetail() {
   };
 
   const deliver = useMutation({
-    mutationFn: () => {
+    mutationFn: (opts: { release: boolean }) => {
       const designs = order?.designs ?? [];
       const allSelected =
         designs.length === 0 || selectedDesignIds.length === designs.length;
       return deliverOrder(id, files, {
         deliveredVia: deliverByEmail ? 'EMAIL' : 'PORTAL',
         designIds: selectedDesignIds.length ? selectedDesignIds : undefined,
-        notifyEmail: notifyPortal,
-        complete: allSelected,
+        notifyEmail: opts.release && notifyPortal,
+        notifySms: opts.release && notifyPortal,
+        complete: opts.release && allSelected,
+        release: opts.release,
       });
     },
-    onSuccess: (res) => {
+    onSuccess: (res, opts) => {
       setFiles([]);
-      if (res.partial) setToast('Partial release. Order still in progress.');
-      else setToast('Files released to customer.');
+      if (!opts.release) {
+        setToast('Submitted for approval. The customer cannot see files until you release them.');
+      } else if (res.partial) {
+        setToast('Partial release. Order still in progress.');
+      } else {
+        setToast('Files released. The customer can download them from Orders and Files.');
+      }
       invalidate();
     },
     onError: (e) => setError(getErrorMessage(e)),
@@ -669,7 +676,16 @@ export function AdminOrderDetail() {
                         downloadSignedFile(adminDeliveryFileUrl(order.id, f.id), f.originalName)
                       }
                     >
-                      <i className="ti ti-check" style={{ color: 'var(--green)' }} /> {f.originalName}
+                      <i
+                        className={`ti ${d.releasedAt ? 'ti-check' : 'ti-clock'}`}
+                        style={{ color: d.releasedAt ? 'var(--green)' : 'var(--amber)' }}
+                      />{' '}
+                      {f.originalName}
+                      {!d.releasedAt && (
+                        <span className="chip c-wait" style={{ marginLeft: 8 }}>
+                          Waiting for approval
+                        </span>
+                      )}
                     </button>
                   )),
                 )}
@@ -708,13 +724,23 @@ export function AdminOrderDetail() {
                   />{' '}
                   Notify customer in the portal
                 </label>
+                <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
+                  Submit for approval saves the files for review. The customer sees them only after you release.
+                </div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {order.status === 'IN_PROGRESS' && (
                     <button
                       type="button"
                       className="btn btn-ghost btn-sm"
-                      disabled={updateStatus.isPending}
-                      onClick={() => updateStatus.mutate('READY_TO_SEND')}
+                      disabled={
+                        deliver.isPending ||
+                        updateStatus.isPending ||
+                        (files.length === 0 && !hasDeliveries)
+                      }
+                      onClick={() => {
+                        if (files.length > 0 || hasDeliveries) deliver.mutate({ release: false });
+                        else updateStatus.mutate('READY_TO_SEND');
+                      }}
                     >
                       <i className="ti ti-checkup-list" /> Submit for approval
                     </button>
@@ -729,8 +755,16 @@ export function AdminOrderDetail() {
                       <i className="ti ti-arrow-back" /> Send back
                     </button>
                   )}
-                  <button type="button" className="btn btn-green btn-sm" disabled={files.length === 0 || deliver.isPending} onClick={() => deliver.mutate()}>
-                    <i className="ti ti-send" /> {deliver.isPending ? 'Uploading…' : 'Approve & release to customer'}
+                  <button
+                    type="button"
+                    className="btn btn-green btn-sm"
+                    disabled={
+                      deliver.isPending || (files.length === 0 && !hasDeliveries)
+                    }
+                    onClick={() => deliver.mutate({ release: true })}
+                  >
+                    <i className="ti ti-send" />{' '}
+                    {deliver.isPending ? 'Uploading…' : 'Approve & release to customer'}
                   </button>
                 </div>
               </div>

@@ -101,6 +101,7 @@ export type Delivery = {
   version: number;
   deliveredVia: string;
   createdAt: string;
+  releasedAt?: string | null;
   files: DeliveryFile[];
 };
 

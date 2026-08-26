@@ -310,11 +310,13 @@ export function PortalOrderDetail() {
             </div>
           )}
 
-          {order.deliveries && order.deliveries.length > 0 && (
-            <div className="card">
-              <div className="card-h">
-                <span className="ct">Delivered files</span>
-              </div>
+          <div className="card">
+            <div className="card-h">
+              <span className="ct">
+                <i className="ti ti-folder" /> Your files
+              </span>
+            </div>
+            {order.deliveries && order.deliveries.length > 0 ? (
               <div className="od-files">
                 {order.deliveries.flatMap((d) =>
                   d.files.map((f) => (
@@ -328,14 +330,18 @@ export function PortalOrderDetail() {
                           downloadSignedFile(myDeliveryFileUrl(order.id, f.id), f.originalName)
                         }
                       >
-                        <i className="ti ti-download" />
+                        <i className="ti ti-download" /> Download
                       </button>
                     </div>
                   )),
                 )}
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="muted" style={{ padding: '14px 16px 16px', fontSize: 13.5 }}>
+                Files show up here after our team releases them. You can also find them under Files.
+              </div>
+            )}
+          </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>

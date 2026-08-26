@@ -235,6 +235,7 @@ CREATE TABLE IF NOT EXISTS deliveries (
   delivered_via       ENUM('PORTAL','EMAIL') NOT NULL DEFAULT 'PORTAL',
   created_by_admin_id CHAR(36) NULL,
   created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  released_at         DATETIME NULL,
   PRIMARY KEY (id),
   UNIQUE KEY uq_delivery_order_version (order_id, version),
   KEY idx_delivery_order (order_id),
