@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   adminAttachmentUrl,
   adminDeliveryFileUrl,
-  adminDuplicateOrder,
   adminUpdateStatus,
   adminUploadAttachments,
   approveCounter,
@@ -31,7 +30,7 @@ import { createInvoice, listInvoices, payInvoice, refundOrder, type RefundTo } f
 import { assignOrder, listTeam, unassignOrder } from '@/lib/team';
 import { updateDesign, type Design, type DesignStatus } from '@/lib/designs';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
-import { money, dateShort, statusLabel } from '@/lib/format';
+import { money, dateShort } from '@/lib/format';
 import { FormPreferencesDisplay } from '@/components/FormPreferencesDisplay';
 import { MessageAttachments } from '@/components/MessageAttachments';
 import type { Order, OrderStatus } from '@/lib/types';
@@ -87,19 +86,6 @@ function relativeTime(iso: string) {
   const d = new Date(iso);
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
-
-const ADMIN_STATUS_OPTIONS: OrderStatus[] = [
-  'CREATED',
-  'WAITING_FOR_QUOTATION',
-  'QUOTATION_PROVIDED',
-  'PENDING_PAYMENT',
-  'IN_PROGRESS',
-  'READY_TO_SEND',
-  'REVISION_REQUESTED',
-  'COMPLETED',
-  'CANCELLED',
-  'REFUNDED',
-];
 
 export function AdminOrderDetail() {
   const { id = '' } = useParams();
@@ -390,16 +376,6 @@ export function AdminOrderDetail() {
     onSuccess: () => invalidate(),
   });
 
-  const duplicate = useMutation({
-    mutationFn: () => adminDuplicateOrder(id, order?.type),
-    onSuccess: (res) => {
-      setToast('Order duplicated. Review and update as needed.');
-      void applyOrderChange(qc, res.order);
-      navigate(`/admin/orders/${res.order.id}`);
-    },
-    onError: (e) => setError(getErrorMessage(e)),
-  });
-
   const resend = useMutation({
     mutationFn: () => resendOrderFiles(id),
     onSuccess: () => setToast('Files notification sent to customer.'),
@@ -461,49 +437,6 @@ export function AdminOrderDetail() {
           </div>
         </div>
         <div className="ph-actions">
-          <select
-            className="status-fit"
-            value={order.status}
-            disabled={updateStatus.isPending}
-            title="Fix the status only if something is wrong. Assign, pay, and release files update this for you."
-            aria-label="Order status"
-            onChange={(e) => {
-              const next = e.target.value as OrderStatus;
-              const label = statusLabel(next, 'admin');
-              const ok = window.confirm(
-                `Change status to “${label}”? Use this only to fix a mistake. Normal work updates the status for you.`,
-              );
-              if (!ok) {
-                e.target.value = order.status;
-                return;
-              }
-              updateStatus.mutate(next);
-            }}
-          >
-            {(order.status === 'CLOSED'
-              ? (['CLOSED', ...ADMIN_STATUS_OPTIONS] as OrderStatus[])
-              : ADMIN_STATUS_OPTIONS
-            ).map((s) => (
-              <option key={s} value={s}>
-                {s === 'CLOSED' ? 'Closed' : statusLabel(s, 'admin')}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            disabled={duplicate.isPending}
-            title="Starts a new order for the same customer with the same name and details. Files and payment are not copied."
-            onClick={() => {
-              const ok = window.confirm(
-                'Copy this as a new order for the same customer? Files and payment are not copied.',
-              );
-              if (!ok) return;
-              duplicate.mutate();
-            }}
-          >
-            <i className="ti ti-copy" /> {duplicate.isPending ? 'Copying…' : 'Copy as new order'}
-          </button>
           <button
             type="button"
             className="btn btn-ghost btn-sm"

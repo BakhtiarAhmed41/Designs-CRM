@@ -747,21 +747,6 @@ button.metric { font: inherit; text-align: left; width: 100%; }
 
 .ph { margin-bottom: 0; align-items: flex-start; padding-bottom: 2px; }
 .ph-actions { gap: 8px; }
-.ph-actions .status-fit {
-  width: auto;
-  max-width: max-content;
-  flex: 0 0 auto;
-  min-height: 32px;
-  padding: 5px 28px 5px 10px;
-  font-size: 12.5px;
-  font-weight: 600;
-  font-family: inherit;
-  color: var(--navy);
-  background: #fff;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  cursor: pointer;
-}
 .crumbs { margin-bottom: 10px; }
 .list-toolbar { margin: 0; padding: 12px 14px; }
 
