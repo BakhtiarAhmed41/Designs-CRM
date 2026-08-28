@@ -177,6 +177,8 @@ export function listAdminConversations(params?: {
   status?: ConversationStatus;
   chatType?: ChatType;
   customerId?: string;
+  orderId?: string;
+  limit?: number;
 }) {
   const q = new URLSearchParams();
   if (params?.label) q.set('label', params.label);
@@ -187,6 +189,8 @@ export function listAdminConversations(params?: {
   if (params?.status) q.set('status', params.status);
   if (params?.chatType) q.set('chatType', params.chatType);
   if (params?.customerId) q.set('customerId', params.customerId);
+  if (params?.orderId) q.set('orderId', params.orderId);
+  if (params?.limit) q.set('limit', String(params.limit));
   const suffix = q.toString() ? `?${q.toString()}` : '';
   return apiFetch<{ conversations: Conversation[] }>(
     `/admin/conversations${suffix}`,
@@ -277,6 +281,12 @@ export function deleteMessageTemplate(id: string) {
 // --- customer -------------------------------------------------------------
 export function listMyConversations() {
   return apiFetch<{ conversations: Conversation[] }>('/conversations');
+}
+
+export function getMyUnreadSummary() {
+  return apiFetch<{ unreadMessages: number; unreadConversations: number }>(
+    '/conversations/unread-summary',
+  );
 }
 
 export function getMyConversation(id: string) {

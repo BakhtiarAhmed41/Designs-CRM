@@ -12,6 +12,8 @@ import type { QuotationLine } from '@/lib/designs';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { SkeletonRows } from '@/components/ui/Skeleton';
+import { invalidateWorkCaches } from '@/lib/queryCache';
+import { freshOnOpen } from '@/lib/queryRefresh';
 import { PageHeader } from '@/components/ui/PageHeader';
 
 type QuoteWithLines = Quotation & { lines?: QuotationLine[] };
@@ -68,10 +70,12 @@ export function PortalQuotes() {
         page,
         pageSize: 10,
       }),
+    ...freshOnOpen,
   });
   const summaryQ = useQuery({
     queryKey: ['my-orders-summary'],
     queryFn: listMyOrderSummary,
+    ...freshOnOpen,
   });
 
   const quotes = (data?.orders ?? []).filter((o) => isQuoteOrder(o));
@@ -84,11 +88,7 @@ export function PortalQuotes() {
       acceptQuotation(orderId, keepLineIds),
     onSuccess: () => {
       setError(null);
-      qc.invalidateQueries({ queryKey: ['my-orders'] });
-      qc.invalidateQueries({ queryKey: ['my-order'] });
-      qc.invalidateQueries({ queryKey: ['portal-orders-nav'] });
-      qc.invalidateQueries({ queryKey: ['admin-quotes'] });
-      qc.invalidateQueries({ queryKey: ['admin-orders'] });
+      void invalidateWorkCaches(qc);
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -97,9 +97,7 @@ export function PortalQuotes() {
     mutationFn: (orderId: string) => rejectQuotation(orderId),
     onSuccess: () => {
       setError(null);
-      qc.invalidateQueries({ queryKey: ['my-orders'] });
-      qc.invalidateQueries({ queryKey: ['my-order'] });
-      qc.invalidateQueries({ queryKey: ['admin-quotes'] });
+      void invalidateWorkCaches(qc);
     },
     onError: (e) => setError(getErrorMessage(e)),
   });

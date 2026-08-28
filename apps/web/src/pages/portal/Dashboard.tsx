@@ -2,18 +2,17 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { QuoteBuilderModal } from '@/components/QuoteBuilderModal';
-import { listMyOrders } from '@/lib/orders';
+import { listMyOrders, listMyOrderSummary } from '@/lib/orders';
 import { listMyInvoices } from '@/lib/billing';
-import { listMyConversations } from '@/lib/messaging';
+import { getMyUnreadSummary } from '@/lib/messaging';
 import { getMyCustomer } from '@/lib/customers';
 import { useAuth } from '@/context/AuthContext';
+import { freshOnOpen } from '@/lib/queryRefresh';
 import { money, statusChipClass, statusLabel } from '@/lib/format';
 import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import type { Order } from '@/lib/types';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonRows } from '@/components/ui/Skeleton';
-
-const DONE = ['COMPLETED', 'CLOSED', 'REJECTED', 'CANCELLED'];
 
 function isQuote(o: Order) {
   return (
@@ -29,33 +28,48 @@ export function PortalDashboard() {
   const { user } = useAuth();
   const [quoteOpen, setQuoteOpen] = useState(false);
 
-  const { data: ordersData, isLoading } = useQuery({
-    queryKey: ['my-orders'],
-    queryFn: () => listMyOrders(),
+  const { data: summary } = useQuery({
+    queryKey: ['my-orders-summary'],
+    queryFn: listMyOrderSummary,
+    ...freshOnOpen,
+  });
+  const { data: quotesReadyData, isLoading: quotesLoading } = useQuery({
+    queryKey: ['my-orders', 'quote-ready'],
+    queryFn: () => listMyOrders({ status: 'QUOTATION_PROVIDED', page: 1, pageSize: 100 }),
+    ...freshOnOpen,
+  });
+  const { data: recentOrdersData, isLoading: recentLoading } = useQuery({
+    queryKey: ['my-orders', 'recent'],
+    queryFn: () => listMyOrders({ type: 'ORDER', page: 1, pageSize: 6 }),
+    ...freshOnOpen,
+  });
+  const { data: activeOrdersData } = useQuery({
+    queryKey: ['my-orders', 'active-slice'],
+    queryFn: () => listMyOrders({ type: 'ORDER', lifecycle: 'active', page: 1, pageSize: 4 }),
+    ...freshOnOpen,
   });
   const { data: invoicesData } = useQuery({
     queryKey: ['my-invoices'],
     queryFn: listMyInvoices,
   });
-  const { data: convosData } = useQuery({
-    queryKey: ['my-conversations'],
-    queryFn: listMyConversations,
+  const { data: unreadData } = useQuery({
+    queryKey: ['portal-unread'],
+    queryFn: getMyUnreadSummary,
   });
+  const isLoading = quotesLoading || recentLoading;
   const { data: meCustomer } = useQuery({
     queryKey: ['portal-customer-me'],
     queryFn: getMyCustomer,
   });
 
-  const orders = ordersData?.orders ?? [];
   const isNet = meCustomer?.customer?.accountType === 'NET_MONTHLY';
-  const activeOrders = orders.filter((o) => o.type === 'ORDER' && !DONE.includes(o.status));
-  const quotesReady = orders.filter((o) => o.status === 'QUOTATION_PROVIDED');
-  const quotesPending = orders.filter((o) => o.status === 'WAITING_FOR_QUOTATION');
+  const activeOrders = activeOrdersData?.orders ?? [];
+  const quotesReady = quotesReadyData?.orders ?? [];
+  const quotesPendingCount = summary?.beingPriced ?? 0;
+  const activeOrdersCount = summary?.activeOrders ?? activeOrders.length;
+  const quotesReadyCount = summary?.awaitingQuote ?? quotesReady.length;
   const unpaidInvoices = (invoicesData?.invoices ?? []).filter((i) => i.status === 'AWAITING');
-  const msgUnread = (convosData?.conversations ?? []).reduce(
-    (n, c) => n + (c.unreadClient ?? 0),
-    0,
-  );
+  const msgUnread = unreadData?.unreadMessages ?? 0;
   const monthKey = (() => {
     const now = new Date();
     return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
@@ -115,7 +129,7 @@ export function PortalDashboard() {
     return rows;
   }, [activeOrders, quotesReady, unpaidInvoices]);
 
-  const recent = orders.filter((o) => !isQuote(o)).slice(0, 6);
+  const recent = (recentOrdersData?.orders ?? []).filter((o) => !isQuote(o)).slice(0, 6);
   const unpaidTotal = unpaidInvoices.reduce((s, i) => s + i.amountCents, 0);
   const firstName = user?.firstName || 'there';
 
@@ -134,10 +148,10 @@ export function PortalDashboard() {
       <div className="metric-row">
         <button type="button" className="metric" onClick={() => navigate('/portal/orders')}>
           <div className="ml">Active orders</div>
-          <div className="mv">{activeOrders.length}</div>
+          <div className="mv">{activeOrdersCount}</div>
           <div className="md">
-            {quotesPending.length > 0
-              ? `${quotesPending.length} quote${quotesPending.length === 1 ? '' : 's'} being priced`
+            {quotesPendingCount > 0
+              ? `${quotesPendingCount} quote${quotesPendingCount === 1 ? '' : 's'} being priced`
               : 'In production now'}
           </div>
         </button>
@@ -150,8 +164,8 @@ export function PortalDashboard() {
         ) : (
           <button type="button" className="metric" onClick={() => navigate('/portal/quotes')}>
             <div className="ml">Quotes to approve</div>
-            <div className={`mv${quotesReady.length ? ' alert' : ''}`}>{quotesReady.length}</div>
-            <div className="md">{quotesReady.length ? 'Ready for your review' : 'Nothing waiting on you'}</div>
+            <div className={`mv${quotesReadyCount ? ' alert' : ''}`}>{quotesReadyCount}</div>
+            <div className="md">{quotesReadyCount ? 'Ready for your review' : 'Nothing waiting on you'}</div>
           </button>
         )}
         <button type="button" className="metric" onClick={() => navigate('/portal/invoices')}>

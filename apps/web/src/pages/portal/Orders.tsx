@@ -11,6 +11,8 @@ import type { Order } from '@/lib/types';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonRows } from '@/components/ui/Skeleton';
+import { invalidateWorkCaches } from '@/lib/queryCache';
+import { freshOnOpen } from '@/lib/queryRefresh';
 import { PageHeader } from '@/components/ui/PageHeader';
 
 type OrderFilter = 'all' | 'active' | 'delivered';
@@ -75,8 +77,7 @@ function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
       setRevOpen(false);
       setRevNote('');
       setActionError(null);
-      qc.invalidateQueries({ queryKey: ['my-orders'] });
-      qc.invalidateQueries({ queryKey: ['my-order', orderId] });
+      void invalidateWorkCaches(qc);
     },
     onError: (e) => setActionError(getErrorMessage(e)),
   });
@@ -100,7 +101,7 @@ function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
         size: order.size,
         preferences: order.preferences,
       });
-      await qc.invalidateQueries({ queryKey: ['my-orders'] });
+      await invalidateWorkCaches(qc);
       navigate('/portal/orders');
     } catch (e) {
       setActionError(getErrorMessage(e));
@@ -285,6 +286,7 @@ export function PortalOrders() {
         page,
         pageSize: 10,
       }),
+    ...freshOnOpen,
   });
 
   const pageItems = data?.orders ?? [];

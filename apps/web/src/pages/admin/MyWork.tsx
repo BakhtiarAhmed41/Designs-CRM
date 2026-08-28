@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { listMyWork } from '@/lib/team';
+import { freshOnOpen } from '@/lib/queryRefresh';
 import { dateShort } from '@/lib/format';
 import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
 import type { OrderStatus } from '@/lib/types';
@@ -31,6 +32,7 @@ export function AdminMyWork() {
   const { data, isLoading } = useQuery({
     queryKey: ['admin-mywork'],
     queryFn: listMyWork,
+    ...freshOnOpen,
     refetchInterval: 30_000,
   });
 

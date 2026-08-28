@@ -191,16 +191,170 @@ export class OrdersService {
     return { options: Array.from(byKey.values()) };
   }
 
+  private sqlIn(ids: string[]) {
+    return ids.map(() => '?').join(',');
+  }
+
   private async designCountsFor(orderIds: string[]) {
     const map = new Map<string, number>();
     if (orderIds.length === 0) return map;
-    const ph = orderIds.map(() => '?').join(',');
     const rows = await this.db.query<{ order_id: string; n: number }>(
-      `SELECT order_id, COUNT(*) AS n FROM order_designs WHERE order_id IN (${ph}) GROUP BY order_id`,
+      `SELECT order_id, COUNT(*) AS n FROM order_designs WHERE order_id IN (${this.sqlIn(orderIds)}) GROUP BY order_id`,
       orderIds,
     );
     for (const r of rows) map.set(r.order_id, Number(r.n));
     return map;
+  }
+
+  private mapAttachment(a: {
+    id: string;
+    order_id: string;
+    original_name: string;
+    mime_type: string | null;
+    byte_size: number | null;
+    created_at: Date;
+  }) {
+    return {
+      id: a.id,
+      orderId: a.order_id,
+      originalName: a.original_name,
+      mimeType: a.mime_type,
+      byteSize: a.byte_size,
+      createdAt: a.created_at,
+    };
+  }
+
+  private mapQuotationLine(
+    l: QuotationLineRow & { attachment_id?: string | null },
+    sizes: Array<{ id: string; label: string; priceCents: number; sortOrder: number }>,
+  ) {
+    return {
+      id: l.id,
+      name: l.name,
+      note: l.note,
+      attachmentId: l.attachment_id ?? null,
+      priceCents: l.price_cents,
+      sortOrder: l.sort_order,
+      clientDecision: l.client_decision ?? 'PENDING',
+      sizes,
+    };
+  }
+
+  private async attachmentsFor(orderIds: string[]) {
+    const map = new Map<string, ReturnType<OrdersService['mapAttachment']>[]>();
+    if (orderIds.length === 0) return map;
+    const rows = await this.db.query<{
+      id: string;
+      order_id: string;
+      original_name: string;
+      mime_type: string | null;
+      byte_size: number | null;
+      storage_key: string;
+      created_at: Date;
+    }>(
+      `SELECT id, order_id, original_name, mime_type, byte_size, storage_key, created_at
+         FROM order_attachments
+        WHERE order_id IN (${this.sqlIn(orderIds)})
+        ORDER BY created_at ASC`,
+      orderIds,
+    );
+    for (const a of rows) {
+      const list = map.get(a.order_id) ?? [];
+      list.push(this.mapAttachment(a));
+      map.set(a.order_id, list);
+    }
+    return map;
+  }
+
+  private async partialFlagsFor(orderIds: string[]) {
+    const set = new Set<string>();
+    if (orderIds.length === 0) return set;
+    const rows = await this.db.query<{ order_id: string }>(
+      `SELECT DISTINCT q.order_id
+         FROM quotation_lines ql
+         JOIN quotations q ON q.id = ql.quotation_id
+        WHERE q.order_id IN (${this.sqlIn(orderIds)})
+          AND q.status = ?
+          AND ql.client_decision = 'DROPPED'`,
+      [...orderIds, QuotationStatus.APPROVED],
+    );
+    for (const r of rows) set.add(r.order_id);
+    return set;
+  }
+
+  private async quotationLinesFor(quotationIds: string[]) {
+    const map = new Map<string, ReturnType<OrdersService['mapQuotationLine']>[]>();
+    if (quotationIds.length === 0) return map;
+    const lines = await this.db.query<QuotationLineRow & { attachment_id?: string | null }>(
+      `SELECT id, quotation_id, name, note, attachment_id, price_cents, sort_order,
+              COALESCE(client_decision, 'PENDING') AS client_decision
+         FROM quotation_lines
+        WHERE quotation_id IN (${this.sqlIn(quotationIds)})
+        ORDER BY sort_order ASC`,
+      quotationIds,
+    );
+    const lineIds = lines.map((l) => l.id);
+    const sizesByLine = new Map<
+      string,
+      Array<{ id: string; label: string; priceCents: number; sortOrder: number }>
+    >();
+    if (lineIds.length > 0) {
+      const sizes = await this.db.query<QuotationLineSizeRow>(
+        `SELECT id, line_id, label, price_cents, sort_order
+           FROM quotation_line_sizes
+          WHERE line_id IN (${this.sqlIn(lineIds)})
+          ORDER BY sort_order ASC`,
+        lineIds,
+      );
+      for (const s of sizes) {
+        const list = sizesByLine.get(s.line_id) ?? [];
+        list.push({
+          id: s.id,
+          label: s.label,
+          priceCents: s.price_cents,
+          sortOrder: s.sort_order,
+        });
+        sizesByLine.set(s.line_id, list);
+      }
+    }
+    for (const l of lines) {
+      const list = map.get(l.quotation_id) ?? [];
+      list.push(this.mapQuotationLine(l, sizesByLine.get(l.id) ?? []));
+      map.set(l.quotation_id, list);
+    }
+    return map;
+  }
+
+  private async quotationsFor(orderIds: string[]) {
+    const map = new Map<
+      string,
+      Array<ReturnType<OrdersService['quotationDto']> & { lines: ReturnType<OrdersService['mapQuotationLine']>[] }>
+    >();
+    if (orderIds.length === 0) return map;
+    const quotes = await this.db.query<QuotationRow>(
+      `SELECT * FROM quotations WHERE order_id IN (${this.sqlIn(orderIds)}) ORDER BY version DESC`,
+      orderIds,
+    );
+    const linesByQuote = await this.quotationLinesFor(quotes.map((q) => q.id));
+    for (const q of quotes) {
+      const list = map.get(q.order_id) ?? [];
+      list.push({
+        ...this.quotationDto(q),
+        lines: linesByQuote.get(q.id) ?? [],
+      });
+      map.set(q.order_id, list);
+    }
+    return map;
+  }
+
+  private async listExtrasFor(orderIds: string[]) {
+    const [designCounts, attachments, quotations, partials] = await Promise.all([
+      this.designCountsFor(orderIds),
+      this.attachmentsFor(orderIds),
+      this.quotationsFor(orderIds),
+      this.partialFlagsFor(orderIds),
+    ]);
+    return { designCounts, attachments, quotations, partials };
   }
 
   private async customerEmailForOrder(order: {
@@ -391,73 +545,15 @@ export class OrdersService {
   }
 
   private async getAttachments(orderId: string) {
-    const rows = await this.db.query<{
-      id: string;
-      order_id: string;
-      original_name: string;
-      mime_type: string | null;
-      byte_size: number | null;
-      storage_key: string;
-      created_at: Date;
-    }>(
-      'SELECT id, order_id, original_name, mime_type, byte_size, storage_key, created_at FROM order_attachments WHERE order_id = ? ORDER BY created_at ASC',
-      [orderId],
-    );
-    return rows.map((a) => ({
-      id: a.id,
-      orderId: a.order_id,
-      originalName: a.original_name,
-      mimeType: a.mime_type,
-      byteSize: a.byte_size,
-      createdAt: a.created_at,
-    }));
+    return (await this.attachmentsFor([orderId])).get(orderId) ?? [];
   }
 
   private async getQuotationLines(quotationId: string) {
-    const lines = await this.db.query<QuotationLineRow & { attachment_id?: string | null }>(
-      `SELECT id, quotation_id, name, note, attachment_id, price_cents, sort_order,
-              COALESCE(client_decision, 'PENDING') AS client_decision
-         FROM quotation_lines WHERE quotation_id = ? ORDER BY sort_order ASC`,
-      [quotationId],
-    );
-    const out = [];
-    for (const l of lines) {
-      const sizes = await this.db.query<QuotationLineSizeRow>(
-        'SELECT id, line_id, label, price_cents, sort_order FROM quotation_line_sizes WHERE line_id = ? ORDER BY sort_order ASC',
-        [l.id],
-      );
-      out.push({
-        id: l.id,
-        name: l.name,
-        note: l.note,
-        attachmentId: l.attachment_id ?? null,
-        priceCents: l.price_cents,
-        sortOrder: l.sort_order,
-        clientDecision: l.client_decision ?? 'PENDING',
-        sizes: sizes.map((s) => ({
-          id: s.id,
-          label: s.label,
-          priceCents: s.price_cents,
-          sortOrder: s.sort_order,
-        })),
-      });
-    }
-    return out;
+    return (await this.quotationLinesFor([quotationId])).get(quotationId) ?? [];
   }
 
   private async getQuotations(orderId: string) {
-    const rows = await this.db.query<QuotationRow>(
-      'SELECT * FROM quotations WHERE order_id = ? ORDER BY version DESC',
-      [orderId],
-    );
-    const out = [];
-    for (const q of rows) {
-      out.push({
-        ...this.quotationDto(q),
-        lines: await this.getQuotationLines(q.id),
-      });
-    }
-    return out;
+    return (await this.quotationsFor([orderId])).get(orderId) ?? [];
   }
 
   private async getDesigns(orderId: string) {
@@ -488,37 +584,56 @@ export class OrdersService {
          FROM deliveries WHERE order_id = ? ORDER BY version DESC`,
       [orderId],
     );
-    const out = [];
-    for (const d of deliveries) {
+    const filesByDelivery = new Map<
+      string,
+      Array<{
+        id: string;
+        originalName: string;
+        mimeType: string | null;
+        byteSize: number | null;
+        formatLabel: string | null;
+        createdAt: Date;
+      }>
+    >();
+    const deliveryIds = deliveries.map((d) => d.id);
+    if (deliveryIds.length > 0) {
       const files = await this.db.query<{
         id: string;
+        delivery_id: string;
         original_name: string;
         mime_type: string | null;
         byte_size: number | null;
         format_label: string | null;
         created_at: Date;
       }>(
-        'SELECT id, original_name, mime_type, byte_size, format_label, created_at FROM delivery_files WHERE delivery_id = ? ORDER BY created_at ASC',
-        [d.id],
+        `SELECT id, delivery_id, original_name, mime_type, byte_size, format_label, created_at
+           FROM delivery_files
+          WHERE delivery_id IN (${this.sqlIn(deliveryIds)})
+          ORDER BY created_at ASC`,
+        deliveryIds,
       );
-      out.push({
-        id: d.id,
-        orderId: d.order_id,
-        version: d.version,
-        deliveredVia: d.delivered_via,
-        createdAt: d.created_at,
-        releasedAt: d.released_at,
-        files: files.map((f) => ({
+      for (const f of files) {
+        const list = filesByDelivery.get(f.delivery_id) ?? [];
+        list.push({
           id: f.id,
           originalName: f.original_name,
           mimeType: f.mime_type,
           byteSize: f.byte_size,
           formatLabel: f.format_label,
           createdAt: f.created_at,
-        })),
-      });
+        });
+        filesByDelivery.set(f.delivery_id, list);
+      }
     }
-    return out;
+    return deliveries.map((d) => ({
+      id: d.id,
+      orderId: d.order_id,
+      version: d.version,
+      deliveredVia: d.delivered_via,
+      createdAt: d.created_at,
+      releasedAt: d.released_at,
+      files: filesByDelivery.get(d.id) ?? [],
+    }));
   }
 
   private async adminUserIds(): Promise<string[]> {
@@ -644,13 +759,19 @@ export class OrdersService {
   private async assembleOrder(id: string, opts?: { releasedOnly?: boolean }) {
     const row = await this.getOrderRow(id);
     if (!row) throw new NotFoundException('Order not found');
-    const partiallyAccepted = await this.orderPartialFlag(id);
-    const deliveries = await this.getDeliveries(id);
+    const [partiallyAccepted, deliveries, designs, attachments, quotations] =
+      await Promise.all([
+        this.orderPartialFlag(id),
+        this.getDeliveries(id),
+        this.getDesigns(id),
+        this.getAttachments(id),
+        this.getQuotations(id),
+      ]);
     return {
       ...this.orderDto(row, { partiallyAccepted }),
-      designs: await this.getDesigns(id),
-      attachments: await this.getAttachments(id),
-      quotations: await this.getQuotations(id),
+      designs,
+      attachments,
+      quotations,
       deliveries: opts?.releasedOnly
         ? deliveries.filter((d) => d.releasedAt)
         : deliveries,
@@ -697,11 +818,11 @@ export class OrdersService {
     const from = parseDateBound(filters?.dateFrom);
     const to = parseDateBound(filters?.dateTo);
     if (from) {
-      where.push('DATE(created_at) >= ?');
+      where.push('created_at >= ?');
       params.push(from);
     }
     if (to) {
-      where.push('DATE(created_at) <= ?');
+      where.push('created_at < DATE_ADD(?, INTERVAL 1 DAY)');
       params.push(to);
     }
     const whereSql = `WHERE ${where.join(' AND ')}`;
@@ -730,17 +851,16 @@ export class OrdersService {
       [...params, pageSize, offset],
     );
     const ids = rows.map((r) => r.id);
-    const designCounts = await this.designCountsFor(ids);
+    const extras = await this.listExtrasFor(ids);
     const items = [];
     for (const r of rows) {
-      const partiallyAccepted = await this.orderPartialFlag(r.id);
-      const quotations = await this.getQuotations(r.id);
+      const quotations = extras.quotations.get(r.id) ?? [];
       const lineCount =
         (quotations[0] as { lines?: unknown[] } | undefined)?.lines?.length ?? 0;
       items.push({
-        ...this.orderDto(r, { partiallyAccepted }),
-        designCount: designCounts.get(r.id) || lineCount,
-        attachments: await this.getAttachments(r.id),
+        ...this.orderDto(r, { partiallyAccepted: extras.partials.has(r.id) }),
+        designCount: extras.designCounts.get(r.id) || lineCount,
+        attachments: extras.attachments.get(r.id) ?? [],
         quotations,
       });
     }
@@ -758,14 +878,24 @@ export class OrdersService {
       `SELECT status, type, COUNT(*) AS n FROM orders WHERE client_user_id = ? GROUP BY status, type`,
       [user.id],
     );
+    const done = new Set<string>([
+      OrderStatus.COMPLETED,
+      OrderStatus.CLOSED,
+      OrderStatus.REJECTED,
+      OrderStatus.CANCELLED,
+    ]);
     let awaitingQuote = 0;
     let beingPriced = 0;
+    let activeOrders = 0;
     for (const r of rows) {
       const n = Number(r.n);
       if (r.status === OrderStatus.QUOTATION_PROVIDED) awaitingQuote += n;
       if (r.status === OrderStatus.WAITING_FOR_QUOTATION) beingPriced += n;
+      if (r.type === OrderType.ORDER && !done.has(r.status)) {
+        activeOrders += n;
+      }
     }
-    return { awaitingQuote, beingPriced };
+    return { awaitingQuote, beingPriced, activeOrders };
   }
 
   async getMyOrder(user: AuthUser | undefined, orderId: string) {
@@ -1140,11 +1270,11 @@ export class OrdersService {
     const from = parseDateBound(filters.dateFrom);
     const to = parseDateBound(filters.dateTo);
     if (from) {
-      where.push('DATE(o.created_at) >= ?');
+      where.push('o.created_at >= ?');
       params.push(from);
     }
     if (to) {
-      where.push('DATE(o.created_at) <= ?');
+      where.push('o.created_at < DATE_ADD(?, INTERVAL 1 DAY)');
       params.push(to);
     }
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
@@ -1174,12 +1304,12 @@ export class OrdersService {
          LIMIT ? OFFSET ?`,
       [...params, pageSize, offset],
     );
+    const extras = await this.listExtrasFor(rows.map((r) => r.id));
     const out = [];
     const hideMoney = !this.canSeeMoney(user);
     for (const r of rows) {
-      const partiallyAccepted = await this.orderPartialFlag(r.id);
       const item = {
-        ...this.orderDto(r, { partiallyAccepted }),
+        ...this.orderDto(r, { partiallyAccepted: extras.partials.has(r.id) }),
         customerName: r.customer_name,
         client: r.client_user_id
           ? {
@@ -1189,8 +1319,8 @@ export class OrdersService {
               lastName: r.client_last,
             }
           : null,
-        attachments: await this.getAttachments(r.id),
-        quotations: await this.getQuotations(r.id),
+        attachments: extras.attachments.get(r.id) ?? [],
+        quotations: extras.quotations.get(r.id) ?? [],
       };
       out.push(hideMoney ? this.stripMoney(item) : item);
     }

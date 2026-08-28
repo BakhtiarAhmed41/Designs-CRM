@@ -29,6 +29,11 @@ export class BillingController {
     return this.billing.listMyInvoices(user);
   }
 
+  @Get('invoices/summary')
+  async summaryMine(@CurrentUser() user: AuthUser | undefined) {
+    return this.billing.myInvoiceSummary(user);
+  }
+
   @Get('invoices/:id/print')
   @Header('Content-Type', 'text/html; charset=utf-8')
   async printMine(

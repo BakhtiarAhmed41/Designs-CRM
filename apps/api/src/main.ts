@@ -17,7 +17,7 @@ async function bootstrap() {
   app.useGlobalFilters(new MulterExceptionFilter(), new ZodExceptionFilter());
   const webOrigins = env.WEB_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean);
   app.enableCors({
-    origin: (origin, cb) => {
+    origin: (origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => {
       if (!origin) {
         cb(null, true);
         return;

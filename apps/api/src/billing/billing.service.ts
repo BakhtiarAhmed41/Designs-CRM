@@ -1088,6 +1088,21 @@ export class BillingService {
     };
   }
 
+  async myInvoiceSummary(user: AuthUser | undefined) {
+    const customer = await this.resolveMyCustomer(user);
+    await this.collapseOrderInvoiceDupes(customer.id);
+    const row = await this.db.queryOne<{ n: number | string; total: number | string }>(
+      `SELECT COUNT(*) AS n, COALESCE(SUM(amount_cents), 0) AS total
+         FROM invoices
+        WHERE customer_id = ? AND status = ?`,
+      [customer.id, InvoiceStatus.AWAITING],
+    );
+    return {
+      awaitingCount: Number(row?.n ?? 0),
+      awaitingCents: Number(row?.total ?? 0),
+    };
+  }
+
   async payMyInvoice(
     user: AuthUser | undefined,
     invoiceId: string,
@@ -1127,11 +1142,23 @@ export class BillingService {
   async getInvoicePrintHtml(user: AuthUser | undefined, invoiceId: string) {
     assertAuthUser(user);
     const invoice = await this.db.queryOne<
-      InvoiceRow & { customer_name: string | null; customer_email: string | null }
+      InvoiceRow & {
+        customer_name: string | null;
+        customer_email: string | null;
+        customer_phone: string | null;
+        order_ref: string | null;
+        order_name: string | null;
+      }
     >(
-      `SELECT i.*, c.name AS customer_name, c.email AS customer_email
+      `SELECT i.*,
+              c.name AS customer_name,
+              c.email AS customer_email,
+              c.phone AS customer_phone,
+              o.human_ref AS order_ref,
+              o.name AS order_name
          FROM invoices i
          LEFT JOIN customers c ON c.id = i.customer_id
+         LEFT JOIN orders o ON o.id = i.order_id
         WHERE i.id = ? LIMIT 1`,
       [invoiceId],
     );
@@ -1149,49 +1176,14 @@ export class BillingService {
         throw new NotFoundException('Invoice not found');
     }
 
-    const amount = (invoice.amount_cents / 100).toFixed(2);
-    const issued = new Date(invoice.issued_at).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-    const paid = invoice.paid_at
-      ? new Date(invoice.paid_at).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        })
-      : null;
-    const ref = invoice.id.slice(0, 8).toUpperCase();
-    const covers = escapeHtml(invoice.covers_text || 'Design services');
-    const cust = escapeHtml(invoice.customer_name || 'Customer');
-    const email = escapeHtml(invoice.customer_email || '');
+    const payments = await this.db.query<PaymentRow>(
+      `SELECT * FROM payments
+        WHERE invoice_id = ?
+        ORDER BY created_at ASC`,
+      [invoiceId],
+    );
 
-    return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"/><title>Invoice ${ref}</title>
-<style>
-  body{font-family:Georgia,serif;color:#1a1a1a;max-width:640px;margin:40px auto;padding:0 24px}
-  h1{font-size:28px;margin:0 0 4px;color:#0b3d5c}
-  .sub{color:#666;font-size:13px;margin-bottom:28px}
-  table{width:100%;border-collapse:collapse;margin:24px 0}
-  th,td{text-align:left;padding:10px 0;border-bottom:1px solid #e5e5e5;font-size:14px}
-  .total{font-size:20px;font-weight:700;margin-top:16px}
-  .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:600;
-    background:${invoice.status === 'PAID' ? '#e6f6ec' : '#fff4e5'};color:${invoice.status === 'PAID' ? '#1b7a3d' : '#9a5b00'}}
-  @media print{body{margin:0}}
-</style></head><body>
-  <h1>Las Vegas Designs USA</h1>
-  <div class="sub">Invoice · ${ref} · <span class="badge">${escapeHtml(invoice.status)}</span></div>
-  <p><b>Bill to:</b> ${cust}${email ? `<br/>${email}` : ''}</p>
-  <p><b>Issued:</b> ${issued}${paid ? `<br/><b>Paid:</b> ${paid}` : ''}</p>
-  ${invoice.period_month ? `<p><b>Period:</b> ${escapeHtml(invoice.period_month)}</p>` : ''}
-  <table>
-    <thead><tr><th>Description</th><th style="text-align:right">Amount</th></tr></thead>
-    <tbody><tr><td>${covers}</td><td style="text-align:right">${escapeHtml(invoice.currency)} ${amount}</td></tr></tbody>
-  </table>
-  <div class="total">Total: ${escapeHtml(invoice.currency)} ${amount}</div>
-  <script>window.onload=function(){window.print()}</script>
-</body></html>`;
+    return buildInvoicePrintHtml(invoice, payments);
   }
 }
 
@@ -1201,4 +1193,445 @@ function escapeHtml(s: string) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function formatInvoiceMoney(cents: number, currency: string) {
+  try {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency || 'USD',
+    }).format(cents / 100);
+  } catch {
+    return `$${(cents / 100).toFixed(2)}`;
+  }
+}
+
+function formatInvoiceDate(value: Date | string | null | undefined) {
+  if (!value) return '';
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+}
+
+function invoiceStatusLabel(status: InvoiceStatus) {
+  if (status === InvoiceStatus.PAID) return 'Paid';
+  if (status === InvoiceStatus.CANCELLED) return 'Cancelled';
+  return 'Due';
+}
+
+function paymentMethodLabel(method: PaymentMethod) {
+  if (method === PaymentMethod.STORE_CREDIT) return 'Store credit';
+  if (method === PaymentMethod.LINK) return 'Payment link';
+  return 'Card';
+}
+
+function buildInvoicePrintHtml(
+  invoice: InvoiceRow & {
+    customer_name: string | null;
+    customer_email: string | null;
+    customer_phone: string | null;
+    order_ref: string | null;
+    order_name: string | null;
+  },
+  payments: PaymentRow[],
+) {
+  const ref = invoice.id.slice(0, 8).toUpperCase();
+  const money = (cents: number) => formatInvoiceMoney(cents, invoice.currency);
+  const issued = formatInvoiceDate(invoice.issued_at);
+  const paidOn = formatInvoiceDate(invoice.paid_at);
+  const period = invoice.period_month
+    ? monthLabel(invoice.period_month)
+    : '';
+  const kindLabel =
+    invoice.kind === InvoiceKind.MONTHLY ? 'Monthly statement' : 'Design services';
+  const description = invoice.covers_text?.trim() || kindLabel;
+  const orderHint = [invoice.order_ref, invoice.order_name]
+    .filter(Boolean)
+    .join(' · ');
+  const charges = payments.filter(
+    (p) => p.type === PaymentType.CHARGE && p.status === PaymentStatus.PAID,
+  );
+  const refunds = payments.filter((p) => p.type === PaymentType.REFUND);
+  const chargedCents = charges.reduce((sum, p) => sum + p.amount_cents, 0);
+  const refundedCents = refunds.reduce((sum, p) => sum + p.amount_cents, 0);
+  const statusClass =
+    invoice.status === InvoiceStatus.PAID
+      ? 'ok'
+      : invoice.status === InvoiceStatus.CANCELLED
+        ? 'off'
+        : 'due';
+
+  const billLines = [
+    `<div class="who">${escapeHtml(invoice.customer_name || 'Customer')}</div>`,
+    invoice.customer_email
+      ? `<div class="soft">${escapeHtml(invoice.customer_email)}</div>`
+      : '',
+    invoice.customer_phone
+      ? `<div class="soft">${escapeHtml(invoice.customer_phone)}</div>`
+      : '',
+  ]
+    .filter(Boolean)
+    .join('');
+
+  const paymentRows = [...charges, ...refunds]
+    .map((p) => {
+      const when = formatInvoiceDate(p.paid_at || p.created_at);
+      const label =
+        p.type === PaymentType.REFUND
+          ? `Refund${p.refund_to ? ` to ${paymentMethodLabel(p.refund_to as PaymentMethod)}` : ''}`
+          : paymentMethodLabel(p.method);
+      const signed =
+        p.type === PaymentType.REFUND ? `−${money(p.amount_cents)}` : money(p.amount_cents);
+      return `<tr>
+        <td>${escapeHtml(when || '—')}</td>
+        <td>${escapeHtml(label)}</td>
+        <td class="num">${escapeHtml(signed)}</td>
+      </tr>`;
+    })
+    .join('');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Invoice LVD-${ref}</title>
+<style>
+  :root {
+    --navy: #143F65;
+    --navy-d: #0E2E4A;
+    --ink: #16202a;
+    --muted: #6b7380;
+    --line: #e4e7ec;
+    --paper: #ffffff;
+    --ok: #1e5c38;
+    --due: #8a5a10;
+    --off: #5c6570;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #eceff3; color: var(--ink); }
+  body {
+    font-family: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.45;
+  }
+  .toolbar {
+    max-width: 760px;
+    margin: 20px auto 0;
+    padding: 0 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--muted);
+    font-size: 12.5px;
+  }
+  .toolbar button {
+    font: inherit;
+    font-weight: 600;
+    font-size: 12.5px;
+    color: #fff;
+    background: var(--navy);
+    border: 0;
+    border-radius: 8px;
+    padding: 8px 14px;
+    cursor: pointer;
+  }
+  .sheet {
+    width: 8.5in;
+    min-height: 11in;
+    margin: 16px auto 40px;
+    background: var(--paper);
+    padding: 0.72in 0.78in 0.64in;
+    box-shadow: 0 18px 50px rgba(14, 46, 74, 0.10);
+    display: flex;
+    flex-direction: column;
+  }
+  .brand {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 28px;
+  }
+  .mark {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .mono {
+    width: 46px;
+    height: 46px;
+    flex-shrink: 0;
+    background: var(--navy);
+    color: #fff;
+    display: grid;
+    place-items: center;
+    font-family: Palatino, "Palatino Linotype", Georgia, serif;
+    font-size: 20px;
+    letter-spacing: 0.02em;
+  }
+  .studio {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--navy);
+  }
+  .place { margin-top: 4px; font-size: 12.5px; color: var(--muted); }
+  .doc-title {
+    text-align: right;
+  }
+  .doc-title h1 {
+    font-family: Palatino, "Palatino Linotype", Georgia, serif;
+    font-size: 40px;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    color: var(--navy-d);
+    line-height: 1;
+  }
+  .doc-title .no {
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+  .stamp {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 3px 9px;
+    border: 1px solid currentColor;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .stamp.ok { color: var(--ok); }
+  .stamp.due { color: var(--due); }
+  .stamp.off { color: var(--off); }
+  .rule {
+    height: 5px;
+    margin: 28px 0 32px;
+    border-top: 1px solid var(--navy);
+    border-bottom: 2.5px solid var(--navy);
+  }
+  .meta {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 36px 48px;
+  }
+  .k {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .who { font-size: 16px; font-weight: 600; color: var(--navy-d); }
+  .soft { font-size: 13px; color: var(--muted); margin-top: 3px; }
+  .facts { display: grid; grid-template-columns: 92px 1fr; gap: 7px 14px; font-size: 13.5px; }
+  .facts dt { color: var(--muted); }
+  .facts dd { color: var(--ink); }
+  table { width: 100%; border-collapse: collapse; }
+  .items { margin-top: 40px; }
+  .items th {
+    text-align: left;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0 0 10px;
+    border-bottom: 1px solid var(--navy);
+  }
+  .items th.num, .pay th.num { text-align: right; }
+  .items td {
+    padding: 16px 0;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+    font-size: 14px;
+  }
+  .item-name { font-weight: 600; color: var(--ink); }
+  .item-sub { margin-top: 3px; font-size: 12.5px; color: var(--muted); }
+  .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .totals {
+    width: 280px;
+    margin: 8px 0 0 auto;
+  }
+  .totals tr td { padding: 7px 0; font-size: 13.5px; color: var(--muted); }
+  .totals tr td.num { color: var(--ink); }
+  .totals .grand td {
+    padding-top: 12px;
+    border-top: 2px solid var(--navy);
+    font-family: Palatino, "Palatino Linotype", Georgia, serif;
+    font-size: 20px;
+    color: var(--navy-d);
+  }
+  .note {
+    margin-top: 28px;
+    padding: 14px 16px;
+    background: #f4f7fa;
+    font-size: 13px;
+    color: var(--navy-d);
+  }
+  .pay { margin-top: 36px; }
+  .pay table { margin-top: 8px; }
+  .pay th {
+    text-align: left;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0 0 8px;
+    border-bottom: 1px solid var(--line);
+  }
+  .pay td { padding: 9px 0; font-size: 13px; border-bottom: 1px solid var(--line); }
+  .foot {
+    margin-top: auto;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.55;
+  }
+  .foot strong { display: block; color: var(--navy); font-size: 12px; margin-bottom: 2px; }
+  @page { size: letter; margin: 0.62in 0.68in; }
+  @media print {
+    html, body { background: #fff; }
+    .toolbar { display: none; }
+    .sheet {
+      width: auto;
+      min-height: 0;
+      margin: 0;
+      padding: 0;
+      box-shadow: none;
+      display: block;
+    }
+    .foot { margin-top: 48px; }
+    .note { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .mono { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+  <div class="toolbar no-print">
+    <span>Use Print and choose “Save as PDF” for a clean copy.</span>
+    <button type="button" onclick="window.print()">Print</button>
+  </div>
+  <article class="sheet">
+    <header class="brand">
+      <div class="mark">
+        <div class="mono" aria-hidden="true">L</div>
+        <div>
+          <div class="studio">Las Vegas Designs</div>
+          <div class="place">USA · Custom embroidery &amp; design</div>
+        </div>
+      </div>
+      <div class="doc-title">
+        <h1>Invoice</h1>
+        <div class="no">No. LVD-${ref}</div>
+        <div class="stamp ${statusClass}">${escapeHtml(invoiceStatusLabel(invoice.status))}</div>
+      </div>
+    </header>
+    <div class="rule"></div>
+    <section class="meta">
+      <div>
+        <div class="k">Billed to</div>
+        ${billLines}
+      </div>
+      <div>
+        <div class="k">Details</div>
+        <dl class="facts">
+          <dt>Issued</dt><dd>${escapeHtml(issued || '—')}</dd>
+          ${paidOn ? `<dt>Paid</dt><dd>${escapeHtml(paidOn)}</dd>` : ''}
+          ${period ? `<dt>Period</dt><dd>${escapeHtml(period)}</dd>` : ''}
+          <dt>Type</dt><dd>${escapeHtml(kindLabel)}</dd>
+        </dl>
+      </div>
+    </section>
+    <table class="items">
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th class="num">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            <div class="item-name">${escapeHtml(description)}</div>
+            ${orderHint ? `<div class="item-sub">${escapeHtml(orderHint)}</div>` : ''}
+          </td>
+          <td class="num">${escapeHtml(money(invoice.amount_cents))}</td>
+        </tr>
+      </tbody>
+    </table>
+    <table class="totals">
+      <tr><td>Subtotal</td><td class="num">${escapeHtml(money(invoice.amount_cents))}</td></tr>
+      ${
+        refundedCents > 0
+          ? `<tr><td>Refunded</td><td class="num">−${escapeHtml(money(refundedCents))}</td></tr>`
+          : ''
+      }
+      <tr class="grand">
+        <td>${invoice.status === InvoiceStatus.PAID ? 'Total paid' : invoice.status === InvoiceStatus.CANCELLED ? 'Cancelled' : 'Amount due'}</td>
+        <td class="num">${escapeHtml(
+          money(
+            invoice.status === InvoiceStatus.CANCELLED
+              ? 0
+              : Math.max(0, invoice.amount_cents - refundedCents),
+          ),
+        )}</td>
+      </tr>
+    </table>
+    ${
+      invoice.status === InvoiceStatus.PAID
+        ? `<p class="note">${
+            refundedCents > 0 && refundedCents >= chargedCents
+              ? 'This invoice was paid and later refunded in full.'
+              : `Paid in full${paidOn ? ` on ${escapeHtml(paidOn)}` : ''}. Thank you.`
+          }</p>`
+        : invoice.status === InvoiceStatus.AWAITING
+          ? `<p class="note">Payment is due upon receipt. You can pay this invoice from your client portal.</p>`
+          : ''
+    }
+    ${
+      paymentRows
+        ? `<section class="pay">
+        <div class="k">Payment record</div>
+        <table>
+          <thead><tr><th>Date</th><th>Method</th><th class="num">Amount</th></tr></thead>
+          <tbody>${paymentRows}</tbody>
+        </table>
+      </section>`
+        : ''
+    }
+    <footer class="foot">
+      <div>
+        <strong>Las Vegas Designs USA</strong>
+        Embroidery digitizing, vector art, and custom design.
+      </div>
+      <div style="text-align:right">
+        Questions about this invoice?<br/>
+        Message us from your client portal.
+      </div>
+    </footer>
+  </article>
+  <script>
+    function go(){ window.print(); }
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(function(){ setTimeout(go, 60); });
+    } else {
+      window.addEventListener('load', go);
+    }
+  </script>
+</body>
+</html>`;
 }

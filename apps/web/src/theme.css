@@ -53,28 +53,12 @@ body {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-right: 4px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+  scrollbar-width: none;
 }
 .app-frame .side .nav::-webkit-scrollbar {
-  width: 4px;
-}
-.app-frame .side .nav::-webkit-scrollbar-button {
   display: none;
-  height: 0;
   width: 0;
-}
-.app-frame .side .nav::-webkit-scrollbar-track {
-  background: transparent;
-  margin-block: 28px;
-}
-.app-frame .side .nav::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.22);
-  border-radius: 99px;
-}
-.app-frame .side .nav::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.38);
+  height: 0;
 }
 .app-frame.with-rolebar .side {
   top: 42px;

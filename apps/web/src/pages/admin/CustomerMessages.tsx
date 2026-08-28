@@ -5,6 +5,7 @@ import { ConversationThread } from '@/components/messaging/ConversationThread';
 import { MessageComposer } from '@/components/messaging/MessageComposer';
 import { useAuth } from '@/context/AuthContext';
 import { getErrorMessage } from '@/lib/api';
+import { whenVisible } from '@/lib/queryRefresh';
 import { dateShort, money, statusChipClass, statusLabel } from '@/lib/format';
 import {
   chatTypeLabel,
@@ -98,7 +99,7 @@ export function AdminCustomerMessages() {
   const listQuery = useQuery({
     queryKey: ['admin-conversations', listFilters],
     queryFn: () => listAdminConversations(listFilters),
-    refetchInterval: 30_000,
+    refetchInterval: whenVisible(30_000),
   });
 
   const conversations = listQuery.data?.conversations ?? [];
@@ -135,7 +136,7 @@ export function AdminCustomerMessages() {
     queryKey: ['admin-conversation', activeConversationId],
     queryFn: () => getAdminConversation(activeConversationId as string),
     enabled: !!activeConversationId,
-    refetchInterval: 20_000,
+    refetchInterval: whenVisible(20_000),
   });
 
   const active = threadQuery.data?.conversation;

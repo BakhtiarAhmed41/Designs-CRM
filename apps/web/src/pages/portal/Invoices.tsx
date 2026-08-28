@@ -9,6 +9,8 @@ import {
 } from '@/lib/billing';
 import { getMyCustomer } from '@/lib/customers';
 import { getErrorMessage } from '@/lib/api';
+import { invalidateWorkCaches } from '@/lib/queryCache';
+import { freshOnOpen } from '@/lib/queryRefresh';
 import { money, dateShort } from '@/lib/format';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -35,6 +37,7 @@ export function PortalInvoices() {
   const { data, isLoading } = useQuery({
     queryKey: ['my-invoices'],
     queryFn: listMyInvoices,
+    ...freshOnOpen,
     refetchInterval: 30000,
   });
 
@@ -65,8 +68,7 @@ export function PortalInvoices() {
     mutationFn: ({ id, method }: { id: string; method: PayMethod }) => payMyInvoice(id, method),
     onSuccess: () => {
       setError(null);
-      qc.invalidateQueries({ queryKey: ['my-invoices'] });
-      qc.invalidateQueries({ queryKey: ['portal-invoices-nav'] });
+      void invalidateWorkCaches(qc);
     },
     onError: (e) => setError(getErrorMessage(e)),
   });

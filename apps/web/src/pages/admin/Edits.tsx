@@ -8,6 +8,8 @@ import { money, dateShort } from '@/lib/format';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { invalidateWorkCaches } from '@/lib/queryCache';
+import { freshOnOpen } from '@/lib/queryRefresh';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 
 type FilterId = '' | EditStatus | 'FREE' | 'PAID' | 'IN_PROGRESS';
@@ -48,6 +50,7 @@ export function AdminEdits() {
   const { data, isLoading } = useQuery({
     queryKey: ['admin-edits', queryParams],
     queryFn: () => listAdminEdits(queryParams),
+    ...freshOnOpen,
     refetchInterval: 30_000,
   });
 
@@ -157,7 +160,7 @@ function EditRow({
   const section = sectionFor(e);
 
   const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ['admin-edits'] });
+    void invalidateWorkCaches(qc);
   };
 
   const markDone = useMutation({

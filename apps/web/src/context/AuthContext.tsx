@@ -34,15 +34,38 @@ type AuthState = {
 };
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
+const AUTH_CACHE_KEY = 'lvd-auth-user';
+
+function readCachedUser(): CurrentUser | null {
+  try {
+    const raw = sessionStorage.getItem(AUTH_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CurrentUser;
+    if (!parsed?.id || !parsed?.role) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedUser(next: CurrentUser | null) {
+  try {
+    if (!next) sessionStorage.removeItem(AUTH_CACHE_KEY);
+    else sessionStorage.setItem(AUTH_CACHE_KEY, JSON.stringify(next));
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<CurrentUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<CurrentUser | null>(() => readCachedUser());
+  const [loading, setLoading] = useState(() => !readCachedUser());
 
   const loadMe = useCallback(async () => {
     try {
       const res = await authApi.getMe();
       setUser(res.user);
+      writeCachedUser(res.user);
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
         try {
@@ -50,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (r.ok) {
             const res = await authApi.getMe();
             setUser(res.user);
+            writeCachedUser(res.user);
             return;
           }
         } catch {
@@ -57,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
       clearSessionTokens();
+      writeCachedUser(null);
       setUser(null);
     }
   }, []);
@@ -75,13 +100,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     const res = await authApi.login(email, password);
     setUser(res.user);
-    try {
-      const me = await authApi.getMe();
-      setUser(me.user);
-      return me.user;
-    } catch {
-      return res.user;
-    }
+    writeCachedUser(res.user);
+    return res.user;
   }, []);
 
   const register = useCallback(async (data: RegisterInput) => {
@@ -92,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await authApi.logout();
     } finally {
+      writeCachedUser(null);
       setUser(null);
     }
   }, []);

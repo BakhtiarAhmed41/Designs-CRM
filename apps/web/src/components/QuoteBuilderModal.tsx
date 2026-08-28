@@ -5,6 +5,7 @@ import { createOrder, getQuoteDraft, saveQuoteDraft, uploadAttachments } from '@
 import { getErrorMessage } from '@/lib/api';
 import { getMyCustomer } from '@/lib/customers';
 import { useAuth } from '@/context/AuthContext';
+import { invalidateWorkCaches } from '@/lib/queryCache';
 
 type ServiceKey = 'embroidery' | 'svg' | 'vector' | 'laser';
 
@@ -171,8 +172,7 @@ export function QuoteBuilderModal({
         await uploadAttachments(order.id, files);
       }
 
-      await qc.invalidateQueries({ queryKey: ['my-orders'] });
-      await qc.invalidateQueries({ queryKey: ['portal-orders-nav'] });
+      await invalidateWorkCaches(qc);
       setToast('Quote submitted. Added to your Quotes as “Being priced.”');
       onSubmitted?.(order.id);
       window.setTimeout(() => onClose(), 500);

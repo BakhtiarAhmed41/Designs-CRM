@@ -20,6 +20,8 @@ import {
 } from '@/lib/billing';
 import { listCustomers } from '@/lib/customers';
 import { getErrorMessage } from '@/lib/api';
+import { invalidateWorkCaches } from '@/lib/queryCache';
+import { freshOnOpen } from '@/lib/queryRefresh';
 import { money, dateShort } from '@/lib/format';
 import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
 import { ListToolbar } from '@/components/lists/ListToolbar';
@@ -42,6 +44,7 @@ export function AdminBilling() {
   const summaryQ = useQuery({
     queryKey: ['billing-summary'],
     queryFn: getBillingSummary,
+    ...freshOnOpen,
     refetchInterval: 30_000,
   });
 
@@ -52,6 +55,7 @@ export function AdminBilling() {
         q: invoiceQ || undefined,
         status: invoiceStatus || undefined,
       }),
+    ...freshOnOpen,
     refetchInterval: 30_000,
   });
 
@@ -67,8 +71,7 @@ export function AdminBilling() {
   const s = summaryQ.data;
 
   function invalidateAll() {
-    qc.invalidateQueries({ queryKey: ['admin-invoices-all'] });
-    qc.invalidateQueries({ queryKey: ['billing-summary'] });
+    void invalidateWorkCaches(qc);
   }
 
   const createMut = useMutation({

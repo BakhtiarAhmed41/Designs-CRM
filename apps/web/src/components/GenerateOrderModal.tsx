@@ -6,6 +6,7 @@ import { listCustomers, type Customer } from '@/lib/customers';
 import { getErrorMessage } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { canFeature } from '@/lib/permissions';
+import { applyOrderChange } from '@/lib/queryCache';
 
 type Mode = 'ORDER' | 'QUOTE_REQUEST';
 
@@ -167,9 +168,7 @@ export function GenerateOrderModal({
       return res;
     },
     onSuccess: (res) => {
-      qc.invalidateQueries({ queryKey: ['admin-orders'] });
-      qc.invalidateQueries({ queryKey: ['admin-quotes'] });
-      qc.invalidateQueries({ queryKey: ['admin-dashboard-stats'] });
+      void applyOrderChange(qc, res.order);
       setCreatedOrderId(res.order.id);
       if (res.payLinkUrl) {
         setResultLink(res.payLinkUrl);

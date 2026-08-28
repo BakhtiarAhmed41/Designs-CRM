@@ -49,6 +49,11 @@ export class MessagingController {
     return { conversations };
   }
 
+  @Get('unread-summary')
+  async unreadSummary(@CurrentUser() user: AuthUser | undefined) {
+    return this.messaging.myUnreadSummary(user);
+  }
+
   @Get(':id')
   async get(
     @CurrentUser() user: AuthUser | undefined,

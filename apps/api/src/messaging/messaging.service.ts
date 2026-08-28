@@ -362,6 +362,8 @@ export class MessagingService {
       status?: ConversationStatus;
       chatType?: ChatType;
       customerId?: string;
+      orderId?: string;
+      limit?: number;
     },
   ) {
     assertAuthUser(user);
@@ -394,6 +396,10 @@ export class MessagingService {
       where.push('c.customer_id = ?');
       params.push(filters.customerId);
     }
+    if (filters.orderId) {
+      where.push('c.order_id = ?');
+      params.push(filters.orderId);
+    }
 
     const q = filters.q?.trim();
     if (q) {
@@ -407,6 +413,10 @@ export class MessagingService {
     }
 
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const limit =
+      filters.limit && Number.isFinite(filters.limit)
+        ? Math.min(100, Math.max(1, Math.floor(filters.limit)))
+        : undefined;
     const rows = await this.db.query<ConversationListRow>(
       `SELECT c.*,
               cust.name AS customer_name,
@@ -420,8 +430,9 @@ export class MessagingService {
          LEFT JOIN customers cust ON cust.id = c.customer_id
          LEFT JOIN orders o ON o.id = c.order_id
          ${whereSql}
-         ORDER BY c.last_message_at IS NULL, c.last_message_at DESC, c.created_at DESC`,
-      params,
+         ORDER BY c.last_message_at IS NULL, c.last_message_at DESC, c.created_at DESC
+         ${limit ? 'LIMIT ?' : ''}`,
+      limit ? [...params, limit] : params,
     );
     return rows.map((r) => this.conversationListDto(r));
   }
@@ -891,6 +902,29 @@ export class MessagingService {
       [customerId],
     );
     return rows.map((r) => this.conversationListDto(r, true));
+  }
+
+  async myUnreadSummary(user: AuthUser | undefined) {
+    assertAuthUser(user);
+    if (user.role !== UserRole.CLIENT) throw new ForbiddenException();
+    const customerId = await this.getCustomerIdForUser(user.id);
+    if (!customerId) {
+      return { unreadMessages: 0, unreadConversations: 0 };
+    }
+    const row = await this.db.queryOne<{
+      total: number;
+      conversations: number;
+    }>(
+      `SELECT COALESCE(SUM(unread_client), 0) AS total,
+              COALESCE(SUM(CASE WHEN unread_client > 0 THEN 1 ELSE 0 END), 0) AS conversations
+         FROM conversations
+        WHERE customer_id = ?`,
+      [customerId],
+    );
+    return {
+      unreadMessages: Number(row?.total ?? 0),
+      unreadConversations: Number(row?.conversations ?? 0),
+    };
   }
 
   private async getOwnedConversation(

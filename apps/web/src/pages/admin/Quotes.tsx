@@ -8,6 +8,8 @@ import {
   sendAdminMessage,
 } from '@/lib/messaging';
 import { getErrorMessage } from '@/lib/api';
+import { invalidateWorkCaches } from '@/lib/queryCache';
+import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
 import { money, dateShort, quoteLifecycleChip } from '@/lib/format';
 import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
 import type { Order, OrderStatus } from '@/lib/types';
@@ -77,7 +79,8 @@ export function AdminQuotes() {
         page,
         pageSize: 20,
       }),
-    refetchInterval: 30_000,
+    ...freshOnOpen,
+    refetchInterval: whenVisible(30_000),
   });
 
   const quotes = data?.orders ?? [];
@@ -92,18 +95,18 @@ export function AdminQuotes() {
         page: 1,
         pageSize: 20,
       }),
-    refetchInterval: 30_000,
+    ...freshOnOpen,
+    refetchInterval: whenVisible(30_000),
   });
   const followUps = followUpsQ.data?.orders ?? [];
 
   function invalidateQuotes() {
-    qc.invalidateQueries({ queryKey: ['admin-quotes'] });
-    qc.invalidateQueries({ queryKey: ['admin-orders'] });
+    void invalidateWorkCaches(qc);
   }
 
   const nudgeMut = useMutation({
     mutationFn: async (order: Order) => {
-      const listed = await listAdminConversations();
+      const listed = await listAdminConversations({ orderId: order.id });
       let convo = listed.conversations.find((c) => c.orderId === order.id);
       if (!convo) {
         const created = await createAdminConversation({

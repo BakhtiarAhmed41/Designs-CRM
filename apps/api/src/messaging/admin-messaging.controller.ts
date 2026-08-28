@@ -97,7 +97,10 @@ export class AdminMessagingController {
     @Query('status') status: string | undefined,
     @Query('chatType') chatType: string | undefined,
     @Query('customerId') customerId: string | undefined,
+    @Query('orderId') orderId: string | undefined,
+    @Query('limit') limit: string | undefined,
   ) {
+    const parsedLimit = limit ? Number(limit) : undefined;
     const conversations = await this.messaging.listAdminConversations(user, {
       label: label || undefined,
       q: q || undefined,
@@ -111,6 +114,8 @@ export class AdminMessagingController {
         ? (chatType as ChatType)
         : undefined,
       customerId: customerId || undefined,
+      orderId: z.string().uuid().safeParse(orderId).success ? orderId : undefined,
+      limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
     });
     return { conversations };
   }

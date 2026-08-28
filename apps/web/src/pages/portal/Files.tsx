@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { listMyFiles, type MyFile } from '@/lib/designs';
+import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
 import { myDeliveryFileUrl, requestFormat } from '@/lib/orders';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import { dateShort } from '@/lib/format';
@@ -31,7 +32,8 @@ export function PortalFiles() {
   const { data, isLoading } = useQuery({
     queryKey: ['my-files'],
     queryFn: listMyFiles,
-    refetchInterval: 30000,
+    ...freshOnOpen,
+    refetchInterval: whenVisible(30_000),
   });
   const requestMut = useMutation({
     mutationFn: () =>

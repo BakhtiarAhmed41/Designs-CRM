@@ -16,6 +16,8 @@ import {
   sendAdminMessage,
 } from '@/lib/messaging';
 import { submitQuoteBuilder } from '@/lib/designs';
+import { applyOrderChange, invalidateWorkCaches } from '@/lib/queryCache';
+import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
 import { getCustomer } from '@/lib/customers';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import { money, dateShort, quoteLifecycleChip } from '@/lib/format';
@@ -71,6 +73,7 @@ export function AdminQuoteDetail() {
   const { data, isLoading } = useQuery({
     queryKey: ['admin-order', id],
     queryFn: () => getAdminOrder(id),
+    ...freshOnOpen,
   });
 
   const order = data?.order;
@@ -92,7 +95,7 @@ export function AdminQuoteDetail() {
 
   const convosQ = useQuery({
     queryKey: ['admin-conversations-quote', id],
-    queryFn: () => listAdminConversations(),
+    queryFn: () => listAdminConversations({ orderId: id }),
     enabled: !!id,
   });
 
@@ -105,7 +108,7 @@ export function AdminQuoteDetail() {
     queryKey: ['admin-conversation', convo?.id],
     queryFn: () => getAdminConversation(convo!.id),
     enabled: !!convo?.id,
-    refetchInterval: 15_000,
+    refetchInterval: whenVisible(15_000),
   });
 
   const totalCents = useMemo(() => {
@@ -144,7 +147,7 @@ export function AdminQuoteDetail() {
     setError(null);
     try {
       await adminUploadAttachments(id, list);
-      qc.invalidateQueries({ queryKey: ['admin-order', id] });
+      void invalidateWorkCaches(qc);
     } catch (e) {
       setError(getErrorMessage(e));
     } finally {
@@ -155,9 +158,8 @@ export function AdminQuoteDetail() {
   const declineMut = useMutation({
     mutationFn: () =>
       adminRejectOrder(id, { reason: 'Declined by staff', status: 'REJECTED' }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin-quotes'] });
-      qc.invalidateQueries({ queryKey: ['admin-orders'] });
+    onSuccess: (res) => {
+      void applyOrderChange(qc, res.order);
       navigate('/admin/quotes');
     },
     onError: (e) => setError(getErrorMessage(e)),
@@ -190,11 +192,8 @@ export function AdminQuoteDetail() {
       return convoId;
     },
     onSuccess: (convoId) => {
-      qc.invalidateQueries({ queryKey: ['admin-order', id] });
-      qc.invalidateQueries({ queryKey: ['admin-quotes'] });
+      void invalidateWorkCaches(qc);
       qc.invalidateQueries({ queryKey: ['admin-conversations'] });
-      qc.invalidateQueries({ queryKey: ['my-orders'] });
-      qc.invalidateQueries({ queryKey: ['my-order', id] });
       const customer = order?.customerId;
       navigate(
         `/admin/messages/customers/${convoId}${customer ? `?customer=${customer}` : ''}`,
@@ -205,11 +204,8 @@ export function AdminQuoteDetail() {
 
   const counterApprove = useMutation({
     mutationFn: () => approveCounter(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin-order', id] });
-      qc.invalidateQueries({ queryKey: ['admin-quotes'] });
-      qc.invalidateQueries({ queryKey: ['admin-orders'] });
-      qc.invalidateQueries({ queryKey: ['my-orders'] });
+    onSuccess: (res) => {
+      void applyOrderChange(qc, res.order);
       navigate(`/admin/orders/${id}`);
     },
     onError: (e) => setError(getErrorMessage(e)),
@@ -217,12 +213,8 @@ export function AdminQuoteDetail() {
 
   const counterReject = useMutation({
     mutationFn: () => rejectCounter(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['admin-order', id] });
-      qc.invalidateQueries({ queryKey: ['admin-quotes'] });
-      qc.invalidateQueries({ queryKey: ['admin-orders'] });
-      qc.invalidateQueries({ queryKey: ['my-orders'] });
-      qc.invalidateQueries({ queryKey: ['my-order', id] });
+    onSuccess: (res) => {
+      void applyOrderChange(qc, res.order);
     },
     onError: (e) => setError(getErrorMessage(e)),
   });

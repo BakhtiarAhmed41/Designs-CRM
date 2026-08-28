@@ -16,6 +16,8 @@ import {
   updateAdminFormatRequest,
   updateOrderNotes,
 } from '@/lib/orders';
+import { applyOrderChange, invalidateWorkCaches } from '@/lib/queryCache';
+import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
 import { createAdminEdit, getOrderActivity, type EditKind } from '@/lib/edits';
 import {
   getAdminConversation,
@@ -24,7 +26,7 @@ import {
   sendAdminMessage,
   createAdminConversation,
 } from '@/lib/messaging';
-import { createInvoice, payInvoice, refundOrder, type RefundTo } from '@/lib/billing';
+import { createInvoice, listInvoices, payInvoice, refundOrder, type RefundTo } from '@/lib/billing';
 import { assignOrder, listTeam } from '@/lib/team';
 import { updateDesign, type Design, type DesignStatus } from '@/lib/designs';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
@@ -94,7 +96,6 @@ const ADMIN_STATUS_OPTIONS: OrderStatus[] = [
   'READY_TO_SEND',
   'REVISION_REQUESTED',
   'COMPLETED',
-  'CLOSED',
   'CANCELLED',
   'REFUNDED',
 ];
@@ -108,7 +109,8 @@ export function AdminOrderDetail() {
   const canAssignDesigner =
     (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') &&
     canFeature(user?.permissions, 'team', user?.role);
-  const canApproveCounter = canSupport(user?.permissions, 'approve', user?.role);
+  const canApprove = canSupport(user?.permissions, 'approve', user?.role);
+  const canApproveCounter = canApprove;
   const [files, setFiles] = useState<File[]>([]);
   const [msgDraft, setMsgDraft] = useState('');
   const [msgFiles, setMsgFiles] = useState<File[]>([]);
@@ -133,6 +135,7 @@ export function AdminOrderDetail() {
   const { data, isLoading } = useQuery({
     queryKey: ['admin-order', id],
     queryFn: () => getAdminOrder(id),
+    ...freshOnOpen,
   });
 
   const activityQ = useQuery({
@@ -148,11 +151,20 @@ export function AdminOrderDetail() {
 
   const convosQ = useQuery({
     queryKey: ['admin-conversations-order', id],
-    queryFn: () => listAdminConversations(),
+    queryFn: () => listAdminConversations({ orderId: id }),
     enabled: !!id,
   });
 
   const order = data?.order as AdminOrderFull | undefined;
+  const invoicesQ = useQuery({
+    queryKey: ['admin-invoices-order', id, order?.customerId],
+    queryFn: () =>
+      listInvoices({
+        customerId: order?.customerId ?? undefined,
+        status: 'PAID',
+      }),
+    enabled: showMoney && !!id && !!order?.customerId,
+  });
   const convo = useMemo(
     () => convosQ.data?.conversations.find((c) => c.orderId === id),
     [convosQ.data, id],
@@ -182,15 +194,13 @@ export function AdminOrderDetail() {
     queryKey: ['admin-conversation', convo?.id],
     queryFn: () => getAdminConversation(convo!.id),
     enabled: !!convo?.id,
-    refetchInterval: 15_000,
+    refetchInterval: whenVisible(15_000),
   });
 
   const designers = (teamQ.data?.members ?? []).filter((m) => m.role === 'DESIGNER');
 
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ['admin-order', id] });
-    qc.invalidateQueries({ queryKey: ['admin-orders'] });
-    qc.invalidateQueries({ queryKey: ['admin-order-activity', id] });
+  const invalidate = (order?: Order) => {
+    void applyOrderChange(qc, order);
   };
 
   const deliver = useMutation({
@@ -216,7 +226,7 @@ export function AdminOrderDetail() {
       } else {
         setToast('Files released. The customer can download them from Orders and Files.');
       }
-      invalidate();
+      invalidate(res.order);
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -246,25 +256,35 @@ export function AdminOrderDetail() {
 
   const counterApprove = useMutation({
     mutationFn: () => approveCounter(id),
-    onSuccess: () => {
+    onSuccess: (res) => {
       setToast('Counter approved.');
-      invalidate();
+      invalidate(res.order);
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
 
   const counterReject = useMutation({
     mutationFn: () => rejectCounter(id),
-    onSuccess: () => {
+    onSuccess: (res) => {
       setToast('Counter rejected.');
-      invalidate();
+      invalidate(res.order);
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
 
   const assign = useMutation({
     mutationFn: () => assignOrder(designerId, id),
-    onSuccess: invalidate,
+    onSuccess: (res) => {
+      qc.setQueryData(['admin-order', id], (prev: unknown) => {
+        if (!prev || typeof prev !== 'object' || !('order' in prev)) return prev;
+        const current = (prev as { order: Order }).order;
+        return {
+          ...prev,
+          order: { ...current, assignedDesignerId: res.assignedDesignerId },
+        };
+      });
+      void invalidateWorkCaches(qc);
+    },
     onError: (e) => setError(getErrorMessage(e)),
   });
 
@@ -308,9 +328,9 @@ export function AdminOrderDetail() {
 
   const saveNotes = useMutation({
     mutationFn: (value: string) => updateOrderNotes(id, value),
-    onSuccess: () => {
+    onSuccess: (res) => {
       setToast('Notes saved.');
-      invalidate();
+      invalidate(res.order);
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -349,13 +369,14 @@ export function AdminOrderDetail() {
   const setDesignStatus = useMutation({
     mutationFn: (vars: { designId: string; status: DesignStatus }) =>
       updateDesign(id, vars.designId, { status: vars.status }),
-    onSuccess: invalidate,
+    onSuccess: () => invalidate(),
   });
 
   const duplicate = useMutation({
     mutationFn: () => adminDuplicateOrder(id, order?.type),
     onSuccess: (res) => {
       setToast('Order duplicated. Review and update as needed.');
+      void applyOrderChange(qc, res.order);
       navigate(`/admin/orders/${res.order.id}`);
     },
     onError: (e) => setError(getErrorMessage(e)),
@@ -369,7 +390,7 @@ export function AdminOrderDetail() {
 
   const updateStatus = useMutation({
     mutationFn: (status: OrderStatus) => adminUpdateStatus(id, status),
-    onSuccess: invalidate,
+    onSuccess: (res) => invalidate(res.order),
     onError: (e) => setError(getErrorMessage(e)),
   });
 
@@ -385,6 +406,10 @@ export function AdminOrderDetail() {
   const messages = threadQ.data?.conversation.messages ?? [];
   const activity = activityQ.data?.activity ?? [];
   const hasDeliveries = (order.deliveries ?? []).length > 0;
+  const hasPaidInvoice = (invoicesQ.data?.invoices ?? []).some(
+    (inv) => inv.orderId === id && inv.status === 'PAID',
+  );
+  const canRefund = hasPaidInvoice && order.status !== 'REFUNDED';
 
   return (
     <div>
@@ -427,9 +452,12 @@ export function AdminOrderDetail() {
               updateStatus.mutate(next);
             }}
           >
-            {ADMIN_STATUS_OPTIONS.map((s) => (
+            {(order.status === 'CLOSED'
+              ? (['CLOSED', ...ADMIN_STATUS_OPTIONS] as OrderStatus[])
+              : ADMIN_STATUS_OPTIONS
+            ).map((s) => (
               <option key={s} value={s}>
-                {statusLabel(s, 'admin')}
+                {s === 'CLOSED' ? 'Closed' : statusLabel(s, 'admin')}
               </option>
             ))}
           </select>
@@ -674,7 +702,7 @@ export function AdminOrderDetail() {
                             r.id,
                             r.status === 'PENDING' ? 'IN_PROGRESS' : 'DONE',
                           ).then(() =>
-                            qc.invalidateQueries({ queryKey: ['admin-format-requests', id] }),
+                            invalidateWorkCaches(qc),
                           )
                         }
                       >
@@ -753,11 +781,13 @@ export function AdminOrderDetail() {
                   />{' '}
                   Notify customer in the portal
                 </label>
-                <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
-                  Submit for approval saves the files for review. The customer sees them only after you release.
-                </div>
+                {!canApprove && (
+                  <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
+                    Submit for approval saves the files for review. The customer sees them only after an admin releases them.
+                  </div>
+                )}
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {order.status === 'IN_PROGRESS' && (
+                  {!canApprove && order.status === 'IN_PROGRESS' && (
                     <button
                       type="button"
                       className="btn btn-ghost btn-sm"
@@ -1018,6 +1048,7 @@ export function AdminOrderDetail() {
               >
                 <i className="ti ti-check" /> Mark payment received
               </button>
+              {canRefund && (
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
@@ -1026,6 +1057,7 @@ export function AdminOrderDetail() {
               >
                 <i className="ti ti-arrow-back-up" /> Refund
               </button>
+              )}
             </div>
           </div>
           )}

@@ -195,6 +195,10 @@ export function listMyInvoices() {
   return apiFetch<{ invoices: Invoice[]; storeCreditCents: number }>('/invoices');
 }
 
+export function getMyInvoiceSummary() {
+  return apiFetch<{ awaitingCount: number; awaitingCents: number }>('/invoices/summary');
+}
+
 export function payMyInvoice(id: string, method: PayMethod) {
   return apiFetch<{ invoice: Invoice | null }>(`/invoices/${id}/pay`, {
     method: 'POST',

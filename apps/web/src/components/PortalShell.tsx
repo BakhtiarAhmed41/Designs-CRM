@@ -3,8 +3,9 @@ import { NavLink } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Brand, LogoutLink, Shell, useShellUser } from './Shell';
 import { listMyOrderSummary } from '@/lib/orders';
-import { listMyInvoices } from '@/lib/billing';
-import { listMyConversations } from '@/lib/messaging';
+import { getMyInvoiceSummary } from '@/lib/billing';
+import { getMyUnreadSummary } from '@/lib/messaging';
+import { whenVisible } from '@/lib/queryRefresh';
 import { useMessagingSocket } from '@/hooks/useMessagingSocket';
 
 type NavEntry = {
@@ -20,10 +21,10 @@ export function PortalShell() {
   const qc = useQueryClient();
   useMessagingSocket({
     onUnreadChanged: () => {
-      void qc.invalidateQueries({ queryKey: ['portal-convos-nav'] });
+      void qc.invalidateQueries({ queryKey: ['portal-unread'] });
     },
     onMessageNew: () => {
-      void qc.invalidateQueries({ queryKey: ['portal-convos-nav'] });
+      void qc.invalidateQueries({ queryKey: ['portal-unread'] });
     },
   });
 
@@ -32,19 +33,17 @@ export function PortalShell() {
     queryFn: listMyOrderSummary,
   });
   const { data: invoicesData } = useQuery({
-    queryKey: ['portal-invoices-nav'],
-    queryFn: listMyInvoices,
+    queryKey: ['portal-invoices-summary'],
+    queryFn: getMyInvoiceSummary,
   });
-  const { data: convos } = useQuery({
-    queryKey: ['portal-convos-nav'],
-    queryFn: listMyConversations,
-    refetchInterval: 20_000,
+  const { data: unread } = useQuery({
+    queryKey: ['portal-unread'],
+    queryFn: getMyUnreadSummary,
+    refetchInterval: whenVisible(20_000),
   });
   const quoteCount = quoteSummary?.awaitingQuote ?? 0;
-  const invoiceCount = (invoicesData?.invoices ?? []).filter(
-    (i) => i.status === 'AWAITING',
-  ).length;
-  const msgUnread = (convos?.conversations ?? []).some((t) => (t.unreadClient ?? 0) > 0);
+  const invoiceCount = invoicesData?.awaitingCount ?? 0;
+  const msgUnread = (unread?.unreadConversations ?? 0) > 0;
 
   const items: NavEntry[] = [
     {

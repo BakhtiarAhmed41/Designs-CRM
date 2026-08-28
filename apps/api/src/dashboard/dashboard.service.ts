@@ -68,48 +68,51 @@ export class DashboardService {
   async getStats(user: AuthUser | undefined) {
     this.assertStaff(user);
 
-    const ordersActive = await this.countByStatuses(ACTIVE_STATUSES);
-    const quotesToPrice = await this.countByStatuses(QUOTE_STATUSES);
-    const inProgress = await this.countByStatuses([OrderStatus.IN_PROGRESS]);
-
-    const revisionsRow = await this.db.queryOne<{ n: number }>(
-      'SELECT COUNT(*) AS n FROM edit_requests WHERE status = ?',
-      [EditStatus.PENDING],
-    );
+    const [
+      ordersActive,
+      quotesToPrice,
+      inProgress,
+      revisionsRow,
+      deliveredRow,
+      outstandingRow,
+      newOrders,
+      unreadRow,
+      byStatusRows,
+    ] = await Promise.all([
+      this.countByStatuses(ACTIVE_STATUSES),
+      this.countByStatuses(QUOTE_STATUSES),
+      this.countByStatuses([OrderStatus.IN_PROGRESS]),
+      this.db.queryOne<{ n: number }>(
+        'SELECT COUNT(*) AS n FROM edit_requests WHERE status = ?',
+        [EditStatus.PENDING],
+      ),
+      this.db.queryOne<{ n: number; total: number | null }>(
+        `SELECT COUNT(*) AS n, COALESCE(SUM(price_cents), 0) AS total
+           FROM orders
+          WHERE status = ?
+            AND completed_at IS NOT NULL
+            AND completed_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')`,
+        [OrderStatus.COMPLETED],
+      ),
+      this.db.queryOne<{ total: number | null }>(
+        `SELECT COALESCE(SUM(price_cents), 0) AS total
+           FROM orders
+          WHERE status IN (${placeholders(OUTSTANDING_STATUSES)})`,
+        OUTSTANDING_STATUSES,
+      ),
+      this.countByStatuses([OrderStatus.CREATED, OrderStatus.PENDING_PAYMENT]),
+      this.db.queryOne<{ n: number }>(
+        'SELECT COALESCE(SUM(unread_admin), 0) AS n FROM conversations',
+      ),
+      this.db.query<{ status: OrderStatus; count: number }>(
+        'SELECT status, COUNT(*) AS count FROM orders GROUP BY status ORDER BY count DESC',
+      ),
+    ]);
     const revisionsOpen = Number(revisionsRow?.n ?? 0);
-
-    const deliveredRow = await this.db.queryOne<{ n: number; total: number | null }>(
-      `SELECT COUNT(*) AS n, COALESCE(SUM(price_cents), 0) AS total
-         FROM orders
-        WHERE status = ?
-          AND completed_at IS NOT NULL
-          AND completed_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')`,
-      [OrderStatus.COMPLETED],
-    );
     const deliveredThisMonth = Number(deliveredRow?.n ?? 0);
     const revenueThisMonthCents = Number(deliveredRow?.total ?? 0);
-
-    const outstandingRow = await this.db.queryOne<{ total: number | null }>(
-      `SELECT COALESCE(SUM(price_cents), 0) AS total
-         FROM orders
-        WHERE status IN (${placeholders(OUTSTANDING_STATUSES)})`,
-      OUTSTANDING_STATUSES,
-    );
     const outstandingCents = Number(outstandingRow?.total ?? 0);
-
-    const newOrders = await this.countByStatuses([
-      OrderStatus.CREATED,
-      OrderStatus.PENDING_PAYMENT,
-    ]);
-
-    const unreadRow = await this.db.queryOne<{ n: number }>(
-      'SELECT COALESCE(SUM(unread_admin), 0) AS n FROM conversations',
-    );
     const unreadMessages = Number(unreadRow?.n ?? 0);
-
-    const byStatusRows = await this.db.query<{ status: OrderStatus; count: number }>(
-      'SELECT status, COUNT(*) AS count FROM orders GROUP BY status ORDER BY count DESC',
-    );
     const byStatus = byStatusRows.map((r) => ({
       status: r.status,
       count: Number(r.count),

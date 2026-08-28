@@ -16,6 +16,8 @@ import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import { createMyConversation, listMyConversations } from '@/lib/messaging';
 import type { Design, QuotationLine } from '@/lib/designs';
 import type { Order, Quotation } from '@/lib/types';
+import { invalidateWorkCaches } from '@/lib/queryCache';
+import { freshOnOpen } from '@/lib/queryRefresh';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 
@@ -45,6 +47,7 @@ export function PortalOrderDetail() {
   const { data, isLoading } = useQuery({
     queryKey: ['my-order', id],
     queryFn: () => getMyOrder(id),
+    ...freshOnOpen,
   });
 
   const startChat = useMutation({
@@ -70,8 +73,7 @@ export function PortalOrderDetail() {
   });
 
   const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ['my-order', id] });
-    qc.invalidateQueries({ queryKey: ['my-orders'] });
+    void invalidateWorkCaches(qc);
   };
 
   const uploadRefs = useMutation({

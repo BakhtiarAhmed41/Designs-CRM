@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ConversationThread } from '@/components/messaging/ConversationThread';
 import { MessageComposer } from '@/components/messaging/MessageComposer';
 import { getErrorMessage } from '@/lib/api';
+import { whenVisible } from '@/lib/queryRefresh';
 import { dateShort } from '@/lib/format';
 import {
   chatTypeLabel,
@@ -43,7 +44,7 @@ export function PortalMessages() {
   const convosQuery = useQuery({
     queryKey: ['my-conversations'],
     queryFn: listMyConversations,
-    refetchInterval: 20_000,
+    refetchInterval: whenVisible(20_000),
   });
 
   const conversations = useMemo(() => {
@@ -68,7 +69,7 @@ export function PortalMessages() {
     queryKey: ['my-conversation', conversationId],
     queryFn: () => getMyConversation(conversationId as string),
     enabled: !!conversationId,
-    refetchInterval: 15_000,
+    refetchInterval: whenVisible(15_000),
   });
 
   useMessagingSocket({

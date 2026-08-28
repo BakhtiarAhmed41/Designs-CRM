@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { listAdminOrders } from '@/lib/orders';
+import { freshOnOpen } from '@/lib/queryRefresh';
 import { money, dateShort, lifecycleChip } from '@/lib/format';
 import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
 import type { Order, OrderStatus } from '@/lib/types';
@@ -53,6 +54,7 @@ export function AdminOrders() {
         page,
         pageSize: 20,
       }),
+    ...freshOnOpen,
   });
 
   const orders = useMemo(() => data?.orders ?? [], [data?.orders]);

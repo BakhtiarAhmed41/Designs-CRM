@@ -52,7 +52,9 @@ export function listMyOrders(params?: {
 }
 
 export function listMyOrderSummary() {
-  return apiFetch<{ awaitingQuote: number; beingPriced: number }>('/orders/summary');
+  return apiFetch<{ awaitingQuote: number; beingPriced: number; activeOrders?: number }>(
+    '/orders/summary',
+  );
 }
 
 export function getMyOrder(id: string) {

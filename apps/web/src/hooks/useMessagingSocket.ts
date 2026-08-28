@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { io, type Socket } from 'socket.io-client';
 import { apiOrigin } from '@/lib/api';
+import { invalidateWorkCaches } from '@/lib/queryCache';
 import { getAccessToken } from '@/lib/session';
 
 type Handler = (payload: unknown) => void;
@@ -41,20 +42,26 @@ export function useMessagingSocket(handlers: {
     const onMessageNew = (payload: unknown) => {
       handlersRef.current.onMessageNew?.(payload);
       void qc.invalidateQueries({ queryKey: ['admin-conversations'] });
+      void qc.invalidateQueries({ queryKey: ['admin-conversations-preview'] });
+      void qc.invalidateQueries({ queryKey: ['admin-conversations-order'] });
+      void qc.invalidateQueries({ queryKey: ['admin-conversations-quote'] });
       void qc.invalidateQueries({ queryKey: ['my-conversations'] });
       void qc.invalidateQueries({ queryKey: ['admin-unread-messages'] });
-      void qc.invalidateQueries({ queryKey: ['portal-convos-nav'] });
+      void qc.invalidateQueries({ queryKey: ['portal-unread'] });
     };
     const onConversationUpdated = (payload: unknown) => {
       handlersRef.current.onConversationUpdated?.(payload);
       void qc.invalidateQueries({ queryKey: ['admin-conversations'] });
+      void qc.invalidateQueries({ queryKey: ['admin-conversations-preview'] });
+      void qc.invalidateQueries({ queryKey: ['admin-conversations-order'] });
+      void qc.invalidateQueries({ queryKey: ['admin-conversations-quote'] });
       void qc.invalidateQueries({ queryKey: ['my-conversations'] });
     };
     const onUnreadChanged = (payload: unknown) => {
       handlersRef.current.onUnreadChanged?.(payload);
       void qc.invalidateQueries({ queryKey: ['admin-unread-messages'] });
       void qc.invalidateQueries({ queryKey: ['team-unread'] });
-      void qc.invalidateQueries({ queryKey: ['portal-convos-nav'] });
+      void qc.invalidateQueries({ queryKey: ['portal-unread'] });
     };
     const onTeamMessage = (payload: unknown) => {
       handlersRef.current.onTeamMessage?.(payload);
@@ -66,6 +73,7 @@ export function useMessagingSocket(handlers: {
     const onNotificationNew = (payload: unknown) => {
       handlersRef.current.onNotificationNew?.(payload);
       void qc.invalidateQueries({ queryKey: ['notifications'] });
+      void invalidateWorkCaches(qc);
     };
     const onPresenceUpdate = (payload: unknown) => {
       handlersRef.current.onPresenceUpdate?.(payload);
@@ -83,7 +91,7 @@ export function useMessagingSocket(handlers: {
           };
         });
       }
-      void qc.invalidateQueries({ queryKey: ['admin-team'] });
+      // Presence is already patched into the team cache above.
     };
 
     socket.on('message:new', onMessageNew);

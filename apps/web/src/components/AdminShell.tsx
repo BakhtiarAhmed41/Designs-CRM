@@ -9,6 +9,7 @@ import { getTeamChatOwner, getTeamUnreadSummary, listTeam, type Presence } from 
 import { getAdminUnreadSummary } from '@/lib/messaging';
 import { canAnyMessaging, featuresForUser } from '@/lib/permissions';
 import type { FeatureKey, UserRole } from '@/lib/types';
+import { whenVisible } from '@/lib/queryRefresh';
 import { useMessagingSocket } from '@/hooks/useMessagingSocket';
 
 const ROLE_META: Record<
@@ -59,7 +60,8 @@ export function AdminShell() {
     queryKey: ['admin-team'],
     queryFn: listTeam,
     enabled: Boolean(user),
-    refetchInterval: 60_000,
+    staleTime: 60_000,
+    refetchInterval: whenVisible(60_000),
   });
   const members = (teamData?.members ?? []).filter((m) => m.id !== user?.id);
   const onlineCount = (teamData?.members ?? []).filter((m) => m.presence === 'ON').length;
@@ -77,19 +79,19 @@ export function AdminShell() {
     queryKey: ['admin-unread-messages'],
     queryFn: getAdminUnreadSummary,
     enabled: showCustomerMessages,
-    refetchInterval: 20_000,
+    refetchInterval: whenVisible(20_000),
   });
   const { data: teamUnread } = useQuery({
     queryKey: ['team-unread'],
     queryFn: getTeamUnreadSummary,
     enabled: showTeamMessages,
-    refetchInterval: 20_000,
+    refetchInterval: whenVisible(20_000),
   });
   const { data: loginRequests } = useQuery({
     queryKey: ['login-requests'],
     queryFn: listLoginRequests,
     enabled: can('customers'),
-    refetchInterval: 30_000,
+    refetchInterval: whenVisible(30_000),
   });
   useMessagingSocket({
     onUnreadChanged: () => {

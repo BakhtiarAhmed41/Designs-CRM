@@ -8,6 +8,7 @@ import {
   markNotificationRead,
 } from '@/lib/notifications';
 import { STAFF_ROLES } from '@/lib/types';
+import { whenVisible } from '@/lib/queryRefresh';
 import { IconBell } from './Icon';
 
 function relativeTime(iso: string) {
@@ -40,7 +41,7 @@ export function NotificationBell() {
   const { data } = useQuery({
     queryKey: ['notifications'],
     queryFn: listNotifications,
-    refetchInterval: 30_000,
+    refetchInterval: whenVisible(30_000),
   });
 
   const unread = data?.unreadCount ?? 0;

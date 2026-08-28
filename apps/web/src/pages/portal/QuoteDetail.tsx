@@ -13,6 +13,8 @@ import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import { dateShort, money, quoteLifecycleChip } from '@/lib/format';
 import type { QuotationLine } from '@/lib/designs';
 import type { Order, Quotation } from '@/lib/types';
+import { invalidateWorkCaches } from '@/lib/queryCache';
+import { freshOnOpen } from '@/lib/queryRefresh';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 
@@ -35,6 +37,7 @@ export function PortalQuoteDetail() {
     queryKey: ['my-order', id],
     queryFn: () => getMyOrder(id),
     enabled: !!id,
+    ...freshOnOpen,
   });
 
   const order = data?.order as Order | undefined;
@@ -55,10 +58,7 @@ export function PortalQuoteDetail() {
   const acceptMut = useMutation({
     mutationFn: () => acceptQuotation(id, selected),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['my-orders'] });
-      void qc.invalidateQueries({ queryKey: ['my-order', id] });
-      void qc.invalidateQueries({ queryKey: ['admin-quotes'] });
-      void qc.invalidateQueries({ queryKey: ['admin-orders'] });
+      void invalidateWorkCaches(qc);
       navigate('/portal/orders');
     },
     onError: (e) => setError(getErrorMessage(e)),
@@ -67,9 +67,7 @@ export function PortalQuoteDetail() {
   const rejectMut = useMutation({
     mutationFn: () => rejectQuotation(id),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['my-orders'] });
-      void qc.invalidateQueries({ queryKey: ['my-order', id] });
-      void qc.invalidateQueries({ queryKey: ['admin-quotes'] });
+      void invalidateWorkCaches(qc);
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -84,8 +82,7 @@ export function PortalQuoteDetail() {
       }),
     onSuccess: () => {
       setError(null);
-      void qc.invalidateQueries({ queryKey: ['my-order', id] });
-      void qc.invalidateQueries({ queryKey: ['my-orders'] });
+      void invalidateWorkCaches(qc);
     },
     onError: (e) => setError(getErrorMessage(e)),
   });

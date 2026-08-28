@@ -1,4 +1,4 @@
-import { cloneElement, useEffect, useState } from 'react';
+import { cloneElement, Suspense, useEffect, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
@@ -89,7 +89,15 @@ export function Shell({
             </div>
           </header>
           <main className={`main${messaging ? ' main-messaging' : ''}`}>
-            <Outlet />
+            <Suspense
+              fallback={
+                <div className="center-screen" style={{ alignItems: 'center', padding: 24 }}>
+                  <div className="spinner" aria-label="Loading" />
+                </div>
+              }
+            >
+              <Outlet />
+            </Suspense>
           </main>
         </div>
       </div>

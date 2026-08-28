@@ -7,6 +7,7 @@ import { getDashboardChart, getDashboardStats } from '@/lib/dashboard';
 import { listAdminEdits } from '@/lib/edits';
 import { listAdminConversations } from '@/lib/messaging';
 import { listAdminOrders } from '@/lib/orders';
+import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
 import { money, dateShort, statusChipClass, statusLabel } from '@/lib/format';
 import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
 import { canFeature } from '@/lib/permissions';
@@ -55,7 +56,8 @@ export function AdminDashboard() {
   const { data: statsData } = useQuery({
     queryKey: ['admin-dashboard-stats'],
     queryFn: getDashboardStats,
-    refetchInterval: 30_000,
+    ...freshOnOpen,
+    refetchInterval: whenVisible(30_000),
   });
   const chartDays = range === 'today' ? 1 : range === 'week' ? 7 : range === 'month' ? 30 : 14;
   const { data: chartData } = useQuery({
@@ -68,13 +70,14 @@ export function AdminDashboard() {
           : undefined,
       ),
     enabled: range !== 'custom' || Boolean(customFrom && customTo),
-    refetchInterval: 60_000,
+    refetchInterval: whenVisible(60_000),
   });
   const { data: ordersData } = useQuery({
     queryKey: ['admin-orders-latest'],
     queryFn: () => listAdminOrders({ type: 'ORDER', page: 1, pageSize: 6 }),
     enabled: can('orders'),
-    refetchInterval: 30_000,
+    ...freshOnOpen,
+    refetchInterval: whenVisible(30_000),
   });
   const { data: quotesData } = useQuery({
     queryKey: ['admin-quotes-to-price'],
@@ -86,19 +89,20 @@ export function AdminDashboard() {
         pageSize: 6,
       }),
     enabled: can('quotes'),
-    refetchInterval: 30_000,
+    ...freshOnOpen,
+    refetchInterval: whenVisible(30_000),
   });
   const { data: convosData } = useQuery({
-    queryKey: ['admin-conversations'],
-    queryFn: () => listAdminConversations(),
+    queryKey: ['admin-conversations-preview'],
+    queryFn: () => listAdminConversations({ limit: 6 }),
     enabled: can('messages') || can('messages_customer_view'),
-    refetchInterval: 30_000,
+    refetchInterval: whenVisible(30_000),
   });
   const { data: editsData } = useQuery({
     queryKey: ['admin-edits-pending'],
     queryFn: () => listAdminEdits({ status: 'PENDING', pageSize: 6 }),
     enabled: can('edits'),
-    refetchInterval: 30_000,
+    refetchInterval: whenVisible(30_000),
   });
 
   const stats = statsData?.stats;
