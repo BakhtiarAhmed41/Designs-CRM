@@ -16,7 +16,8 @@ import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import { createMyConversation, listMyConversations } from '@/lib/messaging';
 import type { Design, QuotationLine } from '@/lib/designs';
 import type { Order, Quotation } from '@/lib/types';
-import { invalidateWorkCaches } from '@/lib/queryCache';
+import { studioQuotation } from '@/lib/quoteHelpers';
+import { applyOrderChange, invalidateWorkCaches } from '@/lib/queryCache';
 import { freshOnOpen } from '@/lib/queryRefresh';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -87,17 +88,17 @@ export function PortalOrderDetail() {
 
   const accept = useMutation({
     mutationFn: (ids?: string[]) => acceptQuotation(id, ids),
-    onSuccess: () => {
+    onSuccess: (res) => {
       setActionError(null);
-      invalidate();
+      void applyOrderChange(qc, res.order);
     },
     onError: (e) => setActionError(getErrorMessage(e)),
   });
   const reject = useMutation({
     mutationFn: () => rejectQuotation(id),
-    onSuccess: () => {
+    onSuccess: (res) => {
       setActionError(null);
-      invalidate();
+      void applyOrderChange(qc, res.order);
     },
     onError: (e) => setActionError(getErrorMessage(e)),
   });
@@ -106,10 +107,10 @@ export function PortalOrderDetail() {
       counterQuotation(id, {
         amountCents: Math.round(parseFloat(counter || '0') * 100),
       }),
-    onSuccess: () => {
+    onSuccess: (res) => {
       setActionError(null);
       setCounter('');
-      invalidate();
+      void applyOrderChange(qc, res.order);
     },
     onError: (e) => setActionError(getErrorMessage(e)),
   });
@@ -126,7 +127,7 @@ export function PortalOrderDetail() {
     );
   }
 
-  const latestQuote = order.quotations?.[0];
+  const latestQuote = studioQuotation(order.quotations) ?? order.quotations?.[0];
   const canDecide = order.status === 'QUOTATION_PROVIDED';
   const canUploadRefs =
     order.status === 'WAITING_FOR_QUOTATION' ||
@@ -205,8 +206,25 @@ export function PortalOrderDetail() {
                       );
                       const lineTotal = (l.priceCents ?? 0) + sizesTotal;
                       const checked = selected.includes(l.id);
+                      const decision = l.clientDecision;
+                      const decided = !canDecide && (decision === 'KEPT' || decision === 'DROPPED');
                       return (
-                        <div key={l.id} className="line">
+                        <div
+                          key={l.id}
+                          className="line"
+                          style={
+                            decided
+                              ? {
+                                  background:
+                                    decision === 'KEPT'
+                                      ? 'rgba(46, 125, 50, 0.08)'
+                                      : 'rgba(154, 30, 34, 0.08)',
+                                  borderRadius: 8,
+                                  padding: '6px 8px',
+                                }
+                              : undefined
+                          }
+                        >
                           <span className="ln">
                             {canDecide ? (
                               <label
@@ -237,6 +255,11 @@ export function PortalOrderDetail() {
                               </>
                             )}
                           </span>
+                          {decided && (
+                            <span className={decision === 'KEPT' ? 'chip c-done' : 'chip c-wait'}>
+                              {decision === 'KEPT' ? 'Approved' : 'Rejected'}
+                            </span>
+                          )}
                           {l.note && (
                             <span className="chip c-prog" style={{ opacity: 0.6 }}>
                               {l.note}
@@ -244,7 +267,14 @@ export function PortalOrderDetail() {
                           )}
                           <span
                             className="lp"
-                            style={{ opacity: canDecide && !checked ? 0.4 : 1 }}
+                            style={{
+                              opacity: canDecide && !checked ? 0.4 : 1,
+                              color: decided
+                                ? decision === 'KEPT'
+                                  ? 'var(--green)'
+                                  : 'var(--maroon)'
+                                : undefined,
+                            }}
                           >
                             {money(lineTotal, latestQuote.currency)}
                           </span>

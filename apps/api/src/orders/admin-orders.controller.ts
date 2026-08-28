@@ -22,6 +22,7 @@ import {
   OrderStatus,
   OrderType,
   STAFF_ROLES,
+  UserRole,
 } from '../common/enums';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { RequireFeatures, RequireSupport } from '../auth/decorators/features.decorator';
@@ -454,7 +455,8 @@ export class AdminOrdersController {
   ) {
     const data = quoteBuilderSchema.parse(body);
     const quotation = await this.orders.submitQuoteBuilder(user, id, data);
-    return { quotation };
+    const order = await this.orders.getAdminOrder(user, id);
+    return { quotation, order };
   }
 
   @Post(':id/attachments')
@@ -493,5 +495,14 @@ export class AdminOrdersController {
     @Param('deliveryFileId') deliveryFileId: string,
   ) {
     return this.orders.getAdminDeliveryFileSignedUrl(user, orderId, deliveryFileId);
+  }
+
+  @Delete(':id')
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  async deleteOrder(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('id') id: string,
+  ) {
+    return this.orders.deleteOrder(user, id);
   }
 }

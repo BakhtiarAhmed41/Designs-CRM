@@ -73,10 +73,12 @@ export function QuoteBuilderModal({
   open,
   onClose,
   onSubmitted,
+  initialService,
 }: {
   open: boolean;
   onClose: () => void;
   onSubmitted?: (orderId: string) => void;
+  initialService?: string | null;
 }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -105,6 +107,10 @@ export function QuoteBuilderModal({
       return;
     }
     setAccountName(fallbackName);
+    if (initialService) {
+      const found = SERVICES.find((s) => s.key === initialService);
+      if (found) setService(found);
+    }
     void getMyCustomer()
       .then((res) => {
         setAccountName(res.customer?.name?.trim() || fallbackName);
@@ -117,7 +123,7 @@ export function QuoteBuilderModal({
         setAccountName(fallbackName);
         setCustomerPrefs(null);
       });
-  }, [open, resetPicker, fallbackName]);
+  }, [open, resetPicker, fallbackName, initialService]);
 
   useEffect(() => {
     if (!toast) return;
@@ -213,7 +219,10 @@ export function QuoteBuilderModal({
         const collected = win?.LVD_COLLECT?.();
         if (service && collected) {
           void saveQuoteDraft(service.key, collected)
-            .then(() => setToast('Draft saved to your account.'))
+            .then(() => {
+              setToast('Draft saved. You’ll see it on Quotes.');
+              void qc.invalidateQueries({ queryKey: ['my-quote-drafts'] });
+            })
             .catch((e) => setError(getErrorMessage(e)));
         }
       }

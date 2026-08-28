@@ -42,6 +42,7 @@ export function PortalShell() {
     refetchInterval: whenVisible(20_000),
   });
   const quoteCount = quoteSummary?.awaitingQuote ?? 0;
+  const orderCount = quoteSummary?.activeOrders ?? 0;
   const invoiceCount = invoicesData?.awaitingCount ?? 0;
   const msgUnread = (unread?.unreadConversations ?? 0) > 0;
 
@@ -67,6 +68,12 @@ export function PortalShell() {
       to: '/portal/orders',
       label: 'Orders',
       icon: 'ti-package',
+      badge:
+        orderCount > 0 ? (
+          <span className="cnt" aria-label={`${orderCount} active orders`}>
+            {orderCount}
+          </span>
+        ) : null,
     },
     {
       to: '/portal/files',

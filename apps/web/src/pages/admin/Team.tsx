@@ -12,6 +12,7 @@ import {
 import { getErrorMessage } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import type { UserRole } from '@/lib/types';
+import { PaginationBar } from '@/components/lists/ListToolbar';
 
 type TeamFilter = '' | UserRole | 'online';
 
@@ -65,6 +66,7 @@ export function AdminTeam() {
   const qc = useQueryClient();
   const canManage = Boolean(user?.permissions?.features?.team);
   const [filter, setFilter] = useState<TeamFilter>('');
+  const [page, setPage] = useState(1);
   const [showNew, setShowNew] = useState(false);
   const [editing, setEditing] = useState<TeamMember | null>(null);
   const [supportPerms, setSupportPerms] = useState({
@@ -87,6 +89,9 @@ export function AdminTeam() {
     else if (filter) list = list.filter((m) => m.role === filter);
     return list;
   }, [data?.members, filter]);
+  const pageSize = 20;
+  const totalPages = Math.max(1, Math.ceil(members.length / pageSize));
+  const pagedMembers = members.slice((page - 1) * pageSize, page * pageSize);
 
   useEffect(() => {
     if (permsHydrated || !data?.members) return;
@@ -137,7 +142,7 @@ export function AdminTeam() {
 
       <div>
         <div className="filters">
-          <button type="button" className={filter === '' ? 'on' : ''} onClick={() => setFilter('')}>
+          <button type="button" className={filter === '' ? 'on' : ''} onClick={() => { setFilter(''); setPage(1); }}>
             All
           </button>
           <button
@@ -192,7 +197,7 @@ export function AdminTeam() {
                 </td>
               </tr>
             )}
-            {members.map((m) => (
+            {pagedMembers.map((m) => (
               <TeamRow
                 key={m.id}
                 member={m}
@@ -205,6 +210,7 @@ export function AdminTeam() {
         </table>
         </div>
       </div>
+      <PaginationBar page={page} totalPages={totalPages} total={members.length} onPage={setPage} />
 
       <div className="card" style={{ marginTop: 14 }}>
         <div className="card-h">

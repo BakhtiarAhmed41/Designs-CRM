@@ -5,6 +5,7 @@ import { Brand, LogoutLink, Shell, useShellUser } from './Shell';
 import { TeamChatPanel } from './TeamChatPanel';
 import { GlobalSearch } from './GlobalSearch';
 import { listLoginRequests } from '@/lib/auth';
+import { getDashboardStats } from '@/lib/dashboard';
 import { getTeamChatOwner, getTeamUnreadSummary, listTeam, type Presence } from '@/lib/team';
 import { getAdminUnreadSummary } from '@/lib/messaging';
 import { canAnyMessaging, featuresForUser } from '@/lib/permissions';
@@ -93,6 +94,12 @@ export function AdminShell() {
     enabled: can('customers'),
     refetchInterval: whenVisible(30_000),
   });
+  const { data: navStats } = useQuery({
+    queryKey: ['admin-dashboard-stats'],
+    queryFn: getDashboardStats,
+    enabled: can('quotes') || can('orders'),
+    refetchInterval: whenVisible(30_000),
+  });
   useMessagingSocket({
     onUnreadChanged: () => {
       void qc.invalidateQueries({ queryKey: ['admin-unread-messages'] });
@@ -102,6 +109,8 @@ export function AdminShell() {
   const customerBadge = customerUnread?.unreadConversations ?? 0;
   const teamBadge = (teamUnread?.dmUnread ?? 0) + (teamUnread?.groupUnread ?? 0);
   const loginRequestBadge = loginRequests?.requests?.length ?? 0;
+  const quoteBadge = navStats?.stats.quotesToPrice ?? 0;
+  const orderBadge = navStats?.stats.newOrders ?? 0;
 
   const sidebar = (
     <aside className="side">
@@ -143,11 +152,13 @@ export function AdminShell() {
         {can('orders') && (
           <NavLink to="/admin/orders" className={({ isActive }) => (isActive ? 'on' : undefined)}>
             <i className="ti ti-package" /> Orders
+            {orderBadge > 0 && <span className="cnt">{orderBadge}</span>}
           </NavLink>
         )}
         {can('quotes') && (
           <NavLink to="/admin/quotes" className={({ isActive }) => (isActive ? 'on' : undefined)}>
             <i className="ti ti-file-invoice" /> Quotes
+            {quoteBadge > 0 && <span className="cnt">{quoteBadge}</span>}
           </NavLink>
         )}
         {can('edits') && (

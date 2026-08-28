@@ -97,7 +97,7 @@ export function counterQuotation(
   orderId: string,
   data: { amountCents?: number; currency?: string; comment?: string },
 ) {
-  return apiFetch<{ quotation: unknown }>(
+  return apiFetch<{ quotation: unknown; order: Order }>(
     `/orders/${orderId}/quotations/counter`,
     { method: 'POST', body: JSON.stringify(data) },
   );
@@ -269,6 +269,18 @@ export function myAttachmentUrl(orderId: string, attachmentId: string) {
 }
 export function myDeliveryFileUrl(orderId: string, fileId: string) {
   return `/orders/${orderId}/delivery-files/${fileId}/signed-url`;
+}
+
+export function deleteAdminOrder(orderId: string) {
+  return apiFetch<{ ok: boolean }>(`/admin/orders/${orderId}`, {
+    method: 'DELETE',
+  });
+}
+
+export function listQuoteDrafts() {
+  return apiFetch<{
+    drafts: Array<{ serviceKey: string; payload: unknown; updatedAt: string }>;
+  }>('/orders/drafts');
 }
 
 export function saveQuoteDraft(serviceKey: string, payload: unknown) {

@@ -8,6 +8,7 @@ import {
   adminUpdateStatus,
   adminUploadAttachments,
   approveCounter,
+  deleteAdminOrder,
   deliverOrder,
   getAdminOrder,
   listAdminFormatRequests,
@@ -16,7 +17,7 @@ import {
   updateAdminFormatRequest,
   updateOrderNotes,
 } from '@/lib/orders';
-import { applyOrderChange, invalidateWorkCaches } from '@/lib/queryCache';
+import { applyOrderChange, cacheOrder, invalidateWorkCaches } from '@/lib/queryCache';
 import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
 import { createAdminEdit, getOrderActivity, type EditKind } from '@/lib/edits';
 import {
@@ -27,7 +28,7 @@ import {
   createAdminConversation,
 } from '@/lib/messaging';
 import { createInvoice, listInvoices, payInvoice, refundOrder, type RefundTo } from '@/lib/billing';
-import { assignOrder, listTeam } from '@/lib/team';
+import { assignOrder, listTeam, unassignOrder } from '@/lib/team';
 import { updateDesign, type Design, type DesignStatus } from '@/lib/designs';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import { money, dateShort, statusLabel } from '@/lib/format';
@@ -175,6 +176,10 @@ export function AdminOrderDetail() {
   }, [order?.internalNotes, id]);
 
   useEffect(() => {
+    setDesignerId(order?.assignedDesignerId ?? '');
+  }, [order?.assignedDesignerId]);
+
+  useEffect(() => {
     const designs = order?.designs ?? [];
     setSelectedDesignIds(designs.map((d) => d.id));
   }, [order?.id, order?.designs?.length]);
@@ -273,7 +278,10 @@ export function AdminOrderDetail() {
   });
 
   const assign = useMutation({
-    mutationFn: () => assignOrder(designerId, id),
+    mutationFn: () =>
+      designerId
+        ? assignOrder(designerId, id)
+        : unassignOrder(id),
     onSuccess: (res) => {
       qc.setQueryData(['admin-order', id], (prev: unknown) => {
         if (!prev || typeof prev !== 'object' || !('order' in prev)) return prev;
@@ -283,7 +291,17 @@ export function AdminOrderDetail() {
           order: { ...current, assignedDesignerId: res.assignedDesignerId },
         };
       });
+      setToast(res.assignedDesignerId ? 'Designer assigned.' : 'Designer unassigned.');
       void invalidateWorkCaches(qc);
+    },
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: () => deleteAdminOrder(id),
+    onSuccess: () => {
+      void invalidateWorkCaches(qc);
+      navigate('/admin/orders');
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -390,8 +408,18 @@ export function AdminOrderDetail() {
 
   const updateStatus = useMutation({
     mutationFn: (status: OrderStatus) => adminUpdateStatus(id, status),
+    onMutate: async (status) => {
+      if (!order) return;
+      await qc.cancelQueries({ queryKey: ['admin-order', id] });
+      const previous = qc.getQueryData(['admin-order', id]);
+      cacheOrder(qc, { ...order, status });
+      return { previous };
+    },
     onSuccess: (res) => invalidate(res.order),
-    onError: (e) => setError(getErrorMessage(e)),
+    onError: (e, _status, ctx) => {
+      if (ctx?.previous) qc.setQueryData(['admin-order', id], ctx.previous);
+      setError(getErrorMessage(e));
+    },
   });
 
   if (isLoading) return <div className="empty-state"><div className="empty-state-title">Loading order…</div></div>;
@@ -490,6 +518,18 @@ export function AdminOrderDetail() {
             onClick={() => setShowRevision(true)}
           >
             <i className="ti ti-refresh" /> Create revision
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            disabled={deleteMut.isPending}
+            onClick={() => {
+              if (window.confirm('Delete this order? This cannot be undone.')) {
+                deleteMut.mutate();
+              }
+            }}
+          >
+            <i className="ti ti-trash" /> {deleteMut.isPending ? 'Deleting…' : 'Delete'}
           </button>
         </div>
       </div>
@@ -982,7 +1022,7 @@ export function AdminOrderDetail() {
               <select
                 className="stat-select"
                 style={{ width: '100%', marginBottom: 9 }}
-                value={designerId || order.assignedDesignerId || ''}
+                value={designerId}
                 onChange={(e) => setDesignerId(e.target.value)}
               >
                 <option value="">Unassigned</option>
@@ -996,10 +1036,16 @@ export function AdminOrderDetail() {
                 type="button"
                 className="btn btn-primary btn-sm"
                 style={{ width: '100%', justifyContent: 'center' }}
-                disabled={!designerId || assign.isPending}
+                disabled={
+                  assign.isPending ||
+                  designerId === (order.assignedDesignerId ?? '')
+                }
                 onClick={() => assign.mutate()}
               >
-                <i className="ti ti-user-check" /> Assign. Moves to their queue.
+                <i className="ti ti-user-check" />{' '}
+                {designerId
+                  ? 'Assign. Moves to their queue.'
+                  : 'Move back to unassigned'}
               </button>
                 </>
               ) : null}

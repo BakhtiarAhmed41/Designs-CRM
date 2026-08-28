@@ -45,7 +45,7 @@ export function NotificationBell() {
   });
 
   const unread = data?.unreadCount ?? 0;
-  const items = data?.notifications ?? [];
+  const items = (data?.notifications ?? []).filter((n) => !n.readAt);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {

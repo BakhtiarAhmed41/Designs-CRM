@@ -117,6 +117,11 @@ export class OrdersController {
     return { files };
   }
 
+  @Get('drafts')
+  async listDrafts(@CurrentUser() user: AuthUser | undefined) {
+    return this.orders.listQuoteDrafts(user);
+  }
+
   @Get('drafts/:serviceKey')
   async getDraft(
     @CurrentUser() user: AuthUser | undefined,
@@ -223,7 +228,8 @@ export class OrdersController {
   ) {
     const data = counterQuotationSchema.parse(body);
     const quotation = await this.orders.clientCounterQuotation(user, orderId, data);
-    return { quotation };
+    const order = await this.orders.getMyOrder(user, orderId);
+    return { quotation, order };
   }
 }
 

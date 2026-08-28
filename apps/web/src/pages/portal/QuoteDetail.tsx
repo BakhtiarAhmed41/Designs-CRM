@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -11,40 +11,39 @@ import {
 import { createMyConversation, listMyConversations } from '@/lib/messaging';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import { dateShort, money, quoteLifecycleChip } from '@/lib/format';
-import type { QuotationLine } from '@/lib/designs';
-import type { Order, Quotation } from '@/lib/types';
-import { invalidateWorkCaches } from '@/lib/queryCache';
+import { lineTotal, studioQuotation } from '@/lib/quoteHelpers';
+import type { Order } from '@/lib/types';
+import { applyOrderChange } from '@/lib/queryCache';
 import { freshOnOpen } from '@/lib/queryRefresh';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
-
-type QuoteWithLines = Quotation & { lines?: QuotationLine[] };
-
-function lineTotal(l: QuotationLine) {
-  return (l.priceCents ?? 0) + l.sizes.reduce((s, sz) => s + (sz.priceCents ?? 0), 0);
-}
 
 export function PortalQuoteDetail() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const [kept, setKept] = useState<string[] | null>(null);
   const [counterAmount, setCounterAmount] = useState('');
   const [counterNote, setCounterNote] = useState('');
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['my-order', id],
     queryFn: () => getMyOrder(id),
     enabled: !!id,
     ...freshOnOpen,
   });
 
+  useEffect(() => {
+    if (!toast) return;
+    const t = window.setTimeout(() => setToast(null), 2800);
+    return () => window.clearTimeout(t);
+  }, [toast]);
+
   const order = data?.order as Order | undefined;
-  const quotations = (order as Order & { quotations?: QuoteWithLines[] } | undefined)
-    ?.quotations;
-  const latest = quotations?.[0];
-  const lines = latest?.lines ?? [];
+  const studio = studioQuotation(order?.quotations);
+  const lines = studio?.lines ?? [];
 
   const selected = useMemo(() => {
     if (kept) return kept;
@@ -57,17 +56,23 @@ export function PortalQuoteDetail() {
 
   const acceptMut = useMutation({
     mutationFn: () => acceptQuotation(id, selected),
-    onSuccess: () => {
-      void invalidateWorkCaches(qc);
-      navigate('/portal/orders');
+    onSuccess: (res) => {
+      void applyOrderChange(qc, res.order);
+      setToast(
+        selected.length < lines.length && lines.length > 0
+          ? 'Partially accepted. Opening your order…'
+          : 'Quote accepted. Opening your order…',
+      );
+      window.setTimeout(() => navigate(`/portal/orders/${id}`), 700);
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
 
   const rejectMut = useMutation({
     mutationFn: () => rejectQuotation(id),
-    onSuccess: () => {
-      void invalidateWorkCaches(qc);
+    onSuccess: (res) => {
+      void applyOrderChange(qc, res.order);
+      setToast('Quote declined.');
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -80,9 +85,10 @@ export function PortalQuoteDetail() {
           : undefined,
         comment: counterNote.trim() || undefined,
       }),
-    onSuccess: () => {
+    onSuccess: (res) => {
       setError(null);
-      void invalidateWorkCaches(qc);
+      void applyOrderChange(qc, res.order);
+      setToast('Counter sent. We’ll review it.');
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -109,6 +115,20 @@ export function PortalQuoteDetail() {
 
   if (isLoading) {
     return <EmptyState icon="ti-loader" title="Loading quote…" />;
+  }
+  if (isError) {
+    return (
+      <EmptyState
+        icon="ti-alert-circle"
+        title="Could not load this quote"
+        description="Check your connection and try again."
+        action={
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => void refetch()}>
+            Try again
+          </button>
+        }
+      />
+    );
   }
   if (!order) {
     return (
@@ -137,6 +157,7 @@ export function PortalQuoteDetail() {
   }
 
   const canDecide = order.status === 'QUOTATION_PROVIDED';
+  const counterPending = order.status === 'WAITING_FOR_ADMIN_QUOTATION_APPROVAL';
   const statusChip = quoteLifecycleChip(order.status, 'customer', {
     partiallyAccepted: order.partiallyAccepted,
   });
@@ -166,13 +187,26 @@ export function PortalQuoteDetail() {
       />
 
       {error && <ErrorBanner>{error}</ErrorBanner>}
+      {toast && (
+        <div className="note" style={{ marginBottom: 12 }}>
+          <i className="ti ti-circle-check" /> {toast}
+        </div>
+      )}
+
+      {counterPending && (
+        <div className="note amber" style={{ marginBottom: 12 }}>
+          <i className="ti ti-scale" /> Your counter is with the studio. You don’t need to approve it.
+        </div>
+      )}
 
       <div className="card card-pad">
         {lines.length === 0 ? (
           <div className="muted">
             {order.status === 'WAITING_FOR_QUOTATION' || order.status === 'CREATED'
               ? 'Your request is being priced. You’ll see line items here when a quote is ready.'
-              : 'No quotation lines yet.'}
+              : order.status === 'REJECTED'
+                ? 'This request was declined by the studio.'
+                : 'No quotation lines yet.'}
           </div>
         ) : (
           <>
@@ -230,8 +264,12 @@ export function PortalQuoteDetail() {
             })}
             <div className="quote-total">
               <div>
-                <div className="muted" style={{ fontSize: 12 }}>Selected total</div>
-                <div style={{ fontSize: 22, fontWeight: 700 }}>{money(total)}</div>
+                <div className="muted" style={{ fontSize: 12 }}>
+                  {canDecide ? 'Selected total' : 'Quoted total'}
+                </div>
+                <div style={{ fontSize: 22, fontWeight: 700 }}>
+                  {money(canDecide ? total : studio?.amountCents ?? total)}
+                </div>
               </div>
               {canDecide && (
                 <div className="quote-total-actions">

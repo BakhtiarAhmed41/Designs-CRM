@@ -24,7 +24,7 @@ import { invalidateWorkCaches } from '@/lib/queryCache';
 import { freshOnOpen } from '@/lib/queryRefresh';
 import { money, dateShort } from '@/lib/format';
 import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
-import { ListToolbar } from '@/components/lists/ListToolbar';
+import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
 
 export function AdminBilling() {
   const qc = useQueryClient();
@@ -35,6 +35,7 @@ export function AdminBilling() {
   const [monthEndResult, setMonthEndResult] = useState<MonthEndResult | null>(null);
   const [invoiceQ, setInvoiceQ] = useState('');
   const [invoiceStatus, setInvoiceStatus] = useState('');
+  const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   const [createCustomerId, setCreateCustomerId] = useState('');
   const [createAmount, setCreateAmount] = useState('');
@@ -66,6 +67,9 @@ export function AdminBilling() {
   });
 
   const invoices = invoicesQ.data?.invoices ?? [];
+  const pageSize = 20;
+  const totalPages = Math.max(1, Math.ceil(invoices.length / pageSize));
+  const pagedInvoices = invoices.slice((page - 1) * pageSize, page * pageSize);
   const unpaidLinks = invoices.filter((i) => i.status === 'AWAITING' && i.kind === 'PER_ORDER');
   const monthlyStatements = invoices.filter((i) => i.kind === 'MONTHLY' && i.status === 'AWAITING');
   const s = summaryQ.data;
@@ -306,7 +310,7 @@ export function AdminBilling() {
           </span>
         </div>
         {invoicesQ.isLoading && <div style={{ padding: 16, color: 'var(--muted)' }}>Loading...</div>}
-        {invoices.map((inv) => (
+        {pagedInvoices.map((inv) => (
           <div key={inv.id} className="orow" style={{ cursor: 'default' }}>
             <div className="othumb">
               <i className={`ti ${inv.kind === 'MONTHLY' ? 'ti-file-invoice' : serviceTi('embroidery')}`} />
@@ -379,6 +383,7 @@ export function AdminBilling() {
           </div>
         ))}
       </div>
+      <PaginationBar page={page} totalPages={totalPages} total={invoices.length} onPage={setPage} />
 
       {payLink && <PayLinkModal url={payLink} onClose={() => setPayLink(null)} />}
       {monthEndResult && (

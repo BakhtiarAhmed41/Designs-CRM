@@ -6,6 +6,7 @@ import {
   adminRejectOrder,
   adminUploadAttachments,
   approveCounter,
+  deleteAdminOrder,
   getAdminOrder,
   rejectCounter,
 } from '@/lib/orders';
@@ -21,6 +22,7 @@ import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
 import { getCustomer } from '@/lib/customers';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import { money, dateShort, quoteLifecycleChip } from '@/lib/format';
+import { lineTotal, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
 import { FormPreferencesDisplay } from '@/components/FormPreferencesDisplay';
 import { MessageAttachments } from '@/components/MessageAttachments';
 import type { Order } from '@/lib/types';
@@ -57,6 +59,18 @@ function emptyLine(): QuoteLine {
   return { name: '', note: '', price: '', attachmentId: null, attachedName: null };
 }
 
+function linesFromQuote(quote?: QuoteWithLines): QuoteLine[] {
+  const rows = quote?.lines ?? [];
+  if (rows.length === 0) return [emptyLine()];
+  return rows.map((l) => ({
+    name: l.name,
+    note: l.note ?? '',
+    price: l.priceCents != null ? (l.priceCents / 100).toFixed(2) : '',
+    attachmentId: l.attachmentId ?? null,
+    attachedName: null,
+  }));
+}
+
 export function AdminQuoteDetail() {
   const { user } = useAuth();
   const canApproveCounter = canSupport(user?.permissions, 'approve', user?.role);
@@ -64,13 +78,14 @@ export function AdminQuoteDetail() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [lines, setLines] = useState<QuoteLine[]>([emptyLine()]);
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [revising, setRevising] = useState(false);
   const [msgDraft, setMsgDraft] = useState('');
   const [msgFiles, setMsgFiles] = useState<File[]>([]);
   const [refUploading, setRefUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-order', id],
     queryFn: () => getAdminOrder(id),
     ...freshOnOpen,
@@ -78,6 +93,12 @@ export function AdminQuoteDetail() {
 
   const order = data?.order;
   const attachments = order?.attachments ?? [];
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = window.setTimeout(() => setToast(null), 3200);
+    return () => window.clearTimeout(t);
+  }, [toast]);
 
   useEffect(() => {
     if (order?.type === 'ORDER') {
@@ -119,6 +140,12 @@ export function AdminQuoteDetail() {
     return t;
   }, [lines]);
 
+  function refreshThread() {
+    void qc.invalidateQueries({ queryKey: ['admin-conversations-quote', id] });
+    void qc.invalidateQueries({ queryKey: ['admin-conversations'] });
+    void qc.invalidateQueries({ queryKey: ['admin-conversation'] });
+  }
+
   const sendMsg = useMutation({
     mutationFn: async ({ body, files }: { body: string; files: File[] }) => {
       if (convo) return sendAdminMessage(convo.id, body, files);
@@ -130,12 +157,37 @@ export function AdminQuoteDetail() {
           ? `Quotation ${order.humanRef} Chat`
           : `Quotation Chat`,
       });
+      qc.setQueryData(['admin-conversations-quote', id], (prev: unknown) => {
+        const current = prev as { conversations?: typeof created.conversation[] } | undefined;
+        const list = current?.conversations ?? [];
+        if (list.some((c) => c.id === created.conversation.id)) return prev;
+        return { ...(current ?? {}), conversations: [created.conversation, ...list] };
+      });
       return sendAdminMessage(created.conversation.id, body, files);
     },
-    onSuccess: () => {
+    onSuccess: (res) => {
       setMsgDraft('');
       setMsgFiles([]);
-      qc.invalidateQueries({ queryKey: ['admin-conversation'] });
+      qc.setQueryData(['admin-conversation', res.conversation.id], (prev: unknown) => {
+        const current = prev as { conversation?: { id: string; messages?: unknown[] } } | undefined;
+        if (current?.conversation) {
+          const messages = current.conversation.messages ?? [];
+          return {
+            conversation: {
+              ...current.conversation,
+              ...res.conversation,
+              messages: [...messages, res.message],
+            },
+          };
+        }
+        return {
+          conversation: {
+            ...res.conversation,
+            messages: [res.message],
+          },
+        };
+      });
+      refreshThread();
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -165,9 +217,18 @@ export function AdminQuoteDetail() {
     onError: (e) => setError(getErrorMessage(e)),
   });
 
+  const deleteMut = useMutation({
+    mutationFn: () => deleteAdminOrder(id),
+    onSuccess: () => {
+      void invalidateWorkCaches(qc);
+      navigate('/admin/quotes');
+    },
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
   const sendQuote = useMutation({
-    mutationFn: async () => {
-      await submitQuoteBuilder(id, {
+    mutationFn: async () =>
+      submitQuoteBuilder(id, {
         lines: lines
           .filter((l) => l.name.trim())
           .map((l) => ({
@@ -176,28 +237,12 @@ export function AdminQuoteDetail() {
             attachmentId: l.attachmentId,
             priceCents: l.price ? Math.round(parseFloat(l.price) * 100) : undefined,
           })),
-      });
-      let convoId = convo?.id;
-      if (!convoId) {
-        const created = await createAdminConversation({
-          orderId: id,
-          customerId: order?.customerId ?? null,
-          chatType: 'QUOTE',
-          subject: order?.humanRef
-            ? `Quotation ${order.humanRef} Chat`
-            : 'Quotation Chat',
-        });
-        convoId = created.conversation.id;
-      }
-      return convoId;
-    },
-    onSuccess: (convoId) => {
-      void invalidateWorkCaches(qc);
-      qc.invalidateQueries({ queryKey: ['admin-conversations'] });
-      const customer = order?.customerId;
-      navigate(
-        `/admin/messages/customers/${convoId}${customer ? `?customer=${customer}` : ''}`,
-      );
+      }),
+    onSuccess: (res) => {
+      setRevising(false);
+      setToast('Quote sent. Waiting for the customer.');
+      void applyOrderChange(qc, res.order);
+      refreshThread();
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -214,13 +259,23 @@ export function AdminQuoteDetail() {
   const counterReject = useMutation({
     mutationFn: () => rejectCounter(id),
     onSuccess: (res) => {
+      setToast('Counter declined. The studio quote is waiting for the customer.');
       void applyOrderChange(qc, res.order);
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
 
   if (isLoading) return <div className="empty-state"><div className="empty-state-title">Loading quote…</div></div>;
-  if (!order) return <div className="empty-state"><div className="empty-state-title">Quote not found</div></div>;
+  if (isError || !order) {
+    return (
+      <div className="empty-state">
+        <div className="empty-state-title">{isError ? 'Could not load this quote' : 'Quote not found'}</div>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => void refetch()}>
+          Try again
+        </button>
+      </div>
+    );
+  }
   if (order.type === 'ORDER') {
     return <div style={{ padding: 16, color: 'var(--muted)' }}>Converted to order. Redirecting…</div>;
   }
@@ -228,13 +283,26 @@ export function AdminQuoteDetail() {
   const customer = customerQ.data?.customer;
   const messages = threadQ.data?.conversation.messages ?? [];
   const awaitingCounter = order.status === 'WAITING_FOR_ADMIN_QUOTATION_APPROVAL';
-  const needsPrice = order.status === 'WAITING_FOR_QUOTATION';
+  const needsPrice =
+    order.status === 'WAITING_FOR_QUOTATION' || order.status === 'CREATED';
+  const alreadyPriced = order.status === 'QUOTATION_PROVIDED';
+  const declined =
+    order.status === 'REJECTED' ||
+    order.status === 'CLIENT_REJECTED_QUOTATION' ||
+    order.status === 'CANCELLED';
+  const showBuilder = needsPrice || revising;
   const statusChip = quoteLifecycleChip(order.status, 'admin', {
     partiallyAccepted: order.partiallyAccepted,
   });
-  const latestQuote = [...(order.quotations ?? [])].sort(
-    (a, b) => b.version - a.version,
-  )[0];
+  const quotations = (order.quotations ?? []) as QuoteWithLines[];
+  const studioQuote = studioQuotation(quotations);
+  const latestQuote = [...quotations].sort((a, b) => b.version - a.version)[0];
+  const studioLines = studioQuote?.lines ?? [];
+
+  function startRevise() {
+    setLines(linesFromQuote(studioQuote));
+    setRevising(true);
+  }
 
   return (
     <div>
@@ -256,10 +324,29 @@ export function AdminQuoteDetail() {
             </div>
           </div>
         </div>
-        <span className={statusChip.cls}>{statusChip.label}</span>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span className={statusChip.cls}>{statusChip.label}</span>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            disabled={deleteMut.isPending}
+            onClick={() => {
+              if (window.confirm('Delete this quote? This cannot be undone.')) {
+                deleteMut.mutate();
+              }
+            }}
+          >
+            <i className="ti ti-trash" /> Delete
+          </button>
+        </div>
       </div>
 
       {error && <div className="alert-error" style={{ marginBottom: 12 }}>{error}</div>}
+      {toast && (
+        <div className="note" style={{ marginBottom: 12 }}>
+          <i className="ti ti-circle-check" /> {toast}
+        </div>
+      )}
 
       <div className="ws">
         <div>
@@ -412,7 +499,7 @@ export function AdminQuoteDetail() {
               </div>
               <div className="card-b">
                 <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 6 }}>
-                  Latest quotation
+                  Customer&apos;s counter
                 </div>
                 <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--navy)', marginBottom: 8 }}>
                   {money(latestQuote?.amountCents ?? order.priceCents)}
@@ -429,9 +516,14 @@ export function AdminQuoteDetail() {
                     &quot;{latestQuote.comment}&quot;
                   </div>
                 )}
+                {studioQuote && (
+                  <div className="muted" style={{ fontSize: 13, marginBottom: 14 }}>
+                    Studio quote was {money(studioQuote.amountCents)}
+                  </div>
+                )}
                 <div className="note" style={{ margin: '0 0 14px' }}>
                   <i className="ti ti-info-circle" /> Approve to move the job forward, or reject to
-                  send it back.
+                  send the studio quote back to the customer.
                 </div>
                 {canApproveCounter ? (
                   <>
@@ -463,11 +555,11 @@ export function AdminQuoteDetail() {
                 )}
               </div>
             </div>
-          ) : (
+          ) : showBuilder ? (
             <div className="card" style={{ border: '1.5px solid var(--navy)' }}>
               <div className="card-h">
                 <span className="ct">
-                  <i className="ti ti-currency-dollar" /> Build the quote. Price each design.
+                  <i className="ti ti-currency-dollar" /> {revising ? 'Revise the quote' : 'Build the quote. Price each design.'}
                 </span>
               </div>
               <div className="card-b">
@@ -481,58 +573,39 @@ export function AdminQuoteDetail() {
                     marginBottom: 6,
                   }}
                 >
-                  Customer&apos;s files. Tap one, then attach it on a line.
-                </div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
-                  {attachments.map((a) => (
-                    <button
-                      key={a.id}
-                      type="button"
-                      className="odf"
-                      style={{
-                        cursor: 'pointer',
-                        borderColor: selectedFile === a.id ? 'var(--navy)' : undefined,
-                      }}
-                      onClick={() => setSelectedFile(a.id)}
-                    >
-                      <i className="ti ti-photo" /> {a.originalName}
-                    </button>
-                  ))}
-                </div>
-
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: 'var(--faint)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '.4px',
-                    marginBottom: 6,
-                  }}
-                >
-                  Quote lines. You decide what the job actually is.
+                  Quote lines
                 </div>
 
                 {lines.map((line, idx) => (
                   <div key={idx} style={{ marginBottom: 10, borderBottom: '0.5px solid var(--line)', paddingBottom: 10 }}>
-                    <input
-                      placeholder="Line name"
-                      value={line.name}
-                      onChange={(e) =>
-                        setLines((prev) =>
-                          prev.map((l, i) => (i === idx ? { ...l, name: e.target.value } : l)),
-                        )
-                      }
-                      style={{
-                        width: '100%',
-                        border: '0.5px solid var(--line)',
-                        borderRadius: 8,
-                        padding: '8px 10px',
-                        fontSize: 12,
-                        marginBottom: 6,
-                        fontFamily: 'inherit',
-                      }}
-                    />
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                      <input
+                        placeholder="Line name"
+                        value={line.name}
+                        onChange={(e) =>
+                          setLines((prev) =>
+                            prev.map((l, i) => (i === idx ? { ...l, name: e.target.value } : l)),
+                          )
+                        }
+                        style={{
+                          flex: 1,
+                          border: '0.5px solid var(--line)',
+                          borderRadius: 8,
+                          padding: '8px 10px',
+                          fontSize: 12,
+                          fontFamily: 'inherit',
+                        }}
+                      />
+                      {lines.length > 1 && (
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => setLines((prev) => prev.filter((_, i) => i !== idx))}
+                        >
+                          <i className="ti ti-trash" /> Remove
+                        </button>
+                      )}
+                    </div>
                     <div style={{ display: 'flex', gap: 6 }}>
                       <input
                         placeholder="Price"
@@ -551,29 +624,36 @@ export function AdminQuoteDetail() {
                           fontFamily: 'inherit',
                         }}
                       />
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        disabled={!selectedFile}
-                        onClick={() =>
-                          setLines((prev) =>
-                            prev.map((l, i) =>
-                              i === idx
-                                ? {
-                                    ...l,
-                                    attachmentId: selectedFile,
-                                    attachedName:
-                                      attachments.find((a) => a.id === selectedFile)?.originalName ??
-                                      selectedFile,
-                                  }
-                                : l,
-                            ),
-                          )
-                        }
-                      >
-                        Attach
-                      </button>
                     </div>
+                    <select
+                      value={line.attachmentId ?? ''}
+                      onChange={(e) => {
+                        const attachmentId = e.target.value || null;
+                        const attachedName =
+                          attachments.find((a) => a.id === attachmentId)?.originalName ?? null;
+                        setLines((prev) =>
+                          prev.map((l, i) =>
+                            i === idx ? { ...l, attachmentId, attachedName } : l,
+                          ),
+                        );
+                      }}
+                      style={{
+                        width: '100%',
+                        marginTop: 6,
+                        border: '0.5px solid var(--line)',
+                        borderRadius: 8,
+                        padding: '8px 10px',
+                        fontSize: 12,
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      <option value="">Attach a customer file (optional)</option>
+                      {attachments.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.originalName}
+                        </option>
+                      ))}
+                    </select>
                     {line.attachedName && (
                       <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
                         Attached: {line.attachedName}
@@ -619,17 +699,86 @@ export function AdminQuoteDetail() {
                   disabled={sendQuote.isPending || !lines.some((l) => l.name.trim())}
                   onClick={() => sendQuote.mutate()}
                 >
-                  <i className="ti ti-send" /> {sendQuote.isPending ? 'Sending…' : 'Send quote for per-design approval'}
+                  <i className="ti ti-send" /> {sendQuote.isPending ? 'Sending…' : revising ? 'Send revised quote' : 'Send quote for per-design approval'}
                 </button>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  style={{ width: '100%', justifyContent: 'center', marginTop: 8 }}
-                  disabled={declineMut.isPending}
-                  onClick={() => declineMut.mutate()}
-                >
-                  <i className="ti ti-x" /> {declineMut.isPending ? 'Declining…' : 'Decline this request'}
-                </button>
+                {revising && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    style={{ width: '100%', justifyContent: 'center', marginTop: 8 }}
+                    onClick={() => setRevising(false)}
+                  >
+                    Cancel revise
+                  </button>
+                )}
+                {!revising && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    style={{ width: '100%', justifyContent: 'center', marginTop: 8 }}
+                    disabled={declineMut.isPending}
+                    onClick={() => declineMut.mutate()}
+                  >
+                    <i className="ti ti-x" /> {declineMut.isPending ? 'Declining…' : 'Decline this request'}
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="card" style={{ border: '1.5px solid var(--navy)' }}>
+              <div className="card-h">
+                <span className="ct">
+                  <i className="ti ti-circle-check" /> {declined ? 'Quote closed' : 'Priced — awaiting customer'}
+                </span>
+              </div>
+              <div className="card-b">
+                <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 6 }}>
+                  Quoted total
+                </div>
+                <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--navy)', marginBottom: 12 }}>
+                  {money(studioQuote?.amountCents ?? order.priceCents)}
+                </div>
+                {studioLines.length > 0 && (
+                  <div style={{ marginBottom: 14 }}>
+                    {studioLines.map((l) => (
+                      <div
+                        key={l.id}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          gap: 8,
+                          padding: '6px 0',
+                          borderBottom: '0.5px solid var(--line)',
+                          fontSize: 13,
+                        }}
+                      >
+                        <span>{l.name}</span>
+                        <span>{money(lineTotal(l))}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {alreadyPriced && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    style={{ width: '100%', justifyContent: 'center' }}
+                    onClick={startRevise}
+                  >
+                    <i className="ti ti-pencil" /> Revise quote
+                  </button>
+                )}
+                {!declined && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    style={{ width: '100%', justifyContent: 'center', marginTop: 8 }}
+                    disabled={declineMut.isPending}
+                    onClick={() => declineMut.mutate()}
+                  >
+                    <i className="ti ti-x" /> {declineMut.isPending ? 'Declining…' : 'Decline this request'}
+                  </button>
+                )}
               </div>
             </div>
           )}

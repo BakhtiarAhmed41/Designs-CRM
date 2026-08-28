@@ -9,6 +9,7 @@ import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { SkeletonRows } from '@/components/ui/Skeleton';
+import { PaginationBar } from '@/components/lists/ListToolbar';
 
 type Group = {
   orderId: string;
@@ -24,6 +25,7 @@ function groupChip(files: MyFile[]): { cls: string; label: string } {
 
 export function PortalFiles() {
   const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
   const [formatFor, setFormatFor] = useState<MyFile | null>(null);
   const [formatValue, setFormatValue] = useState('');
   const [formatNote, setFormatNote] = useState('');
@@ -82,6 +84,9 @@ export function PortalFiles() {
       }))
       .filter((g) => g.files.length > 0);
   }, [groups, q]);
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(visible.length / pageSize));
+  const paged = visible.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div>
@@ -95,7 +100,10 @@ export function PortalFiles() {
           <i className="ti ti-search si" aria-hidden />
           <input
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setPage(1);
+            }}
             placeholder="Search files or order #…"
             aria-label="Search files"
           />
@@ -117,7 +125,7 @@ export function PortalFiles() {
       )}
 
       <div className="file-lib">
-        {visible.map((g) => {
+        {paged.map((g) => {
           const chip = groupChip(g.files);
           return (
             <div key={g.orderId} className="file-group">
@@ -168,6 +176,13 @@ export function PortalFiles() {
           );
         })}
       </div>
+
+      <PaginationBar
+        page={page}
+        totalPages={totalPages}
+        total={visible.length}
+        onPage={setPage}
+      />
 
       {formatMsg && <div className="note">{formatMsg}</div>}
       {formatFor && (

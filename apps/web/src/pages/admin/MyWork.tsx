@@ -9,6 +9,7 @@ import type { OrderStatus } from '@/lib/types';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { SkeletonRows } from '@/components/ui/Skeleton';
+import { PaginationBar } from '@/components/lists/ListToolbar';
 
 type WorkFilter = 'active' | 'submitted';
 
@@ -28,6 +29,7 @@ function statusText(status: OrderStatus) {
 export function AdminMyWork() {
   const navigate = useNavigate();
   const [filter, setFilter] = useState<WorkFilter>('active');
+  const [page, setPage] = useState(1);
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-mywork'],
@@ -41,6 +43,9 @@ export function AdminMyWork() {
     if (filter === 'submitted') return all.filter((o) => o.status === 'READY_TO_SEND');
     return all.filter((o) => o.status !== 'READY_TO_SEND');
   }, [data?.orders, filter]);
+  const pageSize = 20;
+  const totalPages = Math.max(1, Math.ceil(orders.length / pageSize));
+  const paged = orders.slice((page - 1) * pageSize, page * pageSize);
 
   return (
     <div>
@@ -58,14 +63,14 @@ export function AdminMyWork() {
             <button
               type="button"
               className={filter === 'active' ? 'on' : ''}
-              onClick={() => setFilter('active')}
+              onClick={() => { setFilter('active'); setPage(1); }}
             >
               Active
             </button>
             <button
               type="button"
               className={filter === 'submitted' ? 'on' : ''}
-              onClick={() => setFilter('submitted')}
+              onClick={() => { setFilter('submitted'); setPage(1); }}
             >
               Submitted
             </button>
@@ -95,7 +100,7 @@ export function AdminMyWork() {
               </tr>
             </thead>
             <tbody>
-              {orders.map((o) => (
+              {paged.map((o) => (
                 <tr key={o.id} className="click-row" onClick={() => navigate(`/admin/orders/${o.id}`)}>
                   <td>
                     <div className="cell-main">
@@ -128,6 +133,7 @@ export function AdminMyWork() {
           </table>
         )}
       </div>
+      <PaginationBar page={page} totalPages={totalPages} total={orders.length} onPage={setPage} />
 
       <div className="note">
         <i className="ti ti-info-circle" /> You see the full order details and files, but not pricing or payment.

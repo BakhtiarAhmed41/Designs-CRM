@@ -196,8 +196,9 @@ export function PortalMessages() {
                   {c.lastMessagePreview || 'No messages yet'}
                 </div>
                 <div className="msg-cust-meta">
-                  <span className="msg-type">{chatTypeLabel(c.chatType)}</span>
-                  <span className="msg-type">{c.status}</span>
+                  {c.chatType === 'GENERAL' && (
+                    <span className="msg-type">{chatTypeLabel(c.chatType)}</span>
+                  )}
                   {c.unreadClient > 0 && (
                     <span className="msg-badge">{c.unreadClient}</span>
                   )}

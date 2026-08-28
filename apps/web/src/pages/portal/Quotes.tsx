@@ -1,22 +1,24 @@
 import { useEffect, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { QuoteBuilderModal } from '@/components/QuoteBuilderModal';
-import { acceptQuotation, listMyOrderSummary, listMyOrders, myAttachmentUrl, rejectQuotation } from '@/lib/orders';
-import { createMyConversation, listMyConversations } from '@/lib/messaging';
-import { downloadSignedFile, getErrorMessage } from '@/lib/api';
+import { listMyOrderSummary, listMyOrders, listQuoteDrafts } from '@/lib/orders';
 import { money, dateShort, quoteLifecycleChip } from '@/lib/format';
 import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
-import type { Order, Quotation } from '@/lib/types';
-import type { QuotationLine } from '@/lib/designs';
+import type { Order } from '@/lib/types';
+import { studioQuotation } from '@/lib/quoteHelpers';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { SkeletonRows } from '@/components/ui/Skeleton';
-import { invalidateWorkCaches } from '@/lib/queryCache';
 import { freshOnOpen } from '@/lib/queryRefresh';
 import { PageHeader } from '@/components/ui/PageHeader';
 
-type QuoteWithLines = Quotation & { lines?: QuotationLine[] };
+const DRAFT_LABELS: Record<string, string> = {
+  embroidery: 'Embroidery digitizing',
+  svg: 'SVG & cut files',
+  vector: 'Vector & print files',
+  laser: 'CNC & laser cut files',
+};
 
 function isQuoteOrder(o: Order) {
   return (
@@ -33,16 +35,12 @@ function isQuoteOrder(o: Order) {
   );
 }
 
-function lineTotal(l: QuotationLine) {
-  return (l.priceCents ?? 0) + l.sizes.reduce((s, sz) => s + (sz.priceCents ?? 0), 0);
-}
-
 export function PortalQuotes() {
   const navigate = useNavigate();
   const location = useLocation();
   const qc = useQueryClient();
-  const [expanded, setExpanded] = useState<string | null>(null);
   const [quoteOpen, setQuoteOpen] = useState(false);
+  const [draftService, setDraftService] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -51,14 +49,13 @@ export function PortalQuotes() {
     setError(incoming);
     navigate('.', { replace: true, state: {} });
   }, [location.state, navigate]);
-  const [keptByOrder, setKeptByOrder] = useState<Record<string, string[]>>({});
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isFetching } = useQuery({
     queryKey: ['my-quotes', q, status, dateFrom, dateTo, page],
     queryFn: () =>
       listMyOrders({
@@ -72,6 +69,11 @@ export function PortalQuotes() {
       }),
     ...freshOnOpen,
   });
+  const draftsQ = useQuery({
+    queryKey: ['my-quote-drafts'],
+    queryFn: listQuoteDrafts,
+    ...freshOnOpen,
+  });
   const summaryQ = useQuery({
     queryKey: ['my-orders-summary'],
     queryFn: listMyOrderSummary,
@@ -82,68 +84,6 @@ export function PortalQuotes() {
   const totalPages = data?.totalPages ?? 1;
   const awaiting = summaryQ.data?.awaitingQuote ?? 0;
   const pricing = summaryQ.data?.beingPriced ?? 0;
-
-  const approveMut = useMutation({
-    mutationFn: ({ orderId, keepLineIds }: { orderId: string; keepLineIds?: string[] }) =>
-      acceptQuotation(orderId, keepLineIds),
-    onSuccess: () => {
-      setError(null);
-      void invalidateWorkCaches(qc);
-    },
-    onError: (e) => setError(getErrorMessage(e)),
-  });
-
-  const rejectMut = useMutation({
-    mutationFn: (orderId: string) => rejectQuotation(orderId),
-    onSuccess: () => {
-      setError(null);
-      void invalidateWorkCaches(qc);
-    },
-    onError: (e) => setError(getErrorMessage(e)),
-  });
-
-  const startQuoteChat = useMutation({
-    mutationFn: async (order: Order) => {
-      const listed = await listMyConversations();
-      const existing = listed.conversations.find(
-        (c) => c.orderId === order.id && c.chatType === 'QUOTE',
-      );
-      if (existing) return existing;
-      const created = await createMyConversation({
-        orderId: order.id,
-        chatType: 'QUOTE',
-        subject: order.humanRef
-          ? `Quotation ${order.humanRef} Chat`
-          : 'Quotation Chat',
-      });
-      return created.conversation;
-    },
-    onSuccess: (convo) => navigate(`/portal/messages?c=${convo.id}`),
-    onError: (e) => setError(getErrorMessage(e)),
-  });
-
-  function keptLines(orderId: string, lines: QuotationLine[]) {
-    const selected = keptByOrder[orderId];
-    if (selected) return selected;
-    return lines.map((l) => l.id);
-  }
-
-  function toggleLine(orderId: string, lines: QuotationLine[], lineId: string) {
-    const current = keptLines(orderId, lines);
-    const next = current.includes(lineId)
-      ? current.filter((id) => id !== lineId)
-      : [...current, lineId];
-    setKeptByOrder((prev) => ({ ...prev, [orderId]: next }));
-  }
-
-  function selectedTotal(orderId: string, lines: QuotationLine[]) {
-    const kept = new Set(keptLines(orderId, lines));
-    return lines.filter((l) => kept.has(l.id)).reduce((sum, l) => sum + lineTotal(l), 0);
-  }
-
-  function toggle(id: string) {
-    setExpanded((prev) => (prev === id ? null : id));
-  }
 
   return (
     <div>
@@ -158,6 +98,32 @@ export function PortalQuotes() {
       />
 
       {error && <ErrorBanner>{error}</ErrorBanner>}
+
+      {(draftsQ.data?.drafts ?? []).length > 0 && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <div className="card-h">
+            <span className="ct">Saved drafts</span>
+          </div>
+          {(draftsQ.data?.drafts ?? []).map((d) => (
+            <div key={d.serviceKey} className="orow" style={{ cursor: 'default' }}>
+              <div className="oinfo">
+                <div className="on">{DRAFT_LABELS[d.serviceKey] ?? d.serviceKey}</div>
+                <div className="om">Saved {dateShort(d.updatedAt)}</div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => {
+                  setDraftService(d.serviceKey);
+                  setQuoteOpen(true);
+                }}
+              >
+                Continue draft
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="metric-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
         <div className="metric" style={{ cursor: 'default' }}>
@@ -207,8 +173,8 @@ export function PortalQuotes() {
         <div className="card-h">
           <span className="ct">Your quotes</span>
         </div>
-        {isLoading && <SkeletonRows rows={4} />}
-        {!isLoading && quotes.length === 0 && (
+        {(isLoading || (isFetching && quotes.length === 0)) && <SkeletonRows rows={4} />}
+        {!isLoading && !isFetching && quotes.length === 0 && (
           <EmptyState
             icon="ti-file-invoice"
             title="No quotes yet"
@@ -224,25 +190,19 @@ export function PortalQuotes() {
           const chip = quoteLifecycleChip(o.status, 'customer', {
             partiallyAccepted: o.partiallyAccepted,
           });
-          const quote = o.quotations?.[0] as QuoteWithLines | undefined;
+          const quote = studioQuotation(o.quotations);
           const lines = quote?.lines ?? [];
+          const declined =
+            o.status === 'REJECTED' ||
+            o.status === 'CLIENT_REJECTED_QUOTATION' ||
+            o.status === 'CANCELLED';
           const total = quote?.amountCents ?? null;
-          const open = expanded === o.id;
-          const canApprove = o.status === 'QUOTATION_PROVIDED';
-          const keep = keptLines(o.id, lines);
-          const payTotal = lines.length > 0 ? selectedTotal(o.id, lines) : total;
 
           return (
             <div key={o.id}>
               <div
                 className="orow"
-                onClick={() => {
-                  if (canApprove || lines.length > 0) {
-                    toggle(o.id);
-                    return;
-                  }
-                  navigate(`/portal/quotes/${o.id}`);
-                }}
+                onClick={() => navigate(`/portal/quotes/${o.id}`)}
                 style={{ cursor: 'pointer' }}
               >
                 <div className={`thumb${serviceThumbClass(o.serviceType) ? ' m' : ''}`}>
@@ -269,133 +229,15 @@ export function PortalQuotes() {
                   {total != null ? (
                     <>
                       {money(total, quote?.currency)}
-                      {lines.length > 0 && (
-                        <div className="os">{open ? 'tap to close' : 'tap to see breakdown'}</div>
-                      )}
+                      <div className="os">Open quote</div>
                     </>
+                  ) : declined ? (
+                    <span style={{ color: 'var(--faint)', fontWeight: 500 }}>—</span>
                   ) : (
                     <span style={{ color: 'var(--faint)', fontWeight: 500 }}>Pending</span>
                   )}
                 </div>
               </div>
-
-              {open && (lines.length > 0 || canApprove) && (
-                <div className="batch">
-                  {lines.map((l) => {
-                    const checked = keep.includes(l.id);
-                    return (
-                      <div key={l.id} className="line">
-                        <span className="ln">
-                          {canApprove ? (
-                            <label
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => toggleLine(o.id, lines, l.id)}
-                              />
-                              {l.name}
-                            </label>
-                          ) : (
-                            <>
-                              <i className="ti ti-point" /> {l.name}
-                            </>
-                          )}
-                        </span>
-                        {l.note && (
-                          <span className="chip c-prog" style={{ opacity: 0.6 }}>
-                            {l.note}
-                          </span>
-                        )}
-                        {l.attachmentId && (
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void downloadSignedFile(
-                                myAttachmentUrl(o.id, l.attachmentId!),
-                                l.name,
-                              );
-                            }}
-                          >
-                            <i className="ti ti-download" /> File
-                          </button>
-                        )}
-                        <span
-                          className="lp"
-                          style={{ opacity: canApprove && !checked ? 0.4 : 1 }}
-                        >
-                          {money(lineTotal(l), quote?.currency)}
-                        </span>
-                      </div>
-                    );
-                  })}
-                  {canApprove && (
-                    <div
-                      style={{
-                        display: 'flex',
-                        gap: 10,
-                        justifyContent: 'flex-end',
-                        padding: '12px 0 6px',
-                        flexWrap: 'wrap',
-                      }}
-                    >
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/portal/quotes/${o.id}`);
-                        }}
-                      >
-                        Open quote
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        disabled={startQuoteChat.isPending}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          startQuoteChat.mutate(o);
-                        }}
-                      >
-                        <i className="ti ti-message" /> Start Chat
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        disabled={rejectMut.isPending}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          rejectMut.mutate(o.id);
-                        }}
-                      >
-                        Decline
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-primary btn-sm"
-                        disabled={
-                          approveMut.isPending || (lines.length > 0 && keep.length === 0)
-                        }
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          approveMut.mutate({
-                            orderId: o.id,
-                            keepLineIds: lines.length > 0 ? keep : undefined,
-                          });
-                        }}
-                      >
-                        <i className="ti ti-check" /> Approve and start{' '}
-                        {money(payTotal, quote?.currency)}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           );
         })}
@@ -410,7 +252,12 @@ export function PortalQuotes() {
 
       <QuoteBuilderModal
         open={quoteOpen}
-        onClose={() => setQuoteOpen(false)}
+        initialService={draftService}
+        onClose={() => {
+          setQuoteOpen(false);
+          setDraftService(null);
+          void qc.invalidateQueries({ queryKey: ['my-quote-drafts'] });
+        }}
         onSubmitted={(id) => navigate(`/portal/quotes/${id}`)}
       />
     </div>

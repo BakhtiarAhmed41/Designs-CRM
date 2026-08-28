@@ -486,8 +486,9 @@ export function AdminCustomerMessages() {
                       {t.lastMessagePreview || 'No messages yet'}
                     </div>
                     <div className="msg-cust-meta">
-                      <span className="msg-type">{chatTypeLabel(t.chatType)}</span>
-                      <span className="msg-type">{t.status === 'OPEN' ? 'Open' : 'Closed'}</span>
+                      {t.chatType === 'GENERAL' && (
+                        <span className="msg-type">{chatTypeLabel(t.chatType)}</span>
+                      )}
                       {t.unreadAdmin > 0 && <span className="msg-badge">{t.unreadAdmin}</span>}
                     </div>
                   </div>

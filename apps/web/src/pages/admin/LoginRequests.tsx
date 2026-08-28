@@ -9,6 +9,7 @@ import { dateShort } from '@/lib/format';
 import { useState } from 'react';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PaginationBar } from '@/components/lists/ListToolbar';
 import { useAuth } from '@/context/AuthContext';
 
 export function AdminLoginRequests() {
@@ -16,12 +17,16 @@ export function AdminLoginRequests() {
   const { user } = useAuth();
   const canDecide = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
   const { data, isLoading } = useQuery({
     queryKey: ['login-requests'],
     queryFn: listLoginRequests,
     refetchInterval: 20_000,
   });
   const requests = data?.requests ?? [];
+  const pageSize = 20;
+  const totalPages = Math.max(1, Math.ceil(requests.length / pageSize));
+  const paged = requests.slice((page - 1) * pageSize, page * pageSize);
 
   const approve = useMutation({
     mutationFn: (id: string) => approveLoginRequest(id),
@@ -70,7 +75,7 @@ export function AdminLoginRequests() {
             </tr>
           </thead>
           <tbody>
-            {requests.map((r) => (
+            {paged.map((r) => (
               <tr key={r.id}>
                 <td>
                   <b>{r.name}</b>
@@ -109,6 +114,12 @@ export function AdminLoginRequests() {
         </div>
         )}
       </div>
+      <PaginationBar
+        page={page}
+        totalPages={totalPages}
+        total={requests.length}
+        onPage={setPage}
+      />
     </div>
   );
 }

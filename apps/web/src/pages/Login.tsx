@@ -14,6 +14,7 @@ export function Login() {
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [resetToken, setResetToken] = useState('');
@@ -200,14 +201,24 @@ export function Login() {
           {(mode === 'login' || mode === 'register' || mode === 'reset') && (
             <label className="login-field">
               <span>Password</span>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={mode === 'login' ? 1 : 6}
-                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-              />
+              <div className="login-password-wrap">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={mode === 'login' ? 1 : 6}
+                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                />
+                <button
+                  type="button"
+                  className="login-password-toggle"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  <i className={`ti ${showPassword ? 'ti-eye-off' : 'ti-eye'}`} />
+                </button>
+              </div>
             </label>
           )}
           <button className="btn btn-primary login-submit" disabled={busy} type="submit">

@@ -11,7 +11,7 @@ import '@/theme.css';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: false,
+      retry: 1,
       refetchOnWindowFocus: true,
       staleTime: 20_000,
     },

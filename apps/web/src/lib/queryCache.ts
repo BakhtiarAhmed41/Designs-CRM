@@ -29,6 +29,9 @@ const WORK_QUERY_ROOTS = new Set([
   'admin-invoices-order',
   'global-search',
   'pay-link',
+  'admin-customers',
+  'admin-team',
+  'my-quote-drafts',
 ]);
 
 const LIST_ROOTS = [
@@ -83,7 +86,11 @@ export function invalidateWorkCaches(qc: QueryClient) {
   });
 }
 
-export function applyOrderChange(qc: QueryClient, order?: Order) {
-  if (order) cacheOrder(qc, order);
+export async function applyOrderChange(qc: QueryClient, order?: Order) {
+  if (order) {
+    await qc.cancelQueries({ queryKey: ['admin-order', order.id] });
+    await qc.cancelQueries({ queryKey: ['my-order', order.id] });
+    cacheOrder(qc, order);
+  }
   return invalidateWorkCaches(qc);
 }

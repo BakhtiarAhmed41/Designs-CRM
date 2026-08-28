@@ -1,4 +1,5 @@
 import { apiFetch } from './api';
+import type { Order } from './types';
 
 export type DesignStatus = 'WAITING' | 'IN_PROGRESS' | 'DONE' | 'DELIVERED';
 
@@ -95,7 +96,7 @@ export function submitQuoteBuilder(
   orderId: string,
   data: { comment?: string | null; lines: QuoteBuilderLineInput[] },
 ) {
-  return apiFetch<{ quotation: unknown }>(
+  return apiFetch<{ quotation: unknown; order: Order }>(
     `/admin/orders/${orderId}/quote-builder`,
     { method: 'POST', body: JSON.stringify(data) },
   );

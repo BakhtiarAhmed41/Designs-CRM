@@ -308,6 +308,19 @@ export class TeamService {
     return { orderId, assignedDesignerId: userId, status: startWork ? OrderStatus.IN_PROGRESS : current?.status };
   }
 
+  async unassignOrder(orderId: string) {
+    const order = await this.db.queryOne<{ id: string }>(
+      'SELECT id FROM orders WHERE id = ? LIMIT 1',
+      [orderId],
+    );
+    if (!order) throw new NotFoundException('Order not found');
+    await this.db.execute(
+      'UPDATE orders SET assigned_designer_id = NULL WHERE id = ?',
+      [orderId],
+    );
+    return { orderId, assignedDesignerId: null };
+  }
+
   private async staffAttachments(messageIds: string[], channel: 'DM' | 'GROUP') {
     if (messageIds.length === 0) return new Map<string, Array<{
       id: string;

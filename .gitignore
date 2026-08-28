@@ -38,3 +38,10 @@ node_modules
 # uploaded files (local storage)
 /uploads
 apps/api/uploads
+
+# local fix notes (not tracked)
+/fixes.csv
+
+# local QA runs (not production)
+/qa-*.mjs
+/qa-evidence/

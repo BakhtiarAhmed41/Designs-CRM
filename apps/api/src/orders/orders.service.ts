@@ -571,6 +571,17 @@ export class OrdersService {
     );
   }
 
+  private async getLatestProposedQuotation(
+    orderId: string,
+  ): Promise<QuotationRow | null> {
+    return this.db.queryOne<QuotationRow>(
+      `SELECT * FROM quotations
+        WHERE order_id = ? AND status = ?
+        ORDER BY version DESC LIMIT 1`,
+      [orderId, QuotationStatus.PROPOSED],
+    );
+  }
+
   private async getDeliveries(orderId: string) {
     const deliveries = await this.db.query<{
       id: string;
@@ -1064,8 +1075,8 @@ export class OrdersService {
     const order = await this.getOrderRow(orderId);
     if (!order || order.client_user_id !== user.id)
       throw new NotFoundException('Order not found');
-    const latest = await this.getLatestQuotation(orderId);
-    if (!latest || latest.status === QuotationStatus.REJECTED)
+    const latest = await this.getLatestProposedQuotation(orderId);
+    if (!latest)
       throw new BadRequestException('No active quotation to accept');
     if (order.status !== OrderStatus.QUOTATION_PROVIDED)
       throw new BadRequestException('Order is not awaiting client decision');
@@ -1145,7 +1156,7 @@ export class OrdersService {
     const order = await this.getOrderRow(orderId);
     if (!order || order.client_user_id !== user.id)
       throw new NotFoundException('Order not found');
-    const latest = await this.getLatestQuotation(orderId);
+    const latest = await this.getLatestProposedQuotation(orderId);
     if (!latest) throw new BadRequestException('No quotation to reject');
     if (order.status !== OrderStatus.QUOTATION_PROVIDED)
       throw new BadRequestException('Order is not awaiting client decision');
@@ -2218,6 +2229,28 @@ export class OrdersService {
     return { ok: true };
   }
 
+  async deleteOrder(user: AuthUser | undefined, orderId: string) {
+    this.assertAdmin(user);
+    const order = await this.getOrderRow(orderId);
+    if (!order) throw new NotFoundException('Order not found');
+    await this.db.withTransaction(async (tx) => {
+      await tx.execute('UPDATE conversations SET order_id = NULL WHERE order_id = ?', [
+        orderId,
+      ]);
+      await tx.execute('UPDATE invoices SET order_id = NULL WHERE order_id = ?', [
+        orderId,
+      ]);
+      await tx.execute('UPDATE payments SET order_id = NULL WHERE order_id = ?', [
+        orderId,
+      ]);
+      await tx.execute('UPDATE quote_intents SET order_id = NULL WHERE order_id = ?', [
+        orderId,
+      ]);
+      await tx.execute('DELETE FROM orders WHERE id = ?', [orderId]);
+    });
+    return { ok: true };
+  }
+
   // --- quote builder -------------------------------------------------------
 
   async submitQuoteBuilder(
@@ -2380,7 +2413,7 @@ export class OrdersService {
     );
     const email = await this.customerEmailForOrder(order);
     if (email) {
-      await this.mail.sendQuoteReady(email, order.name ?? 'your quote', orderId);
+      void this.mail.sendQuoteReady(email, order.name ?? 'your quote', orderId);
     }
     return {
       ...this.quotationDto(row!),
@@ -2448,6 +2481,26 @@ export class OrdersService {
       [id, user.id, key, JSON.stringify(payload ?? {})],
     );
     return { id, serviceKey: key };
+  }
+
+  async listQuoteDrafts(user: AuthUser | undefined) {
+    assertAuthUser(user);
+    if (user.role !== UserRole.CLIENT) throw new ForbiddenException();
+    const rows = await this.db.query<{
+      service_key: string;
+      payload: unknown;
+      updated_at: Date;
+    }>(
+      'SELECT service_key, payload, updated_at FROM quote_drafts WHERE user_id = ? ORDER BY updated_at DESC',
+      [user.id],
+    );
+    return {
+      drafts: rows.map((r) => ({
+        serviceKey: r.service_key,
+        payload: r.payload,
+        updatedAt: r.updated_at,
+      })),
+    };
   }
 
   async getQuoteDraft(user: AuthUser | undefined, serviceKey: string) {

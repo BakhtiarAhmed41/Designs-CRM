@@ -14,6 +14,7 @@ import { freshOnOpen } from '@/lib/queryRefresh';
 import { money, dateShort } from '@/lib/format';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PaginationBar } from '@/components/lists/ListToolbar';
 
 type InvFilter = 'all' | 'pending' | 'paid';
 
@@ -28,6 +29,7 @@ function invoiceChip(status: Invoice['status'], kind: Invoice['kind'], periodMon
 export function PortalInvoices() {
   const qc = useQueryClient();
   const [filter, setFilter] = useState<InvFilter>('all');
+  const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
 
   const { data: meCustomer } = useQuery({
@@ -50,6 +52,9 @@ export function PortalInvoices() {
     if (filter === 'paid') return invoices.filter((i) => i.status === 'PAID');
     return invoices;
   }, [invoices, filter]);
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   const runningMonth = useMemo(() => {
     const now = new Date();
@@ -170,7 +175,10 @@ export function PortalInvoices() {
                 key={k}
                 type="button"
                 className={filter === k ? 'on' : undefined}
-                onClick={() => setFilter(k)}
+                onClick={() => {
+                  setFilter(k);
+                  setPage(1);
+                }}
               >
                 {label}
               </button>
@@ -202,7 +210,7 @@ export function PortalInvoices() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((inv) => {
+              {paged.map((inv) => {
                 const chip = invoiceChip(inv.status, inv.kind, inv.periodMonth);
                 const canPay = inv.status === 'AWAITING' && inv.amountCents > 0;
                 const useCredit = storeCreditCents >= inv.amountCents;
@@ -266,6 +274,12 @@ export function PortalInvoices() {
           </div>
         )}
       </div>
+      <PaginationBar
+        page={page}
+        totalPages={totalPages}
+        total={filtered.length}
+        onPage={setPage}
+      />
     </div>
   );
 }

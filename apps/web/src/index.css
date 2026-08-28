@@ -826,6 +826,27 @@ button { font-family: inherit; }
   border-color: var(--navy);
   box-shadow: 0 0 0 2px rgba(20, 63, 101, 0.1);
 }
+.login-password-wrap {
+  position: relative;
+}
+.login-password-wrap input {
+  padding-right: 42px;
+}
+.login-password-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.login-password-toggle:hover { color: var(--navy); }
 .login-submit {
   width: 100%;
   justify-content: center;

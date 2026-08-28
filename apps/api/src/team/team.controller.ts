@@ -106,6 +106,13 @@ export class AdminTeamController {
     return this.team.assignOrder(userId, orderId);
   }
 
+  @Post('team/unassign/:orderId')
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @RequireFeatures('team')
+  async unassign(@Param('orderId') orderId: string) {
+    return this.team.unassignOrder(orderId);
+  }
+
   @Get('team-chat/unread-summary')
   @RequireFeatures('messages', 'messages_team_view')
   async teamUnread(@CurrentUser() user: AuthUser) {

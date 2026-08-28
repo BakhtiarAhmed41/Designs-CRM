@@ -77,8 +77,15 @@ export function listMyWork() {
 }
 
 export function assignOrder(userId: string, orderId: string) {
-  return apiFetch<{ orderId: string; assignedDesignerId: string }>(
+  return apiFetch<{ orderId: string; assignedDesignerId: string | null }>(
     `/admin/team/${userId}/assign/${orderId}`,
+    { method: 'POST' },
+  );
+}
+
+export function unassignOrder(orderId: string) {
+  return apiFetch<{ orderId: string; assignedDesignerId: null }>(
+    `/admin/team/unassign/${orderId}`,
     { method: 'POST' },
   );
 }
