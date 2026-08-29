@@ -158,6 +158,11 @@ async function main() {
     );
   }
 
+  if (!(await columnExists('edit_requests', 'design_ids'))) {
+    console.log('Adding edit_requests.design_ids column ...');
+    await conn.query('ALTER TABLE edit_requests ADD COLUMN design_ids JSON NULL');
+  }
+
   if (!(await columnExists('quotation_lines', 'attachment_id'))) {
     console.log('Adding quotation_lines.attachment_id column ...');
     await conn.query(

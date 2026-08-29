@@ -161,10 +161,20 @@ export function approveCounter(orderId: string) {
   );
 }
 
-export function rejectCounter(orderId: string, comment?: string) {
+export function rejectCounter(orderId: string, comment: string) {
   return apiFetch<{ order: Order }>(
     `/admin/orders/${orderId}/quotations/counter/reject`,
     { method: 'PATCH', body: JSON.stringify({ comment }) },
+  );
+}
+
+export function recounterQuotation(
+  orderId: string,
+  data: { amountCents: number; comment: string; currency?: string },
+) {
+  return apiFetch<{ order: Order }>(
+    `/admin/orders/${orderId}/quotations/counter/recounter`,
+    { method: 'POST', body: JSON.stringify(data) },
   );
 }
 

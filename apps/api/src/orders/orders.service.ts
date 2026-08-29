@@ -12,6 +12,7 @@ import {
   CustomerSource,
   DeliveredVia,
   DesignStatus,
+  EditStatus,
   OrderStatus,
   OrderType,
   QuotationStatus,
@@ -348,13 +349,30 @@ export class OrdersService {
   }
 
   private async listExtrasFor(orderIds: string[]) {
-    const [designCounts, attachments, quotations, partials] = await Promise.all([
-      this.designCountsFor(orderIds),
-      this.attachmentsFor(orderIds),
-      this.quotationsFor(orderIds),
-      this.partialFlagsFor(orderIds),
-    ]);
-    return { designCounts, attachments, quotations, partials };
+    const [designCounts, attachments, quotations, partials, partialDeliveries] =
+      await Promise.all([
+        this.designCountsFor(orderIds),
+        this.attachmentsFor(orderIds),
+        this.quotationsFor(orderIds),
+        this.partialFlagsFor(orderIds),
+        this.partialDeliveryFlagsFor(orderIds),
+      ]);
+    return { designCounts, attachments, quotations, partials, partialDeliveries };
+  }
+
+  private async partialDeliveryFlagsFor(orderIds: string[]) {
+    const set = new Set<string>();
+    if (orderIds.length === 0) return set;
+    const rows = await this.db.query<{ order_id: string }>(
+      `SELECT order_id
+         FROM order_designs
+        WHERE order_id IN (${this.sqlIn(orderIds)})
+        GROUP BY order_id
+       HAVING SUM(status = ?) > 0 AND SUM(status = ?) < COUNT(*)`,
+      [...orderIds, DesignStatus.DELIVERED, DesignStatus.DELIVERED],
+    );
+    for (const r of rows) set.add(r.order_id);
+    return set;
   }
 
   private async customerEmailForOrder(order: {
@@ -475,7 +493,100 @@ export class OrdersService {
     };
   }
 
-  private orderDto(o: OrderRow, extras?: { partiallyAccepted?: boolean }) {
+  private designPartialDelivery(designs: Array<{ status: string }>) {
+    if (designs.length < 2) return false;
+    const delivered = designs.filter((d) => d.status === DesignStatus.DELIVERED).length;
+    return delivered > 0 && delivered < designs.length;
+  }
+
+  private parseRevisionDesignIds(raw: unknown, fallback: string | null): string[] {
+    if (Array.isArray(raw)) {
+      return raw.filter((x): x is string => typeof x === 'string' && x.length > 0);
+    }
+    if (typeof raw === 'string' && raw.trim()) {
+      try {
+        const parsed = JSON.parse(raw) as unknown;
+        if (Array.isArray(parsed)) {
+          return parsed.filter((x): x is string => typeof x === 'string' && x.length > 0);
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    return fallback ? [fallback] : [];
+  }
+
+  private async hasOpenRevision(orderId: string) {
+    const row = await this.db.queryOne<{ id: string }>(
+      'SELECT id FROM edit_requests WHERE order_id = ? AND status = ? LIMIT 1',
+      [orderId, EditStatus.PENDING],
+    );
+    return Boolean(row);
+  }
+
+  private async closeRevisionDesigns(orderId: string, publishedDesignIds: string[]) {
+    if (publishedDesignIds.length === 0) return;
+    const open = await this.db.queryOne<{
+      id: string;
+      design_id: string | null;
+      design_ids: unknown;
+    }>(
+      `SELECT id, design_id, design_ids FROM edit_requests
+        WHERE order_id = ? AND status = ?
+        ORDER BY created_at ASC
+        LIMIT 1`,
+      [orderId, EditStatus.PENDING],
+    );
+    if (!open) return;
+    let current = this.parseRevisionDesignIds(open.design_ids, open.design_id);
+    if (current.length === 0) {
+      current = (await this.getDesigns(orderId)).map((d) => d.id);
+    }
+    const remaining = current.filter((id) => !publishedDesignIds.includes(id));
+    if (remaining.length === 0) {
+      await this.db.execute(
+        'UPDATE edit_requests SET status = ?, design_ids = ?, resolved_at = NOW() WHERE id = ?',
+        [EditStatus.DONE, JSON.stringify([]), open.id],
+      );
+      return;
+    }
+    await this.db.execute(
+      'UPDATE edit_requests SET design_id = ?, design_ids = ? WHERE id = ?',
+      [remaining[0] ?? null, JSON.stringify(remaining), open.id],
+    );
+  }
+
+  private async clearDesignDeliveryFiles(orderId: string, designIds: string[]) {
+    if (designIds.length === 0) return;
+    const files = await this.db.query<{ id: string; delivery_id: string }>(
+      `SELECT id, delivery_id FROM delivery_files
+        WHERE design_id IN (${this.sqlIn(designIds)})`,
+      designIds,
+    );
+    if (files.length === 0) return;
+    await this.db.execute(
+      `DELETE FROM delivery_files WHERE design_id IN (${this.sqlIn(designIds)})`,
+      designIds,
+    );
+    const deliveryIds = [...new Set(files.map((f) => f.delivery_id))];
+    for (const deliveryId of deliveryIds) {
+      const leftover = await this.db.queryOne<{ n: number | string }>(
+        'SELECT COUNT(*) AS n FROM delivery_files WHERE delivery_id = ?',
+        [deliveryId],
+      );
+      if (Number(leftover?.n ?? 0) === 0) {
+        await this.db.execute('DELETE FROM deliveries WHERE id = ? AND order_id = ?', [
+          deliveryId,
+          orderId,
+        ]);
+      }
+    }
+  }
+
+  private orderDto(
+    o: OrderRow,
+    extras?: { partiallyAccepted?: boolean; partiallyDelivered?: boolean },
+  ) {
     return {
       id: o.id,
       humanRef: o.human_ref,
@@ -504,6 +615,7 @@ export class OrdersService {
       createdAt: o.created_at,
       updatedAt: o.updated_at,
       partiallyAccepted: extras?.partiallyAccepted ?? false,
+      partiallyDelivered: extras?.partiallyDelivered ?? false,
     };
   }
 
@@ -599,6 +711,7 @@ export class OrdersService {
       string,
       Array<{
         id: string;
+        designId: string | null;
         originalName: string;
         mimeType: string | null;
         byteSize: number | null;
@@ -611,13 +724,14 @@ export class OrdersService {
       const files = await this.db.query<{
         id: string;
         delivery_id: string;
+        design_id: string | null;
         original_name: string;
         mime_type: string | null;
         byte_size: number | null;
         format_label: string | null;
         created_at: Date;
       }>(
-        `SELECT id, delivery_id, original_name, mime_type, byte_size, format_label, created_at
+        `SELECT id, delivery_id, design_id, original_name, mime_type, byte_size, format_label, created_at
            FROM delivery_files
           WHERE delivery_id IN (${this.sqlIn(deliveryIds)})
           ORDER BY created_at ASC`,
@@ -627,6 +741,7 @@ export class OrdersService {
         const list = filesByDelivery.get(f.delivery_id) ?? [];
         list.push({
           id: f.id,
+          designId: f.design_id,
           originalName: f.original_name,
           mimeType: f.mime_type,
           byteSize: f.byte_size,
@@ -779,7 +894,10 @@ export class OrdersService {
         this.getQuotations(id),
       ]);
     return {
-      ...this.orderDto(row, { partiallyAccepted }),
+      ...this.orderDto(row, {
+        partiallyAccepted,
+        partiallyDelivered: this.designPartialDelivery(designs),
+      }),
       designs,
       attachments,
       quotations,
@@ -869,7 +987,10 @@ export class OrdersService {
       const lineCount =
         (quotations[0] as { lines?: unknown[] } | undefined)?.lines?.length ?? 0;
       items.push({
-        ...this.orderDto(r, { partiallyAccepted: extras.partials.has(r.id) }),
+        ...this.orderDto(r, {
+          partiallyAccepted: extras.partials.has(r.id),
+          partiallyDelivered: extras.partialDeliveries.has(r.id),
+        }),
         designCount: extras.designCounts.get(r.id) || lineCount,
         attachments: extras.attachments.get(r.id) ?? [],
         quotations,
@@ -1108,13 +1229,19 @@ export class OrdersService {
     }
 
     if (lines.length > 0) {
+      const quotedTotal =
+        latest.amount_cents != null && Number.isFinite(Number(latest.amount_cents))
+          ? Math.round(Number(latest.amount_cents))
+          : null;
+      const allKept = keepIds.size === lines.length;
+      const orderPrice = allKept && quotedTotal != null ? quotedTotal : totalCents;
       await this.db.execute(
         'UPDATE quotations SET status = ?, amount_cents = ? WHERE id = ?',
-        [QuotationStatus.APPROVED, totalCents, latest.id],
+        [QuotationStatus.APPROVED, orderPrice, latest.id],
       );
       await this.db.execute(
         `UPDATE orders SET status = ?, type = ?, price_cents = ?, approved_at = NOW() WHERE id = ?`,
-        [OrderStatus.IN_PROGRESS, OrderType.ORDER, totalCents, orderId],
+        [OrderStatus.IN_PROGRESS, OrderType.ORDER, orderPrice, orderId],
       );
 
       await this.ensureDesignsFromQuotationLines(orderId, lines, keepIds);
@@ -1320,7 +1447,10 @@ export class OrdersService {
     const hideMoney = !this.canSeeMoney(user);
     for (const r of rows) {
       const item = {
-        ...this.orderDto(r, { partiallyAccepted: extras.partials.has(r.id) }),
+        ...this.orderDto(r, {
+          partiallyAccepted: extras.partials.has(r.id),
+          partiallyDelivered: extras.partialDeliveries.has(r.id),
+        }),
         customerName: r.customer_name,
         client: r.client_user_id
           ? {
@@ -1658,8 +1788,11 @@ export class OrdersService {
         [row.client_user_id],
       );
     }
+    const designs = await this.getDesigns(orderId);
     const assembled = {
-      ...this.orderDto(row),
+      ...this.orderDto(row, {
+        partiallyDelivered: this.designPartialDelivery(designs),
+      }),
       client: client
         ? {
             id: client.id,
@@ -1669,7 +1802,7 @@ export class OrdersService {
             phone: client.phone,
           }
         : null,
-      designs: await this.getDesigns(orderId),
+      designs,
       attachments: await this.getAttachments(orderId),
       quotations: await this.getQuotations(orderId),
       deliveries: await this.getDeliveries(orderId),
@@ -1799,34 +1932,115 @@ export class OrdersService {
     if (order.status !== OrderStatus.WAITING_FOR_ADMIN_QUOTATION_APPROVAL)
       throw new BadRequestException('Order is not awaiting counter approval');
 
-    // Reject only the counter; restore awaiting-customer so both sides sync.
+    const note = input.comment?.trim() || 'Counter declined by the studio.';
     await this.db.execute(
       'UPDATE quotations SET status = ?, comment = COALESCE(?, comment) WHERE id = ?',
-      [QuotationStatus.REJECTED, input.comment?.trim() || null, latest.id],
+      [QuotationStatus.REJECTED, note, latest.id],
     );
-    await this.db.execute('UPDATE orders SET status = ? WHERE id = ?', [
-      OrderStatus.QUOTATION_PROVIDED,
-      orderId,
-    ]);
-    // Re-open the previous admin quote as the active proposal if present.
-    const prior = await this.db.queryOne<{ id: string }>(
-      `SELECT id FROM quotations
-        WHERE order_id = ? AND id != ? AND created_by_role != ?
-        ORDER BY version DESC LIMIT 1`,
-      [orderId, latest.id, UserRole.CLIENT],
+    await this.db.execute(
+      'UPDATE orders SET status = ?, rejection_reason = ?, rejected_at = NOW() WHERE id = ?',
+      [OrderStatus.REJECTED, note, orderId],
     );
-    if (prior) {
-      await this.db.execute('UPDATE quotations SET status = ? WHERE id = ?', [
-        QuotationStatus.PROPOSED,
-        prior.id,
-      ]);
-    }
     if (order.client_user_id) {
       await this.notifications.createFor(order.client_user_id, {
-        title: 'Counter not accepted',
-        body:
-          input.comment?.trim() ||
-          'Your counter was declined. The previous quote is still available to accept or decline.',
+        title: 'Quote declined by studio',
+        body: note,
+        link: `/portal/quotes/${orderId}`,
+      });
+    }
+    return this.assembleOrder(orderId);
+  }
+
+  async adminRecounterQuotation(
+    user: AuthUser | undefined,
+    orderId: string,
+    input: { amountCents: number; currency?: string | null; comment: string },
+  ) {
+    this.assertAdmin(user);
+    const order = await this.getOrderRow(orderId);
+    if (!order) throw new NotFoundException('Order not found');
+    const latest = await this.getLatestQuotation(orderId);
+    if (!latest || latest.status !== QuotationStatus.COUNTERED)
+      throw new BadRequestException('No counter quotation to respond to');
+    if (order.status !== OrderStatus.WAITING_FOR_ADMIN_QUOTATION_APPROVAL)
+      throw new BadRequestException('Order is not awaiting a counter decision');
+
+    const note = input.comment.trim();
+    if (!note) throw new BadRequestException('A note is required');
+    if (!Number.isFinite(input.amountCents) || input.amountCents <= 0) {
+      throw new BadRequestException('Enter a re-counter amount');
+    }
+
+    await this.db.execute(
+      'UPDATE quotations SET status = ? WHERE id = ?',
+      [QuotationStatus.REJECTED, latest.id],
+    );
+
+    const priorStudio = await this.db.queryOne<{ id: string }>(
+      `SELECT id FROM quotations
+        WHERE order_id = ? AND created_by_role != ?
+        ORDER BY version DESC LIMIT 1`,
+      [orderId, UserRole.CLIENT],
+    );
+    const sourceLines = priorStudio
+      ? await this.getQuotationLines(priorStudio.id)
+      : [];
+
+    const nextVersion = (latest.version ?? 0) + 1;
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO quotations
+         (id, order_id, version, status, created_by_role, created_by_id, amount_cents, currency, comment)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        orderId,
+        nextVersion,
+        QuotationStatus.PROPOSED,
+        user.role,
+        user.id,
+        input.amountCents,
+        (input.currency?.trim() || latest.currency || 'USD').toUpperCase(),
+        note,
+      ],
+    );
+
+    let lineSort = 0;
+    for (const line of sourceLines) {
+      const lineId = randomUUID();
+      await this.db.execute(
+        `INSERT INTO quotation_lines
+           (id, quotation_id, name, note, attachment_id, price_cents, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          lineId,
+          id,
+          line.name,
+          line.note,
+          line.attachmentId,
+          line.priceCents,
+          lineSort++,
+        ],
+      );
+      let sizeSort = 0;
+      for (const s of line.sizes) {
+        await this.db.execute(
+          `INSERT INTO quotation_line_sizes
+             (id, line_id, label, price_cents, sort_order)
+           VALUES (?, ?, ?, ?, ?)`,
+          [randomUUID(), lineId, s.label, s.priceCents ?? 0, sizeSort++],
+        );
+      }
+    }
+
+    await this.db.execute(
+      'UPDATE orders SET status = ?, price_cents = ?, rejection_reason = NULL, rejected_at = NULL WHERE id = ?',
+      [OrderStatus.QUOTATION_PROVIDED, input.amountCents, orderId],
+    );
+    if (order.client_user_id) {
+      await this.notifications.createFor(order.client_user_id, {
+        title: 'Re-counter from the studio',
+        body: note,
         link: `/portal/quotes/${orderId}`,
       });
     }
@@ -1922,10 +2136,12 @@ export class OrdersService {
     if (!order) throw new NotFoundException('Order not found');
     if (
       order.status !== OrderStatus.IN_PROGRESS &&
-      order.status !== OrderStatus.READY_TO_SEND
+      order.status !== OrderStatus.READY_TO_SEND &&
+      order.status !== OrderStatus.COMPLETED &&
+      order.status !== OrderStatus.REVISION_REQUESTED
     ) {
       throw new BadRequestException(
-        'Deliveries can only be uploaded while order is IN_PROGRESS or READY_TO_SEND',
+        'Deliveries can only be uploaded while work is in progress or being edited',
       );
     }
     if (
@@ -1939,6 +2155,9 @@ export class OrdersService {
     }
 
     const existing = await this.getDeliveries(orderId);
+    if (incoming.length > 10) {
+      throw new BadRequestException('Upload at most 10 files at a time');
+    }
     if (incoming.length === 0 && existing.length === 0) {
       throw new BadRequestException('Upload finished files first');
     }
@@ -1950,10 +2169,27 @@ export class OrdersService {
     const designIds = (options?.designIds ?? []).filter(Boolean);
     const notifyEmail = options?.notifyEmail !== false;
     const notifySms = options?.notifySms !== false;
-    const wantsComplete = options?.complete !== false;
 
-    if (designIds.length && release) {
-      for (const designId of designIds) {
+    if (incoming.length > 0 && designIds.length > 0) {
+      await this.clearDesignDeliveryFiles(orderId, designIds);
+    }
+
+    if (release) {
+      const idsToMark =
+        designIds.length > 0
+          ? designIds
+          : [
+              ...new Set(
+                existing
+                  .flatMap((d) => d.files.map((f) => f.designId))
+                  .filter((x): x is string => !!x),
+              ),
+            ];
+      const markIds =
+        idsToMark.length > 0
+          ? idsToMark
+          : (await this.getDesigns(orderId)).map((d) => d.id);
+      for (const designId of markIds) {
         await this.db.execute(
           `UPDATE order_designs SET status = ?
             WHERE id = ? AND order_id = ?`,
@@ -2018,34 +2254,76 @@ export class OrdersService {
     }
 
     if (release) {
-      await this.db.execute(
-        'UPDATE deliveries SET released_at = COALESCE(released_at, NOW()) WHERE order_id = ?',
-        [orderId],
-      );
+      if (designIds.length > 0) {
+        await this.db.execute(
+          `UPDATE deliveries
+              SET released_at = COALESCE(released_at, NOW())
+            WHERE order_id = ?
+              AND id IN (
+                SELECT delivery_id FROM (
+                  SELECT DISTINCT delivery_id FROM delivery_files
+                   WHERE design_id IN (${this.sqlIn(designIds)})
+                ) scoped
+              )`,
+          [orderId, ...designIds],
+        );
+      } else {
+        await this.db.execute(
+          'UPDATE deliveries SET released_at = COALESCE(released_at, NOW()) WHERE order_id = ?',
+          [orderId],
+        );
+      }
     }
 
     const designs = await this.getDesigns(orderId);
     const allDelivered =
       designs.length === 0 ||
       designs.every((d) => d.status === DesignStatus.DELIVERED);
-    const partial = release && !allDelivered && designs.length > 0 && !wantsComplete;
+    const partial = release && !allDelivered && designs.length > 0;
 
     const alreadyReleased = existing.some((d) => Boolean(d.releasedAt));
     const isNewUpload = incoming.length > 0;
+    const submittedIds = new Set(
+      (await this.getDeliveries(orderId)).flatMap((d) =>
+        d.files.map((f) => f.designId).filter((x): x is string => !!x),
+      ),
+    );
+    const allDesignsHaveFiles =
+      designs.length === 0 || designs.every((d) => submittedIds.has(d.id));
+
+    if (release && designIds.length > 0) {
+      await this.closeRevisionDesigns(orderId, designIds);
+    } else if (release && allDelivered) {
+      await this.closeRevisionDesigns(
+        orderId,
+        designs.map((d) => d.id),
+      );
+    }
+
+    const revisionOpen = await this.hasOpenRevision(orderId);
 
     if (!release) {
       await this.db.execute('UPDATE orders SET status = ? WHERE id = ?', [
-        OrderStatus.READY_TO_SEND,
+        revisionOpen
+          ? OrderStatus.REVISION_REQUESTED
+          : allDesignsHaveFiles
+            ? OrderStatus.READY_TO_SEND
+            : OrderStatus.IN_PROGRESS,
         orderId,
       ]);
-      if (isNewUpload || order.status !== OrderStatus.READY_TO_SEND) {
+      if (isNewUpload) {
         await this.notifyAdmins({
           title: 'Files submitted for approval',
-          body: `${order.name ?? 'An order'} is ready to release to the customer.`,
+          body: `${order.name ?? 'An order'} has files waiting to be released.`,
           link: `/admin/orders/${orderId}`,
         });
       }
-    } else if (allDelivered || wantsComplete) {
+    } else if (revisionOpen) {
+      await this.db.execute('UPDATE orders SET status = ? WHERE id = ?', [
+        OrderStatus.REVISION_REQUESTED,
+        orderId,
+      ]);
+    } else if (allDelivered) {
       await this.db.execute(
         'UPDATE orders SET status = ?, completed_at = NOW() WHERE id = ?',
         [OrderStatus.COMPLETED, orderId],
@@ -2085,7 +2363,9 @@ export class OrdersService {
 
     const deliveries = await this.getDeliveries(orderId);
     return {
-      order: this.orderDto((await this.getOrderRow(orderId))!),
+      order: this.orderDto((await this.getOrderRow(orderId))!, {
+        partiallyDelivered: this.designPartialDelivery(designs),
+      }),
       delivery: deliveryId
         ? deliveries.find((d) => d.id === deliveryId)
         : deliveries[0],
@@ -2207,6 +2487,23 @@ export class OrdersService {
         params,
       );
     }
+    if (input.status != null && input.status !== DesignStatus.DELIVERED) {
+      const leavingDelivered = design.status === DesignStatus.DELIVERED;
+      const markingAwaiting = input.status === DesignStatus.WAITING;
+      if (leavingDelivered || markingAwaiting) {
+        await this.clearDesignDeliveryFiles(orderId, [designId]);
+        const remaining = await this.getDesigns(orderId);
+        const allDelivered =
+          remaining.length > 0 &&
+          remaining.every((d) => d.status === DesignStatus.DELIVERED);
+        if (!allDelivered) {
+          await this.db.execute(
+            'UPDATE orders SET status = ?, completed_at = NULL WHERE id = ?',
+            [OrderStatus.IN_PROGRESS, orderId],
+          );
+        }
+      }
+    }
     const row = await this.db.queryOne<DesignRow>(
       'SELECT * FROM order_designs WHERE id = ? LIMIT 1',
       [designId],
@@ -2275,6 +2572,7 @@ export class OrdersService {
       OrderStatus.WAITING_FOR_ADMIN_QUOTATION_APPROVAL,
       OrderStatus.CLIENT_REJECTED_QUOTATION,
       OrderStatus.QUOTATION_PROVIDED, // allow revise/re-send
+      OrderStatus.REJECTED, // reopen after staff declined a counter
       OrderStatus.CREATED,
     ]);
     if (!allowPrice.has(order.status)) {
@@ -2362,7 +2660,7 @@ export class OrdersService {
       }
 
       await tx.execute(
-        'UPDATE orders SET status = ?, price_cents = ? WHERE id = ?',
+        'UPDATE orders SET status = ?, price_cents = ?, rejection_reason = NULL, rejected_at = NULL WHERE id = ?',
         [OrderStatus.QUOTATION_PROVIDED, total, orderId],
       );
 

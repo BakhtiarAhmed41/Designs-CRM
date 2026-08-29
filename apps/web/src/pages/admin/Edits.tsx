@@ -78,7 +78,7 @@ export function AdminEdits() {
   return (
     <div>
       <PageHeader
-        title="Edits & revisions"
+        title="Revisions"
         subtitle="Waiting, in progress, and done. Assign a designer from the row."
       />
 
@@ -124,8 +124,8 @@ export function AdminEdits() {
         {!isLoading && edits.length === 0 && (
           <EmptyState
             icon="ti-refresh"
-            title="No edits in this view"
-            description="Revision requests will appear here when customers ask for changes."
+            title="No revisions in this view"
+            description="Revisions will appear here when customers ask for changes."
           />
         )}
         {sections.map((sec) => (
@@ -189,20 +189,33 @@ function EditRow({
         <i className="ti ti-refresh" />
       </div>
       <div className="oinfo">
-        <div className="on">{e.orderName ?? 'Edit request'}</div>
+        <div className="on">{e.orderName ?? 'Revision'}</div>
         <div className="om">
-          <span>
-            #{e.orderRef ?? e.orderId.slice(0, 6)} · &quot;{e.note}&quot;{designer}
-          </span>
+          <span>#{e.orderRef ?? e.orderId.slice(0, 6)}{designer}</span>
           <span className="item-date">{dateShort(e.createdAt)}</span>
         </div>
+        {e.note ? (
+          <div
+            style={{
+              marginTop: 6,
+              fontSize: 13,
+              color: 'var(--ink)',
+              fontWeight: 400,
+              whiteSpace: 'pre-wrap',
+            }}
+          >
+            {e.note}
+          </div>
+        ) : (
+          <div style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)' }}>No note was added.</div>
+        )}
       </div>
       <span
         className={`chip ${
           section === 'done' ? 'c-done' : section === 'progress' ? 'c-prog' : 'c-review'
         }`}
       >
-        {section === 'done' ? 'Done' : section === 'progress' ? 'In progress' : 'Edit pending'}
+        {section === 'done' ? 'Done' : section === 'progress' ? 'In progress' : 'Revision requested'}
       </span>
       {section !== 'done' && (
         <div

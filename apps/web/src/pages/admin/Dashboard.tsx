@@ -120,7 +120,7 @@ export function AdminDashboard() {
     const tiles = [
       { label: 'Delivered this month', value: String(stats?.deliveredThisMonth ?? 0), sub: 'completed jobs', show: can('orders') },
       { label: 'Revenue this month', value: money(stats?.revenueThisMonthCents ?? 0), sub: 'delivered value', alert: true, show: can('billing') },
-      { label: 'Open edits', value: String(stats?.revisionsOpen ?? 0), sub: 'pending action', show: can('edits') },
+      { label: 'Open revisions', value: String(stats?.revisionsOpen ?? 0), sub: 'pending action', show: can('edits') },
       { label: 'Outstanding', value: money(stats?.outstandingCents ?? 0), sub: 'unpaid work', alert: true, show: can('billing') },
     ];
     return tiles.filter((t) => t.show);
@@ -401,13 +401,13 @@ export function AdminDashboard() {
               {showEdits && (
                 <div className="panel">
                   <div className="panel-h">
-                    <h3>Edits & revisions</h3>
+                    <h3>Revisions</h3>
                     <Link to="/admin/edits" className="btn btn-ghost btn-sm">
                       View all
                     </Link>
                   </div>
                   {edits.length === 0 && (
-                    <EmptyState icon="ti-refresh" title="No open edits" description="Revision requests will land here." />
+                    <EmptyState icon="ti-refresh" title="No open revisions" description="Revisions will land here." />
                   )}
                   {edits.slice(0, 6).map((e) => (
                     <Link key={e.id} to={`/admin/orders/${e.orderId}`} className="orow">
@@ -415,13 +415,18 @@ export function AdminDashboard() {
                         <i className="ti ti-refresh" />
                       </div>
                       <div className="oinfo">
-                        <div className="on">{e.orderName ?? 'Edit request'}</div>
+                        <div className="on">{e.orderName ?? 'Revision'}</div>
                         <div className="om">
-                          <span>#{e.orderRef ?? e.orderId.slice(0, 6)} · {e.note}</span>
+                          <span>#{e.orderRef ?? e.orderId.slice(0, 6)}</span>
                           <span className="item-date">{dateShort(e.createdAt)}</span>
                         </div>
+                        {e.note ? (
+                          <div style={{ marginTop: 6, fontSize: 13, color: 'var(--ink)', whiteSpace: 'pre-wrap' }}>
+                            {e.note}
+                          </div>
+                        ) : null}
                       </div>
-                      <span className="chip c-review">Edit pending</span>
+                      <span className="chip c-review">Revision requested</span>
                       <div className="oprice edit-price">
                         {e.kind === 'PAID' ? money(e.priceCents) : 'Free'}
                       </div>

@@ -11,6 +11,7 @@ import { getErrorMessage } from '@/lib/api';
 import { invalidateWorkCaches } from '@/lib/queryCache';
 import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
 import { money, dateShort, quoteLifecycleChip } from '@/lib/format';
+import { isAdminRecounter } from '@/lib/quoteHelpers';
 import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
 import type { Order, OrderStatus } from '@/lib/types';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
@@ -235,6 +236,7 @@ export function AdminQuotes() {
               {quotes.map((o) => {
                 const chip = quoteLifecycleChip(o.status, 'admin', {
                   partiallyAccepted: o.partiallyAccepted,
+                  adminRecounter: isAdminRecounter(o.quotations),
                 });
                 return (
                   <tr key={o.id} className="click-row" onClick={() => navigate(`/admin/quotes/${o.id}`)}>

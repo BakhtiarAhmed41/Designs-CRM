@@ -265,6 +265,7 @@ CREATE TABLE IF NOT EXISTS edit_requests (
   id                   CHAR(36) NOT NULL,
   order_id             CHAR(36) NOT NULL,
   design_id            CHAR(36) NULL,
+  design_ids           JSON NULL,
   revision_order_id    CHAR(36) NULL,
   note                 TEXT NOT NULL,
   kind                 ENUM('FREE','PAID') NOT NULL DEFAULT 'FREE',

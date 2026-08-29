@@ -85,7 +85,7 @@ export function statusChipClass(status: OrderStatus | string | null | undefined)
 export function lifecycleChip(
   status: OrderStatus | string,
   audience: StatusAudience = 'shared',
-  opts?: { partiallyAccepted?: boolean },
+  opts?: { partiallyAccepted?: boolean; partiallyDelivered?: boolean },
 ): StatusChip {
   const isAdmin = audience === 'admin';
   const isCustomer = audience === 'customer';
@@ -122,6 +122,9 @@ export function lifecycleChip(
     case 'IN_PROGRESS':
     case 'READY_TO_SEND':
     case 'REVISION_REQUESTED':
+      if (opts?.partiallyDelivered) {
+        return { cls: 'chip c-prog', label: 'Partially delivered' };
+      }
       if (opts?.partiallyAccepted) {
         return { cls: 'chip c-done', label: 'Partially accepted' };
       }
@@ -149,7 +152,14 @@ export function lifecycleChip(
 export function quoteLifecycleChip(
   status: OrderStatus | string,
   audience: StatusAudience,
-  opts?: { partiallyAccepted?: boolean },
+  opts?: { partiallyAccepted?: boolean; adminRecounter?: boolean },
 ): StatusChip {
+  if (status === 'QUOTATION_PROVIDED' && opts?.adminRecounter) {
+    const isCustomer = audience === 'customer';
+    return {
+      cls: 'chip c-quote',
+      label: isCustomer ? 'Re-counter from admin' : 'Re-counter sent',
+    };
+  }
   return lifecycleChip(status, audience, opts);
 }

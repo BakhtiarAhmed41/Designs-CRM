@@ -287,27 +287,44 @@ export function AdminCustomerMessages() {
                 onChange={(e) => setQ(e.target.value)}
                 onFocus={() => maybeRequestBrowserNotifications()}
               />
-              <div className="filters" style={{ marginTop: 8 }}>
-                {(
-                  [
-                    ['all', 'All'],
-                    ['unread', 'Unread'],
-                    ['open', 'Open'],
-                    ['closed', 'Closed'],
-                    ['GENERAL', 'Topics'],
-                    ['ORDER', 'Orders'],
-                    ['QUOTE', 'Quotes'],
-                  ] as Array<[FilterKey, string]>
-                ).map(([key, label]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    className={filter === key ? 'on' : ''}
-                    onClick={() => setFilter(key)}
-                  >
-                    {label}
-                  </button>
-                ))}
+              <div className="msg-filters">
+                <div className="msg-filters-row cols-4">
+                  {(
+                    [
+                      ['all', 'All'],
+                      ['unread', 'Unread'],
+                      ['open', 'Open'],
+                      ['closed', 'Closed'],
+                    ] as Array<[FilterKey, string]>
+                  ).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      className={filter === key ? 'on' : ''}
+                      onClick={() => setFilter(key)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <div className="msg-filters-row cols-3">
+                  {(
+                    [
+                      ['GENERAL', 'Topics'],
+                      ['ORDER', 'Orders'],
+                      ['QUOTE', 'Quotes'],
+                    ] as Array<[FilterKey, string]>
+                  ).map(([key, label]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      className={filter === key ? 'on' : ''}
+                      onClick={() => setFilter(key)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
             <div className="msg-left-list">

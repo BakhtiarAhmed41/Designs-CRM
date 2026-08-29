@@ -1,11 +1,12 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import type { AuthUser } from '../auth/auth.types';
-import { EditKind, EditStatus, OrderStatus, OrderType, UserRole } from '../common/enums';
+import { EditKind, EditStatus, OrderStatus, UserRole } from '../common/enums';
 import { normalizePage, pageResult } from '../common/pagination';
 import { DbService } from '../db/db.service';
 
@@ -43,6 +44,7 @@ type EditRow = {
   id: string;
   order_id: string;
   design_id: string | null;
+  design_ids: unknown;
   revision_order_id: string | null;
   note: string;
   kind: EditKind;
@@ -53,6 +55,23 @@ type EditRow = {
   created_at: Date;
   resolved_at: Date | null;
 };
+
+function parseDesignIds(raw: unknown, fallback: string | null): string[] {
+  if (Array.isArray(raw)) {
+    return raw.filter((x): x is string => typeof x === 'string' && x.length > 0);
+  }
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed.filter((x): x is string => typeof x === 'string' && x.length > 0);
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return fallback ? [fallback] : [];
+}
 
 type EditJoinRow = EditRow & {
   order_ref: string | null;
@@ -82,10 +101,12 @@ export class EditsService {
   // --- mapping helpers -----------------------------------------------------
 
   private editDto(e: EditJoinRow) {
+    const designIds = parseDesignIds(e.design_ids, e.design_id);
     return {
       id: e.id,
       orderId: e.order_id,
-      designId: e.design_id,
+      designId: designIds[0] ?? e.design_id,
+      designIds,
       revisionOrderId: e.revision_order_id,
       note: e.note,
       kind: e.kind,
@@ -160,6 +181,19 @@ export class EditsService {
     if (!isStaffRole(user.role)) throw new ForbiddenException();
   }
 
+  private async resolveDesignIds(orderId: string, requested?: string[] | null) {
+    const designs = await this.db.query<{ id: string }>(
+      'SELECT id FROM order_designs WHERE order_id = ?',
+      [orderId],
+    );
+    const allowed = new Set(designs.map((d) => d.id));
+    const ids = [...new Set((requested ?? []).filter((id) => allowed.has(id)))];
+    if (ids.length > 0) return ids;
+    if (designs.length === 1) return [designs[0].id];
+    if (designs.length === 0) return [];
+    throw new BadRequestException('Pick which designs need a revision');
+  }
+
   async createEdit(
     user: AuthUser | undefined,
     orderId: string,
@@ -168,6 +202,7 @@ export class EditsService {
       kind: EditKind;
       priceCents?: number | null;
       designId?: string | null;
+      designIds?: string[] | null;
       assignedDesignerId?: string | null;
     },
   ) {
@@ -176,6 +211,7 @@ export class EditsService {
     if (!order) throw new NotFoundException('Order not found');
 
     const note = input.note.trim();
+    if (!note) throw new BadRequestException('Describe what needs to change');
     const kind = input.kind === EditKind.PAID ? EditKind.PAID : EditKind.FREE;
     const priceCents =
       kind === EditKind.PAID
@@ -183,6 +219,11 @@ export class EditsService {
           ? input.priceCents
           : 0
         : null;
+    const requested = [
+      ...(input.designIds ?? []),
+      ...(input.designId ? [input.designId] : []),
+    ];
+    const designIds = await this.resolveDesignIds(orderId, requested);
 
     const openEdit = await this.db.queryOne<{ id: string }>(
       `SELECT id FROM edit_requests
@@ -192,49 +233,45 @@ export class EditsService {
       [orderId, EditStatus.PENDING],
     );
     if (openEdit) {
-      const existing = await this.loadEdit(openEdit.id);
-      if (existing) return existing;
+      await this.db.execute(
+        `UPDATE edit_requests
+            SET note = ?, kind = ?, price_cents = ?, design_id = ?, design_ids = ?,
+                assigned_designer_id = COALESCE(?, assigned_designer_id)
+          WHERE id = ?`,
+        [
+          note,
+          kind,
+          priceCents,
+          designIds[0] ?? null,
+          JSON.stringify(designIds),
+          input.assignedDesignerId ?? null,
+          openEdit.id,
+        ],
+      );
+      await this.db.execute('UPDATE orders SET status = ? WHERE id = ?', [
+        OrderStatus.REVISION_REQUESTED,
+        orderId,
+      ]);
+      await this.writeLog(this.db, {
+        orderId,
+        actorId: user.id,
+        event: 'edit_requested',
+        meta: { editId: openEdit.id, kind, note, designIds, source: 'staff' },
+      });
+      return this.loadEdit(openEdit.id);
     }
 
     const editId = await this.db.withTransaction(async (tx) => {
-      // Create a linked "-R" revision child order.
-      const revisionOrderId = randomUUID();
-      const prior = await tx.queryOne<{ n: number | string }>(
-        'SELECT COUNT(*) AS n FROM orders WHERE parent_order_id = ?',
-        [order.id],
-      );
-      const seq = Number(prior?.n ?? 0) + 1;
-      const base = order.human_ref ?? 'REV';
-      const revisionRef = seq === 1 ? `${base}-R` : `${base}-R${seq}`;
-      await tx.execute(
-        `INSERT INTO orders
-           (id, human_ref, customer_id, client_user_id, type, service_type, name, status, price_cents, currency, parent_order_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          revisionOrderId,
-          revisionRef,
-          order.customer_id,
-          order.client_user_id,
-          OrderType.ORDER,
-          order.service_type,
-          order.name,
-          OrderStatus.IN_PROGRESS,
-          kind === EditKind.PAID ? (priceCents ?? 0) : 0,
-          order.currency || 'USD',
-          order.id,
-        ],
-      );
-
       const id = randomUUID();
       await tx.execute(
         `INSERT INTO edit_requests
-           (id, order_id, design_id, revision_order_id, note, kind, price_cents, status, assigned_designer_id, requested_by_id)
+           (id, order_id, design_id, design_ids, note, kind, price_cents, status, assigned_designer_id, requested_by_id)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           orderId,
-          input.designId ?? null,
-          revisionOrderId,
+          designIds[0] ?? null,
+          JSON.stringify(designIds),
           note,
           kind,
           priceCents,
@@ -253,7 +290,7 @@ export class EditsService {
         orderId,
         actorId: user.id,
         event: 'edit_requested',
-        meta: { editId: id, kind, revisionOrderId, revisionRef },
+        meta: { editId: id, kind, note, designIds, source: 'staff' },
       });
 
       if (order.client_user_id) {
@@ -264,7 +301,7 @@ export class EditsService {
             order.client_user_id,
             'Revision started',
             `We started a revision on your order - ${order.name ?? ''}`,
-            `/orders/${orderId}`,
+            `/portal/orders/${orderId}`,
           ],
         );
       }
@@ -274,7 +311,6 @@ export class EditsService {
 
     return this.loadEdit(editId);
   }
-
   async listEdits(
     user: AuthUser | undefined,
     filters: {
@@ -423,7 +459,7 @@ export class EditsService {
   async clientRequestEdit(
     user: AuthUser | undefined,
     orderId: string,
-    input: { note: string },
+    input: { note: string; designIds?: string[] | null },
   ) {
     assertAuthUser(user);
     if (user.role !== UserRole.CLIENT) throw new ForbiddenException();
@@ -431,7 +467,22 @@ export class EditsService {
     if (!order || order.client_user_id !== user.id)
       throw new NotFoundException('Order not found');
 
+    const revisable = new Set<OrderStatus>([
+      OrderStatus.COMPLETED,
+      OrderStatus.CLOSED,
+      OrderStatus.REVISION_REQUESTED,
+      OrderStatus.IN_PROGRESS,
+      OrderStatus.READY_TO_SEND,
+    ]);
+    if (!revisable.has(order.status)) {
+      throw new BadRequestException(
+        'You can request a revision after files have been delivered',
+      );
+    }
+
     const note = input.note.trim();
+    if (!note) throw new BadRequestException('Describe what needs to change');
+    const designIds = await this.resolveDesignIds(orderId, input.designIds);
 
     const openEdit = await this.db.queryOne<{ id: string }>(
       `SELECT id FROM edit_requests
@@ -441,12 +492,20 @@ export class EditsService {
       [orderId, EditStatus.PENDING],
     );
     if (openEdit) {
-      if (note) {
-        await this.db.execute('UPDATE edit_requests SET note = ? WHERE id = ?', [
-          note,
-          openEdit.id,
-        ]);
-      }
+      await this.db.execute(
+        'UPDATE edit_requests SET note = ?, design_id = ?, design_ids = ? WHERE id = ?',
+        [note, designIds[0] ?? null, JSON.stringify(designIds), openEdit.id],
+      );
+      await this.db.execute('UPDATE orders SET status = ? WHERE id = ?', [
+        OrderStatus.REVISION_REQUESTED,
+        orderId,
+      ]);
+      await this.writeLog(this.db, {
+        orderId,
+        actorId: user.id,
+        event: 'edit_requested',
+        meta: { editId: openEdit.id, kind: EditKind.FREE, source: 'client', note, designIds },
+      });
       return this.loadEdit(openEdit.id);
     }
 
@@ -454,9 +513,18 @@ export class EditsService {
       const id = randomUUID();
       await tx.execute(
         `INSERT INTO edit_requests
-           (id, order_id, note, kind, status, requested_by_id)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [id, orderId, note, EditKind.FREE, EditStatus.PENDING, user.id],
+           (id, order_id, design_id, design_ids, note, kind, status, requested_by_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          orderId,
+          designIds[0] ?? null,
+          JSON.stringify(designIds),
+          note,
+          EditKind.FREE,
+          EditStatus.PENDING,
+          user.id,
+        ],
       );
 
       await tx.execute('UPDATE orders SET status = ? WHERE id = ?', [
@@ -468,13 +536,12 @@ export class EditsService {
         orderId,
         actorId: user.id,
         event: 'edit_requested',
-        meta: { editId: id, kind: EditKind.FREE, source: 'client' },
+        meta: { editId: id, kind: EditKind.FREE, source: 'client', note, designIds },
       });
 
       return id;
     });
 
-    // Notify staff (outside the transaction to keep it lean).
     const staffRows = await this.db.query<{ id: string }>(
       "SELECT id FROM users WHERE role IN ('SUPER_ADMIN','ADMIN','SUPPORT')",
     );
@@ -485,8 +552,8 @@ export class EditsService {
         params.push(
           randomUUID(),
           s.id,
-          'Edit requested',
-          `Client requested an edit - ${order.name ?? order.human_ref ?? ''}`,
+          'Revision requested',
+          `${order.name ?? order.human_ref ?? 'Order'}: ${note.slice(0, 180)}`,
           `/admin/orders/${orderId}`,
         );
       }
@@ -504,6 +571,25 @@ export class EditsService {
     const order = await this.getOrderRow(orderId);
     if (!order || order.client_user_id !== user.id)
       throw new NotFoundException('Order not found');
+    const rows = await this.db.query<EditJoinRow>(
+      `SELECT e.*, o.human_ref AS order_ref, o.name AS order_name, o.currency AS order_currency,
+              ro.human_ref AS revision_ref,
+              d.initials AS designer_initials, d.first_name AS designer_first
+         FROM edit_requests e
+         JOIN orders o ON o.id = e.order_id
+         LEFT JOIN orders ro ON ro.id = e.revision_order_id
+         LEFT JOIN users d ON d.id = e.assigned_designer_id
+        WHERE e.order_id = ?
+        ORDER BY e.created_at DESC`,
+      [orderId],
+    );
+    return rows.map((r) => this.editDto(r));
+  }
+
+  async listEditsForOrder(user: AuthUser | undefined, orderId: string) {
+    this.assertStaff(user);
+    const order = await this.getOrderRow(orderId);
+    if (!order) throw new NotFoundException('Order not found');
     const rows = await this.db.query<EditJoinRow>(
       `SELECT e.*, o.human_ref AS order_ref, o.name AS order_name, o.currency AS order_currency,
               ro.human_ref AS revision_ref,

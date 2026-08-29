@@ -11,12 +11,13 @@ import {
 import { createMyConversation, listMyConversations } from '@/lib/messaging';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import { dateShort, money, quoteLifecycleChip } from '@/lib/format';
-import { lineTotal, studioQuotation } from '@/lib/quoteHelpers';
+import { isAdminRecounter, latestCounter, lineTotal, studioQuotation } from '@/lib/quoteHelpers';
 import type { Order } from '@/lib/types';
 import { applyOrderChange } from '@/lib/queryCache';
 import { freshOnOpen } from '@/lib/queryRefresh';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { QuoteHistory } from '@/components/QuoteHistory';
 
 export function PortalQuoteDetail() {
   const { id = '' } = useParams();
@@ -43,6 +44,7 @@ export function PortalQuoteDetail() {
 
   const order = data?.order as Order | undefined;
   const studio = studioQuotation(order?.quotations);
+  const counterQuote = latestCounter(order?.quotations);
   const lines = studio?.lines ?? [];
 
   const selected = useMemo(() => {
@@ -158,8 +160,13 @@ export function PortalQuoteDetail() {
 
   const canDecide = order.status === 'QUOTATION_PROVIDED';
   const counterPending = order.status === 'WAITING_FOR_ADMIN_QUOTATION_APPROVAL';
+  const adminRecounter = isAdminRecounter(order.quotations);
+  const canPickLines = canDecide && !adminRecounter;
+  const declinedByStudio = order.status === 'REJECTED';
+  const offerTotal = adminRecounter ? studio?.amountCents ?? total : canDecide ? total : studio?.amountCents ?? total;
   const statusChip = quoteLifecycleChip(order.status, 'customer', {
     partiallyAccepted: order.partiallyAccepted,
+    adminRecounter,
   });
 
   return (
@@ -193,14 +200,82 @@ export function PortalQuoteDetail() {
         </div>
       )}
 
-      {counterPending && (
+      {canDecide && adminRecounter && (
+        <div className="quote-counter" style={{ marginTop: 0, marginBottom: 12 }}>
+          <div className="quote-counter-head">
+            <i className="ti ti-scale" aria-hidden />
+            <div>
+              <strong>Re-counter from admin</strong>
+              <p>The studio sent a new price. You can accept it or counter again.</p>
+            </div>
+          </div>
+          <div className="quote-counter-field">
+            <span>Studio offered</span>
+            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--navy)' }}>
+              {studio?.amountCents != null ? money(studio.amountCents, studio.currency) : '—'}
+            </div>
+          </div>
+          {studio?.comment && (
+            <div className="quote-counter-field" style={{ marginTop: 12 }}>
+              <span>Their note</span>
+              <div style={{ fontSize: 13.5, color: 'var(--ink)', fontStyle: 'italic' }}>
+                “{studio.comment}”
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {declinedByStudio && (
         <div className="note amber" style={{ marginBottom: 12 }}>
-          <i className="ti ti-scale" /> Your counter is with the studio. You don’t need to approve it.
+          <i className="ti ti-x" /> This quote was declined by the studio
+          {order.rejectionReason ? `: ${order.rejectionReason}` : '.'}
+        </div>
+      )}
+
+      {counterPending && (
+        <div className="quote-counter" style={{ marginTop: 0, marginBottom: 12 }}>
+          <div className="quote-counter-head">
+            <i className="ti ti-scale" aria-hidden />
+            <div>
+              <strong>Your counter-offer</strong>
+              <p>The studio is reviewing this. You don’t need to approve it.</p>
+            </div>
+          </div>
+          {counterQuote ? (
+            <>
+              <div className="quote-counter-field">
+                <span>You offered</span>
+                <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--navy)' }}>
+                  {counterQuote.amountCents != null
+                    ? money(counterQuote.amountCents, counterQuote.currency)
+                    : '—'}
+                </div>
+              </div>
+              {counterQuote.comment && (
+                <div className="quote-counter-field" style={{ marginTop: 12 }}>
+                  <span>Your note</span>
+                  <div style={{ fontSize: 13.5, color: 'var(--ink)', fontStyle: 'italic' }}>
+                    “{counterQuote.comment}”
+                  </div>
+                </div>
+              )}
+              {studio?.amountCents != null && (
+                <div className="muted" style={{ fontSize: 13, marginTop: 12 }}>
+                  Studio quote was {money(studio.amountCents, studio.currency)}
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>
+              Your counter is with the studio.
+            </p>
+          )}
         </div>
       )}
 
       <div className="card card-pad">
-        {lines.length === 0 ? (
+        {lines.length === 0 && !canDecide && (
           <div className="muted">
             {order.status === 'WAITING_FOR_QUOTATION' || order.status === 'CREATED'
               ? 'Your request is being priced. You’ll see line items here when a quote is ready.'
@@ -208,7 +283,8 @@ export function PortalQuoteDetail() {
                 ? 'This request was declined by the studio.'
                 : 'No quotation lines yet.'}
           </div>
-        ) : (
+        )}
+        {lines.length > 0 && (
           <>
             {lines.map((l) => {
               const on = selected.includes(l.id);
@@ -216,9 +292,9 @@ export function PortalQuoteDetail() {
                 <label
                   key={l.id}
                   className="quote-line"
-                  style={{ cursor: canDecide ? 'pointer' : 'default' }}
+                  style={{ cursor: canPickLines ? 'pointer' : 'default' }}
                 >
-                  {canDecide && (
+                  {canPickLines && (
                     <input
                       type="checkbox"
                       checked={on}
@@ -262,13 +338,17 @@ export function PortalQuoteDetail() {
                 </label>
               );
             })}
+          </>
+        )}
+        {(canDecide || lines.length > 0) && (
+          <>
             <div className="quote-total">
               <div>
                 <div className="muted" style={{ fontSize: 12 }}>
-                  {canDecide ? 'Selected total' : 'Quoted total'}
+                  {canPickLines ? 'Selected total' : 'Quoted total'}
                 </div>
                 <div style={{ fontSize: 22, fontWeight: 700 }}>
-                  {money(canDecide ? total : studio?.amountCents ?? total)}
+                  {money(offerTotal)}
                 </div>
               </div>
               {canDecide && (
@@ -284,7 +364,7 @@ export function PortalQuoteDetail() {
                   <button
                     type="button"
                     className="btn btn-primary"
-                    disabled={acceptMut.isPending || selected.length === 0}
+                    disabled={acceptMut.isPending || (canPickLines && selected.length === 0)}
                     onClick={() => acceptMut.mutate()}
                   >
                     Accept &amp; convert to order
@@ -297,7 +377,7 @@ export function PortalQuoteDetail() {
                 <div className="quote-counter-head">
                   <i className="ti ti-scale" aria-hidden />
                   <div>
-                    <strong>Counter this quote</strong>
+                    <strong>{adminRecounter ? 'Counter again' : 'Counter this quote'}</strong>
                     <p>Suggest a different total. We’ll review it and reply.</p>
                   </div>
                 </div>
@@ -343,6 +423,8 @@ export function PortalQuoteDetail() {
           </>
         )}
       </div>
+
+      <QuoteHistory quotations={order.quotations} />
     </div>
   );
 }

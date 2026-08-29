@@ -48,7 +48,13 @@ const proposeQuotationSchema = z.object({
 });
 
 const counterDecisionSchema = z.object({
-  comment: z.string().optional().nullable(),
+  comment: z.string().min(1),
+});
+
+const recounterSchema = z.object({
+  amountCents: z.number().int().positive(),
+  comment: z.string().min(1),
+  currency: z.string().min(1).optional().nullable(),
 });
 
 const createDesignSchema = z.object({
@@ -412,6 +418,18 @@ export class AdminOrdersController {
   ) {
     const data = counterDecisionSchema.parse(body);
     const order = await this.orders.adminRejectCounter(user, id, data);
+    return { order };
+  }
+
+  @Post(':id/quotations/counter/recounter')
+  @RequireSupport('approve')
+  async recounterQuotation(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    const data = recounterSchema.parse(body);
+    const order = await this.orders.adminRecounterQuotation(user, id, data);
     return { order };
   }
 

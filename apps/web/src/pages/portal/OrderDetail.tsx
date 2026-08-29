@@ -10,6 +10,8 @@ import {
   rejectQuotation,
   uploadAttachments,
 } from '@/lib/orders';
+import { listMyEdits, requestEdit } from '@/lib/edits';
+import { RevisionRequestForm } from '@/components/RevisionRequestForm';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import { money, lifecycleChip, dateShort } from '@/lib/format';
 import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
@@ -17,6 +19,7 @@ import { createMyConversation, listMyConversations } from '@/lib/messaging';
 import type { Design, QuotationLine } from '@/lib/designs';
 import type { Order, Quotation } from '@/lib/types';
 import { studioQuotation } from '@/lib/quoteHelpers';
+import { QuoteHistory } from '@/components/QuoteHistory';
 import { applyOrderChange, invalidateWorkCaches } from '@/lib/queryCache';
 import { freshOnOpen } from '@/lib/queryRefresh';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
@@ -32,8 +35,15 @@ type PortalOrderFull = Omit<Order, 'quotations'> & {
 const DESIGN_STATUS_CHIP: Record<string, string> = {
   WAITING: 'chip c-wait',
   IN_PROGRESS: 'chip c-prog',
-  DONE: 'chip c-done',
+  DONE: 'chip c-prog',
   DELIVERED: 'chip c-done',
+};
+
+const DESIGN_STATUS_LABEL: Record<string, string> = {
+  WAITING: 'Waiting',
+  IN_PROGRESS: 'In progress',
+  DONE: 'In progress',
+  DELIVERED: 'Delivered',
 };
 
 export function PortalOrderDetail() {
@@ -44,11 +54,37 @@ export function PortalOrderDetail() {
   const [keepLineIds, setKeepLineIds] = useState<string[] | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [revOpen, setRevOpen] = useState(false);
+  const [revNote, setRevNote] = useState('');
+  const [revDesignIds, setRevDesignIds] = useState<string[]>([]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['my-order', id],
     queryFn: () => getMyOrder(id),
     ...freshOnOpen,
+  });
+
+  const editsQ = useQuery({
+    queryKey: ['my-order-edits', id],
+    queryFn: () => listMyEdits(id),
+    enabled: !!id,
+    ...freshOnOpen,
+  });
+
+  const revMut = useMutation({
+    mutationFn: (designIds: string[]) => requestEdit(id, revNote.trim(), designIds),
+    onSuccess: (res) => {
+      setRevOpen(false);
+      setRevNote('');
+      setRevDesignIds([]);
+      setActionError(null);
+      applyOrderChange(qc, { ...data?.order, status: 'REVISION_REQUESTED' } as Order);
+      void invalidateWorkCaches(qc);
+      void qc.invalidateQueries({ queryKey: ['my-order-edits', id] });
+      void qc.invalidateQueries({ queryKey: ['my-order', id] });
+      return res;
+    },
+    onError: (e) => setActionError(getErrorMessage(e)),
   });
 
   const startChat = useMutation({
@@ -145,6 +181,13 @@ export function PortalOrderDetail() {
         l.sizes.reduce((s, sz) => s + (sz.priceCents ?? 0), 0),
       0,
     );
+  const openRevision = (editsQ.data?.edits ?? []).find((e) => e.status === 'PENDING');
+  const revisionIds = openRevision?.designIds ?? [];
+  const canRequestRevision =
+    order.status === 'COMPLETED' ||
+    order.status === 'CLOSED' ||
+    order.status === 'REVISION_REQUESTED' ||
+    (order.designs ?? []).some((d) => d.status === 'DELIVERED');
 
   return (
     <div>
@@ -165,9 +208,19 @@ export function PortalOrderDetail() {
           >
             <i className="ti ti-message" /> Message team
           </button>
+          {canRequestRevision && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => setRevOpen((v) => !v)}
+            >
+              <i className="ti ti-edit" /> Request revision
+            </button>
+          )}
           {(() => {
             const chip = lifecycleChip(order.status, 'customer', {
               partiallyAccepted: order.partiallyAccepted,
+              partiallyDelivered: order.partiallyDelivered,
             });
             return <span className={chip.cls}>{chip.label}</span>;
           })()}
@@ -176,6 +229,51 @@ export function PortalOrderDetail() {
       />
 
       {actionError && <ErrorBanner>{actionError}</ErrorBanner>}
+
+      {openRevision && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="card-h">
+            <span className="ct">
+              <i className="ti ti-refresh" /> Your revision
+            </span>
+            <span className="chip c-review">Revision requested</span>
+          </div>
+          <div style={{ padding: '12px 16px 16px' }}>
+            <div style={{ whiteSpace: 'pre-wrap', fontSize: 14 }}>{openRevision.note}</div>
+            {revisionIds.length > 0 && (
+              <div style={{ marginTop: 8, fontSize: 12.5, color: 'var(--muted)' }}>
+                {(order.designs ?? [])
+                  .filter((d) => revisionIds.includes(d.id))
+                  .map((d) => d.name)
+                  .join(', ') || 'Selected designs'}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {revOpen && (
+        <div className="card" style={{ marginBottom: 16, padding: '12px 16px 16px' }}>
+          <RevisionRequestForm
+            designs={order.designs ?? []}
+            note={revNote}
+            onNote={setRevNote}
+            selectedIds={revDesignIds}
+            onToggle={(designId) =>
+              setRevDesignIds((prev) =>
+                prev.includes(designId) ? prev.filter((x) => x !== designId) : [...prev, designId],
+              )
+            }
+            onCancel={() => {
+              setRevOpen(false);
+              setRevNote('');
+              setRevDesignIds([]);
+            }}
+            onSubmit={(ids) => revMut.mutate(ids)}
+            pending={revMut.isPending}
+          />
+        </div>
+      )}
 
       <div className="od-grid">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -342,6 +440,8 @@ export function PortalOrderDetail() {
             </div>
           )}
 
+          <QuoteHistory quotations={order.quotations} />
+
           <div className="card">
             <div className="card-h">
               <span className="ct">
@@ -394,8 +494,18 @@ export function PortalOrderDetail() {
                       {d.size && <span>{d.size}</span>}
                     </div>
                   </div>
-                  <span className={DESIGN_STATUS_CHIP[d.status] ?? 'chip c-prog'}>
-                    {d.status.replace(/_/g, ' ')}
+                  <span
+                    className={
+                      Boolean(openRevision) &&
+                      (revisionIds.length === 0 || revisionIds.includes(d.id))
+                        ? 'chip c-review'
+                        : (DESIGN_STATUS_CHIP[d.status] ?? 'chip c-prog')
+                    }
+                  >
+                    {Boolean(openRevision) &&
+                    (revisionIds.length === 0 || revisionIds.includes(d.id))
+                      ? 'Revision requested'
+                      : (DESIGN_STATUS_LABEL[d.status] ?? d.status.replace(/_/g, ' '))}
                   </span>
                   <div className="oprice">{money(d.priceCents)}</div>
                 </div>

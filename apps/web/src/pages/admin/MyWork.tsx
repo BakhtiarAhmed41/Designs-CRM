@@ -137,7 +137,7 @@ export function AdminMyWork() {
 
       <div className="note">
         <i className="ti ti-info-circle" /> You see the full order details and files, but not pricing or payment.
-        When your file is ready, submit it. It goes to admin for approval before reaching the customer.
+        When a design is ready, open the order and publish it. You can send files to the customer or send them for approval. Revisions stay on the same order.
       </div>
     </div>
   );

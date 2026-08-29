@@ -7,6 +7,7 @@ export type EditRequest = {
   id: string;
   orderId: string;
   designId: string | null;
+  designIds?: string[];
   revisionOrderId: string | null;
   note: string;
   kind: EditKind;
@@ -68,6 +69,7 @@ export function createAdminEdit(
     kind: EditKind;
     priceCents?: number | null;
     designId?: string | null;
+    designIds?: string[] | null;
     assignedDesignerId?: string | null;
   },
 ) {
@@ -93,10 +95,14 @@ export function getOrderActivity(orderId: string) {
   );
 }
 
-export function requestEdit(orderId: string, note: string) {
+export function listAdminOrderEdits(orderId: string) {
+  return apiFetch<{ edits: EditRequest[] }>(`/admin/orders/${orderId}/edits`);
+}
+
+export function requestEdit(orderId: string, note: string, designIds?: string[]) {
   return apiFetch<{ edit: EditRequest }>(`/orders/${orderId}/request-edit`, {
     method: 'POST',
-    body: JSON.stringify({ note }),
+    body: JSON.stringify({ note, designIds }),
   });
 }
 

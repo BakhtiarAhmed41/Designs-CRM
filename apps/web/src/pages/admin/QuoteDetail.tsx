@@ -8,8 +8,9 @@ import {
   approveCounter,
   deleteAdminOrder,
   getAdminOrder,
-  rejectCounter,
 } from '@/lib/orders';
+import { AdminCounterDecision } from '@/components/AdminCounterDecision';
+import { QuoteHistory } from '@/components/QuoteHistory';
 import {
   createAdminConversation,
   getAdminConversation,
@@ -22,7 +23,7 @@ import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
 import { getCustomer } from '@/lib/customers';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import { money, dateShort, quoteLifecycleChip } from '@/lib/format';
-import { lineTotal, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
+import { isAdminRecounter, lineTotal, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
 import { FormPreferencesDisplay } from '@/components/FormPreferencesDisplay';
 import { MessageAttachments } from '@/components/MessageAttachments';
 import type { Order } from '@/lib/types';
@@ -256,15 +257,6 @@ export function AdminQuoteDetail() {
     onError: (e) => setError(getErrorMessage(e)),
   });
 
-  const counterReject = useMutation({
-    mutationFn: () => rejectCounter(id),
-    onSuccess: (res) => {
-      setToast('Counter declined. The studio quote is waiting for the customer.');
-      void applyOrderChange(qc, res.order);
-    },
-    onError: (e) => setError(getErrorMessage(e)),
-  });
-
   if (isLoading) return <div className="empty-state"><div className="empty-state-title">Loading quote…</div></div>;
   if (isError || !order) {
     return (
@@ -291,10 +283,11 @@ export function AdminQuoteDetail() {
     order.status === 'CLIENT_REJECTED_QUOTATION' ||
     order.status === 'CANCELLED';
   const showBuilder = needsPrice || revising;
+  const quotations = (order.quotations ?? []) as QuoteWithLines[];
   const statusChip = quoteLifecycleChip(order.status, 'admin', {
     partiallyAccepted: order.partiallyAccepted,
+    adminRecounter: isAdminRecounter(quotations),
   });
-  const quotations = (order.quotations ?? []) as QuoteWithLines[];
   const studioQuote = studioQuotation(quotations);
   const latestQuote = [...quotations].sort((a, b) => b.version - a.version)[0];
   const studioLines = studioQuote?.lines ?? [];
@@ -491,70 +484,24 @@ export function AdminQuoteDetail() {
 
         <div>
           {awaitingCounter ? (
-            <div className="card" style={{ border: '1.5px solid var(--amber)' }}>
-              <div className="card-h">
-                <span className="ct">
-                  <i className="ti ti-scale" /> Customer counter offer
-                </span>
-              </div>
-              <div className="card-b">
-                <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 6 }}>
-                  Customer&apos;s counter
-                </div>
-                <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--navy)', marginBottom: 8 }}>
-                  {money(latestQuote?.amountCents ?? order.priceCents)}
-                </div>
-                {latestQuote?.comment && (
-                  <div
-                    style={{
-                      fontSize: 13,
-                      color: 'var(--muted)',
-                      marginBottom: 14,
-                      fontStyle: 'italic',
-                    }}
-                  >
-                    &quot;{latestQuote.comment}&quot;
-                  </div>
-                )}
-                {studioQuote && (
-                  <div className="muted" style={{ fontSize: 13, marginBottom: 14 }}>
-                    Studio quote was {money(studioQuote.amountCents)}
-                  </div>
-                )}
-                <div className="note" style={{ margin: '0 0 14px' }}>
-                  <i className="ti ti-info-circle" /> Approve to move the job forward, or reject to
-                  send the studio quote back to the customer.
-                </div>
-                {canApproveCounter ? (
-                  <>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  style={{ width: '100%', justifyContent: 'center', marginBottom: 8 }}
-                  disabled={counterApprove.isPending}
-                  onClick={() => counterApprove.mutate()}
-                >
-                  <i className="ti ti-check" />{' '}
-                  {counterApprove.isPending ? 'Approving…' : 'Approve counter'}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  style={{ width: '100%', justifyContent: 'center' }}
-                  disabled={counterReject.isPending}
-                  onClick={() => counterReject.mutate()}
-                >
-                  <i className="ti ti-x" />{' '}
-                  {counterReject.isPending ? 'Rejecting…' : 'Reject counter'}
-                </button>
-                  </>
-                ) : (
-                  <div className="muted" style={{ fontSize: 13 }}>
-                    Waiting for an admin to approve or reject this counter.
-                  </div>
-                )}
-              </div>
-            </div>
+            <AdminCounterDecision
+              orderId={id}
+              customerAmount={latestQuote?.amountCents ?? order.priceCents}
+              customerNote={latestQuote?.comment}
+              studioAmount={studioQuote?.amountCents}
+              canApprove={canApproveCounter}
+              approvePending={counterApprove.isPending}
+              onApprove={() => counterApprove.mutate()}
+              onDone={(next, kind) => {
+                void applyOrderChange(qc, next);
+                setToast(
+                  kind === 'recounter'
+                    ? 'Re-counter sent. Waiting for the customer.'
+                    : 'Quote closed as declined by the studio.',
+                );
+              }}
+              onError={setError}
+            />
           ) : showBuilder ? (
             <div className="card" style={{ border: '1.5px solid var(--navy)' }}>
               <div className="card-h">
@@ -758,7 +705,7 @@ export function AdminQuoteDetail() {
                     ))}
                   </div>
                 )}
-                {alreadyPriced && (
+                {(alreadyPriced || declined) && (
                   <button
                     type="button"
                     className="btn btn-ghost btn-sm"
@@ -782,6 +729,8 @@ export function AdminQuoteDetail() {
               </div>
             </div>
           )}
+
+          <QuoteHistory quotations={quotations} />
 
           <div className="card" style={{ marginTop: 12 }}>
             <div className="card-h">

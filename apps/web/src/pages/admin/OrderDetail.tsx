@@ -11,14 +11,13 @@ import {
   deliverOrder,
   getAdminOrder,
   listAdminFormatRequests,
-  rejectCounter,
   resendOrderFiles,
   updateAdminFormatRequest,
   updateOrderNotes,
 } from '@/lib/orders';
 import { applyOrderChange, cacheOrder, invalidateWorkCaches } from '@/lib/queryCache';
 import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
-import { createAdminEdit, getOrderActivity, type EditKind } from '@/lib/edits';
+import { createAdminEdit, getOrderActivity, listAdminOrderEdits, type EditKind } from '@/lib/edits';
 import {
   getAdminConversation,
   listAdminConversations,
@@ -30,9 +29,12 @@ import { createInvoice, listInvoices, payInvoice, refundOrder, type RefundTo } f
 import { assignOrder, listTeam, unassignOrder } from '@/lib/team';
 import { updateDesign, type Design, type DesignStatus } from '@/lib/designs';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
-import { money, dateShort } from '@/lib/format';
+import { money, dateShort, lifecycleChip } from '@/lib/format';
+import { AdminCounterDecision } from '@/components/AdminCounterDecision';
 import { FormPreferencesDisplay } from '@/components/FormPreferencesDisplay';
 import { MessageAttachments } from '@/components/MessageAttachments';
+import { QuoteHistory } from '@/components/QuoteHistory';
+import { studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
 import type { Order, OrderStatus } from '@/lib/types';
 import { useAuth } from '@/context/AuthContext';
 import { canFeature, canSupport } from '@/lib/permissions';
@@ -65,8 +67,9 @@ function designChip(status: DesignStatus) {
 
 function designStatusLabel(status: DesignStatus) {
   switch (status) {
-    case 'DONE':
     case 'DELIVERED':
+      return 'Delivered';
+    case 'DONE':
       return 'Ready';
     case 'IN_PROGRESS':
       return 'In progress';
@@ -98,15 +101,19 @@ export function AdminOrderDetail() {
     canFeature(user?.permissions, 'team', user?.role);
   const canApprove = canSupport(user?.permissions, 'approve', user?.role);
   const canApproveCounter = canApprove;
-  const [files, setFiles] = useState<File[]>([]);
+  const isDesigner = user?.role === 'DESIGNER';
+  const canPublishToCustomer = user?.role !== 'SUPPORT' || canApprove;
+  const showSendForApproval = isDesigner || (user?.role === 'SUPPORT' && !canApprove);
   const [msgDraft, setMsgDraft] = useState('');
   const [msgFiles, setMsgFiles] = useState<File[]>([]);
   const [refUploading, setRefUploading] = useState(false);
   const [notes, setNotes] = useState('');
   const [designerId, setDesignerId] = useState('');
   const [notifyPortal, setNotifyPortal] = useState(true);
-  const [deliverByEmail, setDeliverByEmail] = useState(false);
-  const [selectedDesignIds, setSelectedDesignIds] = useState<string[]>([]);
+  const [publishFor, setPublishFor] = useState<Design | null>(null);
+  const [publishFiles, setPublishFiles] = useState<File[]>([]);
+  const [publishSaved, setPublishSaved] = useState(false);
+  const [editingIds, setEditingIds] = useState<string[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -129,6 +136,13 @@ export function AdminOrderDetail() {
     queryKey: ['admin-order-activity', id],
     queryFn: () => getOrderActivity(id),
     enabled: !!id,
+  });
+
+  const editsQ = useQuery({
+    queryKey: ['admin-order-edits', id],
+    queryFn: () => listAdminOrderEdits(id),
+    enabled: !!id,
+    ...freshOnOpen,
   });
 
   const teamQ = useQuery({
@@ -165,11 +179,6 @@ export function AdminOrderDetail() {
     setDesignerId(order?.assignedDesignerId ?? '');
   }, [order?.assignedDesignerId]);
 
-  useEffect(() => {
-    const designs = order?.designs ?? [];
-    setSelectedDesignIds(designs.map((d) => d.id));
-  }, [order?.id, order?.designs?.length]);
-
   const templatesQ = useQuery({
     queryKey: ['message-templates'],
     queryFn: listMessageTemplates,
@@ -195,27 +204,32 @@ export function AdminOrderDetail() {
   };
 
   const deliver = useMutation({
-    mutationFn: (opts: { release: boolean }) => {
-      const designs = order?.designs ?? [];
-      const allSelected =
-        designs.length === 0 || selectedDesignIds.length === designs.length;
-      return deliverOrder(id, files, {
-        deliveredVia: deliverByEmail ? 'EMAIL' : 'PORTAL',
-        designIds: selectedDesignIds.length ? selectedDesignIds : undefined,
+    mutationFn: (opts: {
+      release: boolean;
+      designIds?: string[];
+      upload?: File[];
+    }) =>
+      deliverOrder(id, opts.upload ?? [], {
+        deliveredVia: 'PORTAL',
+        designIds: opts.designIds,
         notifyEmail: opts.release && notifyPortal,
         notifySms: opts.release && notifyPortal,
-        complete: opts.release && allSelected,
+        complete: false,
         release: opts.release,
-      });
-    },
+      }),
     onSuccess: (res, opts) => {
-      setFiles([]);
+      setPublishFiles([]);
+      setPublishFor(null);
+      setPublishSaved(false);
+      if (opts.designIds?.[0]) {
+        setEditingIds((prev) => prev.filter((x) => x !== opts.designIds![0]));
+      }
       if (!opts.release) {
-        setToast('Submitted for approval. The customer cannot see files until you release them.');
+        setToast('Sent to admin for approval. The customer cannot see these files yet.');
       } else if (res.partial) {
-        setToast('Partial release. Order still in progress.');
+        setToast('This design was sent to the customer. Other designs are still in progress.');
       } else {
-        setToast('Files released. The customer can download them from Orders and Files.');
+        setToast('Files sent to the customer. This order is completed.');
       }
       invalidate(res.order);
     },
@@ -249,15 +263,6 @@ export function AdminOrderDetail() {
     mutationFn: () => approveCounter(id),
     onSuccess: (res) => {
       setToast('Counter approved.');
-      invalidate(res.order);
-    },
-    onError: (e) => setError(getErrorMessage(e)),
-  });
-
-  const counterReject = useMutation({
-    mutationFn: () => rejectCounter(id),
-    onSuccess: (res) => {
-      setToast('Counter rejected.');
       invalidate(res.order);
     },
     onError: (e) => setError(getErrorMessage(e)),
@@ -339,15 +344,6 @@ export function AdminOrderDetail() {
     onError: (e) => setError(getErrorMessage(e)),
   });
 
-  useEffect(() => {
-    if (!order || notes === (order.internalNotes ?? '')) return;
-    const t = window.setTimeout(() => {
-      saveNotes.mutate(notes);
-    }, 800);
-    return () => window.clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce notes only
-  }, [notes]);
-
   const markPaid = useMutation({
     mutationFn: async () => {
       if (!order?.priceCents) throw new Error('No price set');
@@ -373,7 +369,14 @@ export function AdminOrderDetail() {
   const setDesignStatus = useMutation({
     mutationFn: (vars: { designId: string; status: DesignStatus }) =>
       updateDesign(id, vars.designId, { status: vars.status }),
-    onSuccess: () => invalidate(),
+    onSuccess: (_res, vars) => {
+      if (vars.status === 'WAITING') {
+        setEditingIds((prev) => prev.filter((x) => x !== vars.designId));
+        setToast('Files removed. This design is waiting again.');
+      }
+      invalidate();
+    },
+    onError: (e) => setError(getErrorMessage(e)),
   });
 
   const resend = useMutation({
@@ -404,9 +407,34 @@ export function AdminOrderDetail() {
   const designs = order.designs ?? [];
   const readyCount = designs.filter((d) => d.status === 'DONE' || d.status === 'DELIVERED').length;
   const progCount = designs.filter((d) => d.status === 'IN_PROGRESS').length;
+  const deliveryFiles = (order.deliveries ?? []).flatMap((batch) =>
+    batch.files.map((f) => ({
+      ...f,
+      releasedAt: batch.releasedAt ?? null,
+    })),
+  );
+  const filesForDesign = (designId: string) =>
+    deliveryFiles.filter((f) => f.designId === designId);
+  const hasSubmitted = (designId: string) => filesForDesign(designId).length > 0;
+  const hasPendingRelease = (designId: string) =>
+    filesForDesign(designId).some((f) => !f.releasedAt);
+  const pendingBatches = (order.deliveries ?? []).filter((d) => !d.releasedAt);
   const payment = payBadge(order.status, order.priceCents);
   const assigned = designers.find((d) => d.id === order.assignedDesignerId);
-  const canDeliver = order.status === 'IN_PROGRESS' || order.status === 'READY_TO_SEND';
+  const canDeliver =
+    order.status === 'IN_PROGRESS' ||
+    order.status === 'READY_TO_SEND' ||
+    order.status === 'COMPLETED' ||
+    order.status === 'REVISION_REQUESTED';
+  const openRevision = (editsQ.data?.edits ?? []).find((e) => e.status === 'PENDING');
+  const revisionIds = openRevision?.designIds ?? [];
+  const designInRevision = (designId: string) =>
+    Boolean(openRevision) &&
+    (revisionIds.length === 0 || revisionIds.includes(designId));
+  const orderChip = lifecycleChip(order.status, 'admin', {
+    partiallyAccepted: order.partiallyAccepted,
+    partiallyDelivered: order.partiallyDelivered,
+  });
   const messages = threadQ.data?.conversation.messages ?? [];
   const activity = activityQ.data?.activity ?? [];
   const hasDeliveries = (order.deliveries ?? []).length > 0;
@@ -431,6 +459,9 @@ export function AdminOrderDetail() {
           <h1>
             #{order.humanRef ?? order.id.slice(0, 6)} · {order.name ?? 'Order'}
           </h1>
+          <div style={{ marginTop: 8 }}>
+            <span className={orderChip.cls}>{orderChip.label}</span>
+          </div>
           <div className="sub">
             {customerName(order)} · {order.serviceType ?? 'Service'} · {designs.length} designs · placed{' '}
             {dateShort(order.createdAt)}
@@ -470,48 +501,82 @@ export function AdminOrderDetail() {
       {error && <div className="alert-error" style={{ marginBottom: 12 }}>{error}</div>}
 
       {order.status === 'WAITING_FOR_ADMIN_QUOTATION_APPROVAL' && (
-        <div className="card" style={{ marginTop: 16, border: '1.5px solid var(--amber)' }}>
+        <div style={{ marginTop: 16 }}>
+          <AdminCounterDecision
+            orderId={id}
+            customerAmount={
+              [...(order.quotations ?? [])].sort((a, b) => b.version - a.version)[0]
+                ?.amountCents ?? order.priceCents
+            }
+            customerNote={
+              [...(order.quotations ?? [])].sort((a, b) => b.version - a.version)[0]
+                ?.comment
+            }
+            studioAmount={studioQuotation(order.quotations as QuoteWithLines[] | undefined)?.amountCents}
+            canApprove={canApproveCounter}
+            approvePending={counterApprove.isPending}
+            onApprove={() => counterApprove.mutate()}
+            onDone={(next, kind) => {
+              invalidate(next);
+              setToast(
+                kind === 'recounter'
+                  ? 'Re-counter sent. Waiting for the customer.'
+                  : 'Quote closed as declined by the studio.',
+              );
+            }}
+            onError={setError}
+          />
+        </div>
+      )}
+
+      <QuoteHistory quotations={order.quotations as QuoteWithLines[] | undefined} />
+
+      {(editsQ.data?.edits.length ?? 0) > 0 && (
+        <div className="card" style={{ marginTop: 16 }}>
           <div className="card-h">
             <span className="ct">
-              <i className="ti ti-scale" /> Customer counter offer
+              <i className="ti ti-refresh" /> Customer revision
             </span>
           </div>
-          <div style={{ padding: '14px 16px' }}>
-            <div style={{ fontSize: 13, marginBottom: 12 }}>
-              Latest amount:{' '}
-              <b style={{ fontSize: 18, color: 'var(--navy)' }}>
-                {money(
-                  [...(order.quotations ?? [])].sort(
-                    (a, b) => b.version - a.version,
-                  )[0]?.amountCents ?? order.priceCents,
+          {(editsQ.data?.edits ?? []).map((e) => {
+            const names = designs
+              .filter((d) => (e.designIds ?? []).includes(d.id) || d.id === e.designId)
+              .map((d) => d.name);
+            return (
+            <div
+              key={e.id}
+              style={{
+                padding: '14px 16px',
+                borderBottom: '0.5px solid var(--line)',
+                display: 'flex',
+                justifyContent: 'space-between',
+                gap: 16,
+                alignItems: 'flex-start',
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>
+                  {e.status === 'DONE' ? 'Resolved' : 'Customer asked for a revision'}
+                </div>
+                <div style={{ marginTop: 8, fontSize: 14, whiteSpace: 'pre-wrap' }}>
+                  {e.note || 'No note was added.'}
+                </div>
+                {names.length > 0 && (
+                  <div style={{ marginTop: 6, fontSize: 12.5, color: 'var(--muted)' }}>
+                    {names.join(', ')}
+                  </div>
                 )}
-              </b>
-            </div>
-            {canApproveCounter ? (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                disabled={counterApprove.isPending}
-                onClick={() => counterApprove.mutate()}
-              >
-                <i className="ti ti-check" /> Approve counter
-              </button>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                disabled={counterReject.isPending}
-                onClick={() => counterReject.mutate()}
-              >
-                <i className="ti ti-x" /> Reject counter
-              </button>
-            </div>
-            ) : (
-              <div className="muted" style={{ fontSize: 13 }}>
-                Waiting for an admin to approve or reject this counter.
+                <div style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)' }}>
+                  {dateShort(e.createdAt)}
+                  {e.kind === 'PAID' ? ' · Paid revision' : ' · Free'}
+                </div>
               </div>
-            )}
-          </div>
+              <span className={e.status === 'DONE' ? 'chip c-done' : 'chip c-review'}>
+                {e.status === 'DONE' ? 'Done' : 'Revision requested'}
+              </span>
+            </div>
+            );
+          })}
         </div>
       )}
 
@@ -598,49 +663,114 @@ export function AdminOrderDetail() {
             {designs.length === 0 && (
               <div style={{ padding: 16, color: 'var(--muted)', fontSize: 13 }}>No designs yet.</div>
             )}
-            {designs.map((d) => (
-              <div key={d.id} className="od-line">
-                <span className="l" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    type="checkbox"
-                    checked={selectedDesignIds.includes(d.id)}
-                    onChange={(e) => {
-                      setSelectedDesignIds((prev) =>
-                        e.target.checked
-                          ? prev.includes(d.id)
-                            ? prev
-                            : [...prev, d.id]
-                          : prev.filter((x) => x !== d.id),
-                      );
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    style={{ padding: '2px 6px', fontSize: 11 }}
-                    onClick={() =>
-                      setDesignStatus.mutate({
-                        designId: d.id,
-                        status: d.status === 'DONE' || d.status === 'DELIVERED' ? 'IN_PROGRESS' : 'DONE',
-                      })
-                    }
-                  >
-                    {d.status === 'DONE' || d.status === 'DELIVERED' ? 'Mark waiting' : 'Mark ready'}
-                  </button>
-                  {d.name}
-                  {d.placement && (
-                    <span style={{ color: 'var(--muted)', fontWeight: 400 }}> ({d.placement})</span>
-                  )}
-                </span>
-                <span className="v">
-                  <span className={designChip(d.status)}>{designStatusLabel(d.status)}</span>
-                </span>
-              </div>
-            ))}
-            <div style={{ padding: '8px 16px 12px', fontSize: 11.5, color: 'var(--muted)' }}>
-              <i className="ti ti-info-circle" /> Tick designs to include in the next release. Leave some
-              unchecked for a partial delivery.
-            </div>
+            {designs.map((d) => {
+              const submitted = hasSubmitted(d.id);
+              const pending = hasPendingRelease(d.id);
+              const hasReleased = filesForDesign(d.id).some((f) => f.releasedAt);
+              const published = d.status === 'DELIVERED' || hasReleased;
+              const inRevision = designInRevision(d.id);
+              const editing = editingIds.includes(d.id) || inRevision;
+              const locked = published && !editing;
+              const canOpenPublish = canDeliver && !locked && (editing || d.status === 'DONE');
+              const markAwaiting = editing && published && !inRevision;
+              const markLabel = markAwaiting
+                ? 'Mark awaiting'
+                : d.status === 'DONE' || d.status === 'DELIVERED'
+                  ? 'Mark in progress'
+                  : 'Mark ready';
+              return (
+                <div key={d.id} className="od-line" style={{ alignItems: 'flex-start', gap: 12 }}>
+                  <span className="l" style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0, flex: 1 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        style={{ padding: '2px 6px', fontSize: 11 }}
+                        disabled={locked || setDesignStatus.isPending}
+                        onClick={() =>
+                          setDesignStatus.mutate({
+                            designId: d.id,
+                            status: markAwaiting
+                              ? 'WAITING'
+                              : d.status === 'DONE' || d.status === 'DELIVERED'
+                                ? 'IN_PROGRESS'
+                                : 'DONE',
+                          })
+                        }
+                      >
+                        {markLabel}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        style={{ padding: '2px 8px', fontSize: 11 }}
+                        disabled={!canOpenPublish}
+                        onClick={() => {
+                          setPublishFor(d);
+                          setPublishFiles([]);
+                          setPublishSaved(false);
+                        }}
+                      >
+                        Publish
+                      </button>
+                      <span style={{ color: 'var(--ink)', fontWeight: 600 }}>
+                        {d.name}
+                        {d.placement && (
+                          <span style={{ color: 'var(--muted)', fontWeight: 400 }}>
+                            {' '}
+                            ({d.placement})
+                          </span>
+                        )}
+                      </span>
+                    </span>
+                    {filesForDesign(d.id).length > 0 && (
+                      <span style={{ fontSize: 12, color: 'var(--muted)' }}>
+                        {filesForDesign(d.id).length} file
+                        {filesForDesign(d.id).length === 1 ? '' : 's'}
+                        {pending ? ' · waiting for approval' : ' · delivered'}
+                      </span>
+                    )}
+                  </span>
+                  <span className="v" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                    <span className={designChip(d.status)}>
+                      {pending
+                        ? 'Waiting for approval'
+                        : inRevision
+                          ? 'Revision requested'
+                          : d.status === 'DELIVERED'
+                            ? 'Delivered'
+                            : designStatusLabel(d.status)}
+                    </span>
+                    {canApprove && pending && (
+                      <button
+                        type="button"
+                        className="btn btn-green btn-sm"
+                        disabled={deliver.isPending}
+                        onClick={() =>
+                          deliver.mutate({ release: true, designIds: [d.id], upload: [] })
+                        }
+                      >
+                        Release
+                      </button>
+                    )}
+                    {submitted && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        disabled={editing}
+                        onClick={() =>
+                          setEditingIds((prev) =>
+                            prev.includes(d.id) ? prev : [...prev, d.id],
+                          )
+                        }
+                      >
+                        Edit
+                      </button>
+                    )}
+                  </span>
+                </div>
+              );
+            })}
           </div>
 
           {(formatReqQ.data?.requests.length ?? 0) > 0 && (
@@ -688,11 +818,11 @@ export function AdminOrderDetail() {
             </div>
           )}
 
-          {(canDeliver || hasDeliveries) && (
+          {hasDeliveries && (
             <div className="card role-manager" style={{ marginTop: 14 }}>
               <div className="card-h">
                 <span className="ct">
-                  <i className="ti ti-checkup-list" /> Finished files &amp; delivery
+                  <i className="ti ti-checkup-list" /> Finished files
                 </span>
               </div>
               <div className="od-files">
@@ -713,93 +843,33 @@ export function AdminOrderDetail() {
                       {f.originalName}
                       {!d.releasedAt && (
                         <span className="chip c-wait" style={{ marginLeft: 8 }}>
-                          Waiting for approval
+                          Waiting for release
                         </span>
                       )}
                     </button>
                   )),
                 )}
-                {canDeliver && (
-                <label className="odf up">
-                  <i className="ti ti-cloud-upload" /> Upload file
-                  <input
-                    type="file"
-                    multiple
-                    hidden
-                    onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
-                  />
-                </label>
-                )}
               </div>
-              {canDeliver && files.length > 0 && (
-                <div style={{ padding: '0 16px', fontSize: 12, color: 'var(--muted)' }}>
-                  {files.length} file(s) selected
-                </div>
-              )}
-              {canDeliver && (
-              <div style={{ padding: '0 16px 14px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, marginBottom: 8, cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={deliverByEmail}
-                    onChange={(e) => setDeliverByEmail(e.target.checked)}
-                  />{' '}
-                  Mark as emailed outside the portal (files still stored here)
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, marginBottom: 10, cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={notifyPortal}
-                    onChange={(e) => setNotifyPortal(e.target.checked)}
-                  />{' '}
-                  Notify customer in the portal
-                </label>
-                {!canApprove && (
-                  <div className="muted" style={{ fontSize: 12, marginBottom: 10 }}>
-                    Submit for approval saves the files for review. The customer sees them only after an admin releases them.
-                  </div>
-                )}
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {!canApprove && order.status === 'IN_PROGRESS' && (
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      disabled={
-                        deliver.isPending ||
-                        updateStatus.isPending ||
-                        (files.length === 0 && !hasDeliveries)
-                      }
-                      onClick={() => {
-                        if (files.length > 0 || hasDeliveries) deliver.mutate({ release: false });
-                        else updateStatus.mutate('READY_TO_SEND');
-                      }}
-                    >
-                      <i className="ti ti-checkup-list" /> Submit for approval
-                    </button>
-                  )}
-                  {order.status === 'READY_TO_SEND' && (
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      disabled={updateStatus.isPending}
-                      onClick={() => updateStatus.mutate('IN_PROGRESS')}
-                    >
-                      <i className="ti ti-arrow-back" /> Send back
-                    </button>
-                  )}
+              {canApprove && pendingBatches.length > 0 && (
+                <div style={{ padding: '0 16px 14px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, marginBottom: 10, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={notifyPortal}
+                      onChange={(e) => setNotifyPortal(e.target.checked)}
+                    />{' '}
+                    Notify customer when released
+                  </label>
                   <button
                     type="button"
                     className="btn btn-green btn-sm"
-                    disabled={
-                      deliver.isPending || (files.length === 0 && !hasDeliveries)
-                    }
-                    onClick={() => deliver.mutate({ release: true })}
+                    disabled={deliver.isPending}
+                    onClick={() => deliver.mutate({ release: true, upload: [] })}
                   >
                     <i className="ti ti-send" />{' '}
-                    {deliver.isPending ? 'Uploading…' : 'Approve & release to customer'}
+                    {deliver.isPending ? 'Releasing…' : 'Release all waiting files'}
                   </button>
                 </div>
-              </div>
               )}
             </div>
           )}
@@ -1080,36 +1150,171 @@ export function AdminOrderDetail() {
               {activity.length === 0 && (
                 <div style={{ padding: 12, color: 'var(--muted)', fontSize: 12 }}>No activity yet.</div>
               )}
-              {activity.map((a) => (
-                <div key={a.id} className="actrow">
-                  <div className="ai">
-                    <i className="ti ti-point" />
+              {activity.map((a) => {
+                const meta =
+                  a.meta && typeof a.meta === 'object'
+                    ? (a.meta as { note?: string; source?: string })
+                    : typeof a.meta === 'string'
+                      ? (() => {
+                          try {
+                            return JSON.parse(a.meta) as { note?: string; source?: string };
+                          } catch {
+                            return {};
+                          }
+                        })()
+                      : {};
+                const label =
+                  a.event === 'edit_requested'
+                    ? meta.source === 'client'
+                      ? 'Customer asked for a revision'
+                      : 'Revision started'
+                    : a.event === 'edit_done'
+                      ? 'Revision marked done'
+                      : a.event.replace(/_/g, ' ');
+                return (
+                  <div key={a.id} className="actrow">
+                    <div className="ai">
+                      <i className="ti ti-point" />
+                    </div>
+                    <div>
+                      <div>{label}</div>
+                      {meta.note ? (
+                        <div style={{ marginTop: 4, color: 'var(--ink)', whiteSpace: 'pre-wrap' }}>
+                          {meta.note}
+                        </div>
+                      ) : null}
+                      <div className="at">{dateShort(a.createdAt)}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div>{a.event}</div>
-                    <div className="at">{dateShort(a.createdAt)}</div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
       </div>
+
+      {publishFor && (
+        <div
+          className="overlay open"
+          onClick={() => {
+            if (deliver.isPending) return;
+            setPublishFor(null);
+            setPublishSaved(false);
+          }}
+        >
+          <div className="modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-h">
+              <span>Publish {publishFor.name}</span>
+              <button
+                type="button"
+                className="modal-x"
+                onClick={() => {
+                  setPublishFor(null);
+                  setPublishSaved(false);
+                }}
+                aria-label="Close"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="modal-b">
+              <p className="muted" style={{ marginTop: 0 }}>
+                {isDesigner
+                  ? 'Attach up to 10 files, click Save, then publish to the customer or send to admin for approval.'
+                  : showSendForApproval
+                    ? 'Attach up to 10 files, click Save, then send them to admin for approval.'
+                    : 'Attach up to 10 files, click Save, then publish them to the customer.'}
+              </p>
+              <label className="odf up" style={{ marginBottom: 12, display: 'inline-flex' }}>
+                <i className="ti ti-cloud-upload" /> Choose files
+                <input
+                  type="file"
+                  multiple
+                  hidden
+                  onChange={(e) => {
+                    const next = Array.from(e.target.files ?? []).slice(0, 10);
+                    setPublishFiles(next);
+                    setPublishSaved(false);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+              {publishFiles.length > 0 && (
+                <div className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>
+                  {publishFiles.map((f) => f.name).join(', ')}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  disabled={deliver.isPending}
+                  onClick={() => {
+                    setPublishFor(null);
+                    setPublishSaved(false);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  disabled={deliver.isPending || publishFiles.length === 0 || publishSaved}
+                  onClick={() => setPublishSaved(true)}
+                >
+                  {publishSaved ? 'Saved' : 'Save'}
+                </button>
+                {showSendForApproval && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    disabled={deliver.isPending || !publishSaved || publishFiles.length === 0}
+                    onClick={() =>
+                      deliver.mutate({
+                        release: false,
+                        designIds: [publishFor.id],
+                        upload: publishFiles,
+                      })
+                    }
+                  >
+                    {deliver.isPending ? 'Sending…' : 'Send for approval'}
+                  </button>
+                )}
+                {canPublishToCustomer && (
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    disabled={deliver.isPending || !publishSaved || publishFiles.length === 0}
+                    onClick={() =>
+                      deliver.mutate({
+                        release: true,
+                        designIds: [publishFor.id],
+                        upload: publishFiles,
+                      })
+                    }
+                  >
+                    {deliver.isPending ? 'Publishing…' : 'Publish to customer'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showRevision && (
         <RevisionModal
           orderRef={order.humanRef ?? order.id.slice(0, 6)}
           defaultDesignerId={order.assignedDesignerId ?? ''}
           designers={designers}
+          designs={designs}
           onClose={() => setShowRevision(false)}
           onSubmit={async (data) => {
-            const res = await createAdminEdit(id, data);
+            await createAdminEdit(id, data);
             setShowRevision(false);
-            setToast('Revision created.');
+            setToast('Revision started on this order.');
             invalidate();
-            if (res.edit.revisionOrderId) {
-              navigate(`/admin/orders/${res.edit.revisionOrderId}`);
-            }
+            void qc.invalidateQueries({ queryKey: ['admin-order-edits', id] });
           }}
         />
       )}
@@ -1141,17 +1346,20 @@ function RevisionModal({
   orderRef,
   defaultDesignerId,
   designers,
+  designs,
   onClose,
   onSubmit,
 }: {
   orderRef: string;
   defaultDesignerId: string;
   designers: Array<{ id: string; firstName: string | null; email: string; skills: string[] }>;
+  designs: Design[];
   onClose: () => void;
   onSubmit: (data: {
     note: string;
     kind: EditKind;
     priceCents?: number | null;
+    designIds?: string[];
     assignedDesignerId?: string | null;
   }) => Promise<void>;
 }) {
@@ -1160,12 +1368,18 @@ function RevisionModal({
   const [price, setPrice] = useState('');
   const [designerId, setDesignerId] = useState(defaultDesignerId);
   const [assignDesigner, setAssignDesigner] = useState(!!defaultDesignerId);
+  const [designIds, setDesignIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const showPicker = designs.length > 1;
 
   const handleSubmit = async () => {
     if (!note.trim()) {
       setError('Describe what needs to change.');
+      return;
+    }
+    if (showPicker && designIds.length === 0) {
+      setError('Pick which designs need a revision.');
       return;
     }
     setError(null);
@@ -1176,6 +1390,7 @@ function RevisionModal({
         kind,
         priceCents:
           kind === 'PAID' && price ? Math.round(Number(price) * 100) : kind === 'PAID' ? 0 : null,
+        designIds: showPicker ? designIds : designs[0] ? [designs[0].id] : [],
         assignedDesignerId: assignDesigner && designerId ? designerId : null,
       });
     } catch (e) {
@@ -1197,9 +1412,39 @@ function RevisionModal({
         <div className="modal-b">
           {error && <div className="alert-error" style={{ marginBottom: 12 }}>{error}</div>}
           <div className="note" style={{ marginTop: 0, marginBottom: 12 }}>
-            <i className="ti ti-info-circle" /> Creates a linked revision order. Original files stay
-            untouched.
+            <i className="ti ti-info-circle" /> Stays on this order. The customer keeps the old files
+            until you publish new ones.
           </div>
+          {showPicker && (
+            <div className="ff">
+              <label>Which designs</label>
+              {designs.map((d) => (
+                <label
+                  key={d.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    fontSize: 13,
+                    marginBottom: 6,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={designIds.includes(d.id)}
+                    onChange={() =>
+                      setDesignIds((prev) =>
+                        prev.includes(d.id) ? prev.filter((x) => x !== d.id) : [...prev, d.id],
+                      )
+                    }
+                  />
+                  {d.name}
+                  {d.placement ? ` (${d.placement})` : ''}
+                </label>
+              ))}
+            </div>
+          )}
           <div className="ff">
             <label>What needs to change</label>
             <textarea
@@ -1215,7 +1460,7 @@ function RevisionModal({
               style={{ flex: 1, justifyContent: 'center' }}
               onClick={() => setKind('FREE')}
             >
-              Free edit
+              Free revision
             </button>
             <button
               type="button"
@@ -1223,12 +1468,12 @@ function RevisionModal({
               style={{ flex: 1, justifyContent: 'center' }}
               onClick={() => setKind('PAID')}
             >
-              Paid edit
+              Paid revision
             </button>
           </div>
           {kind === 'PAID' && (
             <div className="ff">
-              <label>Edit price. Payment link goes out first.</label>
+              <label>Revision price. Payment link goes out first.</label>
               <input
                 type="number"
                 step="0.01"

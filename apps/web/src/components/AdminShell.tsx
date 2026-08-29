@@ -163,7 +163,7 @@ export function AdminShell() {
         )}
         {can('edits') && (
           <NavLink to="/admin/edits" className={({ isActive }) => (isActive ? 'on' : undefined)}>
-            <i className="ti ti-refresh" /> Edits
+            <i className="ti ti-refresh" /> Revisions
           </NavLink>
         )}
         {can('customers') && (

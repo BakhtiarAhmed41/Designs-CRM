@@ -14,6 +14,7 @@ import { EditsService } from './edits.service';
 
 const requestEditSchema = z.object({
   note: z.string().min(1),
+  designIds: z.array(z.string()).optional(),
 });
 
 @Controller('orders')

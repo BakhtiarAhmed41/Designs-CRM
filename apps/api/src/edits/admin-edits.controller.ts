@@ -24,6 +24,7 @@ const createEditSchema = z.object({
   kind: z.enum([EditKind.FREE, EditKind.PAID]),
   priceCents: z.number().int().nonnegative().optional().nullable(),
   designId: z.string().optional().nullable(),
+  designIds: z.array(z.string()).optional().nullable(),
   assignedDesignerId: z.string().optional().nullable(),
 });
 
@@ -92,6 +93,15 @@ export class AdminEditsController {
     const data = updateEditSchema.parse(body);
     const edit = await this.edits.updateEdit(user, id, data);
     return { edit };
+  }
+
+  @Get('orders/:id/edits')
+  async listForOrder(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('id') id: string,
+  ) {
+    const edits = await this.edits.listEditsForOrder(user, id);
+    return { edits };
   }
 
   @Get('orders/:id/activity')

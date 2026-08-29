@@ -125,6 +125,7 @@ export function AdminOrders() {
               {orders.map((o) => {
                 const chip = lifecycleChip(o.status as OrderStatus, 'admin', {
                   partiallyAccepted: o.partiallyAccepted,
+                  partiallyDelivered: o.partiallyDelivered,
                 });
                 return (
                   <tr key={o.id} className="click-row" onClick={() => navigate(`/admin/orders/${o.id}`)}>

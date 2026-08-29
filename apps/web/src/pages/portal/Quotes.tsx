@@ -6,7 +6,7 @@ import { listMyOrderSummary, listMyOrders, listQuoteDrafts } from '@/lib/orders'
 import { money, dateShort, quoteLifecycleChip } from '@/lib/format';
 import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import type { Order } from '@/lib/types';
-import { studioQuotation } from '@/lib/quoteHelpers';
+import { isAdminRecounter, studioQuotation } from '@/lib/quoteHelpers';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { SkeletonRows } from '@/components/ui/Skeleton';
@@ -18,6 +18,13 @@ const DRAFT_LABELS: Record<string, string> = {
   svg: 'SVG & cut files',
   vector: 'Vector & print files',
   laser: 'CNC & laser cut files',
+};
+
+const DRAFT_ICONS: Record<string, string> = {
+  embroidery: 'ti-needle-thread',
+  svg: 'ti-vector-triangle',
+  vector: 'ti-vector-bezier',
+  laser: 'ti-router',
 };
 
 function isQuoteOrder(o: Order) {
@@ -40,6 +47,7 @@ export function PortalQuotes() {
   const location = useLocation();
   const qc = useQueryClient();
   const [quoteOpen, setQuoteOpen] = useState(false);
+  const [draftsOpen, setDraftsOpen] = useState(false);
   const [draftService, setDraftService] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,9 +89,16 @@ export function PortalQuotes() {
   });
 
   const quotes = (data?.orders ?? []).filter((o) => isQuoteOrder(o));
+  const drafts = draftsQ.data?.drafts ?? [];
   const totalPages = data?.totalPages ?? 1;
   const awaiting = summaryQ.data?.awaitingQuote ?? 0;
   const pricing = summaryQ.data?.beingPriced ?? 0;
+
+  function continueDraft(serviceKey: string) {
+    setDraftsOpen(false);
+    setDraftService(serviceKey);
+    setQuoteOpen(true);
+  }
 
   return (
     <div>
@@ -91,39 +106,20 @@ export function PortalQuotes() {
         title="Quotes"
         subtitle="See our price, then approve to start, or message us to adjust."
         actions={
-          <button type="button" className="btn btn-primary" onClick={() => setQuoteOpen(true)}>
-            <i className="ti ti-plus" /> Request a quote
-          </button>
+          <>
+            {drafts.length > 0 && (
+              <button type="button" className="btn btn-ghost" onClick={() => setDraftsOpen(true)}>
+                <i className="ti ti-device-floppy" /> Open drafts
+              </button>
+            )}
+            <button type="button" className="btn btn-primary" onClick={() => setQuoteOpen(true)}>
+              <i className="ti ti-plus" /> Request a quote
+            </button>
+          </>
         }
       />
 
       {error && <ErrorBanner>{error}</ErrorBanner>}
-
-      {(draftsQ.data?.drafts ?? []).length > 0 && (
-        <div className="card" style={{ marginBottom: 12 }}>
-          <div className="card-h">
-            <span className="ct">Saved drafts</span>
-          </div>
-          {(draftsQ.data?.drafts ?? []).map((d) => (
-            <div key={d.serviceKey} className="orow" style={{ cursor: 'default' }}>
-              <div className="oinfo">
-                <div className="on">{DRAFT_LABELS[d.serviceKey] ?? d.serviceKey}</div>
-                <div className="om">Saved {dateShort(d.updatedAt)}</div>
-              </div>
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={() => {
-                  setDraftService(d.serviceKey);
-                  setQuoteOpen(true);
-                }}
-              >
-                Continue draft
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
 
       <div className="metric-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
         <div className="metric" style={{ cursor: 'default' }}>
@@ -189,6 +185,7 @@ export function PortalQuotes() {
         {quotes.map((o) => {
           const chip = quoteLifecycleChip(o.status, 'customer', {
             partiallyAccepted: o.partiallyAccepted,
+            adminRecounter: isAdminRecounter(o.quotations),
           });
           const quote = studioQuotation(o.quotations);
           const lines = quote?.lines ?? [];
@@ -249,6 +246,59 @@ export function PortalQuotes() {
         total={data?.total ?? quotes.length}
         onPage={setPage}
       />
+
+      {draftsOpen && (
+        <div className="overlay open" onClick={() => setDraftsOpen(false)}>
+          <div className="modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-h">
+              <span>Saved drafts</span>
+              <button
+                type="button"
+                className="modal-x"
+                onClick={() => setDraftsOpen(false)}
+                aria-label="Close"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="modal-b" style={{ padding: 0 }}>
+              {drafts.length === 0 ? (
+                <p className="muted" style={{ margin: 0, padding: 18 }}>
+                  No saved drafts.
+                </p>
+              ) : (
+                drafts.map((d, i) => (
+                  <div
+                    key={d.serviceKey}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      padding: '14px 18px',
+                      borderBottom: i === drafts.length - 1 ? 'none' : '1px solid var(--line)',
+                    }}
+                  >
+                    <div className={`thumb${d.serviceKey === 'embroidery' ? ' m' : ''}`}>
+                      <i className={`ti ${DRAFT_ICONS[d.serviceKey] ?? 'ti-file'}`} />
+                    </div>
+                    <div className="oinfo" style={{ flex: 1, minWidth: 0 }}>
+                      <div className="on">{DRAFT_LABELS[d.serviceKey] ?? d.serviceKey}</div>
+                      <div className="om">Saved {dateShort(d.updatedAt)}</div>
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={() => continueDraft(d.serviceKey)}
+                    >
+                      Continue
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <QuoteBuilderModal
         open={quoteOpen}

@@ -2,7 +2,8 @@ import { Fragment, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { createOrder, getMyOrder, listMyOrders } from '@/lib/orders';
-import { requestEdit } from '@/lib/edits';
+import { listMyEdits, requestEdit } from '@/lib/edits';
+import { RevisionRequestForm } from '@/components/RevisionRequestForm';
 import { getErrorMessage } from '@/lib/api';
 import { money, dateShort, lifecycleChip } from '@/lib/format';
 import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
@@ -34,13 +35,19 @@ function orderChip(o: Order, designs?: Design[]): { cls: string; label: string }
   if (['REVISION_REQUESTED', 'PENDING_PAYMENT'].includes(o.status)) {
     return lifecycleChip(o.status, 'customer');
   }
-  if (designs && designs.length > 0) {
-    const done = designs.filter((d) => d.status === 'DELIVERED' || d.status === 'DONE').length;
-    if (done > 0 && done < designs.length) {
-      return { cls: 'chip c-prog', label: `${done} of ${designs.length} done` };
+  if (o.partiallyDelivered) {
+    return { cls: 'chip c-prog', label: 'Partially delivered' };
+  }
+  if (designs && designs.length > 1) {
+    const delivered = designs.filter((d) => d.status === 'DELIVERED').length;
+    if (delivered > 0 && delivered < designs.length) {
+      return { cls: 'chip c-prog', label: 'Partially delivered' };
     }
   }
-  return lifecycleChip(o.status, 'customer', { partiallyAccepted: o.partiallyAccepted });
+  return lifecycleChip(o.status, 'customer', {
+    partiallyAccepted: o.partiallyAccepted,
+    partiallyDelivered: o.partiallyDelivered,
+  });
 }
 
 function designLineIcon(status: Design['status']) {
@@ -62,6 +69,7 @@ function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
   const qc = useQueryClient();
   const [revOpen, setRevOpen] = useState(false);
   const [revNote, setRevNote] = useState('');
+  const [revDesignIds, setRevDesignIds] = useState<string[]>([]);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
 
@@ -71,13 +79,21 @@ function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
     enabled: open,
   });
 
+  const editsQ = useQuery({
+    queryKey: ['my-order-edits', orderId],
+    queryFn: () => listMyEdits(orderId),
+    enabled: open,
+  });
+
   const revMut = useMutation({
-    mutationFn: (note: string) => requestEdit(orderId, note),
+    mutationFn: (designIds: string[]) => requestEdit(orderId, revNote.trim(), designIds),
     onSuccess: () => {
       setRevOpen(false);
       setRevNote('');
+      setRevDesignIds([]);
       setActionError(null);
       void invalidateWorkCaches(qc);
+      void qc.invalidateQueries({ queryKey: ['my-order-edits', orderId] });
     },
     onError: (e) => setActionError(getErrorMessage(e)),
   });
@@ -85,6 +101,12 @@ function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
   const designs = (data?.order as { designs?: Design[] } | undefined)?.designs ?? [];
   const order = data?.order;
   const isDelivered = DONE.includes(order?.status ?? '');
+  const openRevision = (editsQ.data?.edits ?? []).find((e) => e.status === 'PENDING');
+  const revisionIds = openRevision?.designIds ?? [];
+  const canRequestRevision =
+    isDelivered ||
+    order?.status === 'REVISION_REQUESTED' ||
+    designs.some((d) => d.status === 'DELIVERED');
 
   async function handleReorder() {
     if (!order?.serviceType) return;
@@ -124,7 +146,7 @@ function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
     );
   }
 
-  const deliveredActions = isDelivered ? (
+  const deliveredActions = canRequestRevision ? (
     <>
       {actionError && (
         <div className="alert-error" style={{ margin: '8px 0' }}>
@@ -140,9 +162,11 @@ function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
           flexWrap: 'wrap',
         }}
       >
-        <Link to="/portal/files" className="btn btn-ghost btn-sm" onClick={(e) => e.stopPropagation()}>
-          <i className="ti ti-download" /> Download files
-        </Link>
+        {(isDelivered || designs.some((d) => d.status === 'DELIVERED')) && (
+          <Link to="/portal/files" className="btn btn-ghost btn-sm" onClick={(e) => e.stopPropagation()}>
+            <i className="ti ti-download" /> Download files
+          </Link>
+        )}
         <button
           type="button"
           className="btn btn-ghost btn-sm"
@@ -153,66 +177,39 @@ function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
         >
           <i className="ti ti-edit" /> Request revision
         </button>
-        <button
-          type="button"
-          className="btn btn-primary btn-sm"
-          disabled={actionBusy}
-          onClick={(e) => {
-            e.stopPropagation();
-            void handleReorder();
-          }}
-        >
-          <i className="ti ti-refresh" /> {actionBusy ? 'Creating…' : 'Reorder'}
-        </button>
+        {isDelivered && (
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            disabled={actionBusy}
+            onClick={(e) => {
+              e.stopPropagation();
+              void handleReorder();
+            }}
+          >
+            <i className="ti ti-refresh" /> {actionBusy ? 'Creating…' : 'Reorder'}
+          </button>
+        )}
       </div>
       {revOpen && (
-        <div
-          style={{
-            borderTop: '0.5px solid var(--line)',
-            paddingTop: 12,
-            marginTop: 4,
+        <RevisionRequestForm
+          designs={designs}
+          note={revNote}
+          onNote={setRevNote}
+          selectedIds={revDesignIds}
+          onToggle={(id) =>
+            setRevDesignIds((prev) =>
+              prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+            )
+          }
+          onCancel={() => {
+            setRevOpen(false);
+            setRevNote('');
+            setRevDesignIds([]);
           }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <label style={{ fontSize: 12, fontWeight: 500, display: 'block', marginBottom: 6 }}>
-            What should we change?
-          </label>
-          <textarea
-            value={revNote}
-            onChange={(e) => setRevNote(e.target.value)}
-            placeholder="Describe the revision you need…"
-            rows={3}
-            style={{
-              width: '100%',
-              border: '0.5px solid var(--line)',
-              borderRadius: 8,
-              padding: '8px 10px',
-              fontSize: 13,
-              fontFamily: 'inherit',
-              resize: 'vertical',
-            }}
-          />
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => {
-                setRevOpen(false);
-                setRevNote('');
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              disabled={!revNote.trim() || revMut.isPending}
-              onClick={() => revMut.mutate(revNote.trim())}
-            >
-              {revMut.isPending ? 'Sending…' : 'Submit revision request'}
-            </button>
-          </div>
-        </div>
+          onSubmit={(ids) => revMut.mutate(ids)}
+          pending={revMut.isPending}
+        />
       )}
     </>
   ) : null;
@@ -224,8 +221,13 @@ function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
   return (
     <div className="batch">
       {designs.map((d) => {
+        const inRevision =
+          Boolean(openRevision) &&
+          (revisionIds.length === 0 || revisionIds.includes(d.id));
         const ic = designLineIcon(d.status);
-        const chip = designChip(d.status);
+        const chip = inRevision
+          ? { cls: 'chip c-review', label: 'Revision requested' }
+          : designChip(d.status);
         return (
           <div key={d.id} className="line">
             <span className="ln">

@@ -28,6 +28,27 @@ export function latestCounter(
   );
 }
 
+/** Latest staff quote after the customer has already sent a counter. */
+export function isAdminRecounter(
+  quotations?: QuoteWithLines[] | null,
+): boolean {
+  const list = [...(quotations ?? [])].sort(byVersionDesc);
+  const latest = list[0];
+  if (!latest || latest.createdByRole === 'CLIENT') return false;
+  return list.some((q) => q.createdByRole === 'CLIENT');
+}
+
+export function quoteHistoryLabel(
+  q: QuoteWithLines,
+  all: QuoteWithLines[],
+): string {
+  if (q.createdByRole === 'CLIENT') return 'Customer counter';
+  const hadClientBefore = all.some(
+    (other) => other.createdByRole === 'CLIENT' && other.version < q.version,
+  );
+  return hadClientBefore ? 'Re-counter from studio' : 'Studio quote';
+}
+
 export function lineTotal(l: QuotationLine) {
   return (l.priceCents ?? 0) + l.sizes.reduce((s, sz) => s + (sz.priceCents ?? 0), 0);
 }

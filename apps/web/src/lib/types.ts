@@ -91,6 +91,7 @@ export type Attachment = {
 
 export type DeliveryFile = {
   id: string;
+  designId?: string | null;
   originalName: string;
   formatLabel: string | null;
 };
@@ -127,7 +128,9 @@ export type Order = {
   currency: string;
   assignedDesignerId?: string | null;
   internalNotes?: string | null;
+  rejectionReason?: string | null;
   partiallyAccepted?: boolean;
+  partiallyDelivered?: boolean;
   createdAt: string;
   updatedAt: string;
   attachments?: Attachment[];
