@@ -1750,18 +1750,22 @@ export class BillingService {
 }
 
 function invoiceLogoSrc() {
-  const candidates = [
-    join(__dirname, 'assets', 'lvd-logo.png'),
-    join(__dirname, '..', 'assets', 'lvd-logo.png'),
-    join(__dirname, '..', '..', 'assets', 'lvd-logo.png'),
-    join(process.cwd(), 'assets', 'lvd-logo.png'),
-    join(process.cwd(), 'apps', 'api', 'assets', 'lvd-logo.png'),
-    join(process.cwd(), '..', 'web', 'public', 'lvd-logo.png'),
-    join(process.cwd(), 'apps', 'web', 'public', 'lvd-logo.png'),
+  const names = ['lvd-logo-print.png', 'lvd-logo.png'];
+  const dirs = [
+    join(__dirname, 'assets'),
+    join(__dirname, '..', 'assets'),
+    join(__dirname, '..', '..', 'assets'),
+    join(process.cwd(), 'assets'),
+    join(process.cwd(), 'apps', 'api', 'assets'),
+    join(process.cwd(), '..', 'web', 'public'),
+    join(process.cwd(), 'apps', 'web', 'public'),
   ];
-  for (const file of candidates) {
-    if (!existsSync(file)) continue;
-    return `data:image/png;base64,${readFileSync(file).toString('base64')}`;
+  for (const name of names) {
+    for (const dir of dirs) {
+      const file = join(dir, name);
+      if (!existsSync(file)) continue;
+      return `data:image/png;base64,${readFileSync(file).toString('base64')}`;
+    }
   }
   return '';
 }
@@ -1883,9 +1887,11 @@ function buildInvoicePrintHtml(
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="color-scheme" content="light only"/>
 <title>Invoice LVD-${ref}</title>
 <style>
   :root {
+    color-scheme: light only;
     --navy: #143F65;
     --navy-d: #0E2E4A;
     --ink: #16202a;
@@ -1954,6 +1960,9 @@ function buildInvoicePrintHtml(
     flex-shrink: 0;
     background: #fff;
     border-radius: 6px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color-adjust: exact;
   }
   .studio {
     font-size: 11px;
@@ -2109,8 +2118,11 @@ function buildInvoicePrintHtml(
       display: block !important;
     }
     .foot { margin-top: 48px; }
-    .note { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-    .logo { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    html, body, img, .logo, .note, .stamp, .mono {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
   }
 </style>
 </head>
