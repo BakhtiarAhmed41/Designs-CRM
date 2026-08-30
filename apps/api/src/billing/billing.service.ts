@@ -2066,17 +2066,30 @@ function buildInvoicePrintHtml(
     line-height: 1.55;
   }
   .foot strong { display: block; color: var(--navy); font-size: 12px; margin-bottom: 2px; }
-  @page { size: letter; margin: 0.62in 0.68in; }
+  /* Browser “Margins: None” drops @page margins. Keep space on the page itself. */
+  @page { size: A4; margin: 0; }
   @media print {
-    html, body { background: #fff; }
-    .toolbar { display: none; }
+    html {
+      background: #fff !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    body {
+      background: #fff !important;
+      margin: 0 !important;
+      padding: 18mm 16mm 16mm !important;
+    }
+    .toolbar { display: none !important; }
+    .page {
+      padding: 0 !important;
+    }
     .sheet {
-      width: auto;
-      min-height: 0;
-      margin: 0;
-      padding: 0;
-      box-shadow: none;
-      display: block;
+      width: auto !important;
+      min-height: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      box-shadow: none !important;
+      display: block !important;
     }
     .foot { margin-top: 48px; }
     .note { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
@@ -2089,6 +2102,7 @@ function buildInvoicePrintHtml(
     <span>Use Print and choose “Save as PDF” for a clean copy.</span>
     <button type="button" onclick="window.print()">Print</button>
   </div>
+  <div class="page">
   <article class="sheet">
     <header class="brand">
       <div class="mark">
@@ -2188,6 +2202,7 @@ function buildInvoicePrintHtml(
       </div>
     </footer>
   </article>
+  </div>
   <script>
     function go(){ window.print(); }
     if (document.fonts && document.fonts.ready) {
