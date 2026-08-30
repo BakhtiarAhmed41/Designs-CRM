@@ -1212,6 +1212,14 @@ export class OrdersService {
       throw new BadRequestException('Keep at least one line to approve');
     }
 
+    const customer = order.customer_id
+      ? await this.db.queryOne<{ account_type: AccountType }>(
+          'SELECT account_type FROM customers WHERE id = ? LIMIT 1',
+          [order.customer_id],
+        )
+      : null;
+    const billPerOrder = customer?.account_type !== AccountType.NET_MONTHLY;
+
     let totalCents = 0;
     for (const line of lines) {
       const kept = keepIds.has(line.id);
@@ -1228,6 +1236,7 @@ export class OrdersService {
       }
     }
 
+    let billedCents: number | null = null;
     if (lines.length > 0) {
       const quotedTotal =
         latest.amount_cents != null && Number.isFinite(Number(latest.amount_cents))
@@ -1235,13 +1244,18 @@ export class OrdersService {
           : null;
       const allKept = keepIds.size === lines.length;
       const orderPrice = allKept && quotedTotal != null ? quotedTotal : totalCents;
+      billedCents = orderPrice;
+      const nextStatus =
+        orderPrice > 0 && billPerOrder
+          ? OrderStatus.PENDING_PAYMENT
+          : OrderStatus.IN_PROGRESS;
       await this.db.execute(
         'UPDATE quotations SET status = ?, amount_cents = ? WHERE id = ?',
         [QuotationStatus.APPROVED, orderPrice, latest.id],
       );
       await this.db.execute(
         `UPDATE orders SET status = ?, type = ?, price_cents = ?, approved_at = NOW() WHERE id = ?`,
-        [OrderStatus.IN_PROGRESS, OrderType.ORDER, orderPrice, orderId],
+        [nextStatus, OrderType.ORDER, orderPrice, orderId],
       );
 
       await this.ensureDesignsFromQuotationLines(orderId, lines, keepIds);
@@ -1250,14 +1264,33 @@ export class OrdersService {
         latest.amount_cents != null && Number.isFinite(Number(latest.amount_cents))
           ? Math.round(Number(latest.amount_cents))
           : null;
+      billedCents = amountCents;
+      const nextStatus =
+        amountCents != null && amountCents > 0 && billPerOrder
+          ? OrderStatus.PENDING_PAYMENT
+          : OrderStatus.IN_PROGRESS;
       await this.db.execute(
         'UPDATE quotations SET status = ? WHERE id = ?',
         [QuotationStatus.APPROVED, latest.id],
       );
       await this.db.execute(
         `UPDATE orders SET status = ?, type = ?, price_cents = COALESCE(?, price_cents), approved_at = NOW() WHERE id = ?`,
-        [OrderStatus.IN_PROGRESS, OrderType.ORDER, amountCents, orderId],
+        [nextStatus, OrderType.ORDER, amountCents, orderId],
       );
+    }
+
+    if (
+      billedCents != null &&
+      billedCents > 0 &&
+      billPerOrder &&
+      order.customer_id
+    ) {
+      await this.billing.billPayPerOrderQuote({
+        customerId: order.customer_id,
+        orderId,
+        amountCents: billedCents,
+        coversText: order.name,
+      });
     }
 
     await this.convertQuoteChatToOrderChat(orderId);
@@ -2130,6 +2163,15 @@ export class OrdersService {
   ) {
     this.assertAdmin(user);
     const release = options?.release !== false;
+    if (
+      release &&
+      user.role === UserRole.DESIGNER &&
+      !hasSupportPerm(user.role, user.permissions, 'approve')
+    ) {
+      throw new ForbiddenException(
+        'You cannot publish directly to the customer. Send for approval instead.',
+      );
+    }
     const incoming = files ?? [];
 
     const order = await this.getOrderRow(orderId);
@@ -2389,6 +2431,42 @@ export class OrdersService {
   ) {
     this.assertAdmin(user);
     return this.signDeliveryFile(orderId, deliveryFileId);
+  }
+
+  async deleteAdminDeliveryFile(
+    user: AuthUser | undefined,
+    orderId: string,
+    deliveryFileId: string,
+  ) {
+    this.assertAdmin(user);
+    const row = await this.db.queryOne<{
+      id: string;
+      delivery_id: string;
+      storage_key: string;
+    }>(
+      `SELECT df.id, df.delivery_id, df.storage_key
+         FROM delivery_files df
+         JOIN deliveries d ON d.id = df.delivery_id
+        WHERE df.id = ? AND d.order_id = ? LIMIT 1`,
+      [deliveryFileId, orderId],
+    );
+    if (!row) throw new NotFoundException('Delivery file not found');
+    await this.db.execute(
+      'UPDATE format_requests SET delivery_file_id = NULL WHERE delivery_file_id = ?',
+      [deliveryFileId],
+    );
+    await this.db.execute('DELETE FROM delivery_files WHERE id = ?', [deliveryFileId]);
+    const left = await this.db.queryOne<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM delivery_files WHERE delivery_id = ?',
+      [row.delivery_id],
+    );
+    if (!left || Number(left.n) === 0) {
+      await this.db.execute('DELETE FROM deliveries WHERE id = ?', [row.delivery_id]);
+    }
+    await this.storage.deleteObject(row.storage_key);
+    const order = await this.getOrderRow(orderId);
+    if (!order) throw new NotFoundException('Order not found');
+    return this.orderDto(order);
   }
 
   // --- designs -------------------------------------------------------------
@@ -2929,11 +3007,16 @@ export class OrdersService {
       created_at: Date;
       human_ref: string | null;
       order_name: string | null;
+      invoice_id: string | null;
+      price_cents: number | null;
+      invoice_status: string | null;
     }>(
       `SELECT f.id, f.order_id, f.requested_format, f.note, f.status, f.created_at,
-              o.human_ref, o.name AS order_name
+              o.human_ref, o.name AS order_name,
+              f.invoice_id, f.price_cents, i.status AS invoice_status
          FROM format_requests f
          JOIN orders o ON o.id = f.order_id
+         LEFT JOIN invoices i ON i.id = f.invoice_id
         ${orderId ? 'WHERE f.order_id = ?' : ''}
         ORDER BY f.created_at DESC`,
       orderId ? [orderId] : [],
@@ -2947,6 +3030,9 @@ export class OrdersService {
       createdAt: r.created_at,
       humanRef: r.human_ref,
       orderName: r.order_name,
+      invoiceId: r.invoice_id,
+      priceCents: r.price_cents,
+      invoiceStatus: r.invoice_status,
     }));
   }
 
@@ -2961,10 +3047,216 @@ export class OrdersService {
       [id],
     );
     if (!row) throw new NotFoundException('Format request not found');
-    await this.db.execute(
-      `UPDATE format_requests SET status = ?, resolved_at = CASE WHEN ? IN ('DONE','CANCELLED') THEN NOW() ELSE resolved_at END WHERE id = ?`,
-      [status, status, id],
-    );
+    if (status === 'DONE') {
+      throw new BadRequestException(
+        'Upload the export file to finish this request',
+      );
+    }
+    await this.db.execute('UPDATE format_requests SET status = ? WHERE id = ?', [
+      status,
+      id,
+    ]);
+    if (status === 'CANCELLED') {
+      try {
+        await this.db.execute(
+          'UPDATE format_requests SET resolved_at = NOW() WHERE id = ?',
+          [id],
+        );
+      } catch {
+        /* older databases may not have resolved_at */
+      }
+    }
     return { id, status };
+  }
+
+  async fulfillFormatRequest(
+    user: AuthUser | undefined,
+    requestId: string,
+    files: Express.Multer.File[],
+    amountCents?: number | null,
+  ) {
+    this.assertAdmin(user);
+    if (
+      user.role === UserRole.SUPPORT &&
+      !hasSupportPerm(user.role, user.permissions, 'approve')
+    ) {
+      throw new ForbiddenException(
+        'Support cannot release files without approve permission',
+      );
+    }
+    const incoming = files ?? [];
+    if (incoming.length === 0) {
+      throw new BadRequestException('Upload the export file first');
+    }
+    if (incoming.length > 10) {
+      throw new BadRequestException('Upload at most 10 files at a time');
+    }
+
+    const req = await this.db.queryOne<{
+      id: string;
+      order_id: string;
+      requested_format: string;
+      status: string;
+      invoice_id: string | null;
+    }>(
+      'SELECT id, order_id, requested_format, status, invoice_id FROM format_requests WHERE id = ? LIMIT 1',
+      [requestId],
+    );
+    if (!req) throw new NotFoundException('Format request not found');
+    if (req.status === 'DONE' || req.status === 'CANCELLED') {
+      throw new BadRequestException('This format request is already closed');
+    }
+    if (req.invoice_id) {
+      const existingInv = await this.db.queryOne<{ status: string }>(
+        'SELECT status FROM invoices WHERE id = ? LIMIT 1',
+        [req.invoice_id],
+      );
+      if (!existingInv || existingInv.status === 'AWAITING') {
+        throw new BadRequestException(
+          'This export is already waiting for payment',
+        );
+      }
+      if (existingInv.status === 'PAID') {
+        throw new BadRequestException('This export was already invoiced');
+      }
+    }
+
+    const chargeCents =
+      typeof amountCents === 'number' && Number.isFinite(amountCents)
+        ? Math.round(amountCents)
+        : 0;
+    if (chargeCents < 0)
+      throw new BadRequestException('Fee cannot be negative');
+
+    const order = await this.getOrderRow(req.order_id);
+    if (!order) throw new NotFoundException('Order not found');
+    if (chargeCents > 0 && !order.customer_id) {
+      throw new BadRequestException(
+        'Link a customer before charging for this export',
+      );
+    }
+
+    const latest = await this.db.queryOne<{ version: number }>(
+      'SELECT version FROM deliveries WHERE order_id = ? ORDER BY version DESC LIMIT 1',
+      [req.order_id],
+    );
+    const nextVersion = (latest?.version ?? 0) + 1;
+    const deliveryId = randomUUID();
+    await this.db.execute(
+      `INSERT INTO deliveries
+         (id, order_id, version, delivered_via, created_by_admin_id, released_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        deliveryId,
+        req.order_id,
+        nextVersion,
+        DeliveredVia.PORTAL,
+        user.id,
+        chargeCents > 0 ? null : new Date(),
+      ],
+    );
+
+    let firstFileId: string | null = null;
+    for (const f of incoming) {
+      const fileId = randomUUID();
+      if (!firstFileId) firstFileId = fileId;
+      const key = this.storage.newObjectKey(
+        ['orders', req.order_id, 'deliveries', String(nextVersion)],
+        f.originalname,
+      );
+      await this.storage.uploadObject({
+        key,
+        body: f.buffer,
+        contentType: f.mimetype,
+      });
+      await this.db.execute(
+        `INSERT INTO delivery_files
+           (id, delivery_id, design_id, format_label, original_name, mime_type, byte_size, storage_key)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          fileId,
+          deliveryId,
+          null,
+          formatLabelFromName(f.originalname) ?? req.requested_format,
+          f.originalname,
+          f.mimetype || null,
+          typeof f.size === 'number' ? f.size : null,
+          key,
+        ],
+      );
+    }
+
+    const ref = order.human_ref ?? order.name ?? req.order_id.slice(0, 6);
+
+    if (chargeCents > 0) {
+      const covers = `${req.requested_format} export for ${ref}`;
+      const invoice = await this.billing.createAddonInvoice(user, {
+        customerId: order.customer_id!,
+        orderId: req.order_id,
+        amountCents: chargeCents,
+        coversText: covers,
+      });
+      const payLink = await this.billing.createPayLink(user, invoice.id);
+      await this.db.execute(
+        `UPDATE format_requests
+            SET status = ?, delivery_file_id = COALESCE(?, delivery_file_id),
+                invoice_id = ?, price_cents = ?
+          WHERE id = ?`,
+        ['IN_PROGRESS', firstFileId, invoice.id, chargeCents, requestId],
+      );
+      const email = await this.customerEmailForOrder(order);
+      if (email) {
+        const amountLabel = `$${(chargeCents / 100).toFixed(2)}`;
+        await this.mail.sendFormatInvoice(
+          email,
+          req.requested_format,
+          ref,
+          amountLabel,
+          payLink.url,
+        );
+      }
+      return {
+        id: requestId,
+        status: 'IN_PROGRESS' as const,
+        awaitingPayment: true,
+        invoiceId: invoice.id,
+        payLinkUrl: payLink.url,
+        order: this.orderDto((await this.getOrderRow(req.order_id))!),
+      };
+    }
+
+    await this.db.execute(
+      `UPDATE format_requests
+          SET status = ?, delivery_file_id = COALESCE(?, delivery_file_id)
+        WHERE id = ?`,
+      ['DONE', firstFileId, requestId],
+    );
+    try {
+      await this.db.execute(
+        'UPDATE format_requests SET resolved_at = NOW() WHERE id = ?',
+        [requestId],
+      );
+    } catch {
+      /* older databases may not have resolved_at */
+    }
+
+    if (order.client_user_id) {
+      await this.notifications.createFor(order.client_user_id, {
+        title: `${req.requested_format} file is ready`,
+        body: `Your ${req.requested_format} export for ${ref} is in Files.`,
+        link: '/portal/files',
+      });
+    }
+    const email = await this.customerEmailForOrder(order);
+    if (email) {
+      await this.mail.sendFormatReady(email, req.requested_format, ref);
+    }
+
+    return {
+      id: requestId,
+      status: 'DONE' as const,
+      awaitingPayment: false,
+      order: this.orderDto((await this.getOrderRow(req.order_id))!),
+    };
   }
 }

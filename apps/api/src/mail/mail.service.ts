@@ -206,12 +206,50 @@ export class MailService {
     return this.sendMail({
       to,
       subject: `Invoice reminder: ${coversText}`,
-      text: `This is a reminder that ${coversText} (${amountLabel}) is still awaiting payment.\n\n${link}\n\nCard checkout is not live in the portal yet. Reply to this email or use the portal if you have store credit.`,
+      text: `This is a reminder that ${coversText} (${amountLabel}) is still awaiting payment.\n\nPay securely with a card here:\n${link}`,
       html: wrapHtml(
         'Payment reminder',
         `<p>This is a reminder that <strong>${coversText}</strong> (${amountLabel}) is still awaiting payment.</p>
-         <p><a href="${link}">View invoice</a></p>
-         <p>Card checkout is not live in the portal yet. Reply to this email or use store credit in the portal if you have a balance.</p>`,
+         <p><a href="${link}">Pay this invoice</a></p>
+         <p>You can pay by card on that page, or use store credit in the portal if you have a balance.</p>`,
+      ),
+    });
+  }
+
+  async sendFormatInvoice(
+    to: string,
+    format: string,
+    orderRef: string,
+    amountLabel: string,
+    payUrl: string,
+  ) {
+    const link = payUrl.startsWith('http') ? payUrl : `${webBase()}${payUrl}`;
+    return this.sendMail({
+      to,
+      subject: `Invoice for ${format} export: ${orderRef}`,
+      text: `Your ${format} export for ${orderRef} is ready after payment (${amountLabel}).\n\nPay here:\n${link}`,
+      html: wrapHtml(
+        'Export invoice',
+        `<p>Your <strong>${format}</strong> export for <strong>${orderRef}</strong> is ready after payment (${amountLabel}).</p>
+         <p><a href="${link}">Pay this invoice</a></p>`,
+      ),
+    });
+  }
+
+  async sendFormatReady(
+    to: string,
+    format: string,
+    orderRef: string,
+  ) {
+    const link = `${webBase()}/portal/files`;
+    return this.sendMail({
+      to,
+      subject: `Your ${format} file is ready: ${orderRef}`,
+      text: `Your ${format} export for ${orderRef} is in your Files library.\n\n${link}`,
+      html: wrapHtml(
+        'Your export is ready',
+        `<p>Your <strong>${format}</strong> export for <strong>${orderRef}</strong> is in your Files library.</p>
+         <p><a href="${link}">Open Files</a></p>`,
       ),
     });
   }

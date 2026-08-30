@@ -70,6 +70,11 @@ const envSchema = z.object({
     .min(16)
     .optional()
     .or(z.literal('')),
+
+  // Stripe. Empty until keys are added. Secret and webhook stay server-side.
+  STRIPE_SECRET_KEY: z.string().optional().default(''),
+  STRIPE_PUBLISHABLE_KEY: z.string().optional().default(''),
+  STRIPE_WEBHOOK_SECRET: z.string().optional().default(''),
 });
 
 export type Env = z.infer<typeof envSchema>;

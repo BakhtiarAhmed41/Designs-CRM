@@ -3,6 +3,33 @@ import type { Order } from './types';
 
 export type DesignStatus = 'WAITING' | 'IN_PROGRESS' | 'DONE' | 'DELIVERED';
 
+/** Same words on admin and customer: Waiting → In progress → Ready → Delivered */
+export function designStatusLabel(status: DesignStatus | string): string {
+  switch (status) {
+    case 'DELIVERED':
+      return 'Delivered';
+    case 'DONE':
+      return 'Ready';
+    case 'IN_PROGRESS':
+      return 'In progress';
+    default:
+      return 'Waiting';
+  }
+}
+
+export function designStatusChipClass(status: DesignStatus | string): string {
+  switch (status) {
+    case 'DELIVERED':
+      return 'chip c-done';
+    case 'DONE':
+      return 'chip c-review';
+    case 'IN_PROGRESS':
+      return 'chip c-prog';
+    default:
+      return 'chip c-wait';
+  }
+}
+
 export type Design = {
   id: string;
   orderId: string;

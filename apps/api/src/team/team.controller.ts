@@ -45,6 +45,7 @@ const updateSchema = z.object({
   skills: z.array(z.string().min(1).max(60)).optional(),
   permissions: z.record(z.string(), z.boolean()).optional(),
   presence: z.nativeEnum(Presence).optional(),
+  password: z.string().min(8).max(200).optional(),
 });
 
 const presenceSchema = z.object({

@@ -156,6 +156,19 @@ export function parseSupportPermissions(value: unknown): SupportPermissions {
   };
 }
 
+function parseDesignerFlags(value: unknown): {
+  messageClients: boolean;
+  deliverDirect: boolean;
+} {
+  const obj = parseJsonObject(value);
+  return {
+    messageClients:
+      obj.messageClients !== undefined ? Boolean(obj.messageClients) : true,
+    deliverDirect:
+      obj.deliverDirect !== undefined ? Boolean(obj.deliverDirect) : false,
+  };
+}
+
 /** Resolve effective nav/API permissions for a staff user. */
 export function resolvePermissions(input: {
   role: UserRole;
@@ -226,6 +239,24 @@ export function resolvePermissions(input: {
 
   // DESIGNER and others
   features = expandMessagingFeatures(features);
+  if (input.role === UserRole.DESIGNER) {
+    const designer = parseDesignerFlags(input.userPermissions);
+    features = {
+      ...features,
+      messages_customer_view: designer.messageClients,
+      messages_customer_reply: designer.messageClients,
+      messages_customer_start: false,
+    };
+    return {
+      features,
+      support: {
+        money: false,
+        approve: designer.deliverDirect,
+        netTerms: false,
+        messages: designer.messageClients,
+      },
+    };
+  }
   return {
     features,
     support: {

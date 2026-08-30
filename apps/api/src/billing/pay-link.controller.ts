@@ -1,5 +1,10 @@
-import { Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { z } from 'zod';
 import { BillingService } from './billing.service';
+
+const checkoutSchema = z.object({
+  returnOrigin: z.string().optional(),
+});
 
 /**
  * PUBLIC guest pay-link endpoints. Intentionally has NO guards so a customer
@@ -15,8 +20,20 @@ export class PayLinkController {
     return this.billing.getPayLinkSummary(token);
   }
 
+  @Post(':token/checkout')
+  async checkout(@Param('token') token: string, @Body() body: unknown) {
+    const data = checkoutSchema.parse(body ?? {});
+    return this.billing.startCheckoutForPayLink(token, data.returnOrigin);
+  }
+
+  @Post(':token/confirm')
+  async confirm(@Param('token') token: string) {
+    return this.billing.confirmPayLink(token);
+  }
+
   @Post(':token')
-  async pay(@Param('token') token: string) {
-    return this.billing.payViaPayLink(token);
+  async pay(@Param('token') token: string, @Body() body: unknown) {
+    const data = checkoutSchema.parse(body ?? {});
+    return this.billing.payViaPayLink(token, data.returnOrigin);
   }
 }

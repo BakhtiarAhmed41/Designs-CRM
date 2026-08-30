@@ -287,6 +287,13 @@ export function deleteAdminOrder(orderId: string) {
   });
 }
 
+export function deleteAdminDeliveryFile(orderId: string, fileId: string) {
+  return apiFetch<{ order: Order }>(
+    `/admin/orders/${orderId}/delivery-files/${fileId}`,
+    { method: 'DELETE' },
+  );
+}
+
 export function listQuoteDrafts() {
   return apiFetch<{
     drafts: Array<{ serviceKey: string; payload: unknown; updatedAt: string }>;
@@ -338,6 +345,9 @@ export type FormatRequest = {
   createdAt: string;
   humanRef: string | null;
   orderName: string | null;
+  invoiceId?: string | null;
+  priceCents?: number | null;
+  invoiceStatus?: 'AWAITING' | 'PAID' | 'CANCELLED' | null;
 };
 
 export function listAdminFormatRequests(orderId?: string) {
@@ -353,6 +363,26 @@ export function updateAdminFormatRequest(
     `/admin/orders/format-requests/${id}`,
     { method: 'PATCH', body: JSON.stringify({ status }) },
   );
+}
+
+export function fulfillAdminFormatRequest(
+  id: string,
+  files: File[],
+  amountCents?: number,
+) {
+  const form = new FormData();
+  files.forEach((f) => form.append('files', f));
+  if (amountCents && amountCents > 0) {
+    form.append('amountCents', String(amountCents));
+  }
+  return apiFetchForm<{
+    id: string;
+    status: string;
+    awaitingPayment?: boolean;
+    invoiceId?: string;
+    payLinkUrl?: string;
+    order: Order;
+  }>(`/admin/orders/format-requests/${id}/fulfill`, form);
 }
 export function adminAttachmentUrl(orderId: string, attachmentId: string) {
   return `/admin/orders/${orderId}/attachments/${attachmentId}/signed-url`;

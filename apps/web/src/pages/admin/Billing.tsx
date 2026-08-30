@@ -196,8 +196,10 @@ export function AdminBilling() {
         </div>
         <div className="metric" style={{ cursor: 'default' }}>
           <div className="ml">Net-monthly unbilled</div>
-          <div className="mv">{money(s?.storeCreditOutstandingCents ?? 0)}</div>
-          <div className="md">{monthlyStatements.length} trade accounts</div>
+          <div className="mv">{money(s?.netMonthlyUnbilledCents ?? 0)}</div>
+          <div className="md">
+            {monthlyStatements.length} statement{monthlyStatements.length === 1 ? '' : 's'} waiting
+          </div>
         </div>
         <div className="metric" style={{ cursor: 'default' }}>
           <div className="ml">Avg order value</div>
@@ -235,9 +237,20 @@ export function AdminBilling() {
             <div style={{ display: 'flex', gap: 6 }}>
               <button
                 type="button"
+                className="btn btn-primary btn-sm"
+                disabled={linkMut.isPending}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  linkMut.mutate(inv.id);
+                }}
+              >
+                <i className="ti ti-credit-card" /> Pay-link
+              </button>
+              <button
+                type="button"
                 className="btn btn-ghost btn-sm"
                 disabled={remindMut.isPending}
-                title="Sends an in-portal payment reminder with a confirmation link"
+                title="Sends a payment reminder with a card checkout link"
                 onClick={(e) => {
                   e.stopPropagation();
                   remindMut.mutate(inv.id);
@@ -318,7 +331,14 @@ export function AdminBilling() {
             <div className="oinfo">
               <div className="on">{inv.customerName ?? 'Customer'}</div>
               <div className="om">
-                <span>{inv.coversText ?? (inv.kind === 'MONTHLY' ? 'Monthly' : 'Per order')}</span>
+                <span>
+                  {inv.coversText ??
+                    (inv.kind === 'MONTHLY'
+                      ? 'Monthly'
+                      : inv.kind === 'ADD_ON'
+                        ? 'Add-on'
+                        : 'Per order')}
+                </span>
                 <span>{dateShort(inv.issuedAt)}</span>
               </div>
             </div>
@@ -340,7 +360,7 @@ export function AdminBilling() {
                     className="btn btn-ghost btn-sm"
                     onClick={() => linkMut.mutate(inv.id)}
                   >
-                    Pay-link
+                    <i className="ti ti-credit-card" /> Card link
                   </button>
                 </>
               )}
@@ -492,14 +512,14 @@ function PayLinkModal({ url, onClose }: { url: string; onClose: () => void }) {
     <div className="overlay open" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-h">
-          <span>Guest pay-link</span>
+          <span>Customer card pay link</span>
           <button type="button" className="modal-x" onClick={onClose}>
             &times;
           </button>
         </div>
         <div className="modal-b">
           <div className="ff">
-            <label>Payment URL</label>
+            <label>Send this link. The customer pays by card on Stripe.</label>
             <input readOnly value={url} onFocus={(e) => e.target.select()} />
           </div>
           <button

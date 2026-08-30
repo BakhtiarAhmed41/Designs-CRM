@@ -162,6 +162,7 @@ export type EditStatus = (typeof EditStatus)[keyof typeof EditStatus];
 export const InvoiceKind = {
   PER_ORDER: 'PER_ORDER',
   MONTHLY: 'MONTHLY',
+  ADD_ON: 'ADD_ON',
 } as const;
 export type InvoiceKind = (typeof InvoiceKind)[keyof typeof InvoiceKind];
 

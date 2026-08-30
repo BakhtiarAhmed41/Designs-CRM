@@ -71,7 +71,7 @@ export function AdminShell() {
   const can = (key: FeatureKey) => Boolean(features[key]);
   const isDesigner = role === 'DESIGNER';
   const showMessages = canAnyMessaging(features);
-  const showCustomerMessages = can('messages') || can('messages_customer_view');
+  const showCustomerMessages = can('messages_customer_view');
   const showTeamMessages = can('messages') || can('messages_team_view');
   const showMyWork = isDesigner || (!can('dashboard') && can('orders'));
   const showOwnerChat = role !== 'SUPER_ADMIN' && (showTeamMessages || isDesigner);
@@ -119,6 +119,11 @@ export function AdminShell() {
         {can('dashboard') && (
           <NavLink to="/admin" end className={({ isActive }) => (isActive ? 'on' : undefined)}>
             <i className="ti ti-home" /> Dashboard
+          </NavLink>
+        )}
+        {can('dashboard') && (
+          <NavLink to="/admin/reports" className={({ isActive }) => (isActive ? 'on' : undefined)}>
+            <i className="ti ti-chart-bar" /> Reports
           </NavLink>
         )}
         {showMyWork && (

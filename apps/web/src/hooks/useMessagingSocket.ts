@@ -102,8 +102,11 @@ export function useMessagingSocket(handlers: {
     socket.on('presence:update', onPresenceUpdate);
 
     const onVisibility = () => {
-      if (document.visibilityState === 'visible' && socket.connected) {
+      if (!socket.connected) return;
+      if (document.visibilityState === 'visible') {
         socket.emit('presence:online');
+      } else {
+        socket.emit('presence:away');
       }
     };
     document.addEventListener('visibilitychange', onVisibility);
@@ -149,7 +152,7 @@ export function showBrowserNotification(title: string, body?: string) {
   if (Notification.permission !== 'granted') return;
   if (document.visibilityState === 'visible') return;
   try {
-    new Notification(title, { body, icon: '/favicon.ico' });
+    new Notification(title, { body, icon: '/favicon.png' });
   } catch {
     /* ignore */
   }

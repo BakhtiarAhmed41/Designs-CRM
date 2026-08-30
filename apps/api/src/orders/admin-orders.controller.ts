@@ -254,6 +254,25 @@ export class AdminOrdersController {
     return this.orders.updateFormatRequest(user, requestId, data.status);
   }
 
+  @Post('format-requests/:requestId/fulfill')
+  @UseInterceptors(
+    FilesInterceptor('files', 10, {
+      storage: memoryStorage(),
+      limits: { fileSize: 50 * 1024 * 1024 },
+    }),
+  )
+  async fulfillFormatRequest(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('requestId') requestId: string,
+    @UploadedFiles() files: Express.Multer.File[],
+    @Body() body: Record<string, string>,
+  ) {
+    const raw = Number(body?.amountCents);
+    const amountCents =
+      Number.isFinite(raw) && raw > 0 ? Math.round(raw) : undefined;
+    return this.orders.fulfillFormatRequest(user, requestId, files, amountCents);
+  }
+
   @Post()
   async duplicate(
     @CurrentUser() user: AuthUser | undefined,
@@ -513,6 +532,20 @@ export class AdminOrdersController {
     @Param('deliveryFileId') deliveryFileId: string,
   ) {
     return this.orders.getAdminDeliveryFileSignedUrl(user, orderId, deliveryFileId);
+  }
+
+  @Delete(':id/delivery-files/:deliveryFileId')
+  async deleteDeliveryFile(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('id') orderId: string,
+    @Param('deliveryFileId') deliveryFileId: string,
+  ) {
+    const order = await this.orders.deleteAdminDeliveryFile(
+      user,
+      orderId,
+      deliveryFileId,
+    );
+    return { order };
   }
 
   @Delete(':id')

@@ -1,11 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  confirmMyInvoice,
   listMyInvoices,
   openInvoicePrint,
   payMyInvoice,
+  startMyInvoiceCheckout,
   type Invoice,
-  type PayMethod,
 } from '@/lib/billing';
 import { getMyCustomer } from '@/lib/customers';
 import { getErrorMessage } from '@/lib/api';
@@ -28,9 +30,12 @@ function invoiceChip(status: Invoice['status'], kind: Invoice['kind'], periodMon
 
 export function PortalInvoices() {
   const qc = useQueryClient();
+  const [params] = useSearchParams();
+  const paidReturn = params.get('paid') === '1';
   const [filter, setFilter] = useState<InvFilter>('all');
   const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
+  const confirmedReturn = useRef(false);
 
   const { data: meCustomer } = useQuery({
     queryKey: ['portal-customer-me'],
@@ -46,6 +51,7 @@ export function PortalInvoices() {
   const isNet = meCustomer?.customer?.accountType === 'NET_MONTHLY';
   const invoices = data?.invoices ?? [];
   const storeCreditCents = data?.storeCreditCents ?? 0;
+  const unbilledMonthCents = data?.unbilledMonthCents ?? 0;
 
   const filtered = useMemo(() => {
     if (filter === 'pending') return invoices.filter((i) => i.status === 'AWAITING');
@@ -59,18 +65,40 @@ export function PortalInvoices() {
   const runningMonth = useMemo(() => {
     const now = new Date();
     const period = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
-    return invoices
+    const billedThisMonth = invoices
       .filter((i) => i.kind === 'MONTHLY' && i.periodMonth === period)
       .reduce((s, i) => s + i.amountCents, 0);
-  }, [invoices]);
+    return billedThisMonth + unbilledMonthCents;
+  }, [invoices, unbilledMonthCents]);
 
   const lastPending = invoices.find((i) => i.status === 'AWAITING' && i.kind === 'MONTHLY');
   const paidLifetime = invoices
     .filter((i) => i.status === 'PAID')
     .reduce((s, i) => s + i.amountCents, 0);
 
+  useEffect(() => {
+    if (!paidReturn || confirmedReturn.current) return;
+    const awaiting = (data?.invoices ?? []).filter((i) => i.status === 'AWAITING');
+    if (!data) return;
+    confirmedReturn.current = true;
+    void Promise.all(awaiting.map((i) => confirmMyInvoice(i.id).catch(() => null))).then(
+      () => void invalidateWorkCaches(qc),
+    );
+  }, [paidReturn, data, qc]);
+
   const payMut = useMutation({
-    mutationFn: ({ id, method }: { id: string; method: PayMethod }) => payMyInvoice(id, method),
+    mutationFn: async (inv: Invoice) => {
+      const useCredit = storeCreditCents >= inv.amountCents;
+      if (useCredit) {
+        const ok = window.confirm(
+          `Pay ${money(inv.amountCents, inv.currency)} from your store credit?`,
+        );
+        if (!ok) return;
+        await payMyInvoice(inv.id, 'STORE_CREDIT');
+        return;
+      }
+      await startMyInvoiceCheckout(inv.id);
+    },
     onSuccess: () => {
       setError(null);
       void invalidateWorkCaches(qc);
@@ -222,7 +250,13 @@ export function PortalInvoices() {
                   <tr key={inv.id}>
                     <td className="inv-id">{invId}</td>
                     <td>{inv.coversText ?? (inv.kind === 'MONTHLY' ? 'Monthly statement' : 'Invoice')}</td>
-                    <td style={{ color: 'var(--muted)' }}>{inv.kind === 'MONTHLY' ? 'Statement' : 'Order'}</td>
+                    <td style={{ color: 'var(--muted)' }}>
+                      {inv.kind === 'MONTHLY'
+                        ? 'Statement'
+                        : inv.kind === 'ADD_ON'
+                          ? 'Add-on'
+                          : 'Order'}
+                    </td>
                     <td className="amt">{money(inv.amountCents, inv.currency)}</td>
                     <td style={{ color: 'var(--muted)' }}>
                       {inv.status === 'AWAITING' && chip.label === 'Building'
@@ -239,18 +273,10 @@ export function PortalInvoices() {
                             type="button"
                             className="btn btn-primary btn-sm"
                             disabled={payMut.isPending}
-                            onClick={() => {
-                              const method: PayMethod = useCredit ? 'STORE_CREDIT' : 'CARD';
-                              const ok = window.confirm(
-                                useCredit
-                                  ? `Pay ${money(inv.amountCents, inv.currency)} from your store credit?`
-                                  : `Mark this ${money(inv.amountCents, inv.currency)} invoice as paid? Use this if you have already sent payment. Card checkout is not live yet.`,
-                              );
-                              if (!ok) return;
-                              payMut.mutate({ id: inv.id, method });
-                            }}
+                            onClick={() => payMut.mutate(inv)}
                           >
-                            {useCredit ? 'Use credit' : 'Pay now'}
+                            <i className={`ti ${useCredit ? 'ti-wallet' : 'ti-credit-card'}`} />{' '}
+                            {useCredit ? 'Use credit' : 'Pay with card'}
                           </button>
                         )}
                         <button

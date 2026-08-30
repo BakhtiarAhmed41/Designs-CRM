@@ -54,6 +54,15 @@ async function main() {
     await conn.query(readFileSync(schemaPath, 'utf8'));
   }
 
+  async function indexExists(table: string, indexName: string): Promise<boolean> {
+    const [rows] = await conn.query<mysql.RowDataPacket[]>(
+      `SELECT COUNT(*) AS cnt FROM information_schema.STATISTICS
+       WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = ?`,
+      [env.DB_NAME, table, indexName],
+    );
+    return Number(rows[0]?.cnt ?? 0) > 0;
+  }
+
   async function columnExists(table: string, column: string): Promise<boolean> {
     const [cols] = await conn.query<mysql.RowDataPacket[]>(
       `SELECT COUNT(*) AS cnt FROM information_schema.COLUMNS
@@ -161,6 +170,58 @@ async function main() {
   if (!(await columnExists('edit_requests', 'design_ids'))) {
     console.log('Adding edit_requests.design_ids column ...');
     await conn.query('ALTER TABLE edit_requests ADD COLUMN design_ids JSON NULL');
+  }
+
+  if (!(await columnExists('payments', 'stripe_checkout_session_id'))) {
+    console.log('Adding payments.stripe_checkout_session_id column ...');
+    await conn.query(
+      'ALTER TABLE payments ADD COLUMN stripe_checkout_session_id VARCHAR(255) NULL',
+    );
+  }
+  if (!(await columnExists('payments', 'stripe_payment_intent_id'))) {
+    console.log('Adding payments.stripe_payment_intent_id column ...');
+    await conn.query(
+      'ALTER TABLE payments ADD COLUMN stripe_payment_intent_id VARCHAR(255) NULL',
+    );
+  }
+  if (!(await indexExists('payments', 'uq_stripe_session'))) {
+    console.log('Adding payments.uq_stripe_session index ...');
+    await conn.query(
+      'ALTER TABLE payments ADD UNIQUE KEY uq_stripe_session (stripe_checkout_session_id)',
+    );
+  }
+
+  if (!(await columnExists('format_requests', 'resolved_at'))) {
+    console.log('Adding format_requests.resolved_at column ...');
+    await conn.query(
+      'ALTER TABLE format_requests ADD COLUMN resolved_at DATETIME NULL',
+    );
+  }
+
+  if (!(await columnExists('format_requests', 'invoice_id'))) {
+    console.log('Adding format_requests.invoice_id column ...');
+    await conn.query(
+      'ALTER TABLE format_requests ADD COLUMN invoice_id CHAR(36) NULL',
+    );
+  }
+  if (!(await columnExists('format_requests', 'price_cents'))) {
+    console.log('Adding format_requests.price_cents column ...');
+    await conn.query(
+      'ALTER TABLE format_requests ADD COLUMN price_cents INT NULL',
+    );
+  }
+
+  const [kindCols] = await conn.query<mysql.RowDataPacket[]>(
+    `SELECT COLUMN_TYPE AS t FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'invoices' AND COLUMN_NAME = 'kind'`,
+    [env.DB_NAME],
+  );
+  const kindType = String(kindCols[0]?.t ?? '');
+  if (kindType && !kindType.includes('ADD_ON')) {
+    console.log('Adding invoices.kind ADD_ON ...');
+    await conn.query(
+      "ALTER TABLE invoices MODIFY COLUMN kind ENUM('PER_ORDER','MONTHLY','ADD_ON') NOT NULL DEFAULT 'PER_ORDER'",
+    );
   }
 
   if (!(await columnExists('quotation_lines', 'attachment_id'))) {

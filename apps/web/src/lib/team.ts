@@ -45,6 +45,7 @@ export type UpdateTeamMemberInput = {
   skills?: string[];
   permissions?: Record<string, boolean>;
   presence?: Presence;
+  password?: string;
 };
 
 export function listTeam() {

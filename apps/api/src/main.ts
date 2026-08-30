@@ -8,7 +8,7 @@ import { ZodExceptionFilter } from './common/zod-exception.filter';
 
 async function bootstrap() {
   const env = getEnv();
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   app.setGlobalPrefix('api');
   app.use(cookieParser());

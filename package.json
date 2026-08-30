@@ -30,5 +30,8 @@
   "homepage": "https://github.com/BakhtiarAhmed41/Designs-CRM#readme",
   "devDependencies": {
     "concurrently": "^9.2.1"
+  },
+  "dependencies": {
+    "fdir": "^6.5.0"
   }
 }

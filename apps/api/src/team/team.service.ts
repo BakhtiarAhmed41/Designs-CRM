@@ -108,7 +108,16 @@ export class TeamService {
        ORDER BY u.role ASC, u.first_name ASC, u.email ASC`,
       ACTIVE_STATUSES,
     );
-    return rows.map((r) => this.staffDto(r, Number(r.workload ?? 0)));
+    const live = this.gateway?.connectedUserIds?.() ?? null;
+    return rows.map((r) => {
+      const dto = this.staffDto(r, Number(r.workload ?? 0));
+      if (!live) return dto;
+      if (!live.has(r.id)) return { ...dto, presence: Presence.OFF };
+      return {
+        ...dto,
+        presence: r.presence === Presence.AWAY ? Presence.AWAY : Presence.ON,
+      };
+    });
   }
 
   private async getStaffRow(id: string): Promise<StaffRow | null> {
@@ -166,6 +175,7 @@ export class TeamService {
       skills?: string[];
       permissions?: Record<string, boolean>;
       presence?: Presence;
+      password?: string;
     },
   ) {
     const existing = await this.getStaffRow(id);
@@ -214,11 +224,24 @@ export class TeamService {
       sets.push('presence = ?');
       params.push(data.presence);
     }
+    if (data.password) {
+      if (data.password.length < 8) {
+        throw new BadRequestException('Password must be at least 8 characters');
+      }
+      sets.push('password_hash = ?');
+      params.push(await hashSecret(data.password));
+    }
     if (sets.length > 0) {
       params.push(id);
       await this.db.execute(
         `UPDATE users SET ${sets.join(', ')} WHERE id = ?`,
         params,
+      );
+    }
+    if (data.password) {
+      await this.db.execute(
+        'UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = ? AND revoked_at IS NULL',
+        [id],
       );
     }
 
@@ -234,6 +257,7 @@ export class TeamService {
       presence,
       userId,
     ]);
+    this.gateway?.broadcastPresence?.(userId, presence);
     const row = await this.getStaffRow(userId);
     const workload = await this.workloadFor(userId);
     return this.staffDto(row!, workload);

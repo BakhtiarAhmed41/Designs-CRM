@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { startMyOrderCheckout } from '@/lib/billing';
 import {
   acceptQuotation,
   counterQuotation,
@@ -16,7 +17,12 @@ import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import { money, lifecycleChip, dateShort } from '@/lib/format';
 import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import { createMyConversation, listMyConversations } from '@/lib/messaging';
-import type { Design, QuotationLine } from '@/lib/designs';
+import {
+  designStatusChipClass,
+  designStatusLabel,
+  type Design,
+  type QuotationLine,
+} from '@/lib/designs';
 import type { Order, Quotation } from '@/lib/types';
 import { studioQuotation } from '@/lib/quoteHelpers';
 import { QuoteHistory } from '@/components/QuoteHistory';
@@ -32,20 +38,6 @@ type PortalOrderFull = Omit<Order, 'quotations'> & {
   quotations?: QuoteWithLines[];
 };
 
-const DESIGN_STATUS_CHIP: Record<string, string> = {
-  WAITING: 'chip c-wait',
-  IN_PROGRESS: 'chip c-prog',
-  DONE: 'chip c-prog',
-  DELIVERED: 'chip c-done',
-};
-
-const DESIGN_STATUS_LABEL: Record<string, string> = {
-  WAITING: 'Waiting',
-  IN_PROGRESS: 'In progress',
-  DONE: 'In progress',
-  DELIVERED: 'Delivered',
-};
-
 export function PortalOrderDetail() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
@@ -57,6 +49,7 @@ export function PortalOrderDetail() {
   const [revOpen, setRevOpen] = useState(false);
   const [revNote, setRevNote] = useState('');
   const [revDesignIds, setRevDesignIds] = useState<string[]>([]);
+  const [payBusy, setPayBusy] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['my-order', id],
@@ -200,6 +193,23 @@ export function PortalOrderDetail() {
         ]}
         actions={
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {order.status === 'PENDING_PAYMENT' && (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              disabled={payBusy}
+              onClick={() => {
+                setPayBusy(true);
+                setActionError(null);
+                void startMyOrderCheckout(order.id).catch((e) => {
+                  setActionError(getErrorMessage(e));
+                  setPayBusy(false);
+                });
+              }}
+            >
+              <i className="ti ti-credit-card" /> {payBusy ? 'Opening checkout…' : 'Pay with card'}
+            </button>
+          )}
           <button
             type="button"
             className="btn btn-ghost btn-sm"
@@ -494,18 +504,14 @@ export function PortalOrderDetail() {
                       {d.size && <span>{d.size}</span>}
                     </div>
                   </div>
-                  <span
-                    className={
-                      Boolean(openRevision) &&
-                      (revisionIds.length === 0 || revisionIds.includes(d.id))
-                        ? 'chip c-review'
-                        : (DESIGN_STATUS_CHIP[d.status] ?? 'chip c-prog')
-                    }
-                  >
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <span className={designStatusChipClass(d.status)}>
+                      {designStatusLabel(d.status)}
+                    </span>
                     {Boolean(openRevision) &&
-                    (revisionIds.length === 0 || revisionIds.includes(d.id))
-                      ? 'Revision requested'
-                      : (DESIGN_STATUS_LABEL[d.status] ?? d.status.replace(/_/g, ' '))}
+                      (revisionIds.length === 0 || revisionIds.includes(d.id)) && (
+                        <span className="chip c-review">Revision requested</span>
+                      )}
                   </span>
                   <div className="oprice">{money(d.priceCents)}</div>
                 </div>
@@ -529,6 +535,26 @@ export function PortalOrderDetail() {
               <span className="l">Price</span>
               <span className="v">{money(order.priceCents)}</span>
             </div>
+            {order.status === 'PENDING_PAYMENT' && (
+              <div style={{ padding: '0 16px 14px' }}>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  style={{ width: '100%', justifyContent: 'center' }}
+                  disabled={payBusy}
+                  onClick={() => {
+                    setPayBusy(true);
+                    setActionError(null);
+                    void startMyOrderCheckout(order.id).catch((e) => {
+                      setActionError(getErrorMessage(e));
+                      setPayBusy(false);
+                    });
+                  }}
+                >
+                  <i className="ti ti-credit-card" /> {payBusy ? 'Opening checkout…' : 'Pay this order'}
+                </button>
+              </div>
+            )}
             {order.instructions && (
               <div className="od-line">
                 <span className="l">Instructions</span>

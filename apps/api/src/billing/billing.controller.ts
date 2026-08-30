@@ -19,6 +19,11 @@ const paySchema = z.object({
   method: z.enum(['CARD', 'STORE_CREDIT']),
 });
 
+const checkoutSchema = z.object({
+  returnOrigin: z.string().optional(),
+  returnPath: z.string().optional(),
+});
+
 @Controller()
 @UseGuards(JwtAuthGuard)
 export class BillingController {
@@ -32,6 +37,16 @@ export class BillingController {
   @Get('invoices/summary')
   async summaryMine(@CurrentUser() user: AuthUser | undefined) {
     return this.billing.myInvoiceSummary(user);
+  }
+
+  @Post('invoices/by-order/:orderId/checkout')
+  async checkoutMyOrder(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('orderId') orderId: string,
+    @Body() body: unknown,
+  ) {
+    const data = checkoutSchema.parse(body ?? {});
+    return this.billing.startCheckoutForMyOrder(user, orderId, data);
   }
 
   @Get('invoices/:id/print')
@@ -53,6 +68,24 @@ export class BillingController {
   ) {
     const { method } = paySchema.parse(body);
     return this.billing.payMyInvoice(user, id, method);
+  }
+
+  @Post('invoices/:id/checkout')
+  async checkoutMine(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    const data = checkoutSchema.parse(body ?? {});
+    return this.billing.startCheckoutForMyInvoice(user, id, data);
+  }
+
+  @Post('invoices/:id/confirm')
+  async confirmMine(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('id') id: string,
+  ) {
+    return this.billing.confirmMyInvoice(user, id);
   }
 
   @Get('store-credit')

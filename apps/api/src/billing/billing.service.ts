@@ -17,9 +17,11 @@ import {
   RefundTo,
   UserRole,
 } from '../common/enums';
+import { getEnv } from '../config/env';
 import { DbService, DbTransaction } from '../db/db.service';
 import { MailService } from '../mail/mail.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { StripeService } from './stripe.service';
 
 function assertAuthUser(user: AuthUser | undefined): asserts user is AuthUser {
   if (!user) throw new ForbiddenException();
@@ -84,6 +86,8 @@ type PaymentRow = {
   pay_link_token: string | null;
   status: PaymentStatus;
   reason: string | null;
+  stripe_checkout_session_id: string | null;
+  stripe_payment_intent_id: string | null;
   created_at: Date;
   paid_at: Date | null;
 };
@@ -112,7 +116,30 @@ export class BillingService {
     private db: DbService,
     private notifications: NotificationsService,
     private mail: MailService,
+    private stripe: StripeService,
   ) {}
+
+  private webOrigins() {
+    return getEnv()
+      .WEB_ORIGIN.split(',')
+      .map((s) => s.trim().replace(/\/$/, ''))
+      .filter(Boolean);
+  }
+
+  private resolveWebBase(requested?: string | null) {
+    const origins = this.webOrigins();
+    const fallback = origins[0] || 'http://localhost:5173';
+    if (!requested) return fallback;
+    const cleaned = requested.trim().replace(/\/$/, '');
+    return origins.includes(cleaned) ? cleaned : fallback;
+  }
+
+  private safeReturnPath(path: string | undefined, fallback: string) {
+    if (!path || !path.startsWith('/') || path.startsWith('//') || path.includes('://')) {
+      return fallback;
+    }
+    return path;
+  }
 
   // --- mappers -------------------------------------------------------------
 
@@ -181,6 +208,40 @@ export class BillingService {
       'SELECT id, user_id, name, email, account_type, store_credit_cents FROM customers WHERE id = ? LIMIT 1',
       [id],
     );
+  }
+
+  /** Completed net-monthly work not yet on an invoice for the period. */
+  private async unbilledNetMonthlyCents(opts: {
+    customerId?: string;
+    periodMonth: string;
+  }): Promise<number> {
+    const params: unknown[] = [
+      AccountType.NET_MONTHLY,
+      OrderStatus.COMPLETED,
+      opts.periodMonth,
+      InvoiceStatus.AWAITING,
+      InvoiceStatus.PAID,
+    ];
+    const customerClause = opts.customerId ? 'AND o.customer_id = ?' : '';
+    if (opts.customerId) params.push(opts.customerId);
+
+    const row = await this.db.queryOne<{ total: number | string | null }>(
+      `SELECT COALESCE(SUM(o.price_cents), 0) AS total
+         FROM orders o
+         JOIN customers c ON c.id = o.customer_id
+        WHERE c.account_type = ?
+          AND o.status = ?
+          AND o.price_cents IS NOT NULL
+          AND DATE_FORMAT(o.completed_at, '%Y-%m') = ?
+          AND o.id NOT IN (
+                SELECT order_id FROM invoices
+                 WHERE order_id IS NOT NULL
+                   AND status IN (?, ?)
+              )
+          ${customerClause}`,
+      params,
+    );
+    return Number(row?.total ?? 0);
   }
 
   private async resolveMyCustomer(
@@ -315,6 +376,173 @@ export class BillingService {
     });
 
     return this.getInvoiceDetail(user, id);
+  }
+
+  /**
+   * After a customer accepts a quote: create a per-order invoice + pay link.
+   * No admin check — the customer already owns the order.
+   */
+  async billPayPerOrderQuote(data: {
+    customerId: string;
+    orderId: string;
+    amountCents: number;
+    coversText?: string | null;
+  }) {
+    if (!Number.isInteger(data.amountCents) || data.amountCents <= 0) return;
+    const customer = await this.getCustomerRow(data.customerId);
+    if (!customer || customer.account_type === AccountType.NET_MONTHLY) return;
+
+    let invoice = await this.reuseOrderInvoice(data.orderId);
+    if (invoice) {
+      if (
+        invoice.status === InvoiceStatus.AWAITING &&
+        (invoice.amount_cents !== data.amountCents ||
+          (data.coversText?.trim() &&
+            data.coversText.trim() !== invoice.covers_text))
+      ) {
+        await this.db.execute(
+          'UPDATE invoices SET amount_cents = ?, covers_text = COALESCE(?, covers_text) WHERE id = ?',
+          [data.amountCents, data.coversText?.trim() || null, invoice.id],
+        );
+        invoice = (await this.getInvoiceRow(invoice.id)) ?? invoice;
+      }
+    } else {
+      const id = randomUUID();
+      const currencyRow = await this.db.queryOne<{ currency: string | null }>(
+        'SELECT currency FROM orders WHERE id = ? LIMIT 1',
+        [data.orderId],
+      );
+      await this.db.execute(
+        `INSERT INTO invoices
+           (id, customer_id, order_id, kind, amount_cents, currency, covers_text, status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          data.customerId,
+          data.orderId,
+          InvoiceKind.PER_ORDER,
+          data.amountCents,
+          currencyRow?.currency || 'USD',
+          data.coversText?.trim() || null,
+          InvoiceStatus.AWAITING,
+        ],
+      );
+      invoice = await this.getInvoiceRow(id);
+      await this.notifyCustomerUser(data.customerId, {
+        title: 'Invoice ready',
+        body: 'Your quote was accepted. Please pay to start the order.',
+        link: '/portal/invoices',
+      });
+    }
+
+    if (invoice && invoice.status === InvoiceStatus.AWAITING) {
+      await this.ensurePendingPayLink(invoice);
+    }
+  }
+
+  /** Extra format / add-on bill. Never reuse the original job invoice. */
+  async createAddonInvoice(
+    user: AuthUser | undefined,
+    data: {
+      customerId: string;
+      orderId: string;
+      amountCents: number;
+      coversText: string;
+    },
+  ) {
+    this.assertAdmin(user);
+    const customer = await this.getCustomerRow(data.customerId);
+    if (!customer) throw new NotFoundException('Customer not found');
+    if (!Number.isInteger(data.amountCents) || data.amountCents <= 0)
+      throw new BadRequestException('amountCents must be a positive integer');
+    const order = await this.db.queryOne<{ currency: string | null }>(
+      'SELECT currency FROM orders WHERE id = ? LIMIT 1',
+      [data.orderId],
+    );
+    if (!order) throw new NotFoundException('Order not found');
+
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO invoices
+         (id, customer_id, order_id, kind, amount_cents, currency, covers_text, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        data.customerId,
+        data.orderId,
+        InvoiceKind.ADD_ON,
+        data.amountCents,
+        order.currency || 'USD',
+        data.coversText.trim(),
+        InvoiceStatus.AWAITING,
+      ],
+    );
+    await this.notifyCustomerUser(data.customerId, {
+      title: 'New invoice',
+      body: data.coversText.trim(),
+      link: '/portal/invoices',
+    });
+    return this.getInvoiceDetail(user, id);
+  }
+
+  async releasePaidFormatExport(invoiceId: string) {
+    const req = await this.db.queryOne<{
+      id: string;
+      order_id: string;
+      requested_format: string;
+      delivery_file_id: string | null;
+      status: string;
+      human_ref: string | null;
+      order_name: string | null;
+      client_user_id: string | null;
+    }>(
+      `SELECT f.id, f.order_id, f.requested_format, f.delivery_file_id, f.status,
+              o.human_ref, o.name AS order_name, o.client_user_id
+         FROM format_requests f
+         JOIN orders o ON o.id = f.order_id
+        WHERE f.invoice_id = ? LIMIT 1`,
+      [invoiceId],
+    );
+    if (!req || req.status === 'DONE' || req.status === 'CANCELLED') return;
+    if (req.delivery_file_id) {
+      await this.db.execute(
+        `UPDATE deliveries d
+           JOIN delivery_files df ON df.delivery_id = d.id
+            SET d.released_at = COALESCE(d.released_at, NOW())
+          WHERE df.id = ?`,
+        [req.delivery_file_id],
+      );
+    }
+    await this.db.execute(
+      `UPDATE format_requests SET status = ? WHERE id = ?`,
+      ['DONE', req.id],
+    );
+    try {
+      await this.db.execute(
+        'UPDATE format_requests SET resolved_at = NOW() WHERE id = ?',
+        [req.id],
+      );
+    } catch {
+      /* older databases may not have resolved_at */
+    }
+    const ref = req.human_ref ?? req.order_name ?? req.order_id.slice(0, 6);
+    if (req.client_user_id) {
+      await this.notifications.createFor(req.client_user_id, {
+        title: `${req.requested_format} file is ready`,
+        body: `Your ${req.requested_format} export for ${ref} is in Files.`,
+        link: '/portal/files',
+      });
+    }
+    const order = await this.db.queryOne<{ customer_id: string | null }>(
+      'SELECT customer_id FROM orders WHERE id = ? LIMIT 1',
+      [req.order_id],
+    );
+    if (order?.customer_id) {
+      const customer = await this.getCustomerRow(order.customer_id);
+      if (customer?.email) {
+        await this.mail.sendFormatReady(customer.email, req.requested_format, ref);
+      }
+    }
   }
 
   /** One open (or already paid) per-order invoice. Extra awaiting copies are cancelled. */
@@ -575,6 +803,7 @@ export class BillingService {
     }
 
     await this.advanceOrderAfterPayment(invoice.order_id);
+    await this.releasePaidFormatExport(invoice.id);
   }
 
   private async advanceOrderAfterPayment(orderId: string | null) {
@@ -618,24 +847,28 @@ export class BillingService {
     if (invoice.status !== InvoiceStatus.AWAITING)
       throw new BadRequestException('Invoice is not awaiting payment');
 
-    const existingLink = await this.db.queryOne<{ pay_link_token: string }>(
-      `SELECT pay_link_token FROM payments
+    const payment = await this.ensurePendingPayLink(invoice);
+    return { token: payment.pay_link_token!, url: `/pay/${payment.pay_link_token}` };
+  }
+
+  private async ensurePendingPayLink(invoice: InvoiceRow): Promise<PaymentRow> {
+    const existing = await this.db.queryOne<PaymentRow>(
+      `SELECT * FROM payments
         WHERE invoice_id = ? AND method = ? AND status = ? AND pay_link_token IS NOT NULL
         ORDER BY created_at DESC
         LIMIT 1`,
-      [invoiceId, PaymentMethod.LINK, PaymentStatus.PENDING],
+      [invoice.id, PaymentMethod.LINK, PaymentStatus.PENDING],
     );
-    if (existingLink?.pay_link_token) {
-      return { token: existingLink.pay_link_token, url: `/pay/${existingLink.pay_link_token}` };
-    }
+    if (existing?.pay_link_token) return existing;
 
     const token = randomBytes(24).toString('hex');
+    const id = randomUUID();
     await this.db.execute(
       `INSERT INTO payments
          (id, invoice_id, order_id, customer_id, amount_cents, currency, method, type, pay_link_token, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        randomUUID(),
+        id,
         invoice.id,
         invoice.order_id,
         invoice.customer_id,
@@ -647,7 +880,12 @@ export class BillingService {
         PaymentStatus.PENDING,
       ],
     );
-    return { token, url: `/pay/${token}` };
+    const created = await this.db.queryOne<PaymentRow>(
+      'SELECT * FROM payments WHERE id = ? LIMIT 1',
+      [id],
+    );
+    if (!created) throw new BadRequestException('Could not create payment link');
+    return created;
   }
 
   /** PUBLIC: safe summary for a pay-link. */
@@ -674,21 +912,291 @@ export class BillingService {
       customerName: invoice.customer_name ?? null,
       coversText: invoice.covers_text,
       status: invoice.status,
+      stripeEnabled: this.stripe.isConfigured(),
     };
   }
 
-  /** PUBLIC: card checkout is not live. Do not mark the invoice paid here. */
-  async payViaPayLink(token: string) {
+  async startCheckoutForPayLink(token: string, returnOrigin?: string) {
     const payment = await this.db.queryOne<PaymentRow>(
       'SELECT * FROM payments WHERE pay_link_token = ? LIMIT 1',
       [token],
     );
     if (!payment || !payment.invoice_id)
       throw new NotFoundException('Payment link not found');
-    // TODO(payment): integrate Stripe once keys are provided
-    throw new BadRequestException(
-      'Payment integration coming soon. This link does not charge a card or mark the invoice paid.',
+    const invoice = await this.getInvoiceRow(payment.invoice_id);
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    const web = this.resolveWebBase(returnOrigin);
+    return this.startStripeCheckout(invoice, payment, {
+      successPath: `/pay/${token}?status=success`,
+      cancelPath: `/pay/${token}?status=canceled`,
+      web,
+    });
+  }
+
+  async confirmPayLink(token: string) {
+    const payment = await this.db.queryOne<PaymentRow>(
+      'SELECT * FROM payments WHERE pay_link_token = ? LIMIT 1',
+      [token],
     );
+    if (!payment || !payment.invoice_id)
+      throw new NotFoundException('Payment link not found');
+    await this.confirmStripePayment(payment);
+    return this.getPayLinkSummary(token);
+  }
+
+  /** PUBLIC: start Stripe Checkout for this pay-link. */
+  async payViaPayLink(token: string, returnOrigin?: string) {
+    return this.startCheckoutForPayLink(token, returnOrigin);
+  }
+
+  private async startStripeCheckout(
+    invoice: InvoiceRow,
+    payment: PaymentRow,
+    dest: { successPath: string; cancelPath: string; web: string },
+  ) {
+    if (invoice.status === InvoiceStatus.PAID) {
+      throw new BadRequestException('Invoice is already paid');
+    }
+    if (invoice.status !== InvoiceStatus.AWAITING) {
+      throw new BadRequestException('Invoice is not awaiting payment');
+    }
+    if (!this.stripe.isConfigured()) {
+      throw new BadRequestException('Card checkout is not configured');
+    }
+    if (payment.stripe_checkout_session_id) {
+      try {
+        const existing = await this.stripe.retrieveSession(
+          payment.stripe_checkout_session_id,
+        );
+        if (
+          existing.status === 'open' &&
+          existing.url &&
+          existing.amount_total === invoice.amount_cents
+        ) {
+          return { url: existing.url, sessionId: existing.id };
+        }
+        if (existing.payment_status === 'paid') {
+          await this.fulfillStripeSession(existing);
+          throw new BadRequestException('Invoice is already paid');
+        }
+      } catch (err) {
+        if (err instanceof BadRequestException) throw err;
+      }
+    }
+
+    const customer = await this.getCustomerRow(invoice.customer_id);
+    const session = await this.stripe.createInvoiceCheckout({
+      amountCents: invoice.amount_cents,
+      currency: invoice.currency,
+      productName: invoice.covers_text || 'Design invoice',
+      successUrl: `${dest.web}${dest.successPath}`,
+      cancelUrl: `${dest.web}${dest.cancelPath}`,
+      invoiceId: invoice.id,
+      paymentId: payment.id,
+      customerEmail: customer?.email,
+    });
+    await this.db.execute(
+      'UPDATE payments SET stripe_checkout_session_id = ? WHERE id = ?',
+      [session.id, payment.id],
+    );
+    return { url: session.url!, sessionId: session.id };
+  }
+
+  private async confirmStripePayment(payment: PaymentRow) {
+    if (!payment.stripe_checkout_session_id || !this.stripe.isConfigured()) {
+      return;
+    }
+    const session = await this.stripe.retrieveSession(
+      payment.stripe_checkout_session_id,
+    );
+    if (session.payment_status === 'paid') {
+      await this.fulfillStripeSession(session);
+    }
+  }
+
+  async handleStripeWebhook(rawBody: Buffer, signature: string) {
+    const event = this.stripe.constructWebhookEvent(rawBody, signature);
+    if (
+      event.type === 'checkout.session.completed' ||
+      event.type === 'checkout.session.async_payment_succeeded'
+    ) {
+      const session = event.data.object as {
+        id: string;
+        payment_status?: string;
+        payment_intent?: string | { id: string } | null;
+        metadata?: Record<string, string> | null;
+        client_reference_id?: string | null;
+      };
+      if (session.payment_status && session.payment_status !== 'paid') return;
+      await this.fulfillStripeSession(session);
+    }
+  }
+
+  private async fulfillStripeSession(session: {
+    id: string;
+    payment_intent?: string | { id: string } | null;
+    metadata?: Record<string, string> | null;
+    client_reference_id?: string | null;
+  }) {
+    const paymentId = session.metadata?.paymentId;
+    const invoiceId =
+      session.metadata?.invoiceId || session.client_reference_id || null;
+    let payment = paymentId
+      ? await this.db.queryOne<PaymentRow>(
+          'SELECT * FROM payments WHERE id = ? LIMIT 1',
+          [paymentId],
+        )
+      : null;
+    if (!payment) {
+      payment = await this.db.queryOne<PaymentRow>(
+        'SELECT * FROM payments WHERE stripe_checkout_session_id = ? LIMIT 1',
+        [session.id],
+      );
+    }
+    if (!payment && invoiceId) {
+      payment = await this.db.queryOne<PaymentRow>(
+        `SELECT * FROM payments
+          WHERE invoice_id = ? AND status = ? AND type = ?
+          ORDER BY created_at DESC LIMIT 1`,
+        [invoiceId, PaymentStatus.PENDING, PaymentType.CHARGE],
+      );
+    }
+    const resolvedInvoiceId = payment?.invoice_id || invoiceId;
+    if (!resolvedInvoiceId) return;
+    const invoice = await this.getInvoiceRow(resolvedInvoiceId);
+    if (!invoice) return;
+    if (invoice.status === InvoiceStatus.PAID) return;
+
+    const intentId =
+      typeof session.payment_intent === 'string'
+        ? session.payment_intent
+        : session.payment_intent?.id ?? null;
+
+    await this.db.withTransaction(async (tx) => {
+      const locked = await tx.queryOne<{ status: InvoiceStatus }>(
+        'SELECT status FROM invoices WHERE id = ? LIMIT 1 FOR UPDATE',
+        [invoice.id],
+      );
+      if (!locked || locked.status === InvoiceStatus.PAID) return;
+      if (locked.status !== InvoiceStatus.AWAITING) return;
+
+      if (payment) {
+        await tx.execute(
+          `UPDATE payments
+              SET status = ?, method = ?, paid_at = NOW(),
+                  stripe_checkout_session_id = ?,
+                  stripe_payment_intent_id = COALESCE(?, stripe_payment_intent_id)
+            WHERE id = ?`,
+          [
+            PaymentStatus.PAID,
+            PaymentMethod.CARD,
+            session.id,
+            intentId,
+            payment.id,
+          ],
+        );
+      } else {
+        await tx.execute(
+          `INSERT INTO payments
+             (id, invoice_id, order_id, customer_id, amount_cents, currency, method, type, status, paid_at, stripe_checkout_session_id, stripe_payment_intent_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)`,
+          [
+            randomUUID(),
+            invoice.id,
+            invoice.order_id,
+            invoice.customer_id,
+            invoice.amount_cents,
+            invoice.currency,
+            PaymentMethod.CARD,
+            PaymentType.CHARGE,
+            PaymentStatus.PAID,
+            session.id,
+            intentId,
+          ],
+        );
+      }
+      await tx.execute(
+        `UPDATE payments SET status = ?
+          WHERE invoice_id = ? AND status = ? AND id <> ?`,
+        [
+          PaymentStatus.FAILED,
+          invoice.id,
+          PaymentStatus.PENDING,
+          payment?.id ?? '',
+        ],
+      );
+      await tx.execute(
+        'UPDATE invoices SET status = ?, paid_at = NOW() WHERE id = ?',
+        [InvoiceStatus.PAID, invoice.id],
+      );
+    });
+
+    await this.advanceOrderAfterPayment(invoice.order_id);
+    await this.releasePaidFormatExport(invoice.id);
+    await this.notifyCustomerUser(invoice.customer_id, {
+      title: 'Payment received',
+      body: `We received your payment for ${invoice.covers_text ?? 'your invoice'}.`,
+      link: '/portal/invoices',
+    });
+  }
+
+  async startCheckoutForMyInvoice(
+    user: AuthUser | undefined,
+    invoiceId: string,
+    opts?: { returnOrigin?: string; returnPath?: string },
+  ) {
+    const customer = await this.resolveMyCustomer(user);
+    const invoice = await this.getInvoiceRow(invoiceId);
+    if (!invoice || invoice.customer_id !== customer.id)
+      throw new NotFoundException('Invoice not found');
+    const payment = await this.ensurePendingPayLink(invoice);
+    const web = this.resolveWebBase(opts?.returnOrigin);
+    const returnPath = this.safeReturnPath(
+      opts?.returnPath,
+      '/portal/invoices',
+    );
+    return this.startStripeCheckout(invoice, payment, {
+      successPath: `${returnPath}${returnPath.includes('?') ? '&' : '?'}paid=1`,
+      cancelPath: `${returnPath}${returnPath.includes('?') ? '&' : '?'}canceled=1`,
+      web,
+    });
+  }
+
+  async startCheckoutForMyOrder(
+    user: AuthUser | undefined,
+    orderId: string,
+    opts?: { returnOrigin?: string },
+  ) {
+    const customer = await this.resolveMyCustomer(user);
+    const invoice = await this.db.queryOne<InvoiceRow>(
+      `SELECT * FROM invoices
+        WHERE order_id = ? AND customer_id = ? AND status = ?
+        ORDER BY issued_at DESC LIMIT 1`,
+      [orderId, customer.id, InvoiceStatus.AWAITING],
+    );
+    if (!invoice) {
+      throw new NotFoundException('No unpaid invoice for this order');
+    }
+    return this.startCheckoutForMyInvoice(user, invoice.id, {
+      returnOrigin: opts?.returnOrigin,
+      returnPath: `/portal/orders/${orderId}`,
+    });
+  }
+
+  async confirmMyInvoice(user: AuthUser | undefined, invoiceId: string) {
+    const customer = await this.resolveMyCustomer(user);
+    const invoice = await this.getInvoiceRow(invoiceId);
+    if (!invoice || invoice.customer_id !== customer.id)
+      throw new NotFoundException('Invoice not found');
+    const payment = await this.db.queryOne<PaymentRow>(
+      `SELECT * FROM payments
+        WHERE invoice_id = ? AND stripe_checkout_session_id IS NOT NULL
+        ORDER BY created_at DESC LIMIT 1`,
+      [invoiceId],
+    );
+    if (payment) await this.confirmStripePayment(payment);
+    const updated = await this.getInvoiceRow(invoiceId);
+    return { invoice: updated ? this.invoiceDto(updated) : null };
   }
 
   // --- store credit (admin) ------------------------------------------------
@@ -798,6 +1306,33 @@ export class BillingService {
     throw new BadRequestException('to must be CARD or STORE_CREDIT');
   }
 
+  private async refundStripeCharge(opts: {
+    invoiceId?: string | null;
+    orderId?: string | null;
+    amountCents: number;
+    to: RefundTo;
+  }) {
+    if (opts.to !== RefundTo.CARD || !this.stripe.isConfigured()) return;
+    const charge = await this.db.queryOne<{ stripe_payment_intent_id: string | null }>(
+      `SELECT stripe_payment_intent_id FROM payments
+        WHERE ${opts.invoiceId ? 'invoice_id = ?' : 'order_id = ?'}
+          AND type = ? AND status = ? AND stripe_payment_intent_id IS NOT NULL
+        ORDER BY paid_at DESC, created_at DESC
+        LIMIT 1`,
+      [
+        opts.invoiceId ?? opts.orderId,
+        PaymentType.CHARGE,
+        PaymentStatus.PAID,
+      ],
+    );
+    if (charge?.stripe_payment_intent_id) {
+      await this.stripe.refundPaymentIntent(
+        charge.stripe_payment_intent_id,
+        opts.amountCents,
+      );
+    }
+  }
+
   async refundOrder(
     user: AuthUser | undefined,
     orderId: string,
@@ -818,25 +1353,30 @@ export class BillingService {
     if (!Number.isInteger(data.amountCents) || data.amountCents <= 0)
       throw new BadRequestException('amountCents must be a positive integer');
     const to = this.parseRefundTo(data.to);
+    const alreadyRow = await this.db.queryOne<{ total: number | string | null }>(
+      `SELECT COALESCE(SUM(amount_cents), 0) AS total
+         FROM payments
+        WHERE order_id = ? AND type = ? AND status = ?`,
+      [order.id, PaymentType.REFUND, PaymentStatus.PAID],
+    );
+    const alreadyRefunded = Number(alreadyRow?.total ?? 0);
+    if (order.price_cents != null) {
+      const remaining = order.price_cents - alreadyRefunded;
+      if (data.amountCents > remaining) {
+        throw new BadRequestException(
+          remaining <= 0
+            ? 'This order is already fully refunded'
+            : `Refund exceeds remaining amount (${remaining} cents)`,
+        );
+      }
+    }
+    await this.refundStripeCharge({
+      orderId: order.id,
+      amountCents: data.amountCents,
+      to,
+    });
 
     await this.db.withTransaction(async (tx) => {
-      const totalRow = await tx.queryOne<{ total: number | string | null }>(
-        `SELECT COALESCE(SUM(amount_cents), 0) AS total
-           FROM payments
-          WHERE order_id = ? AND type = ? AND status = ?`,
-        [order.id, PaymentType.REFUND, PaymentStatus.PAID],
-      );
-      const alreadyRefunded = Number(totalRow?.total ?? 0);
-      if (order.price_cents != null) {
-        const remaining = order.price_cents - alreadyRefunded;
-        if (data.amountCents > remaining) {
-          throw new BadRequestException(
-            remaining <= 0
-              ? 'This order is already fully refunded'
-              : `Refund exceeds remaining amount (${remaining} cents)`,
-          );
-        }
-      }
 
       await this.recordRefund(tx, {
         invoiceId: null,
@@ -894,23 +1434,29 @@ export class BillingService {
     if (!Number.isInteger(data.amountCents) || data.amountCents <= 0)
       throw new BadRequestException('amountCents must be a positive integer');
     const to = this.parseRefundTo(data.to);
+    const alreadyRow = await this.db.queryOne<{ total: number | string | null }>(
+      `SELECT COALESCE(SUM(amount_cents), 0) AS total
+         FROM payments
+        WHERE invoice_id = ? AND type = ? AND status = ?`,
+      [invoice.id, PaymentType.REFUND, PaymentStatus.PAID],
+    );
+    const alreadyRefunded = Number(alreadyRow?.total ?? 0);
+    const remaining = invoice.amount_cents - alreadyRefunded;
+    if (data.amountCents > remaining) {
+      throw new BadRequestException(
+        remaining <= 0
+          ? 'Invoice is already fully refunded'
+          : `Refund exceeds remaining amount (${remaining} cents)`,
+      );
+    }
+    await this.refundStripeCharge({
+      invoiceId: invoice.id,
+      orderId: invoice.order_id,
+      amountCents: data.amountCents,
+      to,
+    });
 
     await this.db.withTransaction(async (tx) => {
-      const totalRow = await tx.queryOne<{ total: number | string | null }>(
-        `SELECT COALESCE(SUM(amount_cents), 0) AS total
-           FROM payments
-          WHERE invoice_id = ? AND type = ? AND status = ?`,
-        [invoice.id, PaymentType.REFUND, PaymentStatus.PAID],
-      );
-      const alreadyRefunded = Number(totalRow?.total ?? 0);
-      const remaining = invoice.amount_cents - alreadyRefunded;
-      if (data.amountCents > remaining) {
-        throw new BadRequestException(
-          remaining <= 0
-            ? 'Invoice is already fully refunded'
-            : `Refund exceeds remaining amount (${remaining} cents)`,
-        );
-      }
 
       await this.recordRefund(tx, {
         invoiceId: invoice.id,
@@ -1054,11 +1600,13 @@ export class BillingService {
     const storeCredit = await this.db.queryOne<{ total: number | string | null }>(
       'SELECT COALESCE(SUM(store_credit_cents), 0) AS total FROM customers',
     );
+    const unbilled = await this.unbilledNetMonthlyCents({ periodMonth: period });
 
     return {
       outstandingCents: Number(outstanding?.total ?? 0),
       paidThisMonthCents: Number(paidThisMonth?.total ?? 0),
       storeCreditOutstandingCents: Number(storeCredit?.total ?? 0),
+      netMonthlyUnbilledCents: unbilled,
     };
   }
 
@@ -1082,9 +1630,18 @@ export class BillingService {
       seenOrders.add(r.order_id);
       return true;
     });
+    const unbilledMonthCents =
+      customer.account_type === AccountType.NET_MONTHLY
+        ? await this.unbilledNetMonthlyCents({
+            customerId: customer.id,
+            periodMonth: currentPeriodMonth(),
+          })
+        : 0;
+
     return {
       invoices: invoices.map((r) => this.invoiceDto(r)),
       storeCreditCents: customer.store_credit_cents,
+      unbilledMonthCents,
     };
   }
 
@@ -1113,6 +1670,9 @@ export class BillingService {
     if (!invoice || invoice.customer_id !== customer.id)
       throw new NotFoundException('Invoice not found');
     const m = this.parsePayMethod(method);
+    if (m === PaymentMethod.CARD) {
+      return this.startCheckoutForMyInvoice(user, invoiceId);
+    }
     await this.payInvoiceInternal(invoice, m);
     const updated = await this.db.queryOne<
       InvoiceRow & { customer_name: string | null }
@@ -1247,7 +1807,11 @@ function buildInvoicePrintHtml(
     ? monthLabel(invoice.period_month)
     : '';
   const kindLabel =
-    invoice.kind === InvoiceKind.MONTHLY ? 'Monthly statement' : 'Design services';
+    invoice.kind === InvoiceKind.MONTHLY
+      ? 'Monthly statement'
+      : invoice.kind === InvoiceKind.ADD_ON
+        ? 'Add-on export'
+        : 'Design services';
   const description = invoice.covers_text?.trim() || kindLabel;
   const orderHint = [invoice.order_ref, invoice.order_name]
     .filter(Boolean)
@@ -1599,7 +2163,7 @@ function buildInvoicePrintHtml(
               : `Paid in full${paidOn ? ` on ${escapeHtml(paidOn)}` : ''}. Thank you.`
           }</p>`
         : invoice.status === InvoiceStatus.AWAITING
-          ? `<p class="note">Payment is due upon receipt. You can pay this invoice from your client portal.</p>`
+          ? `<p class="note">Payment is due upon receipt. Pay by card from your client portal or the payment link we sent.</p>`
           : ''
     }
     ${

@@ -6,6 +6,7 @@ import { staffLandingPath } from '@/lib/permissions';
 import { PortalShell } from '@/components/PortalShell';
 import { AdminShell } from '@/components/AdminShell';
 import { RequireFeature } from '@/components/RequireFeature';
+import { PageLoading } from '@/components/PageProgress';
 import { Login } from '@/pages/Login';
 import { PayLink } from '@/pages/PayLink';
 
@@ -88,17 +89,13 @@ const AdminLoginRequests = lazy(() =>
 const AdminProfile = lazy(() =>
   import('@/pages/admin/Profile').then((m) => ({ default: m.AdminProfile })),
 );
-
-function PageFallback() {
-  return (
-    <div className="center-screen" style={{ alignItems: 'center', padding: 24 }}>
-      <div className="spinner" aria-label="Loading" />
-    </div>
-  );
-}
+const AdminReports = lazy(() =>
+  import('@/pages/admin/Reports').then((m) => ({ default: m.AdminReports })),
+);
 
 function HomeRedirect() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  if (loading) return <PageLoading />;
   if (!user) return <Navigate to="/login" replace />;
   if (!STAFF_ROLES.includes(user.role)) {
     return <Navigate to="/portal" replace />;
@@ -115,7 +112,7 @@ function RequireRole({
 }) {
   const { user, loading } = useAuth();
   if (loading) {
-    return <PageFallback />;
+    return <PageLoading />;
   }
   if (!user) return <Navigate to="/login" replace />;
   const isStaff = STAFF_ROLES.includes(user.role);
@@ -266,6 +263,14 @@ export function App() {
             }
           />
           <Route path="profile" element={<AdminProfile />} />
+          <Route
+            path="reports"
+            element={
+              <RequireFeature feature="dashboard">
+                <AdminReports />
+              </RequireFeature>
+            }
+          />
           <Route
             path="team"
             element={

@@ -1,7 +1,7 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { createHmac, randomUUID } from 'crypto';
 import { createReadStream, existsSync } from 'fs';
-import { mkdir, writeFile } from 'fs/promises';
+import { mkdir, unlink, writeFile } from 'fs/promises';
 import { dirname, join, normalize, resolve, sep } from 'path';
 import { getEnv } from '../config/env';
 
@@ -115,5 +115,14 @@ export class LocalStorageService {
 
   createStream(key: string) {
     return createReadStream(this.resolveExisting(key));
+  }
+
+  async deleteObject(key: string): Promise<void> {
+    try {
+      const full = this.absPath(key);
+      if (existsSync(full)) await unlink(full);
+    } catch {
+      /* ignore missing or unreadable files */
+    }
   }
 }

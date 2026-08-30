@@ -49,6 +49,31 @@ export class MessagingGateway
     this.notifications.onCreated((userId) => {
       this.emitToUser(userId, 'notification:new', { userId });
     });
+    void this.db
+      .execute(
+        `UPDATE users SET presence = ? WHERE role IN ('SUPER_ADMIN','ADMIN','SUPPORT','DESIGNER')`,
+        [Presence.OFF],
+      )
+      .catch((err) => {
+        this.logger.warn(`failed to reset presence on boot: ${String(err)}`);
+      });
+  }
+
+  /** Staff who currently have an open socket — source of truth for Online. */
+  connectedUserIds(): Set<string> {
+    const ids = new Set<string>();
+    for (const [userId, sockets] of this.socketsByUser) {
+      if (sockets.size > 0) ids.add(userId);
+    }
+    return ids;
+  }
+
+  /** Tell other staff after a REST presence change (dropdown on Team). */
+  broadcastPresence(userId: string, presence: Presence) {
+    this.server?.to('team:group').emit('presence:update', {
+      userId,
+      presence,
+    });
   }
 
   private parseCookieToken(cookieHeader: string | undefined): string | null {
@@ -108,7 +133,9 @@ export class MessagingGateway
     }
     client.data.user = user;
     await client.join(`user:${user.id}`);
-    await client.join('team:group');
+    if (this.isStaff(user.role)) {
+      await client.join('team:group');
+    }
 
     const existing = this.socketsByUser.get(user.id) ?? new Set<string>();
     existing.add(client.id);

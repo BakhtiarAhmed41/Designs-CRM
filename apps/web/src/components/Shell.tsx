@@ -4,6 +4,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { NotificationBell } from './NotificationBell';
 import { AccountMenu } from './AccountMenu';
+import { PageLoading } from './PageProgress';
 
 export type MobileNavItem = {
   to: string;
@@ -89,13 +90,7 @@ export function Shell({
             </div>
           </header>
           <main className={`main${messaging ? ' main-messaging' : ''}`}>
-            <Suspense
-              fallback={
-                <div className="center-screen" style={{ alignItems: 'center', padding: 24 }}>
-                  <div className="spinner" aria-label="Loading" />
-                </div>
-              }
-            >
+            <Suspense fallback={<PageLoading />}>
               <Outlet />
             </Suspense>
           </main>

@@ -7,13 +7,16 @@ import {
   adminUpdateStatus,
   adminUploadAttachments,
   approveCounter,
+  deleteAdminDeliveryFile,
   deleteAdminOrder,
   deliverOrder,
   getAdminOrder,
+  fulfillAdminFormatRequest,
   listAdminFormatRequests,
   resendOrderFiles,
   updateAdminFormatRequest,
   updateOrderNotes,
+  type FormatRequest,
 } from '@/lib/orders';
 import { applyOrderChange, cacheOrder, invalidateWorkCaches } from '@/lib/queryCache';
 import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
@@ -25,10 +28,16 @@ import {
   sendAdminMessage,
   createAdminConversation,
 } from '@/lib/messaging';
-import { createInvoice, listInvoices, payInvoice, refundOrder, type RefundTo } from '@/lib/billing';
+import { createInvoice, createPayLink, listInvoices, payInvoice, refundOrder, type RefundTo } from '@/lib/billing';
 import { assignOrder, listTeam, unassignOrder } from '@/lib/team';
-import { updateDesign, type Design, type DesignStatus } from '@/lib/designs';
-import { downloadSignedFile, getErrorMessage } from '@/lib/api';
+import {
+  designStatusChipClass,
+  designStatusLabel,
+  updateDesign,
+  type Design,
+  type DesignStatus,
+} from '@/lib/designs';
+import { apiFetch, downloadSignedFile, getErrorMessage, resolveFileUrl } from '@/lib/api';
 import { money, dateShort, lifecycleChip } from '@/lib/format';
 import { AdminCounterDecision } from '@/components/AdminCounterDecision';
 import { FormPreferencesDisplay } from '@/components/FormPreferencesDisplay';
@@ -47,47 +56,145 @@ type AdminOrderFull = Order & {
   designs?: Design[];
 };
 
+function feeDollarsToCents(raw: string | undefined): number {
+  const trimmed = (raw ?? '').trim();
+  if (!trimmed) return 0;
+  const n = Number(trimmed);
+  if (!Number.isFinite(n) || n < 0) return Number.NaN;
+  return Math.round(n * 100);
+}
+
 function customerName(order: AdminOrderFull) {
   const c = order.client;
   if (!c) return 'Customer';
   return [c.firstName, c.lastName].filter(Boolean).join(' ') || c.email || 'Customer';
 }
 
-function designChip(status: DesignStatus) {
-  switch (status) {
-    case 'DELIVERED':
-    case 'DONE':
-      return 'chip c-review';
-    case 'IN_PROGRESS':
-      return 'chip c-prog';
-    default:
-      return 'chip c-wait';
-  }
-}
-
-function designStatusLabel(status: DesignStatus) {
-  switch (status) {
-    case 'DELIVERED':
-      return 'Delivered';
-    case 'DONE':
-      return 'Ready';
-    case 'IN_PROGRESS':
-      return 'In progress';
-    default:
-      return 'Waiting';
-  }
-}
-
-function payBadge(status: OrderStatus, priceCents: number | null) {
+function payBadge(
+  status: OrderStatus,
+  priceCents: number | null,
+  paid: boolean,
+) {
+  if (status === 'REFUNDED') return { cls: 'pay-badge pay-unpaid', text: 'Refunded' };
+  if (paid) return { cls: 'pay-badge pay-paid', text: 'Paid in full' };
   if (status === 'PENDING_PAYMENT') return { cls: 'pay-badge pay-unpaid', text: 'Awaiting payment' };
-  if (priceCents && priceCents > 0 && status !== 'COMPLETED') return { cls: 'pay-badge pay-deposit', text: 'Deposit due' };
-  if (priceCents) return { cls: 'pay-badge pay-paid', text: 'Paid in full' };
+  if (priceCents && priceCents > 0) return { cls: 'pay-badge pay-deposit', text: 'Unpaid' };
   return { cls: 'pay-badge pay-unpaid', text: 'Not priced' };
 }
 
 function relativeTime(iso: string) {
   const d = new Date(iso);
   return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+function isImageName(name: string, mime?: string | null) {
+  if (mime?.startsWith('image/')) return true;
+  return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name);
+}
+
+function LocalPublishFiles({
+  files,
+  disabled,
+  onRemove,
+}: {
+  files: File[];
+  disabled?: boolean;
+  onRemove: (index: number) => void;
+}) {
+  const urls = useMemo(
+    () => files.map((f) => (f.type.startsWith('image/') ? URL.createObjectURL(f) : '')),
+    [files],
+  );
+  useEffect(() => {
+    return () => {
+      urls.forEach((u) => {
+        if (u) URL.revokeObjectURL(u);
+      });
+    };
+  }, [urls]);
+
+  return (
+    <div className="pub-files">
+      {files.map((f, i) => (
+        <div key={`${f.name}-${f.size}-${f.lastModified}`} className="pub-file">
+          {urls[i] ? (
+            <img src={urls[i]} alt={f.name} />
+          ) : (
+            <div className="pub-file-icon">
+              <i className="ti ti-file" />
+            </div>
+          )}
+          <span title={f.name}>{f.name}</span>
+          <button
+            type="button"
+            className="pub-file-x"
+            disabled={disabled}
+            aria-label={`Remove ${f.name}`}
+            onClick={() => onRemove(i)}
+          >
+            <i className="ti ti-trash" />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SavedPublishFile({
+  orderId,
+  file,
+  waiting,
+  canDelete,
+  deleting,
+  onDelete,
+}: {
+  orderId: string;
+  file: { id: string; originalName: string; mimeType?: string | null };
+  waiting?: boolean;
+  canDelete: boolean;
+  deleting?: boolean;
+  onDelete: () => void;
+}) {
+  const showImg = isImageName(file.originalName, file.mimeType);
+  const thumbQ = useQuery({
+    queryKey: ['delivery-thumb', orderId, file.id],
+    queryFn: async () => {
+      const { url } = await apiFetch<{ url: string }>(adminDeliveryFileUrl(orderId, file.id));
+      return resolveFileUrl(url);
+    },
+    enabled: showImg,
+    staleTime: 60_000,
+  });
+
+  return (
+    <div className={`pub-file${waiting ? ' wait' : ''}`}>
+      <button
+        type="button"
+        className="pub-file-open"
+        onClick={() => downloadSignedFile(adminDeliveryFileUrl(orderId, file.id), file.originalName)}
+      >
+        {thumbQ.data ? (
+          <img src={thumbQ.data} alt={file.originalName} />
+        ) : (
+          <div className="pub-file-icon">
+            <i className="ti ti-file" />
+          </div>
+        )}
+        <span title={file.originalName}>{file.originalName}</span>
+      </button>
+      {canDelete && (
+        <button
+          type="button"
+          className="pub-file-x"
+          disabled={deleting}
+          aria-label={`Delete ${file.originalName}`}
+          onClick={onDelete}
+        >
+          <i className="ti ti-trash" />
+        </button>
+      )}
+    </div>
+  );
 }
 
 export function AdminOrderDetail() {
@@ -102,8 +209,14 @@ export function AdminOrderDetail() {
   const canApprove = canSupport(user?.permissions, 'approve', user?.role);
   const canApproveCounter = canApprove;
   const isDesigner = user?.role === 'DESIGNER';
-  const canPublishToCustomer = user?.role !== 'SUPPORT' || canApprove;
-  const showSendForApproval = isDesigner || (user?.role === 'SUPPORT' && !canApprove);
+  const canPublishToCustomer = canApprove;
+  const showSendForApproval =
+    !canPublishToCustomer && (isDesigner || user?.role === 'SUPPORT');
+  const canMessageCustomer = canFeature(
+    user?.permissions,
+    'messages_customer_reply',
+    user?.role,
+  );
   const [msgDraft, setMsgDraft] = useState('');
   const [msgFiles, setMsgFiles] = useState<File[]>([]);
   const [refUploading, setRefUploading] = useState(false);
@@ -113,6 +226,8 @@ export function AdminOrderDetail() {
   const [publishFor, setPublishFor] = useState<Design | null>(null);
   const [publishFiles, setPublishFiles] = useState<File[]>([]);
   const [publishSaved, setPublishSaved] = useState(false);
+  const [formatFiles, setFormatFiles] = useState<Record<string, File[]>>({});
+  const [formatPrices, setFormatPrices] = useState<Record<string, string>>({});
   const [editingIds, setEditingIds] = useState<string[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -236,6 +351,15 @@ export function AdminOrderDetail() {
     onError: (e) => setError(getErrorMessage(e)),
   });
 
+  const removeDeliveryFile = useMutation({
+    mutationFn: (fileId: string) => deleteAdminDeliveryFile(id, fileId),
+    onSuccess: (res) => {
+      setToast('File removed.');
+      invalidate(res.order);
+    },
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
   const genInvoice = useMutation({
     mutationFn: async () => {
       if (!order?.priceCents) throw new Error('No price set');
@@ -283,6 +407,93 @@ export function AdminOrderDetail() {
         };
       });
       setToast(res.assignedDesignerId ? 'Designer assigned.' : 'Designer unassigned.');
+      void invalidateWorkCaches(qc);
+    },
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
+  const updateFormatReq = useMutation({
+    mutationFn: (vars: { requestId: string; status: FormatRequest['status'] }) =>
+      updateAdminFormatRequest(vars.requestId, vars.status),
+    onSuccess: (_res, vars) => {
+      qc.setQueryData(['admin-format-requests', id], (prev: unknown) => {
+        if (!prev || typeof prev !== 'object' || !('requests' in prev)) return prev;
+        const data = prev as { requests: FormatRequest[] };
+        return {
+          ...data,
+          requests: data.requests.map((row) =>
+            row.id === vars.requestId ? { ...row, status: vars.status } : row,
+          ),
+        };
+      });
+      setToast('Format request started. Upload the file when it is ready.');
+      void invalidateWorkCaches(qc);
+    },
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
+  const fulfillFormatReq = useMutation({
+    mutationFn: (vars: { requestId: string; files: File[]; amountCents?: number }) =>
+      fulfillAdminFormatRequest(vars.requestId, vars.files, vars.amountCents),
+    onSuccess: (res, vars) => {
+      setFormatFiles((prev) => {
+        const next = { ...prev };
+        delete next[vars.requestId];
+        return next;
+      });
+      setFormatPrices((prev) => {
+        const next = { ...prev };
+        delete next[vars.requestId];
+        return next;
+      });
+      qc.setQueryData(['admin-format-requests', id], (prev: unknown) => {
+        if (!prev || typeof prev !== 'object' || !('requests' in prev)) return prev;
+        const data = prev as { requests: FormatRequest[] };
+        return {
+          ...data,
+          requests: data.requests.map((row) =>
+            row.id === vars.requestId
+              ? {
+                  ...row,
+                  status: res.awaitingPayment ? 'IN_PROGRESS' : 'DONE',
+                  invoiceId: res.invoiceId ?? row.invoiceId,
+                  priceCents: vars.amountCents ?? row.priceCents,
+                  invoiceStatus: res.awaitingPayment ? 'AWAITING' : row.invoiceStatus,
+                }
+              : row,
+          ),
+        };
+      });
+      if (res.awaitingPayment) {
+        if (res.payLinkUrl) {
+          const url = res.payLinkUrl.startsWith('http')
+            ? res.payLinkUrl
+            : `${window.location.origin}${res.payLinkUrl}`;
+          void navigator.clipboard?.writeText(url);
+        }
+        setToast('Invoice sent. The file is held until they pay. Pay link copied.');
+      } else {
+        setToast('File sent. The customer can download it from Files.');
+      }
+      invalidate(res.order);
+    },
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
+  const formatPayLinkMut = useMutation({
+    mutationFn: (invoiceId: string) => createPayLink(invoiceId),
+    onSuccess: (res) => {
+      const url = `${window.location.origin}${res.url}`;
+      void navigator.clipboard?.writeText(url);
+      setToast('Pay link copied.');
+    },
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
+  const formatMarkPaidMut = useMutation({
+    mutationFn: (invoiceId: string) => payInvoice(invoiceId, 'CARD'),
+    onSuccess: () => {
+      setToast('Marked paid. The customer can download the file now.');
       void invalidateWorkCaches(qc);
     },
     onError: (e) => setError(getErrorMessage(e)),
@@ -340,6 +551,30 @@ export function AdminOrderDetail() {
     onSuccess: (res) => {
       setToast('Notes saved.');
       invalidate(res.order);
+    },
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
+  const payLinkMut = useMutation({
+    mutationFn: async () => {
+      if (!order?.priceCents) throw new Error('No price set');
+      const customerId = order.customerId;
+      if (!customerId) throw new Error('No customer linked to this order');
+      const inv = await createInvoice({
+        customerId,
+        orderId: id,
+        amountCents: order.priceCents,
+        coversText: order.name ?? undefined,
+      });
+      if (inv.invoice.status === 'PAID') {
+        throw new Error('This order is already paid.');
+      }
+      return createPayLink(inv.invoice.id);
+    },
+    onSuccess: (res) => {
+      const url = `${window.location.origin}${res.url}`;
+      void navigator.clipboard?.writeText(url);
+      setToast('Customer pay link copied. They can pay by card on that page.');
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -419,7 +654,11 @@ export function AdminOrderDetail() {
   const hasPendingRelease = (designId: string) =>
     filesForDesign(designId).some((f) => !f.releasedAt);
   const pendingBatches = (order.deliveries ?? []).filter((d) => !d.releasedAt);
-  const payment = payBadge(order.status, order.priceCents);
+  const hasPaidInvoice = (invoicesQ.data?.invoices ?? []).some(
+    (inv) => inv.orderId === id && inv.status === 'PAID',
+  );
+  const canRefund = hasPaidInvoice && order.status !== 'REFUNDED';
+  const payment = payBadge(order.status, order.priceCents, hasPaidInvoice);
   const assigned = designers.find((d) => d.id === order.assignedDesignerId);
   const canDeliver =
     order.status === 'IN_PROGRESS' ||
@@ -438,10 +677,6 @@ export function AdminOrderDetail() {
   const messages = threadQ.data?.conversation.messages ?? [];
   const activity = activityQ.data?.activity ?? [];
   const hasDeliveries = (order.deliveries ?? []).length > 0;
-  const hasPaidInvoice = (invoicesQ.data?.invoices ?? []).some(
-    (inv) => inv.orderId === id && inv.status === 'PAID',
-  );
-  const canRefund = hasPaidInvoice && order.status !== 'REFUNDED';
 
   return (
     <div>
@@ -673,15 +908,20 @@ export function AdminOrderDetail() {
               const locked = published && !editing;
               const canOpenPublish = canDeliver && !locked && (editing || d.status === 'DONE');
               const markAwaiting = editing && published && !inRevision;
-              const markLabel = markAwaiting
-                ? 'Mark awaiting'
-                : d.status === 'DONE' || d.status === 'DELIVERED'
-                  ? 'Mark in progress'
-                  : 'Mark ready';
+              const nextMark = markAwaiting
+                ? { label: 'Mark awaiting', status: 'WAITING' as const }
+                : d.status === 'WAITING'
+                  ? { label: 'Mark in progress', status: 'IN_PROGRESS' as const }
+                  : d.status === 'IN_PROGRESS'
+                    ? { label: 'Mark ready', status: 'DONE' as const }
+                    : d.status === 'DONE' && !locked
+                      ? { label: 'Mark in progress', status: 'IN_PROGRESS' as const }
+                      : null;
               return (
                 <div key={d.id} className="od-line" style={{ alignItems: 'flex-start', gap: 12 }}>
                   <span className="l" style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0, flex: 1 }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      {nextMark && (
                       <button
                         type="button"
                         className="btn btn-ghost btn-sm"
@@ -690,16 +930,13 @@ export function AdminOrderDetail() {
                         onClick={() =>
                           setDesignStatus.mutate({
                             designId: d.id,
-                            status: markAwaiting
-                              ? 'WAITING'
-                              : d.status === 'DONE' || d.status === 'DELIVERED'
-                                ? 'IN_PROGRESS'
-                                : 'DONE',
+                            status: nextMark.status,
                           })
                         }
                       >
-                        {markLabel}
+                        {nextMark.label}
                       </button>
+                      )}
                       <button
                         type="button"
                         className="btn btn-primary btn-sm"
@@ -732,14 +969,11 @@ export function AdminOrderDetail() {
                     )}
                   </span>
                   <span className="v" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                    <span className={designChip(d.status)}>
-                      {pending
-                        ? 'Waiting for approval'
-                        : inRevision
-                          ? 'Revision requested'
-                          : d.status === 'DELIVERED'
-                            ? 'Delivered'
-                            : designStatusLabel(d.status)}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <span className={designStatusChipClass(d.status)}>
+                        {pending ? 'Waiting for approval' : designStatusLabel(d.status)}
+                      </span>
+                      {inRevision && <span className="chip c-review">Revision requested</span>}
                     </span>
                     {canApprove && pending && (
                       <button
@@ -780,41 +1014,144 @@ export function AdminOrderDetail() {
                   <i className="ti ti-file-export" /> Format requests
                 </span>
               </div>
-              {formatReqQ.data?.requests.map((r) => (
-                <div key={r.id} className="od-line">
+              <div className="muted" style={{ padding: '10px 16px 0', fontSize: 12.5 }}>
+                Upload the export, then send it. Leave the fee blank to send free.
+                Enter a fee to invoice first — the file is held until they pay.
+              </div>
+              {formatReqQ.data?.requests.map((r) => {
+                const picked = formatFiles[r.id] ?? [];
+                const open = r.status !== 'DONE' && r.status !== 'CANCELLED';
+                const awaitingPay = open && r.invoiceStatus === 'AWAITING' && !!r.invoiceId;
+                const chargeCents = feeDollarsToCents(formatPrices[r.id]);
+                const willCharge = Number.isFinite(chargeCents) && chargeCents > 0;
+                const statusLabel = awaitingPay
+                  ? 'Waiting for payment'
+                  : r.status === 'IN_PROGRESS'
+                    ? 'In progress'
+                    : r.status === 'DONE'
+                      ? 'Sent'
+                      : r.status === 'CANCELLED'
+                        ? 'Cancelled'
+                        : 'Pending';
+                const statusCls = awaitingPay
+                  ? 'chip c-wait'
+                  : r.status === 'DONE'
+                    ? 'chip c-paid'
+                    : 'chip c-prog';
+                return (
+                <div key={r.id} className="od-line" style={{ alignItems: 'flex-start', flexWrap: 'wrap', gap: 10 }}>
                   <span className="l">
                     {r.format}
                     {r.note ? ` · ${r.note}` : ''}
+                    {r.priceCents ? ` · ${money(r.priceCents)}` : ''}
                   </span>
-                  <span className="v" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <span className={r.status === 'DONE' ? 'chip c-paid' : 'chip c-prog'}>
-                      {r.status === 'IN_PROGRESS'
-                        ? 'In progress'
-                        : r.status === 'DONE'
-                          ? 'Done'
-                          : r.status === 'CANCELLED'
-                            ? 'Cancelled'
-                            : 'Pending'}
-                    </span>
-                    {r.status !== 'DONE' && r.status !== 'CANCELLED' && (
+                  <span className="v" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <span className={statusCls}>{statusLabel}</span>
+                    {open && r.status === 'PENDING' && !awaitingPay && (
                       <button
                         type="button"
                         className="btn btn-ghost btn-sm"
+                        disabled={updateFormatReq.isPending || fulfillFormatReq.isPending}
                         onClick={() =>
-                          void updateAdminFormatRequest(
-                            r.id,
-                            r.status === 'PENDING' ? 'IN_PROGRESS' : 'DONE',
-                          ).then(() =>
-                            invalidateWorkCaches(qc),
-                          )
+                          updateFormatReq.mutate({
+                            requestId: r.id,
+                            status: 'IN_PROGRESS',
+                          })
                         }
                       >
-                        {r.status === 'PENDING' ? 'Start' : 'Mark done'}
+                        Start
                       </button>
+                    )}
+                    {awaitingPay && r.invoiceId && showMoney && (
+                      <>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          disabled={formatPayLinkMut.isPending}
+                          onClick={() => formatPayLinkMut.mutate(r.invoiceId!)}
+                        >
+                          Copy pay link
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-green btn-sm"
+                          disabled={formatMarkPaidMut.isPending}
+                          onClick={() => formatMarkPaidMut.mutate(r.invoiceId!)}
+                        >
+                          {formatMarkPaidMut.isPending ? 'Saving…' : 'Mark paid'}
+                        </button>
+                      </>
+                    )}
+                    {open && canPublishToCustomer && !awaitingPay && (
+                      <>
+                        <label className="btn btn-ghost btn-sm" style={{ margin: 0, cursor: 'pointer' }}>
+                          <i className="ti ti-paperclip" /> {picked.length ? `${picked.length} file(s)` : 'Choose file'}
+                          <input
+                            type="file"
+                            multiple
+                            hidden
+                            onChange={(e) => {
+                              const next = Array.from(e.target.files ?? []).slice(0, 10);
+                              setFormatFiles((prev) => ({ ...prev, [r.id]: next }));
+                              e.target.value = '';
+                            }}
+                          />
+                        </label>
+                        {showMoney && (
+                          <label className="fmt-fee" title="Leave blank to send free">
+                            <span>$</span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={formatPrices[r.id] ?? ''}
+                              onChange={(e) =>
+                                setFormatPrices((prev) => ({
+                                  ...prev,
+                                  [r.id]: e.target.value,
+                                }))
+                              }
+                            />
+                          </label>
+                        )}
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          disabled={
+                            fulfillFormatReq.isPending || picked.length === 0
+                          }
+                          onClick={() => {
+                            const cents = feeDollarsToCents(formatPrices[r.id]);
+                            if (Number.isNaN(cents)) {
+                              setError('Enter a valid fee, or leave it blank to send free.');
+                              return;
+                            }
+                            if (cents > 0 && !order?.customerId) {
+                              setError('Link a customer before charging for this export.');
+                              return;
+                            }
+                            fulfillFormatReq.mutate({
+                              requestId: r.id,
+                              files: picked,
+                              amountCents: cents > 0 ? cents : undefined,
+                            });
+                          }}
+                        >
+                          {fulfillFormatReq.isPending
+                            ? willCharge
+                              ? 'Invoicing…'
+                              : 'Sending…'
+                            : willCharge
+                              ? 'Invoice customer'
+                              : 'Send to customer'}
+                        </button>
+                      </>
                     )}
                   </span>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -825,28 +1162,18 @@ export function AdminOrderDetail() {
                   <i className="ti ti-checkup-list" /> Finished files
                 </span>
               </div>
-              <div className="od-files">
+              <div className="pub-files" style={{ padding: '14px 16px' }}>
                 {(order.deliveries ?? []).flatMap((d) =>
                   d.files.map((f) => (
-                    <button
+                    <SavedPublishFile
                       key={f.id}
-                      type="button"
-                      className="odf"
-                      onClick={() =>
-                        downloadSignedFile(adminDeliveryFileUrl(order.id, f.id), f.originalName)
-                      }
-                    >
-                      <i
-                        className={`ti ${d.releasedAt ? 'ti-check' : 'ti-clock'}`}
-                        style={{ color: d.releasedAt ? 'var(--green)' : 'var(--amber)' }}
-                      />{' '}
-                      {f.originalName}
-                      {!d.releasedAt && (
-                        <span className="chip c-wait" style={{ marginLeft: 8 }}>
-                          Waiting for release
-                        </span>
-                      )}
-                    </button>
+                      orderId={order.id}
+                      file={f}
+                      waiting={!d.releasedAt}
+                      canDelete={canDeliver}
+                      deleting={removeDeliveryFile.isPending}
+                      onDelete={() => removeDeliveryFile.mutate(f.id)}
+                    />
                   )),
                 )}
               </div>
@@ -903,7 +1230,7 @@ export function AdminOrderDetail() {
                 <div style={{ color: 'var(--muted)', fontSize: 12 }}>No messages on this order yet.</div>
               )}
             </div>
-            {msgFiles.length > 0 && (
+            {canMessageCustomer && msgFiles.length > 0 && (
               <div style={{ padding: '0 14px 8px', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {msgFiles.map((f, i) => (
                   <button
@@ -917,6 +1244,7 @@ export function AdminOrderDetail() {
                 ))}
               </div>
             )}
+            {canMessageCustomer && (
             <div className="thread-in" style={{ position: 'relative' }}>
               {showTemplates && (
                 <div
@@ -1003,6 +1331,7 @@ export function AdminOrderDetail() {
                 <i className="ti ti-send" />
               </button>
             </div>
+            )}
           </div>
         </div>
 
@@ -1078,25 +1407,39 @@ export function AdminOrderDetail() {
               </span>
             </div>
             <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                style={{ justifyContent: 'center' }}
-                disabled={genInvoice.isPending || !order.priceCents || !order.customerId}
-                onClick={() => genInvoice.mutate()}
-              >
-                <i className="ti ti-file-invoice" />{' '}
-                {genInvoice.isPending ? 'Creating…' : 'Create / edit invoice'}
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                style={{ justifyContent: 'center' }}
-                disabled={markPaid.isPending || !order.priceCents}
-                onClick={() => markPaid.mutate()}
-              >
-                <i className="ti ti-check" /> Mark payment received
-              </button>
+              {!hasPaidInvoice && (
+                <>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    style={{ justifyContent: 'center' }}
+                    disabled={genInvoice.isPending || !order.priceCents || !order.customerId}
+                    onClick={() => genInvoice.mutate()}
+                  >
+                    <i className="ti ti-file-invoice" />{' '}
+                    {genInvoice.isPending ? 'Creating…' : 'Create / edit invoice'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    style={{ justifyContent: 'center' }}
+                    disabled={payLinkMut.isPending || !order.priceCents || !order.customerId}
+                    onClick={() => payLinkMut.mutate()}
+                  >
+                    <i className="ti ti-credit-card" />{' '}
+                    {payLinkMut.isPending ? 'Creating link…' : 'Copy card pay link'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    style={{ justifyContent: 'center' }}
+                    disabled={markPaid.isPending || !order.priceCents}
+                    onClick={() => markPaid.mutate()}
+                  >
+                    <i className="ti ti-check" /> Mark payment received
+                  </button>
+                </>
+              )}
               {canRefund && (
               <button
                 type="button"
@@ -1199,10 +1542,11 @@ export function AdminOrderDetail() {
           onClick={() => {
             if (deliver.isPending) return;
             setPublishFor(null);
+            setPublishFiles([]);
             setPublishSaved(false);
           }}
         >
-          <div className="modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-h">
               <span>Publish {publishFor.name}</span>
               <button
@@ -1210,6 +1554,7 @@ export function AdminOrderDetail() {
                 className="modal-x"
                 onClick={() => {
                   setPublishFor(null);
+                  setPublishFiles([]);
                   setPublishSaved(false);
                 }}
                 aria-label="Close"
@@ -1232,17 +1577,40 @@ export function AdminOrderDetail() {
                   multiple
                   hidden
                   onChange={(e) => {
-                    const next = Array.from(e.target.files ?? []).slice(0, 10);
-                    setPublishFiles(next);
+                    const added = Array.from(e.target.files ?? []);
+                    setPublishFiles((prev) => {
+                      const next = [...prev];
+                      for (const f of added) {
+                        if (next.length >= 10) break;
+                        const dup = next.some(
+                          (x) =>
+                            x.name === f.name &&
+                            x.size === f.size &&
+                            x.lastModified === f.lastModified,
+                        );
+                        if (!dup) next.push(f);
+                      }
+                      return next;
+                    });
                     setPublishSaved(false);
                     e.target.value = '';
                   }}
                 />
               </label>
               {publishFiles.length > 0 && (
-                <div className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>
-                  {publishFiles.map((f) => f.name).join(', ')}
-                </div>
+                <>
+                  <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
+                    {publishFiles.length} of 10 files — click the trash on a picture to remove it
+                  </div>
+                  <LocalPublishFiles
+                    files={publishFiles}
+                    disabled={deliver.isPending}
+                    onRemove={(index) => {
+                      setPublishFiles((prev) => prev.filter((_, i) => i !== index));
+                      setPublishSaved(false);
+                    }}
+                  />
+                </>
               )}
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                 <button
@@ -1251,6 +1619,7 @@ export function AdminOrderDetail() {
                   disabled={deliver.isPending}
                   onClick={() => {
                     setPublishFor(null);
+                    setPublishFiles([]);
                     setPublishSaved(false);
                   }}
                 >

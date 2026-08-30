@@ -93,6 +93,7 @@ export type DeliveryFile = {
   id: string;
   designId?: string | null;
   originalName: string;
+  mimeType?: string | null;
   formatLabel: string | null;
 };
 

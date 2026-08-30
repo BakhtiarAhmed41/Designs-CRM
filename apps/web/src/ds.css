@@ -734,6 +734,7 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   0% { background-position: 100% 0; }
   100% { background-position: -100% 0; }
 }
+.page-loading { padding: 8px 0 24px; max-width: 720px; }
 .skel-list { padding: 4px 0; }
 .skel-row {
   display: flex;

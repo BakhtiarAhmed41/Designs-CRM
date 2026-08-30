@@ -2,7 +2,7 @@ import { apiFetch } from './api';
 import { authorizationHeader } from './session';
 
 // --- shared types ---------------------------------------------------------
-export type InvoiceKind = 'PER_ORDER' | 'MONTHLY';
+export type InvoiceKind = 'PER_ORDER' | 'MONTHLY' | 'ADD_ON';
 export type InvoiceStatus = 'AWAITING' | 'PAID' | 'CANCELLED';
 export type PayMethod = 'CARD' | 'STORE_CREDIT';
 export type RefundTo = 'CARD' | 'STORE_CREDIT';
@@ -67,6 +67,7 @@ export type BillingSummary = {
   outstandingCents: number;
   paidThisMonthCents: number;
   storeCreditOutstandingCents: number;
+  netMonthlyUnbilledCents: number;
 };
 
 export type MonthEndResult = {
@@ -86,7 +87,19 @@ export type PayLinkSummary = {
   customerName: string | null;
   coversText: string | null;
   status: InvoiceStatus;
+  stripeEnabled?: boolean;
 };
+
+function pageOrigin() {
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin;
+  }
+  return undefined;
+}
+
+function goToCheckout(url: string) {
+  window.location.assign(url);
+}
 
 // --- admin ----------------------------------------------------------------
 export function listInvoices(params?: {
@@ -192,7 +205,11 @@ export function getBillingSummary() {
 
 // --- customer -------------------------------------------------------------
 export function listMyInvoices() {
-  return apiFetch<{ invoices: Invoice[]; storeCreditCents: number }>('/invoices');
+  return apiFetch<{
+    invoices: Invoice[];
+    storeCreditCents: number;
+    unbilledMonthCents?: number;
+  }>('/invoices');
 }
 
 export function getMyInvoiceSummary() {
@@ -200,9 +217,42 @@ export function getMyInvoiceSummary() {
 }
 
 export function payMyInvoice(id: string, method: PayMethod) {
-  return apiFetch<{ invoice: Invoice | null }>(`/invoices/${id}/pay`, {
+  return apiFetch<{ invoice: Invoice | null; url?: string }>(`/invoices/${id}/pay`, {
     method: 'POST',
     body: JSON.stringify({ method }),
+  });
+}
+
+export async function startMyInvoiceCheckout(
+  id: string,
+  returnPath?: string,
+) {
+  const res = await apiFetch<{ url: string }>(`/invoices/${id}/checkout`, {
+    method: 'POST',
+    body: JSON.stringify({
+      returnOrigin: pageOrigin(),
+      returnPath,
+    }),
+  });
+  if (!res.url) throw new Error('Stripe did not return a checkout URL');
+  goToCheckout(res.url);
+}
+
+export async function startMyOrderCheckout(orderId: string) {
+  const res = await apiFetch<{ url: string }>(
+    `/invoices/by-order/${orderId}/checkout`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ returnOrigin: pageOrigin() }),
+    },
+  );
+  if (!res.url) throw new Error('Stripe did not return a checkout URL');
+  goToCheckout(res.url);
+}
+
+export function confirmMyInvoice(id: string) {
+  return apiFetch<{ invoice: Invoice | null }>(`/invoices/${id}/confirm`, {
+    method: 'POST',
   });
 }
 
@@ -236,7 +286,23 @@ export function getPayLinkSummary(token: string) {
 }
 
 export function payPayLink(token: string) {
-  return apiFetch<{ status: InvoiceStatus }>(`/pay/${token}`, {
+  return apiFetch<{ url: string }>(`/pay/${token}`, {
+    method: 'POST',
+    body: JSON.stringify({ returnOrigin: pageOrigin() }),
+  });
+}
+
+export async function startPayLinkCheckout(token: string) {
+  const res = await apiFetch<{ url: string }>(`/pay/${token}/checkout`, {
+    method: 'POST',
+    body: JSON.stringify({ returnOrigin: pageOrigin() }),
+  });
+  if (!res.url) throw new Error('Stripe did not return a checkout URL');
+  goToCheckout(res.url);
+}
+
+export function confirmPayLink(token: string) {
+  return apiFetch<PayLinkSummary>(`/pay/${token}/confirm`, {
     method: 'POST',
   });
 }

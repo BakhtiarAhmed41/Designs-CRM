@@ -1,11 +1,17 @@
-import { useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { getPayLinkSummary } from '@/lib/billing';
+import { useEffect, useState } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { confirmPayLink, getPayLinkSummary, startPayLinkCheckout } from '@/lib/billing';
+import { getErrorMessage } from '@/lib/api';
 import { money } from '@/lib/format';
 import { ErrorBanner } from '@/components/ui/EmptyState';
 
 export function PayLink() {
   const { token = '' } = useParams();
+  const [params] = useSearchParams();
+  const returning = params.get('status') === 'success' || params.get('paid') === '1';
+  const canceled = params.get('status') === 'canceled' || params.get('canceled') === '1';
+  const [error, setError] = useState<string | null>(null);
 
   const summaryQ = useQuery({
     queryKey: ['pay-link', token],
@@ -14,7 +20,26 @@ export function PayLink() {
     retry: false,
   });
 
-  const s = summaryQ.data;
+  const confirmMut = useMutation({
+    mutationFn: () => confirmPayLink(token),
+    onSuccess: () => {
+      void summaryQ.refetch();
+    },
+  });
+
+  useEffect(() => {
+    if (!token || !returning) return;
+    confirmMut.mutate();
+    // confirm once when Stripe sends the customer back
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, returning]);
+
+  const payMut = useMutation({
+    mutationFn: () => startPayLinkCheckout(token),
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
+  const s = confirmMut.data ?? summaryQ.data;
   const alreadyPaid = s?.status === 'PAID';
 
   return (
@@ -41,6 +66,8 @@ export function PayLink() {
             <ErrorBanner>This payment link is invalid or has expired.</ErrorBanner>
           )}
 
+          {error && <ErrorBanner>{error}</ErrorBanner>}
+
           {s && !alreadyPaid && (
             <>
               <div style={{ textAlign: 'center', margin: '8px 0 20px' }}>
@@ -54,12 +81,30 @@ export function PayLink() {
                   </div>
                 )}
               </div>
-              {/* TODO(payment): integrate Stripe once keys are provided */}
-              <div className="alert-error" style={{ marginBottom: 0 }}>
-                Payment integration coming soon. This page does not charge a card
-                or mark the invoice paid. Please pay the team directly, or use
-                store credit in the portal if you have a balance.
-              </div>
+              {canceled && (
+                <div className="alert-error" style={{ marginBottom: 12 }}>
+                  Payment was canceled. You can try again when you are ready.
+                </div>
+              )}
+              {s.stripeEnabled === false ? (
+                <div className="alert-error" style={{ marginBottom: 0 }}>
+                  Card checkout is not configured yet. Please contact the studio.
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  style={{ width: '100%', justifyContent: 'center' }}
+                  disabled={payMut.isPending}
+                  onClick={() => {
+                    setError(null);
+                    payMut.mutate();
+                  }}
+                >
+                  <i className="ti ti-credit-card" />{' '}
+                  {payMut.isPending ? 'Opening checkout…' : 'Pay with card'}
+                </button>
+              )}
             </>
           )}
 

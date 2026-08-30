@@ -1,13 +1,14 @@
 import { Fragment, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
+import { startMyOrderCheckout } from '@/lib/billing';
 import { createOrder, getMyOrder, listMyOrders } from '@/lib/orders';
 import { listMyEdits, requestEdit } from '@/lib/edits';
 import { RevisionRequestForm } from '@/components/RevisionRequestForm';
 import { getErrorMessage } from '@/lib/api';
 import { money, dateShort, lifecycleChip } from '@/lib/format';
 import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
-import type { Design } from '@/lib/designs';
+import { designStatusChipClass, designStatusLabel, type Design } from '@/lib/designs';
 import type { Order } from '@/lib/types';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -51,17 +52,18 @@ function orderChip(o: Order, designs?: Design[]): { cls: string; label: string }
 }
 
 function designLineIcon(status: Design['status']) {
-  if (status === 'DELIVERED' || status === 'DONE') {
+  if (status === 'DELIVERED') {
     return { icon: 'ti-check', color: 'var(--green)' };
+  }
+  if (status === 'DONE') {
+    return { icon: 'ti-circle-check', color: 'var(--navy)' };
   }
   if (status === 'WAITING') return { icon: 'ti-alert-circle', color: 'var(--amber)' };
   return { icon: 'ti-loader', color: 'var(--navy)' };
 }
 
 function designChip(status: Design['status']) {
-  if (status === 'DELIVERED' || status === 'DONE') return { cls: 'chip c-done', label: 'Delivered' };
-  if (status === 'WAITING') return { cls: 'chip c-wait', label: 'Waiting on you' };
-  return { cls: 'chip c-prog', label: 'Digitizing' };
+  return { cls: designStatusChipClass(status), label: designStatusLabel(status) };
 }
 
 function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
@@ -225,16 +227,17 @@ function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
           Boolean(openRevision) &&
           (revisionIds.length === 0 || revisionIds.includes(d.id));
         const ic = designLineIcon(d.status);
-        const chip = inRevision
-          ? { cls: 'chip c-review', label: 'Revision requested' }
-          : designChip(d.status);
+        const chip = designChip(d.status);
         return (
           <div key={d.id} className="line">
             <span className="ln">
               <i className={`ti ${ic.icon}`} style={{ color: ic.color }} /> {d.name}
               {d.size ? ` (${d.size})` : ''}
             </span>
-            <span className={chip.cls}>{chip.label}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <span className={chip.cls}>{chip.label}</span>
+              {inRevision && <span className="chip c-review">Revision requested</span>}
+            </span>
             <span className="lp">{money(d.priceCents)}</span>
           </div>
         );
@@ -449,6 +452,20 @@ export function PortalOrders() {
                       <td className="muted">{dateShort(o.createdAt)}</td>
                       <td className="num">
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+                          {o.status === 'PENDING_PAYMENT' && (
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void startMyOrderCheckout(o.id).catch((err) =>
+                                  window.alert(getErrorMessage(err)),
+                                );
+                              }}
+                            >
+                              <i className="ti ti-credit-card" /> Pay
+                            </button>
+                          )}
                           {money(o.priceCents)}
                           <button
                             type="button"

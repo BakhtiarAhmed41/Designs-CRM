@@ -492,6 +492,13 @@ function EditMemberModal({ member, onClose }: { member: TeamMember; onClose: () 
   const [lastName, setLastName] = useState(member.lastName ?? '');
   const [role, setRole] = useState<UserRole>(member.role);
   const [skillsText, setSkillsText] = useState(member.skills.join(', '));
+  const [password, setPassword] = useState('');
+  const [messageClients, setMessageClients] = useState(
+    member.permissions.messageClients !== false,
+  );
+  const [deliverDirect, setDeliverDirect] = useState(
+    Boolean(member.permissions.deliverDirect),
+  );
 
   const save = useMutation({
     mutationFn: () =>
@@ -503,6 +510,10 @@ function EditMemberModal({ member, onClose }: { member: TeamMember; onClose: () 
           .split(',')
           .map((s) => s.trim())
           .filter(Boolean),
+        ...(password.trim() ? { password: password.trim() } : {}),
+        ...(role === 'DESIGNER'
+          ? { permissions: { ...member.permissions, messageClients, deliverDirect } }
+          : {}),
       }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['admin-team'] });
@@ -544,10 +555,41 @@ function EditMemberModal({ member, onClose }: { member: TeamMember; onClose: () 
             <label>Skills (comma separated)</label>
             <input value={skillsText} onChange={(e) => setSkillsText(e.target.value)} />
           </div>
+          {role === 'DESIGNER' && (
+            <div style={{ margin: '4px 0 14px' }}>
+              <PermRow
+                title="Can message customers"
+                desc="Reply on order chats and open the customer inbox"
+                checked={messageClients}
+                onChange={setMessageClients}
+              />
+              <PermRow
+                title="Can deliver files to the customer"
+                desc="Off = send to admin for approval first"
+                checked={deliverDirect}
+                onChange={setDeliverDirect}
+              />
+            </div>
+          )}
+          <div className="ff">
+            <label>New password (optional)</label>
+            <input
+              type="password"
+              value={password}
+              autoComplete="new-password"
+              placeholder="Leave blank to keep the current password"
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            {password.length > 0 && password.length < 8 && (
+              <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                Use at least 8 characters
+              </div>
+            )}
+          </div>
           <button
             type="button"
             className="btn btn-primary"
-            disabled={save.isPending}
+            disabled={save.isPending || (password.length > 0 && password.length < 8)}
             onClick={() => save.mutate()}
           >
             {save.isPending ? 'Saving…' : 'Save'}

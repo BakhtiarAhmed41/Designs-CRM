@@ -2,6 +2,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { canFeature, staffLandingPath } from '@/lib/permissions';
 import type { FeatureKey } from '@/lib/types';
+import { PageLoading } from '@/components/PageProgress';
 
 /** Blocks admin child routes when the signed-in user lacks a feature. */
 export function RequireFeature({
@@ -16,11 +17,7 @@ export function RequireFeature({
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="center-screen">
-        <div className="spinner" />
-      </div>
-    );
+    return <PageLoading />;
   }
 
   const keys = anyOf?.length ? anyOf : feature ? [feature] : [];

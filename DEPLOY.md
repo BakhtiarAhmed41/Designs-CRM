@@ -29,9 +29,6 @@ JWT_REFRESH_SECRET=<32+ random chars>
 COOKIE_SECURE=true
 UPLOAD_DIR=/var/www/designs-crm/uploads
 STORAGE_URL_SECRET=<32+ random chars>
-```
-Create `apps/web/.env.local`:
-```
 VITE_API_BASE_URL=https://your-domain.com/api
 ```
 
