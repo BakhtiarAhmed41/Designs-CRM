@@ -4,6 +4,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
 import { randomBytes, randomUUID } from 'crypto';
 import type { AuthUser } from '../auth/auth.types';
 import {
@@ -1743,8 +1745,25 @@ export class BillingService {
       [invoiceId],
     );
 
-    return buildInvoicePrintHtml(invoice, payments);
+    return buildInvoicePrintHtml(invoice, payments, invoiceLogoSrc());
   }
+}
+
+function invoiceLogoSrc() {
+  const candidates = [
+    join(__dirname, 'assets', 'lvd-logo.png'),
+    join(__dirname, '..', 'assets', 'lvd-logo.png'),
+    join(__dirname, '..', '..', 'assets', 'lvd-logo.png'),
+    join(process.cwd(), 'assets', 'lvd-logo.png'),
+    join(process.cwd(), 'apps', 'api', 'assets', 'lvd-logo.png'),
+    join(process.cwd(), '..', 'web', 'public', 'lvd-logo.png'),
+    join(process.cwd(), 'apps', 'web', 'public', 'lvd-logo.png'),
+  ];
+  for (const file of candidates) {
+    if (!existsSync(file)) continue;
+    return `data:image/png;base64,${readFileSync(file).toString('base64')}`;
+  }
+  return '';
 }
 
 function escapeHtml(s: string) {
@@ -1798,6 +1817,7 @@ function buildInvoicePrintHtml(
     order_name: string | null;
   },
   payments: PaymentRow[],
+  logoSrc = '',
 ) {
   const ref = invoice.id.slice(0, 8).toUpperCase();
   const money = (cents: number) => formatInvoiceMoney(cents, invoice.currency);
@@ -1926,17 +1946,14 @@ function buildInvoicePrintHtml(
     align-items: center;
     gap: 14px;
   }
-  .mono {
-    width: 46px;
-    height: 46px;
+  .logo {
+    height: 48px;
+    width: auto;
+    max-width: 120px;
+    object-fit: contain;
     flex-shrink: 0;
-    background: var(--navy);
-    color: #fff;
-    display: grid;
-    place-items: center;
-    font-family: Palatino, "Palatino Linotype", Georgia, serif;
-    font-size: 20px;
-    letter-spacing: 0.02em;
+    background: #fff;
+    border-radius: 6px;
   }
   .studio {
     font-size: 11px;
@@ -2093,7 +2110,7 @@ function buildInvoicePrintHtml(
     }
     .foot { margin-top: 48px; }
     .note { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-    .mono { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .logo { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
   }
 </style>
 </head>
@@ -2106,7 +2123,11 @@ function buildInvoicePrintHtml(
   <article class="sheet">
     <header class="brand">
       <div class="mark">
-        <div class="mono" aria-hidden="true">L</div>
+        ${
+          logoSrc
+            ? `<img class="logo" src="${logoSrc}" alt="Las Vegas Designs USA" />`
+            : `<div class="logo" aria-hidden="true"></div>`
+        }
         <div>
           <div class="studio">Las Vegas Designs</div>
           <div class="place">USA · Custom embroidery &amp; design</div>

@@ -13,6 +13,11 @@ function writeBundleDir(dir, bundledFile) {
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
   fs.copyFileSync(bundledFile, path.join(dir, 'main.js'));
+  const logoSrc = path.join(apiRoot, 'assets', 'lvd-logo.png');
+  if (fs.existsSync(logoSrc)) {
+    fs.mkdirSync(path.join(dir, 'assets'), { recursive: true });
+    fs.copyFileSync(logoSrc, path.join(dir, 'assets', 'lvd-logo.png'));
+  }
   fs.writeFileSync(
     path.join(dir, 'package.json'),
     JSON.stringify({ type: 'commonjs' }),
