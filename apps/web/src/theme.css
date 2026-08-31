@@ -313,7 +313,9 @@ body {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  width: 100%;
   max-width: 1140px;
+  margin-inline: auto;
 }
 .main:not(.main-messaging) > div > .metric-row,
 .main:not(.main-messaging) > div > .hero,
@@ -452,6 +454,7 @@ button.metric { font: inherit; text-align: left; width: 100%; }
   margin: 0;
 }
 .task {
+  background: #fff;
   padding: 15px 16px 14px;
   min-height: 88px;
   display: flex;
