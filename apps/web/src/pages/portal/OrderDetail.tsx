@@ -14,7 +14,7 @@ import {
 import { listMyEdits, requestEdit } from '@/lib/edits';
 import { RevisionRequestForm } from '@/components/RevisionRequestForm';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
-import { money, lifecycleChip, dateShort } from '@/lib/format';
+import { money, lifecycleChip, dateShort, paymentChip } from '@/lib/format';
 import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import { createMyConversation, listMyConversations } from '@/lib/messaging';
 import {
@@ -181,6 +181,7 @@ export function PortalOrderDetail() {
     order.status === 'CLOSED' ||
     order.status === 'REVISION_REQUESTED' ||
     (order.designs ?? []).some((d) => d.status === 'DELIVERED');
+  const payChip = paymentChip(order.paymentStatus);
 
   return (
     <div>
@@ -493,7 +494,7 @@ export function PortalOrderDetail() {
                 <span className="ct">Designs</span>
               </div>
               {order.designs.map((d) => (
-                <div key={d.id} className="orow" style={{ cursor: 'default' }}>
+                <div key={d.id} className="orow orow-status-under" style={{ cursor: 'default' }}>
                   <div className={`thumb${serviceThumbClass(order.serviceType) ? ' m' : ''}`}>
                     <i className={`ti ${serviceTi(order.serviceType)}`} />
                   </div>
@@ -503,16 +504,16 @@ export function PortalOrderDetail() {
                       {d.placement && <span>{d.placement}</span>}
                       {d.size && <span>{d.size}</span>}
                     </div>
+                    <div className="ostatus">
+                      <span className={designStatusChipClass(d.status)}>
+                        {designStatusLabel(d.status)}
+                      </span>
+                      {Boolean(openRevision) &&
+                        (revisionIds.length === 0 || revisionIds.includes(d.id)) && (
+                          <span className="chip c-review">Revision requested</span>
+                        )}
+                    </div>
                   </div>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    <span className={designStatusChipClass(d.status)}>
-                      {designStatusLabel(d.status)}
-                    </span>
-                    {Boolean(openRevision) &&
-                      (revisionIds.length === 0 || revisionIds.includes(d.id)) && (
-                        <span className="chip c-review">Revision requested</span>
-                      )}
-                  </span>
                   <div className="oprice">{money(d.priceCents)}</div>
                 </div>
               ))}
@@ -534,6 +535,12 @@ export function PortalOrderDetail() {
             <div className="od-line">
               <span className="l">Price</span>
               <span className="v">{money(order.priceCents)}</span>
+            </div>
+            <div className="od-line">
+              <span className="l">Payment</span>
+              <span className="v">
+                <span className={payChip.cls}>{payChip.label}</span>
+              </span>
             </div>
             {order.status === 'PENDING_PAYMENT' && (
               <div style={{ padding: '0 16px 14px' }}>

@@ -100,12 +100,12 @@ async function main() {
     );
   }
 
-  // Expand invoices.status ENUM to include CANCELLED (safe to re-run).
+  // Expand invoices.status ENUM (safe to re-run).
   // eslint-disable-next-line no-console
-  console.log('Ensuring invoices.status includes CANCELLED ...');
+  console.log('Ensuring invoices.status includes PARTIAL and CANCELLED ...');
   await conn.query(
     `ALTER TABLE invoices MODIFY COLUMN status
-       ENUM('AWAITING','PAID','CANCELLED') NOT NULL DEFAULT 'AWAITING'`,
+       ENUM('AWAITING','PARTIAL','PAID','CANCELLED') NOT NULL DEFAULT 'AWAITING'`,
   );
 
   if (!(await columnExists('quotation_lines', 'client_decision'))) {
@@ -229,6 +229,70 @@ async function main() {
     await conn.query(
       'ALTER TABLE quotation_lines ADD COLUMN attachment_id CHAR(36) NULL',
     );
+  }
+
+  if (!(await columnExists('orders', 'created_by_role'))) {
+    console.log('Adding orders.created_by_role column ...');
+    await conn.query(
+      `ALTER TABLE orders ADD COLUMN created_by_role ENUM('SUPER_ADMIN','ADMIN','SUPPORT','DESIGNER','CLIENT') NULL`,
+    );
+  }
+  if (!(await columnExists('orders', 'created_by_id'))) {
+    console.log('Adding orders.created_by_id column ...');
+    await conn.query('ALTER TABLE orders ADD COLUMN created_by_id CHAR(36) NULL');
+  }
+
+  const [invStatusCols] = await conn.query<mysql.RowDataPacket[]>(
+    `SELECT COLUMN_TYPE AS t FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'invoices' AND COLUMN_NAME = 'status'`,
+    [env.DB_NAME],
+  );
+  const invStatusType = String(invStatusCols[0]?.t ?? '');
+  if (invStatusType && !invStatusType.includes('PARTIAL')) {
+    console.log('Adding invoices.status PARTIAL ...');
+    await conn.query(
+      "ALTER TABLE invoices MODIFY COLUMN status ENUM('AWAITING','PARTIAL','PAID','CANCELLED') NOT NULL DEFAULT 'AWAITING'",
+    );
+  }
+  if (!(await columnExists('invoices', 'amount_paid_cents'))) {
+    console.log('Adding invoices.amount_paid_cents column ...');
+    await conn.query(
+      'ALTER TABLE invoices ADD COLUMN amount_paid_cents INT NOT NULL DEFAULT 0',
+    );
+    await conn.query(
+      "UPDATE invoices SET amount_paid_cents = amount_cents WHERE status = 'PAID' AND amount_paid_cents = 0",
+    );
+  } else {
+    await conn.query(
+      "UPDATE invoices SET amount_paid_cents = amount_cents WHERE status = 'PAID' AND amount_paid_cents = 0",
+    );
+  }
+  if (!(await columnExists('invoices', 'due_at'))) {
+    console.log('Adding invoices.due_at column ...');
+    await conn.query('ALTER TABLE invoices ADD COLUMN due_at DATETIME NULL');
+  }
+
+  const [invLineTables] = await conn.query<mysql.RowDataPacket[]>(
+    `SELECT COUNT(*) AS cnt FROM information_schema.TABLES
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'invoice_lines'`,
+    [env.DB_NAME],
+  );
+  if (Number(invLineTables[0]?.cnt ?? 0) === 0) {
+    console.log('Creating invoice_lines table ...');
+    await conn.query(`
+      CREATE TABLE invoice_lines (
+        id           CHAR(36) NOT NULL,
+        invoice_id   CHAR(36) NOT NULL,
+        order_id     CHAR(36) NULL,
+        description  VARCHAR(255) NOT NULL,
+        amount_cents INT NOT NULL,
+        created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        KEY idx_inv_line_invoice (invoice_id),
+        UNIQUE KEY uq_inv_line_order (order_id),
+        CONSTRAINT fk_inv_line_invoice FOREIGN KEY (invoice_id) REFERENCES invoices (id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
   }
 
   if (existsSync(migrationsDir)) {

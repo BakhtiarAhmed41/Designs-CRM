@@ -481,9 +481,9 @@ body{font-size:15px;}
 
 /* Batch expansion */
 .batch{background:#fafbfc;border-top:0.5px solid var(--line);padding:4px 18px 8px 62px;}
-.line{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:8px 0;border-bottom:0.5px dashed var(--line);}
+.line{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:8px 0;border-bottom:0.5px dashed var(--line);}
 .line:last-child{border-bottom:none;}
-.line .ln{font-size:12.5px;color:var(--ink);display:flex;align-items:center;gap:7px;}
+.line .ln{font-size:12.5px;color:var(--ink);display:flex;align-items:center;gap:7px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .line .ln i{color:var(--faint);font-size:15px;}
 .line .lp{font-size:12.5px;font-weight:600;color:var(--muted);}
 

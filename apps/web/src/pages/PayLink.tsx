@@ -75,6 +75,11 @@ export function PayLink() {
                   {s.customerName ?? 'Customer'}
                 </div>
                 <div className="pay-amount">{money(s.amountCents, s.currency)}</div>
+                {s.status === 'PARTIAL' && (
+                  <div style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>
+                    Balance due
+                  </div>
+                )}
                 {s.coversText && (
                   <div style={{ color: 'var(--muted)', fontSize: 13.5, marginTop: 6 }}>
                     {s.coversText}

@@ -5,6 +5,7 @@ import { AppService } from './app.service';
 import { BillingModule } from './billing/billing.module';
 import { CustomersModule } from './customers/customers.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { ReportsModule } from './reports/reports.module';
 import { DbModule } from './db/db.module';
 import { EditsModule } from './edits/edits.module';
 import { MailModule } from './mail/mail.module';
@@ -34,6 +35,7 @@ import { UsersModule } from './users/users.module';
     RolesModule,
     EditsModule,
     DashboardModule,
+    ReportsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

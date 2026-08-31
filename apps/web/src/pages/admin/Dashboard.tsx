@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { BarChart } from '@/components/BarChart';
 import { GenerateOrderModal } from '@/components/GenerateOrderModal';
-import { getDashboardChart, getDashboardStats } from '@/lib/dashboard';
+import { getDashboardStats } from '@/lib/dashboard';
 import { listAdminEdits } from '@/lib/edits';
 import { listAdminConversations } from '@/lib/messaging';
 import { listAdminOrders } from '@/lib/orders';
@@ -15,8 +14,6 @@ import { useAuth } from '@/context/AuthContext';
 import type { FeatureKey, Order, OrderStatus } from '@/lib/types';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
-
-type RangeKey = 'today' | 'week' | 'month' | 'custom';
 
 function customerLabel(o: Order) {
   const c = o.client;
@@ -46,10 +43,6 @@ function relativeTime(iso: string | null | undefined) {
 export function AdminDashboard() {
   const { user } = useAuth();
   const can = (key: FeatureKey) => canFeature(user?.permissions, key, user?.role);
-  const [range, setRange] = useState<RangeKey>('today');
-  const [customFrom, setCustomFrom] = useState('');
-  const [customTo, setCustomTo] = useState('');
-  const [chartOpen, setChartOpen] = useState(false);
   const [genOpen, setGenOpen] = useState(false);
   const [genMode, setGenMode] = useState<'ORDER' | 'QUOTE_REQUEST'>('ORDER');
 
@@ -58,19 +51,6 @@ export function AdminDashboard() {
     queryFn: getDashboardStats,
     ...freshOnOpen,
     refetchInterval: whenVisible(30_000),
-  });
-  const chartDays = range === 'today' ? 1 : range === 'week' ? 7 : range === 'month' ? 30 : 14;
-  const { data: chartData } = useQuery({
-    queryKey: ['admin-dashboard-chart', chartDays, range, customFrom, customTo],
-    queryFn: () =>
-      getDashboardChart(
-        chartDays,
-        range === 'custom' && customFrom && customTo
-          ? { from: customFrom, to: customTo }
-          : undefined,
-      ),
-    enabled: range !== 'custom' || Boolean(customFrom && customTo),
-    refetchInterval: whenVisible(60_000),
   });
   const { data: ordersData } = useQuery({
     queryKey: ['admin-orders-latest'],
@@ -106,7 +86,6 @@ export function AdminDashboard() {
   });
 
   const stats = statsData?.stats;
-  const series = chartData?.series ?? [];
   const orders = ordersData?.orders ?? [];
   const conversations = convosData?.conversations ?? [];
   const edits = editsData?.edits ?? [];
@@ -121,7 +100,8 @@ export function AdminDashboard() {
       { label: 'Delivered this month', value: String(stats?.deliveredThisMonth ?? 0), sub: 'completed jobs', show: can('orders') },
       { label: 'Revenue this month', value: money(stats?.revenueThisMonthCents ?? 0), sub: 'delivered value', alert: true, show: can('billing') },
       { label: 'Open revisions', value: String(stats?.revisionsOpen ?? 0), sub: 'pending action', show: can('edits') },
-      { label: 'Outstanding', value: money(stats?.outstandingCents ?? 0), sub: 'unpaid work', alert: true, show: can('billing') },
+      { label: 'Pending', value: money(stats?.pendingCents ?? 0), sub: 'not yet due', show: can('billing') },
+      { label: 'Overdue', value: money(stats?.overdueCents ?? 0), sub: 'past due date', alert: true, show: can('billing') },
     ];
     return tiles.filter((t) => t.show);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- can() reads current user
@@ -215,7 +195,7 @@ export function AdminDashboard() {
               Money to collect
             </div>
             <div className="tb">
-              <b>{money(stats?.outstandingCents ?? 0)}</b> outstanding
+              <b>{money(stats?.overdueCents ?? 0)}</b> overdue · <b>{money(stats?.pendingCents ?? 0)}</b> pending
             </div>
           </Link>
         )}
@@ -223,30 +203,6 @@ export function AdminDashboard() {
 
       {showPulse && (
         <section className="pulse">
-          <div className="pulse-h">
-            <h3>Store pulse</h3>
-            <div className="pulse-tools">
-              <div className="range">
-                {(['today', 'week', 'month', 'custom'] as RangeKey[]).map((r) => (
-                  <button
-                    key={r}
-                    type="button"
-                    className={range === r ? 'on' : ''}
-                    onClick={() => setRange(r)}
-                  >
-                    {r === 'today' ? 'Today' : r === 'week' ? 'This week' : r === 'month' ? 'This month' : 'Custom'}
-                  </button>
-                ))}
-              </div>
-              {range === 'custom' && (
-                <div className="pulse-dates">
-                  <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} />
-                  <span>to</span>
-                  <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} />
-                </div>
-              )}
-            </div>
-          </div>
           <div className="pulse-grid">
             {statTiles.map((t) => (
               <div key={t.label} className="pulse-stat">
@@ -256,40 +212,6 @@ export function AdminDashboard() {
               </div>
             ))}
           </div>
-          <div className="chart-toggle-row">
-            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setChartOpen((v) => !v)}>
-              <i className={`ti ${chartOpen ? 'ti-chevron-up' : 'ti-chart-bar'}`} />
-              {chartOpen ? 'Hide chart' : 'Show chart'}
-            </button>
-          </div>
-          {chartOpen && (
-            <div className="chart-wrap">
-              <div className="chart-legend">
-                <span className="lg">
-                  <span className="lg-dot" style={{ background: 'var(--navy)' }} /> Orders
-                </span>
-                {can('billing') && (
-                  <span className="lg">
-                    <span className="lg-dot" style={{ background: 'var(--maroon)' }} /> Revenue
-                  </span>
-                )}
-              </div>
-              <div>
-                {series.length === 0 ? (
-                  <div className="pulse-empty">No chart data yet.</div>
-                ) : (
-                  <BarChart
-                    data={series}
-                    valueKey="orders"
-                    valueKey2={can('billing') ? 'deliveredValueCents' : undefined}
-                    labelKey="date"
-                    height={120}
-                    formatValue2={(n) => `$${(n / 100).toFixed(0)}`}
-                  />
-                )}
-              </div>
-            </div>
-          )}
         </section>
       )}
 

@@ -12,6 +12,7 @@ import {
   AccountType,
   InvoiceKind,
   InvoiceStatus,
+  OrderPaymentStatus,
   OrderStatus,
   PaymentMethod,
   PaymentStatus,
@@ -46,6 +47,29 @@ function currentPeriodMonth(): string {
   return `${y}-${m}`;
 }
 
+/** The month that just ended — default for month-end statements. */
+function previousPeriodMonth(): string {
+  const now = new Date();
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  return `${y}-${m}`;
+}
+
+function invoiceRemainingCents(inv: { amount_cents: number; amount_paid_cents?: number }) {
+  return Math.max(0, inv.amount_cents - (inv.amount_paid_cents ?? 0));
+}
+
+function isOpenInvoiceStatus(status: InvoiceStatus) {
+  return status === InvoiceStatus.AWAITING || status === InvoiceStatus.PARTIAL;
+}
+
+function netTermsDays(terms?: string | null) {
+  if (terms === 'NET_15') return 15;
+  if (terms === 'NET_30') return 30;
+  return 30;
+}
+
 function isValidPeriodMonth(value: string): boolean {
   return /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
 }
@@ -66,13 +90,24 @@ type InvoiceRow = {
   order_id: string | null;
   kind: InvoiceKind;
   amount_cents: number;
+  amount_paid_cents: number;
   currency: string;
   covers_text: string | null;
   status: InvoiceStatus;
   period_month: string | null;
   store_credit_applied_cents: number;
   issued_at: Date;
+  due_at: Date | null;
   paid_at: Date | null;
+};
+
+type InvoiceLineRow = {
+  id: string;
+  invoice_id: string;
+  order_id: string | null;
+  description: string;
+  amount_cents: number;
+  created_at: Date;
 };
 
 type PaymentRow = {
@@ -108,6 +143,7 @@ type CustomerRow = {
   name: string;
   email: string | null;
   account_type: AccountType;
+  net_terms?: 'NET_15' | 'NET_30' | null;
   currency?: string | null;
   store_credit_cents: number;
 };
@@ -153,12 +189,15 @@ export class BillingService {
       orderId: i.order_id,
       kind: i.kind,
       amountCents: i.amount_cents,
+      amountPaidCents: i.amount_paid_cents ?? 0,
+      remainingCents: invoiceRemainingCents(i),
       currency: i.currency,
       coversText: i.covers_text,
       status: i.status,
       periodMonth: i.period_month,
       storeCreditAppliedCents: i.store_credit_applied_cents,
       issuedAt: i.issued_at,
+      dueAt: i.due_at ?? null,
       paidAt: i.paid_at,
     };
   }
@@ -207,7 +246,7 @@ export class BillingService {
 
   private async getCustomerRow(id: string): Promise<CustomerRow | null> {
     return this.db.queryOne<CustomerRow>(
-      'SELECT id, user_id, name, email, account_type, store_credit_cents FROM customers WHERE id = ? LIMIT 1',
+      'SELECT id, user_id, name, email, account_type, net_terms, store_credit_cents FROM customers WHERE id = ? LIMIT 1',
       [id],
     );
   }
@@ -220,8 +259,10 @@ export class BillingService {
     const params: unknown[] = [
       AccountType.NET_MONTHLY,
       OrderStatus.COMPLETED,
+      OrderStatus.CLOSED,
       opts.periodMonth,
       InvoiceStatus.AWAITING,
+      InvoiceStatus.PARTIAL,
       InvoiceStatus.PAID,
     ];
     const customerClause = opts.customerId ? 'AND o.customer_id = ?' : '';
@@ -232,13 +273,16 @@ export class BillingService {
          FROM orders o
          JOIN customers c ON c.id = o.customer_id
         WHERE c.account_type = ?
-          AND o.status = ?
+          AND o.status IN (?, ?)
           AND o.price_cents IS NOT NULL
-          AND DATE_FORMAT(o.completed_at, '%Y-%m') = ?
+          AND DATE_FORMAT(COALESCE(o.completed_at, o.closed_at), '%Y-%m') = ?
           AND o.id NOT IN (
                 SELECT order_id FROM invoices
                  WHERE order_id IS NOT NULL
-                   AND status IN (?, ?)
+                   AND status IN (?, ?, ?)
+              )
+          AND o.id NOT IN (
+                SELECT order_id FROM invoice_lines WHERE order_id IS NOT NULL
               )
           ${customerClause}`,
       params,
@@ -246,12 +290,108 @@ export class BillingService {
     return Number(row?.total ?? 0);
   }
 
+  private async invoiceFullyRefunded(invoice: InvoiceRow): Promise<boolean> {
+    const row = await this.db.queryOne<{ total: number | string | null }>(
+      `SELECT COALESCE(SUM(amount_cents), 0) AS total
+         FROM payments
+        WHERE invoice_id = ?
+          AND type = ?
+          AND status = ?`,
+      [invoice.id, PaymentType.REFUND, PaymentStatus.PAID],
+    );
+    return Number(row?.total ?? 0) >= invoice.amount_cents;
+  }
+
+  /**
+   * Payment state for one order.
+   * Monthly customers stay Unpaid until a paid monthly statement exists
+   * for the month they completed in (and they were not billed separately).
+   */
+  async resolveOrderPaymentStatus(order: {
+    id: string;
+    customer_id: string | null;
+    status: OrderStatus;
+    completed_at: Date | string | null;
+  }): Promise<OrderPaymentStatus> {
+    if (order.status === OrderStatus.REFUNDED) return OrderPaymentStatus.REFUNDED;
+
+    const perOrder = await this.db.queryOne<InvoiceRow>(
+      `SELECT * FROM invoices
+        WHERE order_id = ?
+          AND kind = ?
+          AND status IN (?, ?, ?)
+        ORDER BY issued_at DESC
+        LIMIT 1`,
+      [
+        order.id,
+        InvoiceKind.PER_ORDER,
+        InvoiceStatus.AWAITING,
+        InvoiceStatus.PARTIAL,
+        InvoiceStatus.PAID,
+      ],
+    );
+    if (perOrder) {
+      if (await this.invoiceFullyRefunded(perOrder)) {
+        return OrderPaymentStatus.REFUNDED;
+      }
+      if (perOrder.status === InvoiceStatus.PAID) return OrderPaymentStatus.PAID;
+      return OrderPaymentStatus.AWAITING;
+    }
+
+    const monthlyLine = await this.db.queryOne<InvoiceRow>(
+      `SELECT i.*
+         FROM invoice_lines l
+         JOIN invoices i ON i.id = l.invoice_id
+        WHERE l.order_id = ?
+          AND i.status <> ?
+        ORDER BY i.issued_at DESC
+        LIMIT 1`,
+      [order.id, InvoiceStatus.CANCELLED],
+    );
+    if (monthlyLine) {
+      if (await this.invoiceFullyRefunded(monthlyLine)) {
+        return OrderPaymentStatus.REFUNDED;
+      }
+      if (monthlyLine.status === InvoiceStatus.PAID) return OrderPaymentStatus.PAID;
+      return OrderPaymentStatus.AWAITING;
+    }
+
+    if (
+      order.customer_id &&
+      (order.status === OrderStatus.COMPLETED || order.status === OrderStatus.CLOSED)
+    ) {
+      const billedSeparately = await this.db.queryOne<{ id: string }>(
+        `SELECT id FROM invoices
+          WHERE order_id = ?
+            AND status IN (?, ?, ?)
+          LIMIT 1`,
+        [
+          order.id,
+          InvoiceStatus.AWAITING,
+          InvoiceStatus.PARTIAL,
+          InvoiceStatus.PAID,
+        ],
+      );
+      if (!billedSeparately) {
+        const customer = await this.getCustomerRow(order.customer_id);
+        if (customer?.account_type === AccountType.NET_MONTHLY) {
+          return OrderPaymentStatus.UNPAID;
+        }
+      }
+    }
+
+    if (order.status === OrderStatus.PENDING_PAYMENT) {
+      return OrderPaymentStatus.AWAITING;
+    }
+    return OrderPaymentStatus.UNPAID;
+  }
+
   private async resolveMyCustomer(
     user: AuthUser | undefined,
   ): Promise<CustomerRow> {
     assertAuthUser(user);
     const row = await this.db.queryOne<CustomerRow>(
-      'SELECT id, user_id, name, email, account_type, store_credit_cents FROM customers WHERE user_id = ? LIMIT 1',
+      'SELECT id, user_id, name, email, account_type, net_terms, store_credit_cents FROM customers WHERE user_id = ? LIMIT 1',
       [user.id],
     );
     if (!row)
@@ -283,7 +423,10 @@ export class BillingService {
     const where: string[] = [];
     const params: unknown[] = [];
     const statuses = Object.values(InvoiceStatus) as string[];
-    if (filters.status && statuses.includes(filters.status)) {
+    if (filters.status === InvoiceStatus.AWAITING) {
+      where.push('i.status IN (?, ?)');
+      params.push(InvoiceStatus.AWAITING, InvoiceStatus.PARTIAL);
+    } else if (filters.status && statuses.includes(filters.status)) {
       where.push('i.status = ?');
       params.push(filters.status);
     } else {
@@ -560,10 +703,10 @@ export class BillingService {
     if (paid) return paid;
     return this.db.queryOne<InvoiceRow>(
       `SELECT * FROM invoices
-        WHERE order_id = ? AND kind = ? AND status = ?
+        WHERE order_id = ? AND kind = ? AND status IN (?, ?)
         ORDER BY issued_at ASC
         LIMIT 1`,
-      [orderId, InvoiceKind.PER_ORDER, InvoiceStatus.AWAITING],
+      [orderId, InvoiceKind.PER_ORDER, InvoiceStatus.AWAITING, InvoiceStatus.PARTIAL],
     );
   }
 
@@ -638,6 +781,10 @@ export class BillingService {
       'SELECT * FROM payments WHERE invoice_id = ? ORDER BY created_at ASC',
       [id],
     );
+    const lines = await this.db.query<InvoiceLineRow>(
+      'SELECT * FROM invoice_lines WHERE invoice_id = ? ORDER BY created_at ASC',
+      [id],
+    );
     const customer = await this.getCustomerRow(invoice.customer_id);
     return {
       ...this.invoiceDto(invoice),
@@ -651,6 +798,18 @@ export class BillingService {
           }
         : null,
       payments: payments.map((p) => this.paymentDto(p)),
+      lines: lines.map((l) => this.invoiceLineDto(l)),
+    };
+  }
+
+  private invoiceLineDto(l: InvoiceLineRow) {
+    return {
+      id: l.id,
+      invoiceId: l.invoice_id,
+      orderId: l.order_id,
+      description: l.description,
+      amountCents: l.amount_cents,
+      createdAt: l.created_at,
     };
   }
 
@@ -658,8 +817,8 @@ export class BillingService {
     this.assertAdmin(user);
     const invoice = await this.getInvoiceRow(invoiceId);
     if (!invoice) throw new NotFoundException('Invoice not found');
-    if (invoice.status !== InvoiceStatus.AWAITING) {
-      throw new BadRequestException('Only awaiting invoices can be cancelled');
+    if (!isOpenInvoiceStatus(invoice.status) || invoiceRemainingCents(invoice) < invoice.amount_cents) {
+      throw new BadRequestException('Only unpaid invoices with no payments can be cancelled');
     }
 
     await this.db.withTransaction(async (tx) => {
@@ -681,8 +840,8 @@ export class BillingService {
     this.assertAdmin(user);
     const invoice = await this.getInvoiceRow(invoiceId);
     if (!invoice) throw new NotFoundException('Invoice not found');
-    if (invoice.status !== InvoiceStatus.AWAITING) {
-      throw new BadRequestException('Only awaiting invoices can be reminded');
+    if (!isOpenInvoiceStatus(invoice.status)) {
+      throw new BadRequestException('Only unpaid invoices can be reminded');
     }
 
     const payLink = await this.createPayLink(user, invoiceId);
@@ -693,7 +852,7 @@ export class BillingService {
     });
     const customer = await this.getCustomerRow(invoice.customer_id);
     if (customer?.email) {
-      const amountLabel = `${(invoice.amount_cents / 100).toFixed(2)} ${invoice.currency}`;
+      const amountLabel = `${(invoiceRemainingCents(invoice) / 100).toFixed(2)} ${invoice.currency}`;
       await this.mail.sendInvoiceReminder(
         customer.email,
         invoice.covers_text ?? 'your invoice',
@@ -707,19 +866,98 @@ export class BillingService {
 
   // --- pay an invoice (shared by admin + customer) -------------------------
 
+  private invoiceSettleStatus(amountCents: number, amountPaidCents: number): InvoiceStatus {
+    if (amountPaidCents >= amountCents) return InvoiceStatus.PAID;
+    if (amountPaidCents > 0) return InvoiceStatus.PARTIAL;
+    return InvoiceStatus.AWAITING;
+  }
+
+  private async settleInvoicePayment(
+    tx: DbTransaction,
+    invoiceId: string,
+    applyCents: number,
+    extras?: { storeCreditAppliedCents?: number },
+  ) {
+    const locked = await tx.queryOne<InvoiceRow>(
+      'SELECT * FROM invoices WHERE id = ? LIMIT 1 FOR UPDATE',
+      [invoiceId],
+    );
+    if (!locked) throw new NotFoundException('Invoice not found');
+    if (locked.status === InvoiceStatus.PAID) return { applied: 0, status: InvoiceStatus.PAID };
+    if (locked.status === InvoiceStatus.CANCELLED) {
+      throw new BadRequestException('Cannot pay a cancelled invoice');
+    }
+    if (!isOpenInvoiceStatus(locked.status)) {
+      throw new BadRequestException('Invoice is not awaiting payment');
+    }
+    const remaining = invoiceRemainingCents(locked);
+    const applied = Math.min(remaining, applyCents);
+    if (applied <= 0) return { applied: 0, status: locked.status };
+    const amountPaid = (locked.amount_paid_cents ?? 0) + applied;
+    const status = this.invoiceSettleStatus(locked.amount_cents, amountPaid);
+    await tx.execute(
+      `UPDATE invoices
+          SET amount_paid_cents = ?,
+              status = ?,
+              paid_at = IF(? = ?, NOW(), paid_at),
+              store_credit_applied_cents = store_credit_applied_cents + ?
+        WHERE id = ?`,
+      [
+        amountPaid,
+        status,
+        status,
+        InvoiceStatus.PAID,
+        extras?.storeCreditAppliedCents ?? 0,
+        invoiceId,
+      ],
+    );
+    return { applied, status };
+  }
+
+  private async afterInvoicePayment(invoiceId: string) {
+    const invoice = await this.getInvoiceRow(invoiceId);
+    if (!invoice) return;
+    if (invoice.status === InvoiceStatus.PAID) {
+      await this.advanceOrderAfterPayment(invoice.order_id);
+      await this.releasePaidFormatExport(invoice.id);
+      await this.notifyCustomerUser(invoice.customer_id, {
+        title: 'Payment received',
+        body: `We received your payment for ${invoice.covers_text ?? 'your invoice'}.`,
+        link: '/portal/invoices',
+      });
+      return;
+    }
+    if (invoice.status === InvoiceStatus.PARTIAL) {
+      await this.notifyCustomerUser(invoice.customer_id, {
+        title: 'Partial payment received',
+        body: `A payment was applied. ${(invoiceRemainingCents(invoice) / 100).toFixed(2)} ${invoice.currency} remains on ${invoice.covers_text ?? 'your invoice'}.`,
+        link: '/portal/invoices',
+      });
+    }
+  }
+
   private async payInvoiceInternal(
     invoice: InvoiceRow,
     method: 'CARD' | 'STORE_CREDIT',
+    amountCents?: number,
   ) {
     if (invoice.status === InvoiceStatus.PAID) {
-      // Idempotent: already settled.
       return;
     }
     if (invoice.status === InvoiceStatus.CANCELLED) {
       throw new BadRequestException('Cannot pay a cancelled invoice');
     }
-    if (invoice.status !== InvoiceStatus.AWAITING) {
+    if (!isOpenInvoiceStatus(invoice.status)) {
       throw new BadRequestException('Invoice is not awaiting payment');
+    }
+
+    const remaining = invoiceRemainingCents(invoice);
+    if (remaining <= 0) return;
+    if (amountCents != null && (!Number.isInteger(amountCents) || amountCents <= 0)) {
+      throw new BadRequestException('amountCents must be a positive integer');
+    }
+    if (amountCents != null && amountCents > remaining) {
+      throw new BadRequestException('Payment exceeds the remaining balance');
     }
 
     if (method === PaymentMethod.STORE_CREDIT) {
@@ -729,19 +967,31 @@ export class BillingService {
           [invoice.customer_id],
         );
         if (!customer) throw new NotFoundException('Customer not found');
-        if (customer.store_credit_cents < invoice.amount_cents)
+        if (customer.store_credit_cents <= 0) {
           throw new BadRequestException('Insufficient store credit');
+        }
+        const apply = Math.min(
+          remaining,
+          customer.store_credit_cents,
+          amountCents ?? remaining,
+        );
+        if (apply <= 0) throw new BadRequestException('Nothing to apply');
+
+        const settled = await this.settleInvoicePayment(tx, invoice.id, apply, {
+          storeCreditAppliedCents: apply,
+        });
+        if (settled.applied <= 0) return;
 
         await tx.execute(
           'UPDATE customers SET store_credit_cents = store_credit_cents - ? WHERE id = ?',
-          [invoice.amount_cents, invoice.customer_id],
+          [settled.applied, invoice.customer_id],
         );
         await tx.execute(
           'INSERT INTO store_credit_entries (id, customer_id, delta_cents, reason) VALUES (?, ?, ?, ?)',
           [
             randomUUID(),
             invoice.customer_id,
-            -invoice.amount_cents,
+            -settled.applied,
             `Applied to invoice ${invoice.id}`,
           ],
         );
@@ -754,33 +1004,22 @@ export class BillingService {
             invoice.id,
             invoice.order_id,
             invoice.customer_id,
-            invoice.amount_cents,
+            settled.applied,
             invoice.currency,
             PaymentMethod.STORE_CREDIT,
             PaymentType.CHARGE,
             PaymentStatus.PAID,
           ],
         );
-        await tx.execute(
-          'UPDATE invoices SET status = ?, paid_at = NOW(), store_credit_applied_cents = store_credit_applied_cents + ? WHERE id = ?',
-          [InvoiceStatus.PAID, invoice.amount_cents, invoice.id],
-        );
       });
     } else {
-      // Staff bookkeeping: record money received outside the portal.
-      // TODO(payment): integrate Stripe once keys are provided
       await this.db.withTransaction(async (tx) => {
-        const locked = await tx.queryOne<{ status: InvoiceStatus }>(
-          'SELECT status FROM invoices WHERE id = ? LIMIT 1 FOR UPDATE',
-          [invoice.id],
+        const settled = await this.settleInvoicePayment(
+          tx,
+          invoice.id,
+          amountCents ?? remaining,
         );
-        if (!locked || locked.status === InvoiceStatus.PAID) return;
-        if (locked.status === InvoiceStatus.CANCELLED) {
-          throw new BadRequestException('Cannot pay a cancelled invoice');
-        }
-        if (locked.status !== InvoiceStatus.AWAITING) {
-          throw new BadRequestException('Invoice is not awaiting payment');
-        }
+        if (settled.applied <= 0) return;
         await tx.execute(
           `INSERT INTO payments
              (id, invoice_id, order_id, customer_id, amount_cents, currency, method, type, status, paid_at)
@@ -790,22 +1029,17 @@ export class BillingService {
             invoice.id,
             invoice.order_id,
             invoice.customer_id,
-            invoice.amount_cents,
+            settled.applied,
             invoice.currency,
             PaymentMethod.CARD,
             PaymentType.CHARGE,
             PaymentStatus.PAID,
           ],
         );
-        await tx.execute(
-          'UPDATE invoices SET status = ?, paid_at = NOW() WHERE id = ?',
-          [InvoiceStatus.PAID, invoice.id],
-        );
       });
     }
 
-    await this.advanceOrderAfterPayment(invoice.order_id);
-    await this.releasePaidFormatExport(invoice.id);
+    await this.afterInvoicePayment(invoice.id);
   }
 
   private async advanceOrderAfterPayment(orderId: string | null) {
@@ -821,12 +1055,13 @@ export class BillingService {
     user: AuthUser | undefined,
     invoiceId: string,
     method: string,
+    amountCents?: number,
   ) {
     this.assertAdmin(user);
     const invoice = await this.getInvoiceRow(invoiceId);
     if (!invoice) throw new NotFoundException('Invoice not found');
     const m = this.parsePayMethod(method);
-    await this.payInvoiceInternal(invoice, m);
+    await this.payInvoiceInternal(invoice, m, amountCents);
     return this.getInvoiceDetail(user, invoiceId);
   }
 
@@ -846,7 +1081,7 @@ export class BillingService {
       throw new BadRequestException('Invoice is already paid');
     if (invoice.status === InvoiceStatus.CANCELLED)
       throw new BadRequestException('Cannot create a pay link for a cancelled invoice');
-    if (invoice.status !== InvoiceStatus.AWAITING)
+    if (!isOpenInvoiceStatus(invoice.status))
       throw new BadRequestException('Invoice is not awaiting payment');
 
     const payment = await this.ensurePendingPayLink(invoice);
@@ -854,6 +1089,7 @@ export class BillingService {
   }
 
   private async ensurePendingPayLink(invoice: InvoiceRow): Promise<PaymentRow> {
+    const remaining = invoiceRemainingCents(invoice);
     const existing = await this.db.queryOne<PaymentRow>(
       `SELECT * FROM payments
         WHERE invoice_id = ? AND method = ? AND status = ? AND pay_link_token IS NOT NULL
@@ -861,7 +1097,16 @@ export class BillingService {
         LIMIT 1`,
       [invoice.id, PaymentMethod.LINK, PaymentStatus.PENDING],
     );
-    if (existing?.pay_link_token) return existing;
+    if (existing?.pay_link_token) {
+      if (existing.amount_cents !== remaining) {
+        await this.db.execute('UPDATE payments SET amount_cents = ? WHERE id = ?', [
+          remaining,
+          existing.id,
+        ]);
+        existing.amount_cents = remaining;
+      }
+      return existing;
+    }
 
     const token = randomBytes(24).toString('hex');
     const id = randomUUID();
@@ -874,7 +1119,7 @@ export class BillingService {
         invoice.id,
         invoice.order_id,
         invoice.customer_id,
-        invoice.amount_cents,
+        remaining,
         invoice.currency,
         PaymentMethod.LINK,
         PaymentType.CHARGE,
@@ -909,11 +1154,14 @@ export class BillingService {
     );
     if (!invoice) throw new NotFoundException('Invoice not found');
     return {
-      amountCents: invoice.amount_cents,
+      amountCents: invoiceRemainingCents(invoice),
+      amountPaidCents: invoice.amount_paid_cents ?? 0,
+      remainingCents: invoiceRemainingCents(invoice),
       currency: invoice.currency,
       customerName: invoice.customer_name ?? null,
       coversText: invoice.covers_text,
       status: invoice.status,
+      dueAt: invoice.due_at ?? null,
       stripeEnabled: this.stripe.isConfigured(),
     };
   }
@@ -959,11 +1207,15 @@ export class BillingService {
     if (invoice.status === InvoiceStatus.PAID) {
       throw new BadRequestException('Invoice is already paid');
     }
-    if (invoice.status !== InvoiceStatus.AWAITING) {
+    if (!isOpenInvoiceStatus(invoice.status)) {
       throw new BadRequestException('Invoice is not awaiting payment');
     }
     if (!this.stripe.isConfigured()) {
       throw new BadRequestException('Card checkout is not configured');
+    }
+    const remaining = invoiceRemainingCents(invoice);
+    if (remaining <= 0) {
+      throw new BadRequestException('Invoice is already paid');
     }
     if (payment.stripe_checkout_session_id) {
       try {
@@ -973,7 +1225,7 @@ export class BillingService {
         if (
           existing.status === 'open' &&
           existing.url &&
-          existing.amount_total === invoice.amount_cents
+          existing.amount_total === remaining
         ) {
           return { url: existing.url, sessionId: existing.id };
         }
@@ -988,7 +1240,7 @@ export class BillingService {
 
     const customer = await this.getCustomerRow(invoice.customer_id);
     const session = await this.stripe.createInvoiceCheckout({
-      amountCents: invoice.amount_cents,
+      amountCents: remaining,
       currency: invoice.currency,
       productName: invoice.covers_text || 'Design invoice',
       successUrl: `${dest.web}${dest.successPath}`,
@@ -1025,6 +1277,7 @@ export class BillingService {
       const session = event.data.object as {
         id: string;
         payment_status?: string;
+        amount_total?: number | null;
         payment_intent?: string | { id: string } | null;
         metadata?: Record<string, string> | null;
         client_reference_id?: string | null;
@@ -1036,6 +1289,7 @@ export class BillingService {
 
   private async fulfillStripeSession(session: {
     id: string;
+    amount_total?: number | null;
     payment_intent?: string | { id: string } | null;
     metadata?: Record<string, string> | null;
     client_reference_id?: string | null;
@@ -1074,24 +1328,35 @@ export class BillingService {
         ? session.payment_intent
         : session.payment_intent?.id ?? null;
 
+    const remaining = invoiceRemainingCents(invoice);
+    const chargeCents = Math.max(
+      0,
+      Math.min(
+        remaining,
+        session.amount_total ?? payment?.amount_cents ?? remaining,
+      ),
+    );
+    if (chargeCents <= 0) return;
+
     await this.db.withTransaction(async (tx) => {
-      const locked = await tx.queryOne<{ status: InvoiceStatus }>(
-        'SELECT status FROM invoices WHERE id = ? LIMIT 1 FOR UPDATE',
+      const locked = await tx.queryOne<InvoiceRow>(
+        'SELECT * FROM invoices WHERE id = ? LIMIT 1 FOR UPDATE',
         [invoice.id],
       );
       if (!locked || locked.status === InvoiceStatus.PAID) return;
-      if (locked.status !== InvoiceStatus.AWAITING) return;
+      if (!isOpenInvoiceStatus(locked.status)) return;
 
       if (payment) {
         await tx.execute(
           `UPDATE payments
-              SET status = ?, method = ?, paid_at = NOW(),
+              SET status = ?, method = ?, paid_at = NOW(), amount_cents = ?,
                   stripe_checkout_session_id = ?,
                   stripe_payment_intent_id = COALESCE(?, stripe_payment_intent_id)
             WHERE id = ?`,
           [
             PaymentStatus.PAID,
             PaymentMethod.CARD,
+            chargeCents,
             session.id,
             intentId,
             payment.id,
@@ -1107,7 +1372,7 @@ export class BillingService {
             invoice.id,
             invoice.order_id,
             invoice.customer_id,
-            invoice.amount_cents,
+            chargeCents,
             invoice.currency,
             PaymentMethod.CARD,
             PaymentType.CHARGE,
@@ -1117,29 +1382,29 @@ export class BillingService {
           ],
         );
       }
-      await tx.execute(
-        `UPDATE payments SET status = ?
-          WHERE invoice_id = ? AND status = ? AND id <> ?`,
-        [
-          PaymentStatus.FAILED,
-          invoice.id,
-          PaymentStatus.PENDING,
-          payment?.id ?? '',
-        ],
-      );
-      await tx.execute(
-        'UPDATE invoices SET status = ?, paid_at = NOW() WHERE id = ?',
-        [InvoiceStatus.PAID, invoice.id],
-      );
+      const settled = await this.settleInvoicePayment(tx, invoice.id, chargeCents);
+      const leftover = Math.max(0, locked.amount_cents - ((locked.amount_paid_cents ?? 0) + settled.applied));
+      if (settled.status === InvoiceStatus.PAID) {
+        await tx.execute(
+          `UPDATE payments SET status = ?
+            WHERE invoice_id = ? AND status = ? AND id <> ?`,
+          [
+            PaymentStatus.FAILED,
+            invoice.id,
+            PaymentStatus.PENDING,
+            payment?.id ?? '',
+          ],
+        );
+      } else {
+        await tx.execute(
+          `UPDATE payments SET amount_cents = ?
+            WHERE invoice_id = ? AND status = ?`,
+          [leftover, invoice.id, PaymentStatus.PENDING],
+        );
+      }
     });
 
-    await this.advanceOrderAfterPayment(invoice.order_id);
-    await this.releasePaidFormatExport(invoice.id);
-    await this.notifyCustomerUser(invoice.customer_id, {
-      title: 'Payment received',
-      body: `We received your payment for ${invoice.covers_text ?? 'your invoice'}.`,
-      link: '/portal/invoices',
-    });
+    await this.afterInvoicePayment(invoice.id);
   }
 
   async startCheckoutForMyInvoice(
@@ -1172,9 +1437,9 @@ export class BillingService {
     const customer = await this.resolveMyCustomer(user);
     const invoice = await this.db.queryOne<InvoiceRow>(
       `SELECT * FROM invoices
-        WHERE order_id = ? AND customer_id = ? AND status = ?
+        WHERE order_id = ? AND customer_id = ? AND status IN (?, ?)
         ORDER BY issued_at DESC LIMIT 1`,
-      [orderId, customer.id, InvoiceStatus.AWAITING],
+      [orderId, customer.id, InvoiceStatus.AWAITING, InvoiceStatus.PARTIAL],
     );
     if (!invoice) {
       throw new NotFoundException('No unpaid invoice for this order');
@@ -1486,6 +1751,62 @@ export class BillingService {
 
   // --- net-monthly month-end run -------------------------------------------
 
+  private async listUnbilledMonthlyOrders(customerId: string, periodMonth: string) {
+    return this.db.query<{
+      id: string;
+      name: string | null;
+      human_ref: string | null;
+      price_cents: number;
+      currency: string | null;
+    }>(
+      `SELECT o.id, o.name, o.human_ref, o.price_cents, o.currency
+         FROM orders o
+        WHERE o.customer_id = ?
+          AND o.status IN (?, ?)
+          AND o.price_cents IS NOT NULL
+          AND o.price_cents > 0
+          AND DATE_FORMAT(COALESCE(o.completed_at, o.closed_at), '%Y-%m') = ?
+          AND o.id NOT IN (
+                SELECT order_id FROM invoice_lines WHERE order_id IS NOT NULL
+              )
+          AND o.id NOT IN (
+                SELECT order_id FROM invoices
+                 WHERE order_id IS NOT NULL
+                   AND status IN (?, ?, ?)
+              )
+        ORDER BY COALESCE(o.completed_at, o.closed_at) ASC`,
+      [
+        customerId,
+        OrderStatus.COMPLETED,
+        OrderStatus.CLOSED,
+        periodMonth,
+        InvoiceStatus.AWAITING,
+        InvoiceStatus.PARTIAL,
+        InvoiceStatus.PAID,
+      ],
+    );
+  }
+
+  private async insertInvoiceLines(
+    invoiceId: string,
+    orders: Array<{
+      id: string;
+      name: string | null;
+      human_ref: string | null;
+      price_cents: number;
+    }>,
+  ) {
+    for (const o of orders) {
+      const desc =
+        [o.human_ref, o.name].filter(Boolean).join(' · ') || 'Design order';
+      await this.db.execute(
+        `INSERT INTO invoice_lines (id, invoice_id, order_id, description, amount_cents)
+         VALUES (?, ?, ?, ?, ?)`,
+        [randomUUID(), invoiceId, o.id, desc.slice(0, 255), o.price_cents],
+      );
+    }
+  }
+
   async runMonthEnd(
     user: AuthUser | undefined,
     body: { periodMonth?: string },
@@ -1494,10 +1815,10 @@ export class BillingService {
     const period =
       body.periodMonth && isValidPeriodMonth(body.periodMonth)
         ? body.periodMonth
-        : currentPeriodMonth();
+        : previousPeriodMonth();
 
     const customers = await this.db.query<CustomerRow>(
-      'SELECT id, user_id, name, email, account_type, store_credit_cents FROM customers WHERE account_type = ?',
+      'SELECT id, user_id, name, email, account_type, net_terms, store_credit_cents FROM customers WHERE account_type = ?',
       [AccountType.NET_MONTHLY],
     );
 
@@ -1510,61 +1831,77 @@ export class BillingService {
     }> = [];
 
     for (const customer of customers) {
-      const existing = await this.db.queryOne<{ id: string; status: string }>(
-        'SELECT id, status FROM invoices WHERE customer_id = ? AND kind = ? AND period_month = ? LIMIT 1',
-        [customer.id, InvoiceKind.MONTHLY, period],
-      );
-      if (existing && existing.status !== InvoiceStatus.CANCELLED) continue;
+      const orders = await this.listUnbilledMonthlyOrders(customer.id, period);
+      if (orders.length === 0) continue;
 
-      const agg = await this.db.queryOne<{
-        total: number | string | null;
-        n: number | string | null;
-        currency: string | null;
-      }>(
-        `SELECT COALESCE(SUM(o.price_cents), 0) AS total,
-                COUNT(*) AS n,
-                MIN(o.currency) AS currency
-           FROM orders o
-          WHERE o.customer_id = ?
-            AND o.status = ?
-            AND o.price_cents IS NOT NULL
-            AND DATE_FORMAT(o.completed_at, '%Y-%m') = ?
-            AND o.id NOT IN (
-                  SELECT order_id FROM invoices
-                   WHERE order_id IS NOT NULL
-                     AND status IN (?, ?)
-                )`,
+      const addCents = orders.reduce((sum, o) => sum + o.price_cents, 0);
+      if (addCents <= 0) continue;
+
+      const open = await this.db.queryOne<InvoiceRow>(
+        `SELECT * FROM invoices
+          WHERE customer_id = ?
+            AND kind = ?
+            AND period_month = ?
+            AND status IN (?, ?)
+          ORDER BY issued_at ASC
+          LIMIT 1`,
         [
           customer.id,
-          OrderStatus.COMPLETED,
+          InvoiceKind.MONTHLY,
           period,
           InvoiceStatus.AWAITING,
-          InvoiceStatus.PAID,
+          InvoiceStatus.PARTIAL,
         ],
       );
 
-      const amountCents = Number(agg?.total ?? 0);
-      const orderCount = Number(agg?.n ?? 0);
-      if (orderCount === 0 || amountCents <= 0) continue;
+      if (open) {
+        await this.insertInvoiceLines(open.id, orders);
+        const lineCount = await this.db.queryOne<{ n: number | string }>(
+          'SELECT COUNT(*) AS n FROM invoice_lines WHERE invoice_id = ?',
+          [open.id],
+        );
+        const totalCount = Number(lineCount?.n ?? orders.length);
+        const coversText = `${totalCount} order${totalCount === 1 ? '' : 's'} in ${monthLabel(period)}`;
+        await this.db.execute(
+          'UPDATE invoices SET amount_cents = amount_cents + ?, covers_text = ? WHERE id = ?',
+          [addCents, coversText, open.id],
+        );
+        await this.notifyCustomerUser(customer.id, {
+          title: 'Monthly statement updated',
+          body: coversText,
+          link: '/portal/invoices',
+        });
+        summary.push({
+          customerId: customer.id,
+          customerName: customer.name,
+          amountCents: open.amount_cents + addCents,
+          orderCount: orders.length,
+          invoiceId: open.id,
+        });
+        continue;
+      }
 
       const invoiceId = randomUUID();
-      const coversText = `${orderCount} order${orderCount === 1 ? '' : 's'} in ${monthLabel(period)}`;
+      const coversText = `${orders.length} order${orders.length === 1 ? '' : 's'} in ${monthLabel(period)}`;
+      const dueDays = netTermsDays(customer.net_terms);
       await this.db.execute(
         `INSERT INTO invoices
-           (id, customer_id, order_id, kind, amount_cents, currency, covers_text, status, period_month)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (id, customer_id, order_id, kind, amount_cents, amount_paid_cents, currency, covers_text, status, period_month, due_at)
+         VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? DAY))`,
         [
           invoiceId,
           customer.id,
           null,
           InvoiceKind.MONTHLY,
-          amountCents,
-          agg?.currency || 'USD',
+          addCents,
+          orders[0]?.currency || 'USD',
           coversText,
           InvoiceStatus.AWAITING,
           period,
+          dueDays,
         ],
       );
+      await this.insertInvoiceLines(invoiceId, orders);
 
       await this.notifyCustomerUser(customer.id, {
         title: 'Monthly statement ready',
@@ -1575,8 +1912,8 @@ export class BillingService {
       summary.push({
         customerId: customer.id,
         customerName: customer.name,
-        amountCents,
-        orderCount,
+        amountCents: addCents,
+        orderCount: orders.length,
         invoiceId,
       });
     }
@@ -1589,9 +1926,24 @@ export class BillingService {
     await this.collapseOrderInvoiceDupes();
     const period = currentPeriodMonth();
 
-    const outstanding = await this.db.queryOne<{ total: number | string | null }>(
-      'SELECT COALESCE(SUM(amount_cents), 0) AS total FROM invoices WHERE status = ?',
-      [InvoiceStatus.AWAITING],
+    const outstanding = await this.db.queryOne<{
+      total: number | string | null;
+      pending: number | string | null;
+      overdue: number | string | null;
+    }>(
+      `SELECT
+          COALESCE(SUM(GREATEST(0, amount_cents - COALESCE(amount_paid_cents, 0))), 0) AS total,
+          COALESCE(SUM(CASE
+            WHEN due_at IS NULL OR due_at >= NOW()
+            THEN GREATEST(0, amount_cents - COALESCE(amount_paid_cents, 0))
+            ELSE 0 END), 0) AS pending,
+          COALESCE(SUM(CASE
+            WHEN due_at IS NOT NULL AND due_at < NOW()
+            THEN GREATEST(0, amount_cents - COALESCE(amount_paid_cents, 0))
+            ELSE 0 END), 0) AS overdue
+         FROM invoices
+        WHERE status IN (?, ?)`,
+      [InvoiceStatus.AWAITING, InvoiceStatus.PARTIAL],
     );
     const paidThisMonth = await this.db.queryOne<{ total: number | string | null }>(
       `SELECT COALESCE(SUM(amount_cents), 0) AS total
@@ -1606,6 +1958,8 @@ export class BillingService {
 
     return {
       outstandingCents: Number(outstanding?.total ?? 0),
+      pendingCents: Number(outstanding?.pending ?? 0),
+      overdueCents: Number(outstanding?.overdue ?? 0),
       paidThisMonthCents: Number(paidThisMonth?.total ?? 0),
       storeCreditOutstandingCents: Number(storeCredit?.total ?? 0),
       netMonthlyUnbilledCents: unbilled,
@@ -1651,10 +2005,11 @@ export class BillingService {
     const customer = await this.resolveMyCustomer(user);
     await this.collapseOrderInvoiceDupes(customer.id);
     const row = await this.db.queryOne<{ n: number | string; total: number | string }>(
-      `SELECT COUNT(*) AS n, COALESCE(SUM(amount_cents), 0) AS total
+      `SELECT COUNT(*) AS n,
+              COALESCE(SUM(GREATEST(0, amount_cents - COALESCE(amount_paid_cents, 0))), 0) AS total
          FROM invoices
-        WHERE customer_id = ? AND status = ?`,
-      [customer.id, InvoiceStatus.AWAITING],
+        WHERE customer_id = ? AND status IN (?, ?)`,
+      [customer.id, InvoiceStatus.AWAITING, InvoiceStatus.PARTIAL],
     );
     return {
       awaitingCount: Number(row?.n ?? 0),
@@ -1744,8 +2099,12 @@ export class BillingService {
         ORDER BY created_at ASC`,
       [invoiceId],
     );
+    const lines = await this.db.query<InvoiceLineRow>(
+      'SELECT * FROM invoice_lines WHERE invoice_id = ? ORDER BY created_at ASC',
+      [invoiceId],
+    );
 
-    return buildInvoicePrintHtml(invoice, payments, invoiceLogoSrc());
+    return buildInvoicePrintHtml(invoice, payments, invoiceLogoSrc(), lines);
   }
 }
 
@@ -1802,6 +2161,7 @@ function formatInvoiceDate(value: Date | string | null | undefined) {
 
 function invoiceStatusLabel(status: InvoiceStatus) {
   if (status === InvoiceStatus.PAID) return 'Paid';
+  if (status === InvoiceStatus.PARTIAL) return 'Partially paid';
   if (status === InvoiceStatus.CANCELLED) return 'Cancelled';
   return 'Due';
 }
@@ -1822,11 +2182,15 @@ function buildInvoicePrintHtml(
   },
   payments: PaymentRow[],
   logoSrc = '',
+  lines: InvoiceLineRow[] = [],
 ) {
   const ref = invoice.id.slice(0, 8).toUpperCase();
   const money = (cents: number) => formatInvoiceMoney(cents, invoice.currency);
   const issued = formatInvoiceDate(invoice.issued_at);
+  const dueOn = formatInvoiceDate(invoice.due_at);
   const paidOn = formatInvoiceDate(invoice.paid_at);
+  const remainingCents = invoiceRemainingCents(invoice);
+  const paidCents = invoice.amount_paid_cents ?? 0;
   const period = invoice.period_month
     ? monthLabel(invoice.period_month)
     : '';
@@ -1881,6 +2245,26 @@ function buildInvoicePrintHtml(
       </tr>`;
     })
     .join('');
+
+  const itemRows =
+    lines.length > 0
+      ? lines
+          .map(
+            (l) => `<tr>
+          <td>
+            <div class="item-name">${escapeHtml(l.description)}</div>
+          </td>
+          <td class="num">${escapeHtml(money(l.amount_cents))}</td>
+        </tr>`,
+          )
+          .join('')
+      : `<tr>
+          <td>
+            <div class="item-name">${escapeHtml(description)}</div>
+            ${orderHint ? `<div class="item-sub">${escapeHtml(orderHint)}</div>` : ''}
+          </td>
+          <td class="num">${escapeHtml(money(invoice.amount_cents))}</td>
+        </tr>`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -2161,6 +2545,7 @@ function buildInvoicePrintHtml(
         <div class="k">Details</div>
         <dl class="facts">
           <dt>Issued</dt><dd>${escapeHtml(issued || '—')}</dd>
+          ${dueOn ? `<dt>Due</dt><dd>${escapeHtml(dueOn)}</dd>` : ''}
           ${paidOn ? `<dt>Paid</dt><dd>${escapeHtml(paidOn)}</dd>` : ''}
           ${period ? `<dt>Period</dt><dd>${escapeHtml(period)}</dd>` : ''}
           <dt>Type</dt><dd>${escapeHtml(kindLabel)}</dd>
@@ -2175,17 +2560,16 @@ function buildInvoicePrintHtml(
         </tr>
       </thead>
       <tbody>
-        <tr>
-          <td>
-            <div class="item-name">${escapeHtml(description)}</div>
-            ${orderHint ? `<div class="item-sub">${escapeHtml(orderHint)}</div>` : ''}
-          </td>
-          <td class="num">${escapeHtml(money(invoice.amount_cents))}</td>
-        </tr>
+        ${itemRows}
       </tbody>
     </table>
     <table class="totals">
       <tr><td>Subtotal</td><td class="num">${escapeHtml(money(invoice.amount_cents))}</td></tr>
+      ${
+        paidCents > 0
+          ? `<tr><td>Paid</td><td class="num">−${escapeHtml(money(paidCents))}</td></tr>`
+          : ''
+      }
       ${
         refundedCents > 0
           ? `<tr><td>Refunded</td><td class="num">−${escapeHtml(money(refundedCents))}</td></tr>`
@@ -2197,7 +2581,9 @@ function buildInvoicePrintHtml(
           money(
             invoice.status === InvoiceStatus.CANCELLED
               ? 0
-              : Math.max(0, invoice.amount_cents - refundedCents),
+              : invoice.status === InvoiceStatus.PAID
+                ? invoice.amount_cents
+                : remainingCents,
           ),
         )}</td>
       </tr>
@@ -2209,9 +2595,11 @@ function buildInvoicePrintHtml(
               ? 'This invoice was paid and later refunded in full.'
               : `Paid in full${paidOn ? ` on ${escapeHtml(paidOn)}` : ''}. Thank you.`
           }</p>`
-        : invoice.status === InvoiceStatus.AWAITING
-          ? `<p class="note">Payment is due upon receipt. Pay by card from your client portal or the payment link we sent.</p>`
-          : ''
+        : invoice.status === InvoiceStatus.PARTIAL
+          ? `<p class="note">Partially paid. ${escapeHtml(money(remainingCents))} remains due${dueOn ? ` by ${escapeHtml(dueOn)}` : ''}.</p>`
+          : invoice.status === InvoiceStatus.AWAITING
+            ? `<p class="note">${dueOn ? `Payment is due by ${escapeHtml(dueOn)}.` : 'Payment is due upon receipt.'} Pay by card from your client portal or the payment link we sent.</p>`
+            : ''
     }
     ${
       paymentRows

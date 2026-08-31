@@ -168,10 +168,20 @@ export type InvoiceKind = (typeof InvoiceKind)[keyof typeof InvoiceKind];
 
 export const InvoiceStatus = {
   AWAITING: 'AWAITING',
+  PARTIAL: 'PARTIAL',
   PAID: 'PAID',
   CANCELLED: 'CANCELLED',
 } as const;
 export type InvoiceStatus = (typeof InvoiceStatus)[keyof typeof InvoiceStatus];
+
+export const OrderPaymentStatus = {
+  PAID: 'PAID',
+  AWAITING: 'AWAITING',
+  UNPAID: 'UNPAID',
+  REFUNDED: 'REFUNDED',
+} as const;
+export type OrderPaymentStatus =
+  (typeof OrderPaymentStatus)[keyof typeof OrderPaymentStatus];
 
 export const PaymentMethod = {
   CARD: 'CARD',

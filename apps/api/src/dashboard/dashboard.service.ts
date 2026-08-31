@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import type { AuthUser } from '../auth/auth.types';
-import { EditStatus, OrderStatus, UserRole } from '../common/enums';
+import { EditStatus, InvoiceStatus, OrderStatus, UserRole } from '../common/enums';
 import { DbService } from '../db/db.service';
 
 function isStaffRole(role: UserRole): boolean {
@@ -28,11 +28,6 @@ const ACTIVE_STATUSES: OrderStatus[] = [
 const QUOTE_STATUSES: OrderStatus[] = [
   OrderStatus.WAITING_FOR_QUOTATION,
   OrderStatus.WAITING_FOR_ADMIN_QUOTATION_APPROVAL,
-];
-
-const OUTSTANDING_STATUSES: OrderStatus[] = [
-  OrderStatus.IN_PROGRESS,
-  OrderStatus.PENDING_PAYMENT,
 ];
 
 function placeholders(values: unknown[]): string {
@@ -74,7 +69,8 @@ export class DashboardService {
       inProgress,
       revisionsRow,
       deliveredRow,
-      outstandingRow,
+      pendingRow,
+      overdueRow,
       newOrders,
       unreadRow,
       byStatusRows,
@@ -95,10 +91,19 @@ export class DashboardService {
         [OrderStatus.COMPLETED],
       ),
       this.db.queryOne<{ total: number | null }>(
-        `SELECT COALESCE(SUM(price_cents), 0) AS total
-           FROM orders
-          WHERE status IN (${placeholders(OUTSTANDING_STATUSES)})`,
-        OUTSTANDING_STATUSES,
+        `SELECT COALESCE(SUM(GREATEST(0, amount_cents - COALESCE(amount_paid_cents, 0))), 0) AS total
+           FROM invoices
+          WHERE status IN (?, ?)
+            AND (due_at IS NULL OR due_at >= NOW())`,
+        [InvoiceStatus.AWAITING, InvoiceStatus.PARTIAL],
+      ),
+      this.db.queryOne<{ total: number | null }>(
+        `SELECT COALESCE(SUM(GREATEST(0, amount_cents - COALESCE(amount_paid_cents, 0))), 0) AS total
+           FROM invoices
+          WHERE status IN (?, ?)
+            AND due_at IS NOT NULL
+            AND due_at < NOW()`,
+        [InvoiceStatus.AWAITING, InvoiceStatus.PARTIAL],
       ),
       this.countByStatuses([OrderStatus.CREATED, OrderStatus.PENDING_PAYMENT]),
       this.db.queryOne<{ n: number }>(
@@ -111,7 +116,8 @@ export class DashboardService {
     const revisionsOpen = Number(revisionsRow?.n ?? 0);
     const deliveredThisMonth = Number(deliveredRow?.n ?? 0);
     const revenueThisMonthCents = Number(deliveredRow?.total ?? 0);
-    const outstandingCents = Number(outstandingRow?.total ?? 0);
+    const pendingCents = Number(pendingRow?.total ?? 0);
+    const overdueCents = Number(overdueRow?.total ?? 0);
     const unreadMessages = Number(unreadRow?.n ?? 0);
     const byStatus = byStatusRows.map((r) => ({
       status: r.status,
@@ -125,7 +131,9 @@ export class DashboardService {
       revisionsOpen,
       deliveredThisMonth,
       revenueThisMonthCents,
-      outstandingCents,
+      pendingCents,
+      overdueCents,
+      outstandingCents: pendingCents + overdueCents,
       newOrders,
       unreadMessages,
       byStatus,

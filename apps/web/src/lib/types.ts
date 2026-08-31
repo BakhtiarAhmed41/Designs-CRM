@@ -55,6 +55,8 @@ export type CurrentUser = {
   permissions?: UserPermissions;
 };
 
+export type OrderPaymentStatus = 'PAID' | 'AWAITING' | 'UNPAID' | 'REFUNDED';
+
 export type OrderStatus =
   | 'CREATED'
   | 'WAITING_FOR_QUOTATION'
@@ -126,7 +128,11 @@ export type Order = {
   status: OrderStatus;
   designCount?: number;
   priceCents: number | null;
+  paymentStatus?: OrderPaymentStatus;
   currency: string;
+  channel?: string | null;
+  createdByRole?: UserRole | null;
+  createdById?: string | null;
   assignedDesignerId?: string | null;
   internalNotes?: string | null;
   rejectionReason?: string | null;

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   adminAttachmentUrl,
+  adminAcceptQuotation,
   adminRejectOrder,
   adminUploadAttachments,
   approveCounter,
@@ -23,7 +24,7 @@ import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
 import { getCustomer } from '@/lib/customers';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import { money, dateShort, quoteLifecycleChip } from '@/lib/format';
-import { isAdminRecounter, lineTotal, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
+import { isAdminRecounter, isStaffCreatedOrder, lineTotal, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
 import { FormPreferencesDisplay } from '@/components/FormPreferencesDisplay';
 import { MessageAttachments } from '@/components/MessageAttachments';
 import type { Order } from '@/lib/types';
@@ -248,6 +249,15 @@ export function AdminQuoteDetail() {
     onError: (e) => setError(getErrorMessage(e)),
   });
 
+  const acceptAsAdmin = useMutation({
+    mutationFn: () => adminAcceptQuotation(id),
+    onSuccess: (res) => {
+      void applyOrderChange(qc, res.order);
+      navigate(`/admin/orders/${id}`);
+    },
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
   const counterApprove = useMutation({
     mutationFn: () => approveCounter(id),
     onSuccess: (res) => {
@@ -314,6 +324,7 @@ export function AdminQuoteDetail() {
             </h1>
             <div className="sub">
               {statusChip.label} · requested {dateShort(order.createdAt)}
+              {isStaffCreatedOrder(order) ? ' · Created by admin' : ''}
             </div>
           </div>
         </div>
@@ -675,7 +686,7 @@ export function AdminQuoteDetail() {
             <div className="card" style={{ border: '1.5px solid var(--navy)' }}>
               <div className="card-h">
                 <span className="ct">
-                  <i className="ti ti-circle-check" /> {declined ? 'Quote closed' : 'Priced — awaiting customer'}
+                  <i className="ti ti-circle-check" /> {declined ? 'Quote closed' : isStaffCreatedOrder(order) ? 'Priced — customer or admin can approve' : 'Priced — awaiting customer'}
                 </span>
               </div>
               <div className="card-b">
@@ -704,6 +715,18 @@ export function AdminQuoteDetail() {
                       </div>
                     ))}
                   </div>
+                )}
+                {alreadyPriced && isStaffCreatedOrder(order) && (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    style={{ width: '100%', justifyContent: 'center', marginBottom: 8 }}
+                    disabled={acceptAsAdmin.isPending}
+                    onClick={() => acceptAsAdmin.mutate()}
+                  >
+                    <i className="ti ti-check" />
+                    {acceptAsAdmin.isPending ? 'Approving…' : 'Approve quote'}
+                  </button>
                 )}
                 {(alreadyPriced || declined) && (
                   <button

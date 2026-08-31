@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { adminRejectOrder, listAdminOrders } from '@/lib/orders';
+import { GenerateOrderModal } from '@/components/GenerateOrderModal';
 import {
   createAdminConversation,
   listAdminConversations,
@@ -11,7 +12,7 @@ import { getErrorMessage } from '@/lib/api';
 import { invalidateWorkCaches } from '@/lib/queryCache';
 import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
 import { money, dateShort, quoteLifecycleChip } from '@/lib/format';
-import { isAdminRecounter } from '@/lib/quoteHelpers';
+import { isAdminRecounter, isStaffCreatedOrder } from '@/lib/quoteHelpers';
 import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
 import type { Order, OrderStatus } from '@/lib/types';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
@@ -50,6 +51,7 @@ export function AdminQuotes() {
   const [page, setPage] = useState(1);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [genOpen, setGenOpen] = useState(false);
 
   useEffect(() => {
     if (!toast) return;
@@ -154,6 +156,11 @@ export function AdminQuotes() {
       <PageHeader
         title="Quotes"
         subtitle="Needs pricing, sent, urgent, and declined in one pipeline."
+        actions={
+          <button type="button" className="btn btn-primary" onClick={() => setGenOpen(true)}>
+            <i className="ti ti-file-dollar" /> Generate quote
+          </button>
+        }
       />
 
       {error && <ErrorBanner>{error}</ErrorBanner>}
@@ -247,7 +254,10 @@ export function AdminQuotes() {
                         </div>
                         <div>
                           <div className="on">{o.name ?? 'Quote request'}</div>
-                          <div className="om">Q-{o.humanRef ?? o.id.slice(0, 6)}</div>
+                          <div className="om">
+                            Q-{o.humanRef ?? o.id.slice(0, 6)}
+                            {isStaffCreatedOrder(o) ? ' · Admin created' : ''}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -336,6 +346,11 @@ export function AdminQuotes() {
           <i className="ti ti-circle-check" /> {toast}
         </div>
       )}
+      <GenerateOrderModal
+        open={genOpen}
+        onClose={() => setGenOpen(false)}
+        defaultMode="QUOTE_REQUEST"
+      />
     </div>
   );
 }

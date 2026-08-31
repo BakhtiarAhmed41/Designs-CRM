@@ -29,6 +29,7 @@ const createInvoiceSchema = z.object({
 
 const paySchema = z.object({
   method: z.enum(['CARD', 'STORE_CREDIT']),
+  amountCents: z.number().int().positive().optional(),
 });
 
 const storeCreditSchema = z.object({
@@ -106,8 +107,8 @@ export class AdminBillingController {
     @Param('id') id: string,
     @Body() body: unknown,
   ) {
-    const { method } = paySchema.parse(body);
-    const invoice = await this.billing.payInvoiceAsAdmin(user, id, method);
+    const { method, amountCents } = paySchema.parse(body);
+    const invoice = await this.billing.payInvoiceAsAdmin(user, id, method, amountCents);
     return { invoice };
   }
 

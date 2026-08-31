@@ -31,3 +31,19 @@ export function RequireFeature({
 
   return <>{children}</>;
 }
+
+/** Blocks a route unless the signed-in user is Admin or Super Admin. */
+export function RequireAdminRole({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <PageLoading />;
+  }
+
+  const role = user?.role;
+  if (role !== 'SUPER_ADMIN' && role !== 'ADMIN') {
+    return <Navigate to={staffLandingPath(user?.role, user?.permissions)} replace />;
+  }
+
+  return <>{children}</>;
+}

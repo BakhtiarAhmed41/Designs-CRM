@@ -70,6 +70,7 @@ export function AdminShell() {
   const features = featuresForUser(role, user?.permissions);
   const can = (key: FeatureKey) => Boolean(features[key]);
   const isDesigner = role === 'DESIGNER';
+  const showReports = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN';
   const showMessages = canAnyMessaging(features);
   const showCustomerMessages = can('messages_customer_view');
   const showTeamMessages = can('messages') || can('messages_team_view');
@@ -116,20 +117,20 @@ export function AdminShell() {
     <aside className="side">
       <Brand subtitle={meta.sideSub} />
       <nav className="nav" id="nav">
-        {can('dashboard') && (
-          <NavLink to="/admin" end className={({ isActive }) => (isActive ? 'on' : undefined)}>
-            <i className="ti ti-home" /> Dashboard
-          </NavLink>
-        )}
-        {can('dashboard') && (
-          <NavLink to="/admin/reports" className={({ isActive }) => (isActive ? 'on' : undefined)}>
-            <i className="ti ti-chart-bar" /> Reports
-          </NavLink>
-        )}
-        {showMyWork && (
-          <NavLink to="/admin/mywork" className={({ isActive }) => (isActive ? 'on' : undefined)}>
-            <i className="ti ti-briefcase" /> My work
-          </NavLink>
+        {(can('dashboard') || showReports) && (
+          <>
+            <div className="divider">Overview</div>
+            {can('dashboard') && (
+              <NavLink to="/admin" end className={({ isActive }) => (isActive ? 'on' : undefined)}>
+                <i className="ti ti-home" /> Dashboard
+              </NavLink>
+            )}
+            {showReports && (
+              <NavLink to="/admin/reports" className={({ isActive }) => (isActive ? 'on' : undefined)}>
+                <i className="ti ti-chart-bar" /> Reports
+              </NavLink>
+            )}
+          </>
         )}
         {showMessages && (
           <>
@@ -139,7 +140,7 @@ export function AdminShell() {
                 to="/admin/messages/customers"
                 className={({ isActive }) => (isActive ? 'on' : undefined)}
               >
-                <i className="ti ti-message-circle" /> Customer Messages
+                <i className="ti ti-message-circle" /> Customer inbox
                 {customerBadge > 0 && <span className="cnt">{customerBadge}</span>}
               </NavLink>
             )}
@@ -148,57 +149,68 @@ export function AdminShell() {
                 to="/admin/messages/team"
                 className={({ isActive }) => (isActive ? 'on' : undefined)}
               >
-                <i className="ti ti-messages" /> Team Messages
+                <i className="ti ti-messages" /> Team inbox
                 {teamBadge > 0 && <span className="cnt">{teamBadge}</span>}
               </NavLink>
             )}
           </>
         )}
-        {can('orders') && (
-          <NavLink to="/admin/orders" className={({ isActive }) => (isActive ? 'on' : undefined)}>
-            <i className="ti ti-package" /> Orders
-            {orderBadge > 0 && <span className="cnt">{orderBadge}</span>}
-          </NavLink>
-        )}
-        {can('quotes') && (
-          <NavLink to="/admin/quotes" className={({ isActive }) => (isActive ? 'on' : undefined)}>
-            <i className="ti ti-file-invoice" /> Quotes
-            {quoteBadge > 0 && <span className="cnt">{quoteBadge}</span>}
-          </NavLink>
-        )}
-        {can('edits') && (
-          <NavLink to="/admin/edits" className={({ isActive }) => (isActive ? 'on' : undefined)}>
-            <i className="ti ti-refresh" /> Revisions
-          </NavLink>
-        )}
-        {can('customers') && (
-          <NavLink to="/admin/customers" className={({ isActive }) => (isActive ? 'on' : undefined)}>
-            <i className="ti ti-users" /> Customers
-          </NavLink>
-        )}
-        {can('billing') && (
+        {(showMyWork || can('orders') || can('quotes') || can('edits')) && (
           <>
-            <div className="divider">Money</div>
-            <NavLink to="/admin/billing" className={({ isActive }) => (isActive ? 'on' : undefined)}>
-              <i className="ti ti-cash" /> Billing &amp; invoices
-            </NavLink>
+            <div className="divider">Work</div>
+            {showMyWork && (
+              <NavLink to="/admin/mywork" className={({ isActive }) => (isActive ? 'on' : undefined)}>
+                <i className="ti ti-briefcase" /> My work
+              </NavLink>
+            )}
+            {can('orders') && (
+              <NavLink to="/admin/orders" className={({ isActive }) => (isActive ? 'on' : undefined)}>
+                <i className="ti ti-package" /> Orders
+                {orderBadge > 0 && <span className="cnt">{orderBadge}</span>}
+              </NavLink>
+            )}
+            {can('quotes') && (
+              <NavLink to="/admin/quotes" className={({ isActive }) => (isActive ? 'on' : undefined)}>
+                <i className="ti ti-file-invoice" /> Quotes
+                {quoteBadge > 0 && <span className="cnt">{quoteBadge}</span>}
+              </NavLink>
+            )}
+            {can('edits') && (
+              <NavLink to="/admin/edits" className={({ isActive }) => (isActive ? 'on' : undefined)}>
+                <i className="ti ti-refresh" /> Revisions
+              </NavLink>
+            )}
           </>
         )}
         {can('customers') && (
-          <NavLink
-            to="/admin/login-requests"
-            className={({ isActive }) => (isActive ? 'on' : undefined)}
-          >
-            <i className="ti ti-user-plus" /> Login requests
-            {loginRequestBadge > 0 && <span className="cnt">{loginRequestBadge}</span>}
-          </NavLink>
+          <>
+            <div className="divider">Customers</div>
+            <NavLink to="/admin/customers" className={({ isActive }) => (isActive ? 'on' : undefined)}>
+              <i className="ti ti-users" /> All customers
+            </NavLink>
+            <NavLink
+              to="/admin/login-requests"
+              className={({ isActive }) => (isActive ? 'on' : undefined)}
+            >
+              <i className="ti ti-user-plus" /> Login requests
+              {loginRequestBadge > 0 && <span className="cnt">{loginRequestBadge}</span>}
+            </NavLink>
+          </>
         )}
-        {(can('team') || can('roles')) && (
+        {can('billing') && (
+          <>
+            <div className="divider">Billing</div>
+            <NavLink to="/admin/billing" className={({ isActive }) => (isActive ? 'on' : undefined)}>
+              <i className="ti ti-cash" /> Invoices
+            </NavLink>
+          </>
+        )}
+        {(can('team') || can('roles') || showOwnerChat) && (
           <>
             <div className="divider">Team</div>
             {can('team') && (
               <NavLink to="/admin/team" className={({ isActive }) => (isActive ? 'on' : undefined)}>
-                <i className="ti ti-users-group" /> Team{' '}
+                <i className="ti ti-users-group" /> People{' '}
                 <span className="cnt" id="team-online">
                   {onlineCount} on
                 </span>
@@ -209,38 +221,35 @@ export function AdminShell() {
                 <i className="ti ti-shield-lock" /> Roles &amp; users
               </NavLink>
             )}
-          </>
-        )}
-        {can('team') &&
-          members.slice(0, 6).map((m) => (
-            <a
-              key={m.id}
-              href="#team-chat"
-              style={{ padding: '6px 11px' }}
-              onClick={(e) => {
-                e.preventDefault();
-                setChatPeerId(m.id);
-              }}
-            >
-              <span className="tm-dot" style={{ background: presenceColor(m.presence) }} />
-              {memberLabel(m)}
-            </a>
-          ))}
-        {showOwnerChat && (
-          <>
-            <div className="divider">Chat</div>
-            <a
-              href="#owner-chat"
-              style={{ padding: '6px 11px' }}
-              onClick={(e) => {
-                e.preventDefault();
-                void getTeamChatOwner().then((res) => {
-                  if (res.peerId) setChatPeerId(res.peerId);
-                });
-              }}
-            >
-              <span className="tm-dot" style={{ background: 'var(--green)' }} /> Message owner
-            </a>
+            {can('team') &&
+              members.slice(0, 6).map((m) => (
+                <a
+                  key={m.id}
+                  href="#team-chat"
+                  style={{ padding: '6px 11px' }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setChatPeerId(m.id);
+                  }}
+                >
+                  <span className="tm-dot" style={{ background: presenceColor(m.presence) }} />
+                  {memberLabel(m)}
+                </a>
+              ))}
+            {showOwnerChat && (
+              <a
+                href="#owner-chat"
+                style={{ padding: '6px 11px' }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  void getTeamChatOwner().then((res) => {
+                    if (res.peerId) setChatPeerId(res.peerId);
+                  });
+                }}
+              >
+                <span className="tm-dot" style={{ background: 'var(--green)' }} /> Message owner
+              </a>
+            )}
           </>
         )}
       </nav>

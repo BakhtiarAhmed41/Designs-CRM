@@ -11,7 +11,7 @@ import {
 import { createMyConversation, listMyConversations } from '@/lib/messaging';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import { dateShort, money, quoteLifecycleChip } from '@/lib/format';
-import { isAdminRecounter, latestCounter, lineTotal, studioQuotation } from '@/lib/quoteHelpers';
+import { isAdminRecounter, isStaffCreatedOrder, latestCounter, lineTotal, studioQuotation } from '@/lib/quoteHelpers';
 import type { Order } from '@/lib/types';
 import { applyOrderChange } from '@/lib/queryCache';
 import { freshOnOpen } from '@/lib/queryRefresh';
@@ -173,7 +173,7 @@ export function PortalQuoteDetail() {
     <div>
       <PageHeader
         title={order.name ?? 'Quote request'}
-        subtitle={`Q-${order.humanRef ?? order.id.slice(0, 6)} · ${dateShort(order.createdAt)}`}
+        subtitle={`Q-${order.humanRef ?? order.id.slice(0, 6)} · ${dateShort(order.createdAt)}${isStaffCreatedOrder(order) ? ' · Created by the studio' : ''}`}
         crumbs={[
           { label: 'Quotes', to: '/portal/quotes' },
           { label: order.humanRef ?? 'Quote' },

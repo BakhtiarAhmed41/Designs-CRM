@@ -566,6 +566,9 @@ button.metric { font: inherit; text-align: left; width: 100%; }
   padding: 13px 16px;
   grid-template-columns: 36px minmax(0,1fr) auto auto;
 }
+.orow-status-under {
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+}
 .thumb, .othumb {
   width: 36px;
   height: 36px;
@@ -620,6 +623,13 @@ button.metric { font: inherit; text-align: left; width: 100%; }
   padding: 8px 14px;
   font-weight: 600;
   letter-spacing: -0.01em;
+  text-decoration: none;
+}
+.btn:hover,
+.btn:focus,
+.btn:active,
+.btn:visited {
+  text-decoration: none;
 }
 .btn-sm { min-height: 32px; padding: 6px 12px; border-radius: 8px; }
 .btn-primary { box-shadow: 0 1px 0 rgba(14,46,74,.18); }
@@ -691,7 +701,8 @@ button.metric { font: inherit; text-align: left; width: 100%; }
 }
 
 .range + div input[type="date"],
-.panel-h input[type="date"] {
+.panel-h input[type="date"],
+.report-dates input[type="date"] {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 6px 10px;

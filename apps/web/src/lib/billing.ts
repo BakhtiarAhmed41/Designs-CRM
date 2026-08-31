@@ -3,7 +3,7 @@ import { authorizationHeader } from './session';
 
 // --- shared types ---------------------------------------------------------
 export type InvoiceKind = 'PER_ORDER' | 'MONTHLY' | 'ADD_ON';
-export type InvoiceStatus = 'AWAITING' | 'PAID' | 'CANCELLED';
+export type InvoiceStatus = 'AWAITING' | 'PARTIAL' | 'PAID' | 'CANCELLED';
 export type PayMethod = 'CARD' | 'STORE_CREDIT';
 export type RefundTo = 'CARD' | 'STORE_CREDIT';
 
@@ -14,14 +14,31 @@ export type Invoice = {
   orderId: string | null;
   kind: InvoiceKind;
   amountCents: number;
+  amountPaidCents?: number;
+  remainingCents?: number;
   currency: string;
   coversText: string | null;
   status: InvoiceStatus;
   periodMonth: string | null;
   storeCreditAppliedCents: number;
   issuedAt: string;
+  dueAt?: string | null;
   paidAt: string | null;
 };
+
+export function invoiceRemainingCents(inv: Pick<Invoice, 'amountCents' | 'amountPaidCents' | 'remainingCents'>) {
+  if (typeof inv.remainingCents === 'number') return Math.max(0, inv.remainingCents);
+  return Math.max(0, inv.amountCents - (inv.amountPaidCents ?? 0));
+}
+
+export function isInvoiceOpen(status: InvoiceStatus) {
+  return status === 'AWAITING' || status === 'PARTIAL';
+}
+
+export function isInvoiceOverdue(inv: Pick<Invoice, 'status' | 'dueAt'>) {
+  if (!isInvoiceOpen(inv.status) || !inv.dueAt) return false;
+  return new Date(inv.dueAt).getTime() < Date.now();
+}
 
 export type Payment = {
   id: string;
@@ -65,6 +82,8 @@ export type StoreCredit = {
 
 export type BillingSummary = {
   outstandingCents: number;
+  pendingCents?: number;
+  overdueCents?: number;
   paidThisMonthCents: number;
   storeCreditOutstandingCents: number;
   netMonthlyUnbilledCents: number;
@@ -83,10 +102,13 @@ export type MonthEndResult = {
 
 export type PayLinkSummary = {
   amountCents: number;
+  amountPaidCents?: number;
+  remainingCents?: number;
   currency: string;
   customerName: string | null;
   coversText: string | null;
   status: InvoiceStatus;
+  dueAt?: string | null;
   stripeEnabled?: boolean;
 };
 
@@ -131,10 +153,10 @@ export function createInvoice(data: {
   });
 }
 
-export function payInvoice(id: string, method: PayMethod) {
+export function payInvoice(id: string, method: PayMethod, amountCents?: number) {
   return apiFetch<{ invoice: InvoiceDetail }>(`/admin/invoices/${id}/pay`, {
     method: 'POST',
-    body: JSON.stringify({ method }),
+    body: JSON.stringify({ method, amountCents }),
   });
 }
 

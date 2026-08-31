@@ -1,5 +1,10 @@
 import type { QuotationLine } from './designs';
-import type { Quotation } from './types';
+import type { Quotation, UserRole } from './types';
+import { STAFF_ROLES } from './types';
+
+export function isStaffCreatedOrder(order?: { createdByRole?: UserRole | null } | null) {
+  return Boolean(order?.createdByRole && STAFF_ROLES.includes(order.createdByRole));
+}
 
 export type QuoteWithLines = Quotation & { lines?: QuotationLine[] };
 

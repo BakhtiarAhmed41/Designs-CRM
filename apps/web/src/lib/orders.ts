@@ -154,6 +154,16 @@ export function proposeQuotation(
   });
 }
 
+export function adminAcceptQuotation(
+  orderId: string,
+  keepLineIds?: string[] | null,
+) {
+  return apiFetch<{ order: Order }>(
+    `/admin/orders/${orderId}/quotations/accept`,
+    { method: 'POST', body: JSON.stringify({ keepLineIds: keepLineIds ?? null }) },
+  );
+}
+
 export function approveCounter(orderId: string) {
   return apiFetch<{ order: Order }>(
     `/admin/orders/${orderId}/quotations/counter/approve`,
@@ -202,6 +212,16 @@ export type AdminCreateOrderInput = {
   priceCents?: number | null;
   instructions?: string | null;
   channel?: string | null;
+  mainCategory?: string | null;
+  subCategory?: string | null;
+  turnaroundKey?: string | null;
+  preferences?: unknown;
+  lines?: Array<{
+    name: string;
+    note?: string | null;
+    priceCents?: number | null;
+    sizes?: Array<{ label: string; priceCents: number }>;
+  }>;
 };
 
 export function adminCreateOrder(data: AdminCreateOrderInput) {

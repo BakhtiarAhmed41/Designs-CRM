@@ -64,7 +64,14 @@ body {
   justify-content: center;
   gap: 7px;
   letter-spacing: -0.01em;
+  text-decoration: none;
   transition: background var(--ease), color var(--ease), border-color var(--ease), box-shadow var(--ease), transform 80ms ease;
+}
+.btn:hover,
+.btn:focus,
+.btn:active,
+.btn:visited {
+  text-decoration: none;
 }
 .btn:active:not(:disabled) { transform: translateY(0.5px); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -185,7 +192,7 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
 }
 .card-h .ct i { font-size: 16px; color: var(--navy); }
 .card-h a { font-size: 12.5px; color: var(--navy); font-weight: 600; text-decoration: none; }
-.card-h a:hover { text-decoration: underline; }
+.card-h a:hover:not(.btn) { text-decoration: underline; }
 .card-b { padding: 16px 18px; }
 
 .orow, .crow {
@@ -214,7 +221,15 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   font-size: 18px;
 }
 .thumb.m, .othumb.m { background: var(--tint-m); color: var(--maroon); }
-.oinfo .on { font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em; }
+.oinfo { min-width: 0; }
+.oinfo .on {
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .oinfo .om {
   font-size: 12px;
   color: var(--faint);
@@ -222,6 +237,17 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+.orow-status-under {
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: start;
+}
+.ostatus {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 6px;
 }
 .oprice { font-size: 13.5px; font-weight: 600; text-align: right; }
 .oprice .os { font-size: 11px; color: var(--faint); font-weight: 400; }

@@ -68,7 +68,7 @@ export function PortalDashboard() {
   const quotesPendingCount = summary?.beingPriced ?? 0;
   const activeOrdersCount = summary?.activeOrders ?? activeOrders.length;
   const quotesReadyCount = summary?.awaitingQuote ?? quotesReady.length;
-  const unpaidInvoices = (invoicesData?.invoices ?? []).filter((i) => i.status === 'AWAITING');
+  const unpaidInvoices = (invoicesData?.invoices ?? []).filter((i) => i.status === 'AWAITING' || i.status === 'PARTIAL');
   const msgUnread = unreadData?.unreadMessages ?? 0;
   const monthKey = (() => {
     const now = new Date();
@@ -119,9 +119,9 @@ export function PortalDashboard() {
         thumb: 'ti-receipt',
         thumbMar: true,
         title: inv.coversText ?? 'Invoice due',
-        meta: money(inv.amountCents),
+        meta: money(inv.remainingCents ?? inv.amountCents),
         chip: 'chip c-review',
-        chipLabel: 'Unpaid',
+        chipLabel: inv.status === 'PARTIAL' ? 'Partial' : 'Unpaid',
         action: { label: 'Pay now', to: '/portal/invoices' },
       });
     }
@@ -130,7 +130,7 @@ export function PortalDashboard() {
   }, [activeOrders, quotesReady, unpaidInvoices]);
 
   const recent = (recentOrdersData?.orders ?? []).filter((o) => !isQuote(o)).slice(0, 6);
-  const unpaidTotal = unpaidInvoices.reduce((s, i) => s + i.amountCents, 0);
+  const unpaidTotal = unpaidInvoices.reduce((s, i) => s + (i.remainingCents ?? i.amountCents), 0);
   const firstName = user?.firstName || 'there';
 
   return (

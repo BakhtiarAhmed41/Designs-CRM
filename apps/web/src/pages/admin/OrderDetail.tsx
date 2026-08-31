@@ -43,7 +43,7 @@ import { AdminCounterDecision } from '@/components/AdminCounterDecision';
 import { FormPreferencesDisplay } from '@/components/FormPreferencesDisplay';
 import { MessageAttachments } from '@/components/MessageAttachments';
 import { QuoteHistory } from '@/components/QuoteHistory';
-import { studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
+import { isStaffCreatedOrder, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
 import type { Order, OrderStatus } from '@/lib/types';
 import { useAuth } from '@/context/AuthContext';
 import { canFeature, canSupport } from '@/lib/permissions';
@@ -700,6 +700,7 @@ export function AdminOrderDetail() {
           <div className="sub">
             {customerName(order)} · {order.serviceType ?? 'Service'} · {designs.length} designs · placed{' '}
             {dateShort(order.createdAt)}
+            {isStaffCreatedOrder(order) ? ' · Created by admin' : ''}
           </div>
         </div>
         <div className="ph-actions">

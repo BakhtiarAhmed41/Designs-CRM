@@ -9,6 +9,9 @@ import {
   getStoreCredit,
   listInvoices,
   openInvoicePrint,
+  invoiceRemainingCents,
+  isInvoiceOpen,
+  isInvoiceOverdue,
   payInvoice,
   refundInvoice,
   remindInvoice,
@@ -41,6 +44,12 @@ export function AdminBilling() {
   const [createAmount, setCreateAmount] = useState('');
   const [createCover, setCreateCover] = useState('');
   const [createCustomerSearch, setCreateCustomerSearch] = useState('');
+  const [monthEndPeriod, setMonthEndPeriod] = useState(() => {
+    const now = new Date();
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+  });
+  const [payFor, setPayFor] = useState<Invoice | null>(null);
 
   const summaryQ = useQuery({
     queryKey: ['billing-summary'],
@@ -70,8 +79,8 @@ export function AdminBilling() {
   const pageSize = 20;
   const totalPages = Math.max(1, Math.ceil(invoices.length / pageSize));
   const pagedInvoices = invoices.slice((page - 1) * pageSize, page * pageSize);
-  const unpaidLinks = invoices.filter((i) => i.status === 'AWAITING' && i.kind === 'PER_ORDER');
-  const monthlyStatements = invoices.filter((i) => i.kind === 'MONTHLY' && i.status === 'AWAITING');
+  const unpaidLinks = invoices.filter((i) => isInvoiceOpen(i.status) && i.kind === 'PER_ORDER');
+  const monthlyStatements = invoices.filter((i) => i.kind === 'MONTHLY' && isInvoiceOpen(i.status));
   const s = summaryQ.data;
 
   function invalidateAll() {
@@ -102,7 +111,8 @@ export function AdminBilling() {
   });
 
   const payMut = useMutation({
-    mutationFn: ({ id, method }: { id: string; method: PayMethod }) => payInvoice(id, method),
+    mutationFn: ({ id, method, amountCents }: { id: string; method: PayMethod; amountCents?: number }) =>
+      payInvoice(id, method, amountCents),
     onSuccess: () => {
       setError(null);
       invalidateAll();
@@ -139,7 +149,7 @@ export function AdminBilling() {
   });
 
   const monthEndMut = useMutation({
-    mutationFn: () => runMonthEnd(),
+    mutationFn: () => runMonthEnd(monthEndPeriod),
     onSuccess: (res) => {
       setError(null);
       setMonthEndResult(res);
@@ -178,6 +188,7 @@ export function AdminBilling() {
         statusOptions={[
           { value: '', label: 'All statuses' },
           { value: 'AWAITING', label: 'Unpaid' },
+          { value: 'PARTIAL', label: 'Partially paid' },
           { value: 'PAID', label: 'Paid' },
           { value: 'CANCELLED', label: 'Cancelled' },
         ]}
@@ -190,9 +201,14 @@ export function AdminBilling() {
           <div className="md">Paid invoices</div>
         </div>
         <div className="metric" style={{ cursor: 'default' }}>
-          <div className="ml">Outstanding</div>
-          <div className="mv">{money(s?.outstandingCents ?? 0)}</div>
-          <div className="md">{unpaidLinks.length} unpaid</div>
+          <div className="ml">Pending</div>
+          <div className="mv">{money(s?.pendingCents ?? s?.outstandingCents ?? 0)}</div>
+          <div className="md">Not yet due</div>
+        </div>
+        <div className="metric" style={{ cursor: 'default' }}>
+          <div className="ml">Overdue</div>
+          <div className="mv">{money(s?.overdueCents ?? 0)}</div>
+          <div className="md">Past due date</div>
         </div>
         <div className="metric" style={{ cursor: 'default' }}>
           <div className="ml">Net-monthly unbilled</div>
@@ -233,7 +249,9 @@ export function AdminBilling() {
                 <span>Issued {dateShort(inv.issuedAt)}</span>
               </div>
             </div>
-            <span className="chip c-new">Awaiting payment</span>
+            <span className={`chip ${inv.status === 'PARTIAL' ? 'c-prog' : 'c-new'}`}>
+              {inv.status === 'PARTIAL' ? 'Partially paid' : 'Awaiting payment'}
+            </span>
             <div style={{ display: 'flex', gap: 6 }}>
               <button
                 type="button"
@@ -258,22 +276,24 @@ export function AdminBilling() {
               >
                 <i className="ti ti-bell" /> Remind
               </button>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                style={{ color: 'var(--maroon)' }}
-                disabled={cancelMut.isPending}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (window.confirm('Cancel this invoice?')) {
-                    cancelMut.mutate(inv.id);
-                  }
-                }}
-              >
-                <i className="ti ti-x" />
-              </button>
+              {inv.status === 'AWAITING' && (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  style={{ color: 'var(--maroon)' }}
+                  disabled={cancelMut.isPending}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (window.confirm('Cancel this invoice?')) {
+                      cancelMut.mutate(inv.id);
+                    }
+                  }}
+                >
+                  <i className="ti ti-x" />
+                </button>
+              )}
             </div>
-            <div className="oprice">{money(inv.amountCents, inv.currency)}</div>
+            <div className="oprice">{money(invoiceRemainingCents(inv), inv.currency)}</div>
           </div>
         ))}
       </div>
@@ -283,18 +303,26 @@ export function AdminBilling() {
           <span className="ct">
             <i className="ti ti-file-invoice" /> Monthly statements for net-monthly accounts
           </span>
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            disabled={monthEndMut.isPending}
-            onClick={() => monthEndMut.mutate()}
-          >
-            <i className="ti ti-file-invoice" /> Generate all
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input
+              type="month"
+              value={monthEndPeriod}
+              onChange={(e) => setMonthEndPeriod(e.target.value)}
+              style={{ maxWidth: 160 }}
+            />
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              disabled={monthEndMut.isPending}
+              onClick={() => monthEndMut.mutate()}
+            >
+              <i className="ti ti-file-invoice" /> Generate
+            </button>
+          </div>
         </div>
         <div className="note" style={{ margin: '14px 16px' }}>
-          <i className="ti ti-info-circle" /> On the 1st, all unbilled logos for each trade account roll into one
-          statement. Review here. Nothing sends until you approve.
+          <i className="ti ti-info-circle" /> One invoice per month of completed or delivered work. Orders still
+          running wait for the month they finish. Remaining balances stay open until paid in full.
         </div>
         {monthlyStatements.length === 0 && (
           <div style={{ padding: '0 16px 16px', color: 'var(--muted)' }}>No statements ready.</div>
@@ -310,8 +338,10 @@ export function AdminBilling() {
                 <span>{inv.coversText ?? inv.periodMonth ?? 'Monthly statement'}</span>
               </div>
             </div>
-            <span className="chip c-prog">Ready to bill</span>
-            <div className="oprice">{money(inv.amountCents, inv.currency)}</div>
+            <span className={`chip ${isInvoiceOverdue(inv) ? 'c-new' : inv.status === 'PARTIAL' ? 'c-prog' : 'c-prog'}`}>
+              {isInvoiceOverdue(inv) ? 'Overdue' : inv.status === 'PARTIAL' ? 'Partially paid' : 'Ready to bill'}
+            </span>
+            <div className="oprice">{money(invoiceRemainingCents(inv), inv.currency)}</div>
           </div>
         ))}
       </div>
@@ -339,14 +369,26 @@ export function AdminBilling() {
                         ? 'Add-on'
                         : 'Per order')}
                 </span>
-                <span>{dateShort(inv.issuedAt)}</span>
+                <span>
+                  {inv.dueAt
+                    ? `Due ${dateShort(inv.dueAt)}`
+                    : dateShort(inv.issuedAt)}
+                </span>
               </div>
             </div>
-            <span className={`chip ${inv.status === 'PAID' ? 'c-done' : inv.status === 'CANCELLED' ? 'c-wait' : 'c-new'}`}>
-              {inv.status === 'PAID' ? 'Paid' : inv.status === 'CANCELLED' ? 'Cancelled' : 'Awaiting'}
+            <span className={`chip ${inv.status === 'PAID' ? 'c-done' : inv.status === 'CANCELLED' ? 'c-wait' : inv.status === 'PARTIAL' ? 'c-prog' : isInvoiceOverdue(inv) ? 'c-new' : 'c-new'}`}>
+              {inv.status === 'PAID'
+                ? 'Paid'
+                : inv.status === 'CANCELLED'
+                  ? 'Cancelled'
+                  : inv.status === 'PARTIAL'
+                    ? 'Partially paid'
+                    : isInvoiceOverdue(inv)
+                      ? 'Overdue'
+                      : 'Awaiting'}
             </span>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {inv.status === 'AWAITING' && (
+              {isInvoiceOpen(inv.status) && (
                 <>
                   <button
                     type="button"
@@ -354,6 +396,13 @@ export function AdminBilling() {
                     onClick={() => payMut.mutate({ id: inv.id, method: 'CARD' })}
                   >
                     Mark paid
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => setPayFor(inv)}
+                  >
+                    Record payment
                   </button>
                   <button
                     type="button"
@@ -399,12 +448,26 @@ export function AdminBilling() {
                 Credit +/−
               </button>
             </div>
-            <div className="oprice">{money(inv.amountCents, inv.currency)}</div>
+            <div className="oprice">
+              {isInvoiceOpen(inv.status) && invoiceRemainingCents(inv) !== inv.amountCents
+                ? money(invoiceRemainingCents(inv), inv.currency)
+                : money(inv.amountCents, inv.currency)}
+            </div>
           </div>
         ))}
       </div>
       <PaginationBar page={page} totalPages={totalPages} total={invoices.length} onPage={setPage} />
 
+      {payFor && (
+        <RecordPaymentModal
+          invoice={payFor}
+          onClose={() => setPayFor(null)}
+          onDone={() => {
+            setPayFor(null);
+            invalidateAll();
+          }}
+        />
+      )}
       {payLink && <PayLinkModal url={payLink} onClose={() => setPayLink(null)} />}
       {monthEndResult && (
         <MonthEndModal result={monthEndResult} onClose={() => setMonthEndResult(null)} />
@@ -531,6 +594,66 @@ function PayLinkModal({ url, onClose }: { url: string; onClose: () => void }) {
             }}
           >
             {copied ? 'Copied!' : 'Copy link'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RecordPaymentModal({
+  invoice,
+  onClose,
+  onDone,
+}: {
+  invoice: Invoice;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const remaining = invoiceRemainingCents(invoice);
+  const [amount, setAmount] = useState((remaining / 100).toFixed(2));
+  const [method, setMethod] = useState<PayMethod>('CARD');
+  const [error, setError] = useState<string | null>(null);
+
+  const mut = useMutation({
+    mutationFn: () =>
+      payInvoice(invoice.id, method, Math.round(Number(amount) * 100)),
+    onSuccess: onDone,
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
+  return (
+    <div className="overlay open" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-h">
+          <span>Record payment</span>
+          <button type="button" className="modal-x" onClick={onClose}>
+            &times;
+          </button>
+        </div>
+        <div className="modal-b">
+          {error && <div className="alert-error" style={{ marginBottom: 12 }}>{error}</div>}
+          <div className="note" style={{ marginBottom: 12 }}>
+            Remaining: <b>{money(remaining, invoice.currency)}</b>
+          </div>
+          <div className="ff">
+            <label>Amount received</label>
+            <input type="number" step="0.01" min="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          </div>
+          <div className="ff">
+            <label>Method</label>
+            <select value={method} onChange={(e) => setMethod(e.target.value as PayMethod)}>
+              <option value="CARD">Card / bank</option>
+              <option value="STORE_CREDIT">Store credit</option>
+            </select>
+          </div>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={mut.isPending || !(Number(amount) > 0)}
+            onClick={() => mut.mutate()}
+          >
+            {mut.isPending ? 'Saving…' : 'Save payment'}
           </button>
         </div>
       </div>

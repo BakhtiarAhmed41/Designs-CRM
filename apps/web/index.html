@@ -26,56 +26,10 @@
     </noscript>
     <style>
       html,body{margin:0;background:#fff}
-      #lvd-progress{position:fixed;top:0;left:0;right:0;height:3px;z-index:100000;pointer-events:none;opacity:1;transition:opacity .28s ease}
-      #lvd-progress>i{display:block;height:100%;width:12%;background:linear-gradient(90deg,#143F65,#9A1E22);transition:width .22s ease}
-      #lvd-boot{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:system-ui,-apple-system,sans-serif;color:#143F65}
-      #lvd-boot[hidden]{display:none}
-      #lvd-boot img{height:36px;width:auto}
-      #lvd-boot p{margin:0;font-size:13px;color:#6b7280}
     </style>
   </head>
   <body>
-    <div id="lvd-progress" role="progressbar" aria-label="Page loading" aria-valuemin="0" aria-valuemax="100" aria-valuenow="12"><i></i></div>
-    <div id="lvd-boot">
-      <img src="/lvd-logo.png" alt="Las Vegas Designs USA" width="72" height="38" />
-      <p>Loading…</p>
-    </div>
     <div id="root"></div>
-    <script>
-      (function () {
-        var wrap = document.getElementById('lvd-progress');
-        var bar = wrap && wrap.querySelector('i');
-        var v = 12;
-        var timer;
-        function set(n) {
-          v = Math.max(0, Math.min(100, n));
-          if (bar) bar.style.width = v + '%';
-          if (wrap) wrap.setAttribute('aria-valuenow', String(Math.round(v)));
-        }
-        function trickle(cap) {
-          clearInterval(timer);
-          timer = setInterval(function () {
-            if (v >= cap) return;
-            set(v + Math.max(0.5, (cap - v) * 0.08));
-          }, 180);
-        }
-        trickle(80);
-        window.__lvdStart = function () {
-          if (wrap) wrap.style.opacity = '1';
-          set(16);
-          trickle(88);
-        };
-        window.__lvdReady = function () {
-          clearInterval(timer);
-          set(100);
-          var boot = document.getElementById('lvd-boot');
-          if (boot) boot.hidden = true;
-          setTimeout(function () {
-            if (wrap) wrap.style.opacity = '0';
-          }, 240);
-        };
-      })();
-    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -5,7 +5,7 @@ import { STAFF_ROLES } from '@/lib/types';
 import { staffLandingPath } from '@/lib/permissions';
 import { PortalShell } from '@/components/PortalShell';
 import { AdminShell } from '@/components/AdminShell';
-import { RequireFeature } from '@/components/RequireFeature';
+import { RequireAdminRole, RequireFeature } from '@/components/RequireFeature';
 import { PageLoading } from '@/components/PageProgress';
 import { Login } from '@/pages/Login';
 import { PayLink } from '@/pages/PayLink';
@@ -266,9 +266,9 @@ export function App() {
           <Route
             path="reports"
             element={
-              <RequireFeature feature="dashboard">
+              <RequireAdminRole>
                 <AdminReports />
-              </RequireFeature>
+              </RequireAdminRole>
             }
           />
           <Route

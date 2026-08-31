@@ -3,6 +3,9 @@ import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   confirmMyInvoice,
+  invoiceRemainingCents,
+  isInvoiceOpen,
+  isInvoiceOverdue,
   listMyInvoices,
   openInvoicePrint,
   payMyInvoice,
@@ -20,11 +23,13 @@ import { PaginationBar } from '@/components/lists/ListToolbar';
 
 type InvFilter = 'all' | 'pending' | 'paid';
 
-function invoiceChip(status: Invoice['status'], kind: Invoice['kind'], periodMonth: string | null) {
-  if (kind === 'MONTHLY' && status === 'AWAITING' && !periodMonth) {
+function invoiceChip(inv: Invoice) {
+  if (inv.kind === 'MONTHLY' && inv.status === 'AWAITING' && !inv.periodMonth) {
     return { cls: 'chip c-prog', label: 'Building' };
   }
-  if (status === 'PAID') return { cls: 'chip c-paid', label: 'Paid' };
+  if (inv.status === 'PAID') return { cls: 'chip c-paid', label: 'Paid' };
+  if (inv.status === 'PARTIAL') return { cls: 'chip c-prog', label: 'Partially paid' };
+  if (isInvoiceOverdue(inv)) return { cls: 'chip c-unpaid', label: 'Overdue' };
   return { cls: 'chip c-unpaid', label: 'Pending' };
 }
 
@@ -54,7 +59,7 @@ export function PortalInvoices() {
   const unbilledMonthCents = data?.unbilledMonthCents ?? 0;
 
   const filtered = useMemo(() => {
-    if (filter === 'pending') return invoices.filter((i) => i.status === 'AWAITING');
+    if (filter === 'pending') return invoices.filter((i) => isInvoiceOpen(i.status));
     if (filter === 'paid') return invoices.filter((i) => i.status === 'PAID');
     return invoices;
   }, [invoices, filter]);
@@ -71,14 +76,14 @@ export function PortalInvoices() {
     return billedThisMonth + unbilledMonthCents;
   }, [invoices, unbilledMonthCents]);
 
-  const lastPending = invoices.find((i) => i.status === 'AWAITING' && i.kind === 'MONTHLY');
+  const lastPending = invoices.find((i) => isInvoiceOpen(i.status) && i.kind === 'MONTHLY');
   const paidLifetime = invoices
     .filter((i) => i.status === 'PAID')
     .reduce((s, i) => s + i.amountCents, 0);
 
   useEffect(() => {
     if (!paidReturn || confirmedReturn.current) return;
-    const awaiting = (data?.invoices ?? []).filter((i) => i.status === 'AWAITING');
+    const awaiting = (data?.invoices ?? []).filter((i) => isInvoiceOpen(i.status));
     if (!data) return;
     confirmedReturn.current = true;
     void Promise.all(awaiting.map((i) => confirmMyInvoice(i.id).catch(() => null))).then(
@@ -88,14 +93,23 @@ export function PortalInvoices() {
 
   const payMut = useMutation({
     mutationFn: async (inv: Invoice) => {
-      const useCredit = storeCreditCents >= inv.amountCents;
-      if (useCredit) {
+      const remaining = invoiceRemainingCents(inv);
+      if (storeCreditCents >= remaining && remaining > 0) {
         const ok = window.confirm(
-          `Pay ${money(inv.amountCents, inv.currency)} from your store credit?`,
+          `Pay ${money(remaining, inv.currency)} from your store credit?`,
         );
         if (!ok) return;
         await payMyInvoice(inv.id, 'STORE_CREDIT');
         return;
+      }
+      if (storeCreditCents > 0 && storeCreditCents < remaining) {
+        const ok = window.confirm(
+          `Apply ${money(storeCreditCents, inv.currency)} of store credit toward the ${money(remaining, inv.currency)} balance? The rest stays outstanding.`,
+        );
+        if (ok) {
+          await payMyInvoice(inv.id, 'STORE_CREDIT');
+          return;
+        }
       }
       await startMyInvoiceCheckout(inv.id);
     },
@@ -150,8 +164,8 @@ export function PortalInvoices() {
             </div>
             <div className="stat">
               <div className="sl">Last statement</div>
-              <div className="sv">{money(lastPending?.amountCents ?? 0)}</div>
-              <div className="sd">{lastPending?.periodMonth ?? 'None'} · pending</div>
+              <div className="sv">{money(lastPending ? invoiceRemainingCents(lastPending) : 0)}</div>
+              <div className="sd">{lastPending?.periodMonth ?? 'None'} · {lastPending?.status === 'PARTIAL' ? 'partial' : 'pending'}</div>
             </div>
             <div className="stat">
               <div className="sl">Paid to date</div>
@@ -166,12 +180,12 @@ export function PortalInvoices() {
               <div className="sv maroon">
                 {money(
                   invoices
-                    .filter((i) => i.status === 'AWAITING')
-                    .reduce((s, i) => s + i.amountCents, 0),
+                    .filter((i) => isInvoiceOpen(i.status))
+                    .reduce((s, i) => s + invoiceRemainingCents(i), 0),
                 )}
               </div>
               <div className="sd">
-                {invoices.filter((i) => i.status === 'AWAITING').length} invoice(s)
+                {invoices.filter((i) => isInvoiceOpen(i.status)).length} invoice(s)
               </div>
             </div>
             <div className="stat">
@@ -232,16 +246,17 @@ export function PortalInvoices() {
                 <th>{isNet ? 'Statement' : 'Order'}</th>
                 <th>Items</th>
                 <th>Amount</th>
-                <th>Date</th>
+                <th>Due</th>
                 <th>Status</th>
                 <th />
               </tr>
             </thead>
             <tbody>
               {paged.map((inv) => {
-                const chip = invoiceChip(inv.status, inv.kind, inv.periodMonth);
-                const canPay = inv.status === 'AWAITING' && inv.amountCents > 0;
-                const useCredit = storeCreditCents >= inv.amountCents;
+                const chip = invoiceChip(inv);
+                const remaining = invoiceRemainingCents(inv);
+                const canPay = isInvoiceOpen(inv.status) && remaining > 0;
+                const useCredit = storeCreditCents >= remaining;
                 const invId =
                   inv.periodMonth?.toUpperCase().replace(' ', '-') ??
                   inv.id.slice(0, 8).toUpperCase();
@@ -257,11 +272,13 @@ export function PortalInvoices() {
                           ? 'Add-on'
                           : 'Order'}
                     </td>
-                    <td className="amt">{money(inv.amountCents, inv.currency)}</td>
+                    <td className="amt">{money(remaining > 0 && remaining !== inv.amountCents ? remaining : inv.amountCents, inv.currency)}</td>
                     <td style={{ color: 'var(--muted)' }}>
-                      {inv.status === 'AWAITING' && chip.label === 'Building'
+                      {chip.label === 'Building'
                         ? 'Pending'
-                        : dateShort(inv.issuedAt) || 'None'}
+                        : inv.dueAt
+                          ? dateShort(inv.dueAt)
+                          : dateShort(inv.issuedAt) || 'None'}
                     </td>
                     <td>
                       <span className={chip.cls}>{chip.label}</span>

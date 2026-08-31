@@ -123,6 +123,8 @@ CREATE TABLE IF NOT EXISTS orders (
   price_cents          INT NULL,
   currency             VARCHAR(3) NOT NULL DEFAULT 'USD',
   channel              VARCHAR(40) NULL,
+  created_by_role      ENUM('SUPER_ADMIN','ADMIN','SUPPORT','DESIGNER','CLIENT') NULL,
+  created_by_id        CHAR(36) NULL,
   assigned_designer_id CHAR(36) NULL,
   parent_order_id      CHAR(36) NULL,
   due_date             DATE NULL,
@@ -290,17 +292,32 @@ CREATE TABLE IF NOT EXISTS invoices (
   order_id                  CHAR(36) NULL,
   kind                      ENUM('PER_ORDER','MONTHLY','ADD_ON') NOT NULL DEFAULT 'PER_ORDER',
   amount_cents              INT NOT NULL,
+  amount_paid_cents         INT NOT NULL DEFAULT 0,
   currency                  VARCHAR(3) NOT NULL DEFAULT 'USD',
   covers_text               VARCHAR(500) NULL,
-  status                    ENUM('AWAITING','PAID','CANCELLED') NOT NULL DEFAULT 'AWAITING',
+  status                    ENUM('AWAITING','PARTIAL','PAID','CANCELLED') NOT NULL DEFAULT 'AWAITING',
   period_month              CHAR(7) NULL,
   store_credit_applied_cents INT NOT NULL DEFAULT 0,
   issued_at                 DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  due_at                    DATETIME NULL,
   paid_at                   DATETIME NULL,
   PRIMARY KEY (id),
   KEY idx_invoice_customer (customer_id),
   KEY idx_invoice_status (status),
   CONSTRAINT fk_invoice_customer FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS invoice_lines (
+  id           CHAR(36) NOT NULL,
+  invoice_id   CHAR(36) NOT NULL,
+  order_id     CHAR(36) NULL,
+  description  VARCHAR(255) NOT NULL,
+  amount_cents INT NOT NULL,
+  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_inv_line_invoice (invoice_id),
+  UNIQUE KEY uq_inv_line_order (order_id),
+  CONSTRAINT fk_inv_line_invoice FOREIGN KEY (invoice_id) REFERENCES invoices (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS payments (

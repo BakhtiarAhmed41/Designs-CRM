@@ -10,7 +10,6 @@ const WORK_QUERY_ROOTS = new Set([
   'admin-order-edits',
   'admin-mywork',
   'admin-dashboard-stats',
-  'admin-dashboard-chart',
   'admin-quotes',
   'admin-quotes-to-price',
   'admin-quotes-followups',

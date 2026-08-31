@@ -1,4 +1,4 @@
-import type { OrderStatus } from './types';
+import type { OrderPaymentStatus, OrderStatus } from './types';
 
 export function money(cents: number | null | undefined, currency = 'USD'): string {
   if (cents == null) return '-';
@@ -146,6 +146,20 @@ export function lifecycleChip(
         cls: 'chip c-prog',
         label: STATUS_LABEL[status as OrderStatus] ?? String(status).replace(/_/g, ' '),
       };
+  }
+}
+
+export function paymentChip(status: OrderPaymentStatus | null | undefined): StatusChip {
+  switch (status) {
+    case 'PAID':
+      return { cls: 'chip c-paid', label: 'Paid' };
+    case 'AWAITING':
+      return { cls: 'chip c-wait', label: 'Awaiting payment' };
+    case 'REFUNDED':
+      return { cls: 'chip c-unpaid', label: 'Refunded' };
+    case 'UNPAID':
+    default:
+      return { cls: 'chip c-unpaid', label: 'Unpaid' };
   }
 }
 

@@ -13,6 +13,7 @@ import {
   DeliveredVia,
   DesignStatus,
   EditStatus,
+  OrderPaymentStatus,
   OrderStatus,
   OrderType,
   QuotationStatus,
@@ -85,6 +86,9 @@ type OrderRow = {
   status: OrderStatus;
   price_cents: number | null;
   currency: string;
+  channel: string | null;
+  created_by_role: UserRole | null;
+  created_by_id: string | null;
   assigned_designer_id: string | null;
   parent_order_id: string | null;
   due_date: Date | null;
@@ -585,7 +589,11 @@ export class OrdersService {
 
   private orderDto(
     o: OrderRow,
-    extras?: { partiallyAccepted?: boolean; partiallyDelivered?: boolean },
+    extras?: {
+      partiallyAccepted?: boolean;
+      partiallyDelivered?: boolean;
+      paymentStatus?: OrderPaymentStatus;
+    },
   ) {
     return {
       id: o.id,
@@ -606,6 +614,9 @@ export class OrdersService {
       status: o.status,
       priceCents: o.price_cents,
       currency: o.currency,
+      channel: o.channel ?? null,
+      createdByRole: o.created_by_role ?? null,
+      createdById: o.created_by_id ?? null,
       assignedDesignerId: o.assigned_designer_id,
       parentOrderId: o.parent_order_id,
       dueDate: o.due_date,
@@ -616,6 +627,7 @@ export class OrdersService {
       updatedAt: o.updated_at,
       partiallyAccepted: extras?.partiallyAccepted ?? false,
       partiallyDelivered: extras?.partiallyDelivered ?? false,
+      paymentStatus: extras?.paymentStatus,
     };
   }
 
@@ -851,8 +863,8 @@ export class OrdersService {
     );
     await this.db.execute(
       `INSERT INTO orders
-         (id, human_ref, customer_id, client_user_id, type, service_type, main_category, sub_category, name, instructions, size, turnaround_key, turnaround_label, turnaround_hours, preferences, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, human_ref, customer_id, client_user_id, type, service_type, main_category, sub_category, name, instructions, size, turnaround_key, turnaround_label, turnaround_hours, preferences, status, created_by_role, created_by_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         humanRef,
@@ -870,6 +882,8 @@ export class OrdersService {
         turnaround.hours,
         data.preferences ? JSON.stringify(data.preferences) : null,
         OrderStatus.WAITING_FOR_QUOTATION,
+        UserRole.CLIENT,
+        client.id,
       ],
     );
 
@@ -885,18 +899,20 @@ export class OrdersService {
   private async assembleOrder(id: string, opts?: { releasedOnly?: boolean }) {
     const row = await this.getOrderRow(id);
     if (!row) throw new NotFoundException('Order not found');
-    const [partiallyAccepted, deliveries, designs, attachments, quotations] =
+    const [partiallyAccepted, deliveries, designs, attachments, quotations, paymentStatus] =
       await Promise.all([
         this.orderPartialFlag(id),
         this.getDeliveries(id),
         this.getDesigns(id),
         this.getAttachments(id),
         this.getQuotations(id),
+        this.billing.resolveOrderPaymentStatus(row),
       ]);
     return {
       ...this.orderDto(row, {
         partiallyAccepted,
         partiallyDelivered: this.designPartialDelivery(designs),
+        paymentStatus,
       }),
       designs,
       attachments,
@@ -1196,6 +1212,34 @@ export class OrdersService {
     const order = await this.getOrderRow(orderId);
     if (!order || order.client_user_id !== user.id)
       throw new NotFoundException('Order not found');
+    return this.convertAcceptedQuotation(order, input, 'customer');
+  }
+
+  async adminAcceptQuotation(
+    user: AuthUser | undefined,
+    orderId: string,
+    input?: { keepLineIds?: string[] | null },
+  ) {
+    this.assertAdmin(user);
+    const order = await this.getOrderRow(orderId);
+    if (!order) throw new NotFoundException('Order not found');
+    if (order.type !== OrderType.QUOTE_REQUEST) {
+      throw new BadRequestException('Only quotes can be approved here');
+    }
+    if (!order.created_by_role || !isAdminRole(order.created_by_role)) {
+      throw new BadRequestException(
+        'Only admin-created quotes can be approved from the admin panel',
+      );
+    }
+    return this.convertAcceptedQuotation(order, input, 'admin');
+  }
+
+  private async convertAcceptedQuotation(
+    order: OrderRow,
+    input: { keepLineIds?: string[] | null } | undefined,
+    approvedBy: 'customer' | 'admin',
+  ) {
+    const orderId = order.id;
     const latest = await this.getLatestProposedQuotation(orderId);
     if (!latest)
       throw new BadRequestException('No active quotation to accept');
@@ -1298,9 +1342,11 @@ export class OrdersService {
     await this.notifyAdmins({
       title: 'Quotation approved',
       body:
-        keepIds.size < lines.length
-          ? `Customer partially accepted — converted to order - ${order.name ?? ''}`
-          : `Customer accepted — converted to order - ${order.name ?? ''}`,
+        approvedBy === 'admin'
+          ? `Admin approved a studio-created quote — converted to order - ${order.name ?? ''}`
+          : keepIds.size < lines.length
+            ? `Customer partially accepted — converted to order - ${order.name ?? ''}`
+            : `Customer accepted — converted to order - ${order.name ?? ''}`,
       link: `/admin/orders/${orderId}`,
     });
     return this.assembleOrder(orderId);
@@ -1559,10 +1605,20 @@ export class OrdersService {
       serviceType: string;
       size?: string | null;
       name?: string | null;
+      mainCategory?: string | null;
+      subCategory?: string | null;
       designCount?: number | null;
       priceCents?: number | null;
       instructions?: string | null;
       channel?: string | null;
+      preferences?: unknown;
+      turnaroundKey?: string | null;
+      lines?: Array<{
+        name: string;
+        note?: string | null;
+        priceCents?: number | null;
+        sizes?: Array<{ label: string; priceCents: number }>;
+      }> | null;
     },
   ) {
     this.assertAdmin(user);
@@ -1635,22 +1691,38 @@ export class OrdersService {
       data.name?.trim() ||
       data.serviceType ||
       (data.type === OrderType.QUOTE_REQUEST ? 'Quote request' : 'Order');
+    const pricedLines = (data.lines ?? []).filter((l) => l.name.trim());
+    let lineTotal: number | null = null;
+    if (pricedLines.length > 0) {
+      lineTotal = 0;
+      for (const line of pricedLines) {
+        lineTotal += typeof line.priceCents === 'number' ? line.priceCents : 0;
+        for (const s of line.sizes ?? []) {
+          lineTotal += typeof s.priceCents === 'number' ? s.priceCents : 0;
+        }
+      }
+    }
     const priceCents =
-      typeof data.priceCents === 'number' && Number.isFinite(data.priceCents)
-        ? Math.round(data.priceCents)
-        : null;
+      lineTotal != null
+        ? lineTotal
+        : typeof data.priceCents === 'number' && Number.isFinite(data.priceCents)
+          ? Math.round(data.priceCents)
+          : null;
     const designCount =
-      typeof data.designCount === 'number' && data.designCount > 0
+      pricedLines.length === 0 &&
+      typeof data.designCount === 'number' &&
+      data.designCount > 0
         ? Math.min(Math.floor(data.designCount), 50)
         : 0;
 
     const billPerOrder = accountType !== AccountType.NET_MONTHLY;
+    const prefs = data.preferences as { turnaround?: string } | null;
+    const turnaround = await this.resolveTurnaround(
+      data.turnaroundKey ?? prefs?.turnaround ?? null,
+    );
     let status: OrderStatus;
     if (data.type === OrderType.ORDER) {
-      status =
-        priceCents != null && priceCents > 0 && billPerOrder
-          ? OrderStatus.PENDING_PAYMENT
-          : OrderStatus.CREATED;
+      status = OrderStatus.IN_PROGRESS;
     } else {
       status =
         priceCents != null && priceCents > 0
@@ -1660,8 +1732,8 @@ export class OrdersService {
 
     await this.db.execute(
       `INSERT INTO orders
-         (id, human_ref, customer_id, client_user_id, type, service_type, name, instructions, size, status, price_cents, channel)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, human_ref, customer_id, client_user_id, type, service_type, main_category, sub_category, name, instructions, size, turnaround_key, turnaround_label, turnaround_hours, preferences, status, price_cents, channel, created_by_role, created_by_id, approved_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         humanRef,
@@ -1669,16 +1741,91 @@ export class OrdersService {
         clientUserId,
         data.type,
         serviceType,
+        data.mainCategory ?? null,
+        data.subCategory ?? null,
         name,
         data.instructions?.trim() || null,
         data.size?.trim() || null,
+        turnaround.key,
+        turnaround.label,
+        turnaround.hours,
+        data.preferences ? JSON.stringify(data.preferences) : null,
         status,
         priceCents,
-        data.channel?.trim() || null,
+        data.channel?.trim() || 'ADMIN',
+        user.role,
+        user.id,
+        null,
       ],
     );
+    if (data.type === OrderType.ORDER) {
+      await this.db.execute(
+        'UPDATE orders SET approved_at = NOW() WHERE id = ?',
+        [id],
+      );
+    }
 
-    if (designCount > 0) {
+    if (data.type === OrderType.ORDER && pricedLines.length > 0) {
+      const quotationId = randomUUID();
+      await this.db.execute(
+        `INSERT INTO quotations
+           (id, order_id, version, status, created_by_role, created_by_id, amount_cents, currency, comment)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          quotationId,
+          id,
+          1,
+          QuotationStatus.APPROVED,
+          user.role,
+          user.id,
+          priceCents,
+          'USD',
+          'Created by admin as an approved order',
+        ],
+      );
+      const createdLines: Array<{
+        id: string;
+        name: string;
+        priceCents: number | null;
+        sizes: Array<{ priceCents: number | null }>;
+      }> = [];
+      let lineSort = 0;
+      for (const line of pricedLines) {
+        const lineId = randomUUID();
+        await this.db.execute(
+          `INSERT INTO quotation_lines
+             (id, quotation_id, name, note, attachment_id, price_cents, sort_order, client_decision)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'KEPT')`,
+          [
+            lineId,
+            quotationId,
+            line.name.trim(),
+            line.note?.trim() || null,
+            null,
+            typeof line.priceCents === 'number' ? line.priceCents : null,
+            lineSort++,
+          ],
+        );
+        const sizeRows: Array<{ priceCents: number | null }> = [];
+        let sizeSort = 0;
+        for (const s of line.sizes ?? []) {
+          await this.db.execute(
+            `INSERT INTO quotation_line_sizes
+               (id, line_id, label, price_cents, sort_order)
+             VALUES (?, ?, ?, ?, ?)`,
+            [randomUUID(), lineId, s.label.trim(), s.priceCents ?? 0, sizeSort++],
+          );
+          sizeRows.push({ priceCents: s.priceCents ?? 0 });
+        }
+        createdLines.push({
+          id: lineId,
+          name: line.name.trim(),
+          priceCents: typeof line.priceCents === 'number' ? line.priceCents : null,
+          sizes: sizeRows,
+        });
+      }
+      await this.ensureDesignsFromQuotationLines(id, createdLines);
+    } else if (designCount > 0) {
       for (let i = 0; i < designCount; i++) {
         const designName =
           designCount === 1 && data.name?.trim()
@@ -1822,9 +1969,11 @@ export class OrdersService {
       );
     }
     const designs = await this.getDesigns(orderId);
+    const paymentStatus = await this.billing.resolveOrderPaymentStatus(row);
     const assembled = {
       ...this.orderDto(row, {
         partiallyDelivered: this.designPartialDelivery(designs),
+        paymentStatus,
       }),
       client: client
         ? {
@@ -2195,7 +2344,6 @@ export class OrdersService {
         'Support cannot release designer files without approve permission',
       );
     }
-
     const existing = await this.getDeliveries(orderId);
     if (incoming.length > 10) {
       throw new BadRequestException('Upload at most 10 files at a time');

@@ -113,6 +113,27 @@ const adminCreateOrderSchema = z
     priceCents: z.number().int().nonnegative().optional().nullable(),
     instructions: z.string().optional().nullable(),
     channel: z.string().optional().nullable(),
+    mainCategory: z.string().optional().nullable(),
+    subCategory: z.string().optional().nullable(),
+    turnaroundKey: z.string().optional().nullable(),
+    preferences: z.unknown().optional(),
+    lines: z
+      .array(
+        z.object({
+          name: z.string().min(1),
+          note: z.string().optional().nullable(),
+          priceCents: z.number().int().nonnegative().optional().nullable(),
+          sizes: z
+            .array(
+              z.object({
+                label: z.string().min(1),
+                priceCents: z.number().int().nonnegative(),
+              }),
+            )
+            .optional(),
+        }),
+      )
+      .optional(),
   })
   .superRefine((val, ctx) => {
     if (!val.customerId && !val.customerName?.trim()) {
@@ -309,7 +330,12 @@ export class AdminOrdersController {
       designCount: data.designCount ?? null,
       priceCents: data.priceCents ?? null,
       instructions: data.instructions || null,
-      channel: data.channel || data.source || null,
+      channel: data.channel || data.source || 'ADMIN',
+      mainCategory: data.mainCategory || null,
+      subCategory: data.subCategory || null,
+      turnaroundKey: data.turnaroundKey || null,
+      preferences: data.preferences,
+      lines: data.lines,
     });
   }
 
@@ -405,6 +431,21 @@ export class AdminOrdersController {
       complete: parseBool(body?.complete, true),
       release: parseBool(body?.release, true),
     });
+  }
+
+  @Post(':id/quotations/accept')
+  async acceptQuotation(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    const data = z
+      .object({
+        keepLineIds: z.array(z.string().min(1)).optional().nullable(),
+      })
+      .parse(body ?? {});
+    const order = await this.orders.adminAcceptQuotation(user, id, data);
+    return { order };
   }
 
   @Post(':id/quotations')
