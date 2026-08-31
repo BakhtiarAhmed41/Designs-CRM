@@ -203,7 +203,10 @@ export function AdminDashboard() {
 
       {showPulse && (
         <section className="pulse">
-          <div className="pulse-grid">
+          <div
+            className="pulse-grid"
+            style={{ gridTemplateColumns: `repeat(${statTiles.length}, minmax(0, 1fr))` }}
+          >
             {statTiles.map((t) => (
               <div key={t.label} className="pulse-stat">
                 <div className="ps-l">{t.label}</div>
