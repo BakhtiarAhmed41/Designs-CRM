@@ -958,8 +958,8 @@ button.ghost i { color: var(--ink); }
 
 .card { padding: 0; }
 .card + .card { margin-top: 0; }
-.card-b { padding: 18px 20px; }
-.card-pad { padding: 20px 22px; }
+.card-b { padding: 18px 12px; }
+.card-pad { padding: 20px 12px; }
 .card .qtable, .card .itable { margin: 0; }
 .pay-card .card-b { padding: 22px; }
 
@@ -1454,6 +1454,8 @@ body,
 .expand-row td,
 .qtable th,
 .itable th,
+.form-frame,
+.modal-b,
 .card-b,
 .card-pad,
 .batch,
@@ -1587,4 +1589,18 @@ button.primary i,
 .tmsg.me,
 .msg.me {
   color: #fff;
+}
+
+.form-frame {
+  width: 100%;
+  min-height: 420px;
+  height: auto;
+  border: none;
+  background: var(--etsy-white);
+  overflow: hidden;
+  display: block;
+}
+
+.modal-b.form-section {
+  padding: 18px 22px 22px;
 }

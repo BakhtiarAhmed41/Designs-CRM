@@ -470,6 +470,11 @@
       btn.textContent = isAdmin ? 'Continue to pricing →' : original;
     });
 
+    document.querySelectorAll('.form-hint').forEach(function (el) {
+      var original = rememberDefault(el, 'data-default-label');
+      el.textContent = isAdmin ? 'Next you will add prices and files.' : original;
+    });
+
     document.querySelectorAll('.ct').forEach(function (el) {
       var original = rememberDefault(el, 'data-default-label');
       if (isAdmin && isOrder) {
@@ -492,10 +497,30 @@
         : titleBase;
   }
 
+  function reportHeight() {
+    if (!inIframe()) return;
+    var h = Math.max(
+      document.body ? document.body.scrollHeight : 0,
+      document.documentElement ? document.documentElement.scrollHeight : 0,
+    );
+    parent.postMessage({ type: 'lvd-form-height', height: h + 8 }, '*');
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     var svc = serviceKey();
+    if (inIframe()) document.documentElement.classList.add('in-frame');
     var restored = restoreDraft(svc);
     loadTurnaroundLabels();
+    reportHeight();
+    if (window.ResizeObserver) {
+      var ro = new ResizeObserver(function () {
+        reportHeight();
+      });
+      ro.observe(document.body);
+    }
+    document.addEventListener('click', function () {
+      setTimeout(reportHeight, 60);
+    });
 
     document.querySelectorAll('.btn-p').forEach(function (btn) {
       btn.addEventListener('click', function (e) {

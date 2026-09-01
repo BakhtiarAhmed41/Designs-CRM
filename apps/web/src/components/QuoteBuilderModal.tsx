@@ -335,8 +335,14 @@ export function QuoteBuilderModal({
       const data = ev.data as {
         type?: string;
         restoredDraft?: boolean;
+        height?: number;
       } | null;
       if (!data || typeof data !== 'object') return;
+      if (data.type === 'lvd-form-height' && typeof data.height === 'number') {
+        const next = Math.max(360, Math.ceil(data.height));
+        const frame = iframeRef.current;
+        if (frame) frame.style.height = `${next}px`;
+      }
       if (data.type === 'lvd-form-ready') {
         const win = iframeRef.current?.contentWindow;
         if (win) {
@@ -411,7 +417,7 @@ export function QuoteBuilderModal({
               <i className="ti ti-x" />
             </button>
           </div>
-          <div className="modal-b">
+          <div className={`modal-b${service ? ' form-section' : ''}`}>
             {error && (
               <div className="alert-error" style={{ marginBottom: 14 }}>
                 {error}
@@ -492,7 +498,9 @@ export function QuoteBuilderModal({
                     title={`${service.label} ${kindLabel} form`}
                     src={`/portal-forms/${service.key}.html`}
                     onLoad={() => {
-                      const win = iframeRef.current?.contentWindow;
+                      const frame = iframeRef.current;
+                      if (frame) frame.style.height = '520px';
+                      const win = frame?.contentWindow;
                       if (!win) return;
                       win.postMessage(
                         {
@@ -520,11 +528,6 @@ export function QuoteBuilderModal({
                     >
                       Cancel
                     </button>
-                  </div>
-                  <div className="muted" style={{ fontSize: 12, marginTop: 8, textAlign: 'right' }}>
-                    {isAdmin
-                      ? 'Use Continue to pricing inside the form. Next you will add prices and files.'
-                      : 'Use the Submit button inside the form above to send your request.'}
                   </div>
                 </div>
 
