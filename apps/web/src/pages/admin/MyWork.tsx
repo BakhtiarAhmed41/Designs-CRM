@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/context/AuthContext';
 import { listMyWork } from '@/lib/team';
 import { freshOnOpen } from '@/lib/queryRefresh';
 import { dateShort } from '@/lib/format';
@@ -28,6 +29,8 @@ function statusText(status: OrderStatus) {
 
 export function AdminMyWork() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const hideCustomer = user?.role === 'DESIGNER';
   const [filter, setFilter] = useState<WorkFilter>('active');
   const [page, setPage] = useState(1);
 
@@ -94,7 +97,7 @@ export function AdminMyWork() {
             <thead>
               <tr>
                 <th>Job</th>
-                <th>Customer</th>
+                {!hideCustomer && <th>Customer</th>}
                 <th>Due</th>
                 <th>Status</th>
               </tr>
@@ -113,7 +116,7 @@ export function AdminMyWork() {
                       </div>
                     </div>
                   </td>
-                  <td>{o.customerName ?? 'Customer'}</td>
+                  {!hideCustomer && <td>{o.customerName ?? 'Customer'}</td>}
                   <td className="muted">{o.dueDate ? dateShort(o.dueDate) : 'None'}</td>
                   <td>
                     <span

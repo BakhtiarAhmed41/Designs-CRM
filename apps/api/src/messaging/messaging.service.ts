@@ -26,6 +26,10 @@ function assertAuthUser(user: AuthUser | undefined): asserts user is AuthUser {
   if (!user) throw new ForbiddenException();
 }
 
+function hideCustomerDetails(user: AuthUser) {
+  return user.role === UserRole.DESIGNER;
+}
+
 type ConversationRow = {
   id: string;
   customer_id: string | null;
@@ -121,12 +125,16 @@ export class MessagingService {
     };
   }
 
-  private conversationListDto(c: ConversationListRow, stripPrivate = false) {
+  private conversationListDto(
+    c: ConversationListRow,
+    stripPrivate = false,
+    stripCustomer = false,
+  ) {
     return {
       ...this.conversationDto(c, stripPrivate),
-      customerName: c.customer_name,
-      customerEmail: c.customer_email ?? null,
-      customerPhone: c.customer_phone ?? null,
+      customerName: stripCustomer ? null : c.customer_name,
+      customerEmail: stripCustomer ? null : c.customer_email ?? null,
+      customerPhone: stripCustomer ? null : c.customer_phone ?? null,
       orderRef: c.order_ref,
       orderType: c.order_type ?? null,
       orderStatus: c.order_status ?? null,
@@ -392,6 +400,9 @@ export class MessagingService {
     if (filters.chatType) {
       where.push('c.chat_type = ?');
       params.push(filters.chatType);
+    } else if (hideCustomerDetails(user)) {
+      where.push('c.chat_type <> ?');
+      params.push(ChatType.QUOTE);
     }
     if (filters.customerId) {
       where.push('c.customer_id = ?');
@@ -405,12 +416,20 @@ export class MessagingService {
     const q = filters.q?.trim();
     if (q) {
       const like = `%${q}%`;
-      where.push(
-        `(c.id = ? OR c.subject LIKE ? OR cust.name LIKE ? OR cust.email LIKE ? OR cust.phone LIKE ?
-          OR o.human_ref LIKE ?
-          OR EXISTS (SELECT 1 FROM messages m2 WHERE m2.conversation_id = c.id AND m2.body LIKE ? AND m2.deleted_at IS NULL))`,
-      );
-      params.push(q, like, like, like, like, like, like);
+      if (hideCustomerDetails(user)) {
+        where.push(
+          `(c.id = ? OR c.subject LIKE ? OR o.human_ref LIKE ?
+            OR EXISTS (SELECT 1 FROM messages m2 WHERE m2.conversation_id = c.id AND m2.body LIKE ? AND m2.deleted_at IS NULL))`,
+        );
+        params.push(q, like, like, like);
+      } else {
+        where.push(
+          `(c.id = ? OR c.subject LIKE ? OR cust.name LIKE ? OR cust.email LIKE ? OR cust.phone LIKE ?
+            OR o.human_ref LIKE ?
+            OR EXISTS (SELECT 1 FROM messages m2 WHERE m2.conversation_id = c.id AND m2.body LIKE ? AND m2.deleted_at IS NULL))`,
+        );
+        params.push(q, like, like, like, like, like, like);
+      }
     }
 
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
@@ -435,7 +454,9 @@ export class MessagingService {
          ${limit ? 'LIMIT ?' : ''}`,
       limit ? [...params, limit] : params,
     );
-    return rows.map((r) => this.conversationListDto(r));
+    return rows.map((r) =>
+      this.conversationListDto(r, false, hideCustomerDetails(user)),
+    );
   }
 
   async adminUnreadSummary(user: AuthUser | undefined) {
@@ -473,7 +494,7 @@ export class MessagingService {
     let orderRef: string | null = null;
     let orderType: string | null = null;
     let orderStatus: string | null = null;
-    if (row.customer_id) {
+    if (row.customer_id && !hideCustomerDetails(user)) {
       const c = await this.db.queryOne<{ name: string | null }>(
         'SELECT name FROM customers WHERE id = ? LIMIT 1',
         [row.customer_id],
@@ -576,37 +597,57 @@ export class MessagingService {
       archived: false,
     });
 
+    const hideCustomer = hideCustomerDetails(user);
     return {
-      customer: {
-        id: customer.id,
-        name: customer.name,
-        email: customer.email,
-        phone: customer.phone,
-        accountType: customer.account_type,
-        createdAt: customer.created_at,
-        customerSince: customer.since_date ?? customer.created_at,
-        notes: null as string | null,
-        preferredBranch: null as string | null,
-        assignedSalesperson: null as string | null,
-        totalOrders: Number(stats?.total_orders ?? 0),
-        totalSpentCents: Number(stats?.total_spent ?? 0),
-        lastOrderAt: stats?.last_order_at ?? null,
-        lastContactAt: lastContact?.last_at ?? null,
-      },
+      customer: hideCustomer
+        ? {
+            id: customer.id,
+            name: null,
+            email: null,
+            phone: null,
+            accountType: null,
+            createdAt: customer.created_at,
+            customerSince: null,
+            notes: null as string | null,
+            preferredBranch: null as string | null,
+            assignedSalesperson: null as string | null,
+            totalOrders: 0,
+            totalSpentCents: 0,
+            lastOrderAt: null,
+            lastContactAt: null,
+          }
+        : {
+            id: customer.id,
+            name: customer.name,
+            email: customer.email,
+            phone: customer.phone,
+            accountType: customer.account_type,
+            createdAt: customer.created_at,
+            customerSince: customer.since_date ?? customer.created_at,
+            notes: null as string | null,
+            preferredBranch: null as string | null,
+            assignedSalesperson: null as string | null,
+            totalOrders: Number(stats?.total_orders ?? 0),
+            totalSpentCents: Number(stats?.total_spent ?? 0),
+            lastOrderAt: stats?.last_order_at ?? null,
+            lastContactAt: lastContact?.last_at ?? null,
+          },
       recentOrders: recentOrders.map((o) => ({
         id: o.id,
         humanRef: o.human_ref,
         status: o.status,
-        totalCents: o.price_cents,
+        totalCents: hideCustomer ? null : o.price_cents,
         createdAt: o.created_at,
       })),
-      recentQuotes: recentQuotes.map((o) => ({
-        id: o.id,
-        humanRef: o.human_ref,
-        status: o.status,
-        totalCents: o.price_cents,
-        createdAt: o.created_at,
-      })),
+      recentQuotes: hideCustomer
+        ? []
+        : recentQuotes.map((o) => ({
+            id: o.id,
+            humanRef: o.human_ref,
+            status: o.status,
+            totalCents: o.price_cents,
+            createdAt: o.created_at,
+          })),
       conversations,
     };
   }

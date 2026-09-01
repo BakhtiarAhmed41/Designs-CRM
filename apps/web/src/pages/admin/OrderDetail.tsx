@@ -700,7 +700,8 @@ export function AdminOrderDetail() {
             <span className={orderChip.cls}>{orderChip.label}</span>
           </div>
           <div className="sub">
-            {customerName(order)} · {order.serviceType ?? 'Service'} · {designs.length} designs · placed{' '}
+            {isDesigner ? null : <>{customerName(order)} · </>}
+            {order.serviceType ?? 'Service'} · {designs.length} designs · placed{' '}
             {dateShort(order.createdAt)}
             {isStaffCreatedOrder(order) ? ' · Created by admin' : ''}
           </div>
@@ -1232,7 +1233,7 @@ export function AdminOrderDetail() {
                   {m.body && m.body !== '(attachment)' ? <div>{m.body}</div> : null}
                   <MessageAttachments attachments={m.attachments} />
                   <div className="tm">
-                    {m.direction === 'OUTBOUND' ? 'You' : customerName(order)} · {relativeTime(m.createdAt)}
+                    {m.direction === 'OUTBOUND' ? 'You' : isDesigner ? 'Customer' : customerName(order)} · {relativeTime(m.createdAt)}
                   </div>
                 </div>
               ))}
@@ -1318,7 +1319,7 @@ export function AdminOrderDetail() {
               </label>
               <input
                 value={msgDraft}
-                placeholder={`Reply to ${customerName(order)}…`}
+                placeholder={isDesigner ? 'Type a message…' : `Reply to ${customerName(order)}…`}
                 onChange={(e) => setMsgDraft(e.target.value)}
                 onKeyDown={(e) => {
                   if (

@@ -97,7 +97,7 @@ export function AdminShell() {
   });
   const { data: navStats } = useQuery({
     queryKey: ['admin-dashboard-stats'],
-    queryFn: getDashboardStats,
+    queryFn: () => getDashboardStats(),
     enabled: can('quotes') || can('orders'),
     refetchInterval: whenVisible(30_000),
   });

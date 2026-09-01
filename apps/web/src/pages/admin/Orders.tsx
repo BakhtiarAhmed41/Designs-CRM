@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
 import { GenerateOrderModal } from '@/components/GenerateOrderModal';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -35,6 +36,8 @@ function customerLabel(o: Order & { customerName?: string | null }) {
 
 export function AdminOrders() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const hideCustomer = user?.role === 'DESIGNER';
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -77,7 +80,7 @@ export function AdminOrders() {
           setQ(v);
           setPage(1);
         }}
-        searchPlaceholder="Search by name, order #, customer…"
+        searchPlaceholder={hideCustomer ? 'Search by order no…' : 'Search by name, order #, customer…'}
         status={status}
         onStatus={(v) => {
           setStatus(v);
@@ -115,7 +118,7 @@ export function AdminOrders() {
             <thead>
               <tr>
                 <th>Order</th>
-                <th>Customer</th>
+                {!hideCustomer && <th>Customer</th>}
                 <th>Status</th>
                 <th>Date</th>
                 <th className="num">Amount</th>
@@ -140,7 +143,7 @@ export function AdminOrders() {
                         </div>
                       </div>
                     </td>
-                    <td>{customerLabel(o)}</td>
+                    {!hideCustomer && <td>{customerLabel(o)}</td>}
                     <td>
                       <span className={chip.cls}>{chip.label}</span>
                     </td>

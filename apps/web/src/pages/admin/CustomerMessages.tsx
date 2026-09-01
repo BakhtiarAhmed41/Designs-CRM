@@ -73,6 +73,7 @@ export function AdminCustomerMessages() {
   const canStart =
     canFeature(user?.permissions, 'messages_customer_start', user?.role) ||
     canFeature(user?.permissions, 'messages', user?.role);
+  const hideCustomerDetails = user?.role === 'DESIGNER';
 
   const [q, setQ] = useState(searchParams.get('q') ?? '');
   const [chatSearch, setChatSearch] = useState('');
@@ -92,11 +93,11 @@ export function AdminCustomerMessages() {
     if (filter === 'unread') base.unread = true;
     if (filter === 'open') base.status = 'OPEN';
     if (filter === 'closed') base.status = 'CLOSED';
-    if (filter === 'GENERAL' || filter === 'ORDER' || filter === 'QUOTE') {
+    if (filter === 'GENERAL' || filter === 'ORDER' || (filter === 'QUOTE' && !hideCustomerDetails)) {
       base.chatType = filter;
     }
     return base;
-  }, [q, filter]);
+  }, [q, filter, hideCustomerDetails]);
 
   const listQuery = useQuery({
     queryKey: ['admin-conversations', listFilters],
@@ -107,15 +108,22 @@ export function AdminCustomerMessages() {
   const conversations = listQuery.data?.conversations ?? [];
 
   const customerGroups = useMemo(() => {
+    const visible = hideCustomerDetails
+      ? conversations.filter((c) => c.chatType !== 'QUOTE')
+      : conversations;
     const map = new Map<
       string,
       { customerId: string; name: string; items: Conversation[]; unread: number; lastAt: string | null }
     >();
-    for (const c of conversations) {
+    for (const c of visible) {
       const key = c.customerId ?? 'unknown';
       const cur = map.get(key) ?? {
         customerId: key,
-        name: c.customerName || 'Unknown customer',
+        name: hideCustomerDetails
+          ? c.orderRef
+            ? `Order ${c.orderRef}`
+            : conversationTitle(c)
+          : c.customerName || 'Unknown customer',
         items: [],
         unread: 0,
         lastAt: null,
@@ -124,13 +132,19 @@ export function AdminCustomerMessages() {
       cur.unread += Number(c.unreadAdmin || 0);
       if (!cur.lastAt || (c.lastMessageAt && c.lastMessageAt > cur.lastAt)) {
         cur.lastAt = c.lastMessageAt;
+        if (hideCustomerDetails) {
+          cur.name = c.orderRef ? `Order ${c.orderRef}` : conversationTitle(c);
+        }
+      }
+      if (!hideCustomerDetails && c.customerName) {
+        cur.name = c.customerName;
       }
       map.set(key, cur);
     }
     return Array.from(map.values()).sort((a, b) =>
       (b.lastAt || '').localeCompare(a.lastAt || ''),
     );
-  }, [conversations]);
+  }, [conversations, hideCustomerDetails]);
 
   const activeConversationId = conversationId ?? null;
 
@@ -179,7 +193,9 @@ export function AdminCustomerMessages() {
       const p = payload as { conversation?: { customerName?: string }; message?: { body?: string } };
       showBrowserNotification(
         'New customer message',
-        p.message?.body || p.conversation?.customerName || 'Open Messages',
+        p.message?.body ||
+          (hideCustomerDetails ? 'Open Messages' : p.conversation?.customerName) ||
+          'Open Messages',
       );
       if (activeConversationId) {
         void qc.invalidateQueries({ queryKey: ['admin-conversation', activeConversationId] });
@@ -254,9 +270,10 @@ export function AdminCustomerMessages() {
   }
 
   const customerThreads = useMemo(() => {
-    const threads =
+    const threads = (
       contextQuery.data?.conversations ??
-      conversations.filter((c) => c.customerId === customerId);
+      conversations.filter((c) => c.customerId === customerId)
+    ).filter((c) => !hideCustomerDetails || c.chatType !== 'QUOTE');
     const term = chatSearch.trim().toLowerCase();
     const filtered = !term
       ? threads
@@ -267,7 +284,13 @@ export function AdminCustomerMessages() {
     return [...filtered].sort((a, b) =>
       (b.lastMessageAt || '').localeCompare(a.lastMessageAt || ''),
     );
-  }, [contextQuery.data?.conversations, conversations, customerId, chatSearch]);
+  }, [
+    contextQuery.data?.conversations,
+    conversations,
+    customerId,
+    chatSearch,
+    hideCustomerDetails,
+  ]);
 
   const deleteChat = useMutation({
     mutationFn: (id: string) => deleteAdminConversation(id),
@@ -301,11 +324,14 @@ export function AdminCustomerMessages() {
     deleteChat.mutate(t.id);
   }
 
-  const customerName =
-    contextQuery.data?.customer.name ||
-    active?.customerName ||
-    customerGroups.find((g) => g.customerId === customerId)?.name ||
-    'Customer';
+  const customerName = hideCustomerDetails
+    ? active?.orderRef
+      ? `Order ${active.orderRef}`
+      : customerGroups.find((g) => g.customerId === customerId)?.name || 'Order chats'
+    : contextQuery.data?.customer.name ||
+      active?.customerName ||
+      customerGroups.find((g) => g.customerId === customerId)?.name ||
+      'Customer';
 
   return (
     <div className={`msg-workspace ${customerSelected ? 'chatgpt' : ''}`}>
@@ -313,10 +339,12 @@ export function AdminCustomerMessages() {
         {!customerSelected ? (
           <>
             <div className="msg-left-head">
-              <div className="h2" style={{ margin: 0 }}>Customer Messages</div>
+              <div className="h2" style={{ margin: 0 }}>
+                {hideCustomerDetails ? 'Order chats' : 'Customer Messages'}
+              </div>
               <input
                 className="msg-search"
-                placeholder="Search customers…"
+                placeholder={hideCustomerDetails ? 'Search by order no…' : 'Search customers…'}
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 onFocus={() => maybeRequestBrowserNotifications()}
@@ -341,12 +369,14 @@ export function AdminCustomerMessages() {
                     </button>
                   ))}
                 </div>
-                <div className="msg-filters-row cols-3">
+                <div className={`msg-filters-row ${hideCustomerDetails ? 'cols-2' : 'cols-3'}`}>
                   {(
                     [
                       ['GENERAL', 'Topics'],
                       ['ORDER', 'Orders'],
-                      ['QUOTE', 'Quotes'],
+                      ...((hideCustomerDetails ? [] : [['QUOTE', 'Quotes']]) as Array<
+                        [FilterKey, string]
+                      >),
                     ] as Array<[FilterKey, string]>
                   ).map(([key, label]) => (
                     <button
@@ -371,7 +401,13 @@ export function AdminCustomerMessages() {
                     className="msg-cust-card"
                     onClick={() => selectCustomer(g.customerId)}
                   >
-                    <div className="av">{initials(g.name)}</div>
+                    <div className="av">
+                      {hideCustomerDetails ? (
+                        <i className="ti ti-package" />
+                      ) : (
+                        initials(g.name)
+                      )}
+                    </div>
                     <div className="msg-cust-main">
                       <div className="msg-cust-top">
                         <strong>{g.name}</strong>
@@ -397,12 +433,12 @@ export function AdminCustomerMessages() {
           <>
             <div className="msg-left-head">
               <button type="button" className="msg-back" onClick={clearCustomer}>
-                <i className="ti ti-arrow-left" /> All customers
+                <i className="ti ti-arrow-left" /> {hideCustomerDetails ? 'All chats' : 'All customers'}
               </button>
               <div className="h2" style={{ margin: '8px 0 0' }}>{customerName}</div>
               <input
                 className="msg-search"
-                placeholder="Search chats…"
+                placeholder={hideCustomerDetails ? 'Search by order no…' : 'Search chats…'}
                 value={chatSearch}
                 onChange={(e) => setChatSearch(e.target.value)}
                 onFocus={() => maybeRequestBrowserNotifications()}
@@ -496,7 +532,8 @@ export function AdminCustomerMessages() {
                           <i className="ti ti-package" /> Order {o.humanRef || o.id.slice(0, 6)}
                         </button>
                       ))}
-                      {(contextQuery.data?.recentQuotes ?? []).slice(0, 5).map((o) => (
+                      {!hideCustomerDetails &&
+                        (contextQuery.data?.recentQuotes ?? []).slice(0, 5).map((o) => (
                         <button
                           key={o.id}
                           type="button"
@@ -575,7 +612,11 @@ export function AdminCustomerMessages() {
 
       <section className="msg-center">
         {!customerSelected ? (
-          <div className="msg-empty-state">Select a customer to open their chats.</div>
+          <div className="msg-empty-state">
+            {hideCustomerDetails
+              ? 'Select an order chat to open it.'
+              : 'Select a customer to open their chats.'}
+          </div>
         ) : activeConversationId && active ? (
           <>
             <div className="msg-center-head">
@@ -649,9 +690,12 @@ export function AdminCustomerMessages() {
       {customerSelected && (
         <aside className="msg-right">
           {!contextQuery.data ? (
-            <div className="msg-empty">Customer context appears here.</div>
+            <div className="msg-empty">
+              {hideCustomerDetails ? 'Order details appear here.' : 'Customer context appears here.'}
+            </div>
           ) : (
             <>
+              {!hideCustomerDetails && (
               <div className="msg-right-section">
                 <div className="msg-right-title">Customer Information</div>
                 <div className="msg-kv"><span>Name</span><b>{contextQuery.data.customer.name}</b></div>
@@ -670,6 +714,7 @@ export function AdminCustomerMessages() {
                   <b>{money(contextQuery.data.customer.totalSpentCents)}</b>
                 </div>
               </div>
+              )}
 
               <div className="msg-right-section">
                 <div className="msg-right-title">Recent Orders</div>
@@ -705,6 +750,7 @@ export function AdminCustomerMessages() {
                 )}
               </div>
 
+              {!hideCustomerDetails && (
               <div className="msg-right-section">
                 <div className="msg-right-title">Recent Quotations</div>
                 {contextQuery.data.recentQuotes.map((o) => (
@@ -740,6 +786,7 @@ export function AdminCustomerMessages() {
                   <div className="muted">No quotes</div>
                 )}
               </div>
+              )}
 
               {active && (
                 <div className="msg-right-section">
