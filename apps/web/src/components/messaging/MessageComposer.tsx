@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useDialog } from '@/components/ui/AppDialog';
 
 type Props = {
   disabled?: boolean;
@@ -17,6 +18,7 @@ export function MessageComposer({
   onCreateTemplate,
   onDeleteTemplate,
 }: Props) {
+  const dialog = useDialog();
   const [draft, setDraft] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
@@ -81,11 +83,24 @@ export function MessageComposer({
               type="button"
               className="ghost"
               onClick={() => {
-                const title = window.prompt('Template title');
-                if (!title?.trim()) return;
-                const body = draft.trim() || window.prompt('Template body') || '';
-                if (!body.trim()) return;
-                void onCreateTemplate(title.trim(), body.trim());
+                void (async () => {
+                  const title = await dialog.prompt({
+                    title: 'Template title',
+                    message: 'Give this saved reply a short name.',
+                    confirmLabel: 'Next',
+                  });
+                  if (!title) return;
+                  const body =
+                    draft.trim() ||
+                    (await dialog.prompt({
+                      title: 'Template body',
+                      message: 'Write the message to insert later.',
+                      confirmLabel: 'Save',
+                    })) ||
+                    '';
+                  if (!body.trim()) return;
+                  await onCreateTemplate(title.trim(), body.trim());
+                })();
               }}
             >
               Save as template
@@ -113,7 +128,10 @@ export function MessageComposer({
             const max = 25 * 1024 * 1024;
             const ok = list.filter((f) => f.size <= max);
             if (ok.length < list.length) {
-              window.alert('Some files were skipped (max 25MB each).');
+              void dialog.alert({
+                title: 'Some files were skipped',
+                message: 'Each file can be 25MB at most.',
+              });
             }
             if (ok.length) setFiles((prev) => [...prev, ...ok].slice(0, 8));
           }}

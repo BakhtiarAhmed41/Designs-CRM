@@ -11,11 +11,11 @@ import {
   chatTypeLabel,
   conversationTitle,
   createAdminConversation,
+  deleteAdminConversation,
   getAdminConversation,
   getCustomerMessagingContext,
   listAdminConversations,
   createMessageTemplate,
-  deleteAdminMessage,
   deleteMessageTemplate,
   listMessageTemplates,
   sendAdminMessage,
@@ -24,6 +24,7 @@ import {
   type Conversation,
   type ConversationStatus,
 } from '@/lib/messaging';
+import { useDialog } from '@/components/ui/AppDialog';
 import { canFeature } from '@/lib/permissions';
 import type { OrderStatus } from '@/lib/types';
 import {
@@ -65,6 +66,7 @@ export function AdminCustomerMessages() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { user } = useAuth();
+  const dialog = useDialog();
   const canReply =
     canFeature(user?.permissions, 'messages_customer_reply', user?.role) ||
     canFeature(user?.permissions, 'messages', user?.role);
@@ -266,6 +268,38 @@ export function AdminCustomerMessages() {
       (b.lastMessageAt || '').localeCompare(a.lastMessageAt || ''),
     );
   }, [contextQuery.data?.conversations, conversations, customerId, chatSearch]);
+
+  const deleteChat = useMutation({
+    mutationFn: (id: string) => deleteAdminConversation(id),
+    onSuccess: (_res, id) => {
+      setError(null);
+      const remaining = customerThreads.filter((c) => c.id !== id);
+      if (id === activeConversationId) {
+        if (remaining[0] && customerId) {
+          navigate(`/admin/messages/customers/${remaining[0].id}?customer=${customerId}`);
+        } else if (customerId) {
+          navigate(`/admin/messages/customers?customer=${customerId}`);
+        } else {
+          navigate('/admin/messages/customers');
+        }
+      }
+      void qc.invalidateQueries({ queryKey: ['admin-conversations'] });
+      void qc.invalidateQueries({ queryKey: ['admin-conversation', id] });
+      void qc.invalidateQueries({ queryKey: ['msg-customer-context', customerId] });
+    },
+    onError: (err) => setError(getErrorMessage(err)),
+  });
+
+  async function confirmDeleteChat(t: Conversation) {
+    const ok = await dialog.confirm({
+      title: 'Delete this chat?',
+      message: 'This cannot be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+    deleteChat.mutate(t.id);
+  }
 
   const customerName =
     contextQuery.data?.customer.name ||
@@ -486,13 +520,20 @@ export function AdminCustomerMessages() {
             </div>
             <div className="msg-left-list">
               {customerThreads.map((t) => (
-                <button
+                <div
                   key={t.id}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   className={`msg-cust-card ${t.id === activeConversationId ? 'on' : ''}`}
                   onClick={() =>
                     navigate(`/admin/messages/customers/${t.id}?customer=${customerId}`)
                   }
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      navigate(`/admin/messages/customers/${t.id}?customer=${customerId}`);
+                    }
+                  }}
                 >
                   <div className="msg-cust-main" style={{ width: '100%' }}>
                     <div className="msg-cust-top">
@@ -509,7 +550,20 @@ export function AdminCustomerMessages() {
                       {t.unreadAdmin > 0 && <span className="msg-badge">{t.unreadAdmin}</span>}
                     </div>
                   </div>
-                </button>
+                  <button
+                    type="button"
+                    className="icon-btn danger msg-thread-delete"
+                    aria-label="Delete chat"
+                    title="Delete chat"
+                    disabled={deleteChat.isPending}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      confirmDeleteChat(t);
+                    }}
+                  >
+                    <i className="ti ti-trash" />
+                  </button>
+                </div>
               ))}
               {customerThreads.length === 0 && (
                 <div className="msg-empty">No chats yet. Start a new conversation.</div>
@@ -557,17 +611,6 @@ export function AdminCustomerMessages() {
             <ConversationThread
               messages={active.messages ?? []}
               mineDirection="OUTBOUND"
-              onDelete={
-                canFeature(user?.permissions, 'messages_delete', user?.role)
-                  ? (messageId) => {
-                      void deleteAdminMessage(messageId).then(() => {
-                        void qc.invalidateQueries({
-                          queryKey: ['admin-conversation', activeConversationId],
-                        });
-                      });
-                    }
-                  : undefined
-              }
             />
             {error && <div className="err" style={{ margin: '0 12px' }}>{error}</div>}
             {!canReply && active.status === 'OPEN' && (

@@ -17,6 +17,7 @@ import {
 import { getErrorMessage } from '@/lib/api';
 import { money, dateShort, statusChipClass, statusLabel } from '@/lib/format';
 import type { OrderStatus } from '@/lib/types';
+import { useDialog } from '@/components/ui/AppDialog';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -218,6 +219,7 @@ function CustomerDetailModal({
   allCustomers: Customer[];
   onClose: () => void;
 }) {
+  const dialog = useDialog();
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
 
@@ -407,7 +409,16 @@ function CustomerDetailModal({
                   aria-label="Delete customer"
                   title="Delete customer"
                   onClick={() => {
-                    if (window.confirm('Delete this customer?')) remove.mutate();
+                    void dialog
+                      .confirm({
+                        title: 'Delete this customer?',
+                        message: 'Their chats and linked records may be affected.',
+                        confirmLabel: 'Delete',
+                        danger: true,
+                      })
+                      .then((ok) => {
+                        if (ok) remove.mutate();
+                      });
                   }}
                   disabled={remove.isPending}
                 >

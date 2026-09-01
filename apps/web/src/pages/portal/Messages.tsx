@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useDialog } from '@/components/ui/AppDialog';
 import { ConversationThread } from '@/components/messaging/ConversationThread';
 import { MessageComposer } from '@/components/messaging/MessageComposer';
 import { getErrorMessage } from '@/lib/api';
@@ -34,6 +35,7 @@ function relativeTime(iso: string | null | undefined) {
 }
 
 export function PortalMessages() {
+  const dialog = useDialog();
   const qc = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
@@ -132,8 +134,14 @@ export function PortalMessages() {
     maybeRequestBrowserNotifications();
   }
 
-  function confirmDelete(c: Conversation) {
-    if (!window.confirm('Delete this chat? It will be removed from your list.')) return;
+  async function confirmDelete(c: Conversation) {
+    const ok = await dialog.confirm({
+      title: 'Delete this chat?',
+      message: 'It will be removed from your list.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     deleteTopic.mutate(c.id);
   }
 

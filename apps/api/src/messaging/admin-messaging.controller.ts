@@ -182,6 +182,15 @@ export class AdminMessagingController {
     );
   }
 
+  @Delete('conversations/:id')
+  @RequireFeatures('messages', 'messages_customer_view')
+  async removeConversation(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('id') id: string,
+  ) {
+    return this.messaging.deleteAdminConversation(user, id);
+  }
+
   @Patch('conversations/:id')
   @RequireFeatures('messages', 'messages_customer_view')
   async update(

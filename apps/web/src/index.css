@@ -1,9 +1,10 @@
 /* Auto-ported from Admin_Final_-V2.html + Customer_Portal_Final_-V2 */
 :root{
   --navy:#143F65; --navy-d:#0E2E4A; --maroon:#9A1E22;
-  --ink:#1a1d21; --muted:#6b7280; --faint:#9aa1ab;
-  --line:rgba(20,63,101,.10); --line-s:rgba(0,0,0,.07);
-  --bg:#eef0f3; --card:#ffffff; --tint:#ECF1F6; --tint-m:#F6E9EA;
+  --etsy-white:#F5F5F1;
+  --ink:#222222; --muted:#4A4A4A; --faint:#6B6B6B;
+  --line:rgba(34,34,34,.10); --line-s:rgba(0,0,0,.07);
+  --bg:#F5F5F1; --card:#F5F5F1; --tint:#EDEBE6; --tint-m:#F6E9EA;
   --green:#2f7d32; --green-bg:#E7F1E4; --amber:#8a5a10; --amber-bg:#FBF0DC;
   --purple:#5e35b1; --purple-bg:#EDE7F6;
 }
@@ -775,12 +776,12 @@ button { font-family: inherit; }
 .login-brand {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
   margin-bottom: 22px;
 }
 .login-brand img {
-  height: 48px;
+  height: 38px;
   width: auto;
   max-width: 100%;
   flex-shrink: 0;
@@ -795,6 +796,7 @@ button { font-family: inherit; }
   font-size: 13px;
   color: var(--muted);
   margin-top: 2px;
+  text-align: center;
 }
 .login-form {
   display: flex;
@@ -1097,6 +1099,7 @@ button { font-family: inherit; }
   height:30px;
   font-size:15px;
   margin-top:2px;
+  flex-shrink:0;
   opacity:.7;
 }
 .msg-cust-card:hover .msg-thread-delete,
@@ -1170,12 +1173,6 @@ button { font-family: inherit; }
   display:flex;align-items:center;gap:6px;
 }
 .msg-bubble.mine .msg-meta{justify-content:flex-end;}
-.msg-del{
-  border:0;background:transparent;padding:0;margin:0;
-  color:#c0392b;cursor:pointer;line-height:1;font-size:14px;
-  display:inline-flex;align-items:center;
-}
-.msg-del:hover{color:#8e2118;}
 .msg-sender{font-size:11px;font-weight:700;margin-bottom:4px;opacity:.85;}
 .msg-file{
   display:flex;align-items:center;gap:6px;margin-top:6px;

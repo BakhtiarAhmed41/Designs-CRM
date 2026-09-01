@@ -17,8 +17,12 @@ export class DashboardController {
   constructor(private dashboard: DashboardService) {}
 
   @Get('stats')
-  async stats(@CurrentUser() user: AuthUser | undefined) {
-    const stats = await this.dashboard.getStats(user);
+  async stats(
+    @CurrentUser() user: AuthUser | undefined,
+    @Query('from') from: string | undefined,
+    @Query('to') to: string | undefined,
+  ) {
+    const stats = await this.dashboard.getStats(user, from, to);
     return { stats };
   }
 

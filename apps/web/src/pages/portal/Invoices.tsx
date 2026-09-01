@@ -17,6 +17,7 @@ import { getErrorMessage } from '@/lib/api';
 import { invalidateWorkCaches } from '@/lib/queryCache';
 import { freshOnOpen } from '@/lib/queryRefresh';
 import { money, dateShort } from '@/lib/format';
+import { useDialog } from '@/components/ui/AppDialog';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PaginationBar } from '@/components/lists/ListToolbar';
@@ -34,6 +35,7 @@ function invoiceChip(inv: Invoice) {
 }
 
 export function PortalInvoices() {
+  const dialog = useDialog();
   const qc = useQueryClient();
   const [params] = useSearchParams();
   const paidReturn = params.get('paid') === '1';
@@ -95,17 +97,21 @@ export function PortalInvoices() {
     mutationFn: async (inv: Invoice) => {
       const remaining = invoiceRemainingCents(inv);
       if (storeCreditCents >= remaining && remaining > 0) {
-        const ok = window.confirm(
-          `Pay ${money(remaining, inv.currency)} from your store credit?`,
-        );
+        const ok = await dialog.confirm({
+          title: 'Pay with store credit?',
+          message: `Pay ${money(remaining, inv.currency)} from your store credit.`,
+          confirmLabel: 'Pay now',
+        });
         if (!ok) return;
         await payMyInvoice(inv.id, 'STORE_CREDIT');
         return;
       }
       if (storeCreditCents > 0 && storeCreditCents < remaining) {
-        const ok = window.confirm(
-          `Apply ${money(storeCreditCents, inv.currency)} of store credit toward the ${money(remaining, inv.currency)} balance? The rest stays outstanding.`,
-        );
+        const ok = await dialog.confirm({
+          title: 'Apply store credit?',
+          message: `Apply ${money(storeCreditCents, inv.currency)} of store credit toward the ${money(remaining, inv.currency)} balance? The rest stays outstanding.`,
+          confirmLabel: 'Apply credit',
+        });
         if (ok) {
           await payMyInvoice(inv.id, 'STORE_CREDIT');
           return;

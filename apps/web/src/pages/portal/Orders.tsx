@@ -12,6 +12,7 @@ import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import { designStatusChipClass, designStatusLabel, type Design } from '@/lib/designs';
 import type { Order } from '@/lib/types';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
+import { useDialog } from '@/components/ui/AppDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 import { invalidateWorkCaches } from '@/lib/queryCache';
@@ -275,6 +276,7 @@ function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
 }
 
 export function PortalOrders() {
+  const dialog = useDialog();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [month, setMonth] = useState<string>('all');
@@ -495,7 +497,10 @@ export function PortalOrders() {
                                     }
                                   })
                                   .catch((err) =>
-                                    window.alert(getErrorMessage(err)),
+                                    void dialog.alert({
+                                      title: 'Could not start payment',
+                                      message: getErrorMessage(err),
+                                    }),
                                   );
                               }}
                             >

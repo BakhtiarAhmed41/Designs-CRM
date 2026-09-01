@@ -821,6 +821,30 @@ export class MessagingService {
     return dto;
   }
 
+  async deleteAdminConversation(user: AuthUser | undefined, conversationId: string) {
+    assertAuthUser(user);
+    const convo = await this.getConversationRow(conversationId);
+    if (!convo) throw new NotFoundException('Conversation not found');
+
+    const attachments = await this.db.query<{ storage_key: string }>(
+      `SELECT ma.storage_key
+         FROM message_attachments ma
+         JOIN messages m ON m.id = ma.message_id
+        WHERE m.conversation_id = ?`,
+      [conversationId],
+    );
+    await this.db.execute('DELETE FROM conversations WHERE id = ?', [
+      conversationId,
+    ]);
+    for (const file of attachments) {
+      await this.storage.deleteObject(file.storage_key);
+    }
+    this.gateway?.emitToConversation(conversationId, 'conversation:deleted', {
+      conversationId,
+    });
+    return { ok: true };
+  }
+
   async softDeleteMessage(user: AuthUser | undefined, messageId: string) {
     assertAuthUser(user);
     const message = await this.db.queryOne<MessageRow>(

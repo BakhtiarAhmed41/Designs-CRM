@@ -1,18 +1,21 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { DateRangeBar } from '@/components/ui/DateRangeBar';
 import { QuoteBuilderModal } from '@/components/QuoteBuilderModal';
-import { listMyOrders, listMyOrderSummary } from '@/lib/orders';
+import { listMyOrders } from '@/lib/orders';
 import { listMyInvoices } from '@/lib/billing';
-import { getMyUnreadSummary } from '@/lib/messaging';
-import { getMyCustomer } from '@/lib/customers';
+import { datesForPreset, inDateRange, type RangePreset } from '@/lib/dateRange';
 import { useAuth } from '@/context/AuthContext';
 import { freshOnOpen } from '@/lib/queryRefresh';
 import { money, statusChipClass, statusLabel } from '@/lib/format';
-import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
+import { serviceTi } from '@/lib/serviceIcon';
 import type { Order } from '@/lib/types';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { SkeletonRows } from '@/components/ui/Skeleton';
+
+type WorkTab = 'orders' | 'quotes' | 'invoices';
 
 function isQuote(o: Order) {
   return (
@@ -24,240 +27,221 @@ function isQuote(o: Order) {
 }
 
 export function PortalDashboard() {
-  const navigate = useNavigate();
   const { user } = useAuth();
   const [quoteOpen, setQuoteOpen] = useState(false);
+  const [preset, setPreset] = useState<RangePreset>('thisMonth');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const [tab, setTab] = useState<WorkTab>('orders');
 
-  const { data: summary } = useQuery({
-    queryKey: ['my-orders-summary'],
-    queryFn: listMyOrderSummary,
+  const dates = datesForPreset(preset, customFrom, customTo);
+  const rangeReady = Boolean(dates.from && dates.to);
+
+  const { data: ordersData, isLoading: ordersLoading } = useQuery({
+    queryKey: ['my-orders', 'dash', dates.from, dates.to],
+    queryFn: () =>
+      listMyOrders({ type: 'ORDER', page: 1, pageSize: 8, dateFrom: dates.from, dateTo: dates.to }),
+    enabled: rangeReady,
     ...freshOnOpen,
   });
-  const { data: quotesReadyData, isLoading: quotesLoading } = useQuery({
-    queryKey: ['my-orders', 'quote-ready'],
-    queryFn: () => listMyOrders({ status: 'QUOTATION_PROVIDED', page: 1, pageSize: 100 }),
-    ...freshOnOpen,
-  });
-  const { data: recentOrdersData, isLoading: recentLoading } = useQuery({
-    queryKey: ['my-orders', 'recent'],
-    queryFn: () => listMyOrders({ type: 'ORDER', page: 1, pageSize: 6 }),
-    ...freshOnOpen,
-  });
-  const { data: activeOrdersData } = useQuery({
-    queryKey: ['my-orders', 'active-slice'],
-    queryFn: () => listMyOrders({ type: 'ORDER', lifecycle: 'active', page: 1, pageSize: 4 }),
+  const { data: quotesData, isLoading: quotesLoading } = useQuery({
+    queryKey: ['my-quotes', 'dash', dates.from, dates.to],
+    queryFn: () =>
+      listMyOrders({
+        type: 'QUOTE_REQUEST',
+        page: 1,
+        pageSize: 8,
+        dateFrom: dates.from,
+        dateTo: dates.to,
+      }),
+    enabled: rangeReady,
     ...freshOnOpen,
   });
   const { data: invoicesData } = useQuery({
     queryKey: ['my-invoices'],
     queryFn: listMyInvoices,
   });
-  const { data: unreadData } = useQuery({
-    queryKey: ['portal-unread'],
-    queryFn: getMyUnreadSummary,
-  });
-  const isLoading = quotesLoading || recentLoading;
-  const { data: meCustomer } = useQuery({
-    queryKey: ['portal-customer-me'],
-    queryFn: getMyCustomer,
-  });
 
-  const isNet = meCustomer?.customer?.accountType === 'NET_MONTHLY';
-  const activeOrders = activeOrdersData?.orders ?? [];
-  const quotesReady = quotesReadyData?.orders ?? [];
-  const quotesPendingCount = summary?.beingPriced ?? 0;
-  const activeOrdersCount = summary?.activeOrders ?? activeOrders.length;
-  const quotesReadyCount = summary?.awaitingQuote ?? quotesReady.length;
-  const unpaidInvoices = (invoicesData?.invoices ?? []).filter((i) => i.status === 'AWAITING' || i.status === 'PARTIAL');
-  const msgUnread = unreadData?.unreadMessages ?? 0;
-  const monthKey = (() => {
-    const now = new Date();
-    return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
-  })();
-  const monthSpend = (invoicesData?.invoices ?? [])
-    .filter((i) => (i.issuedAt ?? '').slice(0, 7) === monthKey)
-    .reduce((s, i) => s + (i.amountCents ?? 0), 0);
-
-  const attention = useMemo(() => {
-    const rows: Array<{
-      key: string;
-      thumb: string;
-      thumbMar?: boolean;
-      title: string;
-      meta: string;
-      chip: string;
-      chipLabel: string;
-      action?: { label: string; to: string };
-    }> = [];
-
-    for (const o of quotesReady) {
-      rows.push({
-        key: `q-${o.id}`,
-        thumb: serviceTi(o.serviceType),
-        thumbMar: true,
-        title: o.name ?? 'Quote ready',
-        meta: o.humanRef ?? o.id.slice(0, 6),
-        chip: 'chip c-quote',
-        chipLabel: 'Approve quote',
-        action: { label: 'Review', to: `/portal/quotes/${o.id}` },
-      });
-    }
-    for (const o of activeOrders.slice(0, 4)) {
-      rows.push({
-        key: `o-${o.id}`,
-        thumb: serviceTi(o.serviceType),
-        title: o.name ?? o.serviceType ?? 'Order',
-        meta: o.humanRef ?? o.id.slice(0, 6),
-        chip: statusChipClass(o.status),
-        chipLabel: statusLabel(o.status),
-        action: { label: 'Open', to: `/portal/orders/${o.id}` },
-      });
-    }
-    for (const inv of unpaidInvoices.slice(0, 3)) {
-      rows.push({
-        key: `i-${inv.id}`,
-        thumb: 'ti-receipt',
-        thumbMar: true,
-        title: inv.coversText ?? 'Invoice due',
-        meta: money(inv.remainingCents ?? inv.amountCents),
-        chip: 'chip c-review',
-        chipLabel: inv.status === 'PARTIAL' ? 'Partial' : 'Unpaid',
-        action: { label: 'Pay now', to: '/portal/invoices' },
-      });
-    }
-
-    return rows;
-  }, [activeOrders, quotesReady, unpaidInvoices]);
-
-  const recent = (recentOrdersData?.orders ?? []).filter((o) => !isQuote(o)).slice(0, 6);
+  const orders = (ordersData?.orders ?? []).filter((o) => !isQuote(o));
+  const quotes = quotesData?.orders ?? [];
+  const invoices = (invoicesData?.invoices ?? []).filter((i) =>
+    rangeReady ? inDateRange(i.issuedAt, dates.from, dates.to) : true,
+  );
+  const unpaidInvoices = (invoicesData?.invoices ?? []).filter(
+    (i) => i.status === 'AWAITING' || i.status === 'PARTIAL',
+  );
   const unpaidTotal = unpaidInvoices.reduce((s, i) => s + (i.remainingCents ?? i.amountCents), 0);
+  const spentCents = invoices.reduce((s, i) => s + (i.amountCents ?? 0), 0);
+  const isLoading = ordersLoading || quotesLoading;
   const firstName = user?.firstName || 'there';
 
+  const statTiles = useMemo(
+    () => [
+      { label: 'Orders', value: String(ordersData?.total ?? orders.length), sub: 'placed in this range' },
+      { label: 'Quotes', value: String(quotesData?.total ?? quotes.length), sub: 'requests in this range' },
+      { label: 'Spent', value: money(spentCents), sub: 'invoices in this range' },
+      { label: 'Balance due', value: money(unpaidTotal), sub: unpaidInvoices.length ? `${unpaidInvoices.length} open` : 'all paid', alert: unpaidTotal > 0 },
+    ],
+    [orders.length, ordersData?.total, quotes.length, quotesData?.total, spentCents, unpaidInvoices.length, unpaidTotal],
+  );
+
+  const tabs: Array<{ id: WorkTab; label: string; count: number; to: string }> = [
+    { id: 'orders', label: 'Orders', count: orders.length, to: '/portal/orders' },
+    { id: 'quotes', label: 'Quotes', count: quotes.length, to: '/portal/quotes' },
+    { id: 'invoices', label: 'Invoices', count: invoices.length, to: '/portal/invoices' },
+  ];
+  const activeMeta = tabs.find((t) => t.id === tab);
+
   return (
-    <div>
-      <div className="hero">
-        <div>
-          <h2>Welcome back, {firstName}</h2>
-          <p>Quotes, orders, invoices, and messages in one place to keep work moving.</p>
-        </div>
-        <button type="button" className="btn btn-primary" onClick={() => setQuoteOpen(true)}>
-          <i className="ti ti-plus" /> Start new quote
-        </button>
-      </div>
-
-      <div className="metric-row">
-        <button type="button" className="metric" onClick={() => navigate('/portal/orders')}>
-          <div className="ml">Active orders</div>
-          <div className="mv">{activeOrdersCount}</div>
-          <div className="md">
-            {quotesPendingCount > 0
-              ? `${quotesPendingCount} quote${quotesPendingCount === 1 ? '' : 's'} being priced`
-              : 'In production now'}
-          </div>
-        </button>
-        {isNet ? (
-          <button type="button" className="metric" onClick={() => navigate('/portal/invoices')}>
-            <div className="ml">This month</div>
-            <div className="mv">{money(monthSpend)}</div>
-            <div className="md">Statement generates next month</div>
+    <div className="dash">
+      <PageHeader
+        title={`Welcome back, ${firstName}`}
+        actions={
+          <button type="button" className="btn btn-primary" onClick={() => setQuoteOpen(true)}>
+            <i className="ti ti-plus" /> Start new quote
           </button>
+        }
+      />
+
+      <section className="pulse">
+        <div className="pulse-h">
+          <h3>Statistics</h3>
+          <div className="pulse-tools">
+            <DateRangeBar
+              preset={preset}
+              onPreset={setPreset}
+              customFrom={customFrom}
+              customTo={customTo}
+              onCustomFrom={setCustomFrom}
+              onCustomTo={setCustomTo}
+            />
+          </div>
+        </div>
+        {rangeReady ? (
+          <div
+            className="pulse-grid"
+            style={{ gridTemplateColumns: `repeat(${statTiles.length}, minmax(0, 1fr))` }}
+          >
+            {statTiles.map((t) => (
+              <div key={t.label} className="pulse-stat">
+                <div className="ps-l">{t.label}</div>
+                <div className={`ps-v${t.alert ? ' alert' : ''}`}>{t.value}</div>
+                <div className="ps-s">{t.sub}</div>
+              </div>
+            ))}
+          </div>
         ) : (
-          <button type="button" className="metric" onClick={() => navigate('/portal/quotes')}>
-            <div className="ml">Quotes to approve</div>
-            <div className={`mv${quotesReadyCount ? ' alert' : ''}`}>{quotesReadyCount}</div>
-            <div className="md">{quotesReadyCount ? 'Ready for your review' : 'Nothing waiting on you'}</div>
-          </button>
+          <div className="pulse-empty">Pick a start and end date.</div>
         )}
-        <button type="button" className="metric" onClick={() => navigate('/portal/invoices')}>
-          <div className="ml">{isNet ? 'Statement due' : 'Balance due'}</div>
-          <div className={`mv${unpaidTotal ? ' alert' : ''}`}>{money(unpaidTotal)}</div>
-          <div className="md">
-            {unpaidInvoices.length
-              ? `${unpaidInvoices.length} open invoice${unpaidInvoices.length === 1 ? '' : 's'}`
-              : 'All paid'}
-          </div>
-        </button>
-        <button type="button" className="metric" onClick={() => navigate('/portal/messages')}>
-          <div className="ml">Messages</div>
-          <div className={`mv${msgUnread ? ' alert' : ''}`}>{msgUnread}</div>
-          <div className="md">{msgUnread ? 'Unread from our team' : 'Inbox is clear'}</div>
-        </button>
-      </div>
+      </section>
 
-      <div className="board">
-        <div className="panel">
-          <div className="panel-h">
-            <h3>Needs your attention</h3>
-          </div>
-          {isLoading && <SkeletonRows rows={3} />}
-          {!isLoading && attention.length === 0 && (
-            <EmptyState
-              icon="ti-circle-check"
-              title="All caught up"
-              description="Nothing needs you right now. Start a new quote when you’re ready."
-              action={
-                <button type="button" className="btn btn-primary btn-sm" onClick={() => setQuoteOpen(true)}>
-                  Start new quote
-                </button>
-              }
-            />
-          )}
-          {attention.map((row) => (
-            <div key={row.key} className="orow">
-              <div className={`thumb${row.thumbMar ? ' m' : ''}`}>
-                <i className={`ti ${row.thumb}`} />
-              </div>
-              <div className="oinfo">
-                <div className="on">{row.title}</div>
-                <div className="om">
-                  <span>{row.meta}</span>
-                </div>
-              </div>
-              <span className={row.chip}>{row.chipLabel}</span>
-              <div className="oprice">
-                {row.action && (
-                  <Link to={row.action.to} className="btn btn-primary btn-sm">
-                    {row.action.label}
-                  </Link>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="panel">
-          <div className="panel-h">
-            <h3>Recent orders</h3>
-            <Link to="/portal/orders">View all</Link>
-          </div>
-          {!isLoading && recent.length === 0 && (
-            <EmptyState
-              icon="ti-package"
-              title="No orders yet"
-              description="Approve a quote and it will show up here."
-            />
-          )}
-          {recent.map((o) => (
-            <Link
-              key={o.id}
-              to={`/portal/orders/${o.id}`}
-              className="orow"
-              style={{ textDecoration: 'none', color: 'inherit' }}
+      <div className="panel">
+        <div className="dash-tabs" role="tablist">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.id}
+              className={tab === t.id ? 'on' : ''}
+              onClick={() => setTab(t.id)}
             >
-              <div className={`thumb${serviceThumbClass(o.serviceType) ? ' m' : ''}`}>
-                <i className={`ti ${serviceTi(o.serviceType)}`} />
-              </div>
-              <div className="oinfo">
-                <div className="on">{o.name ?? o.serviceType ?? 'Order'}</div>
-                <div className="om">
-                  <span>{o.humanRef ?? o.id.slice(0, 6)}</span>
-                </div>
-              </div>
-              <span className={statusChipClass(o.status)}>{statusLabel(o.status)}</span>
-              <div className="oprice">{money(o.priceCents)}</div>
-            </Link>
+              {t.label}
+              <span className="dash-tab-count">{t.count}</span>
+            </button>
           ))}
+          {activeMeta && (
+            <Link to={activeMeta.to} className="btn btn-ghost btn-sm dash-tab-link">
+              View all
+            </Link>
+          )}
         </div>
+
+        {isLoading && <SkeletonRows rows={4} />}
+
+        {!isLoading && tab === 'orders' && (
+          <>
+            {orders.length === 0 && (
+              <EmptyState
+                icon="ti-package"
+                title="No orders yet"
+                description="Approve a quote and it will show up here."
+              />
+            )}
+            {orders.map((o) => (
+              <Link key={o.id} to={`/portal/orders/${o.id}`} className="orow">
+                <div className="othumb">
+                  <i className={`ti ${serviceTi(o.serviceType)}`} />
+                </div>
+                <div className="oinfo">
+                  <div className="on">{o.name ?? o.serviceType ?? 'Order'}</div>
+                  <div className="om">
+                    <span>{o.humanRef ?? o.id.slice(0, 6)}</span>
+                  </div>
+                </div>
+                <span className={statusChipClass(o.status)}>{statusLabel(o.status)}</span>
+                <div className="oprice">{money(o.priceCents)}</div>
+              </Link>
+            ))}
+          </>
+        )}
+
+        {!isLoading && tab === 'quotes' && (
+          <>
+            {quotes.length === 0 && (
+              <EmptyState
+                icon="ti-file-invoice"
+                title="No quotes in this range"
+                description="Start a new quote when you are ready."
+                action={
+                  <button type="button" className="btn btn-primary btn-sm" onClick={() => setQuoteOpen(true)}>
+                    Start new quote
+                  </button>
+                }
+              />
+            )}
+            {quotes.map((o) => (
+              <Link key={o.id} to={`/portal/quotes/${o.id}`} className="orow">
+                <div className="othumb">
+                  <i className={`ti ${serviceTi(o.serviceType)}`} />
+                </div>
+                <div className="oinfo">
+                  <div className="on">{o.name ?? 'Quote request'}</div>
+                  <div className="om">
+                    <span>Q-{o.humanRef ?? o.id.slice(0, 6)}</span>
+                  </div>
+                </div>
+                <span className={statusChipClass(o.status)}>{statusLabel(o.status)}</span>
+                <div className="oprice">{money(o.priceCents)}</div>
+              </Link>
+            ))}
+          </>
+        )}
+
+        {!isLoading && tab === 'invoices' && (
+          <>
+            {invoices.length === 0 && (
+              <EmptyState icon="ti-receipt" title="No invoices in this range" description="New invoices will show up here." />
+            )}
+            {invoices.map((inv) => (
+              <Link key={inv.id} to="/portal/invoices" className="orow">
+                <div className="othumb">
+                  <i className="ti ti-receipt" />
+                </div>
+                <div className="oinfo">
+                  <div className="on">{inv.coversText ?? 'Invoice'}</div>
+                  <div className="om">
+                    <span>{inv.status === 'PARTIAL' ? 'Partial' : inv.status === 'PAID' ? 'Paid' : 'Unpaid'}</span>
+                  </div>
+                </div>
+                <span className={`chip ${inv.status === 'PAID' ? 'c-paid' : 'c-review'}`}>
+                  {inv.status === 'PAID' ? 'Paid' : inv.status === 'PARTIAL' ? 'Partial' : 'Unpaid'}
+                </span>
+                <div className="oprice">{money(inv.remainingCents ?? inv.amountCents)}</div>
+              </Link>
+            ))}
+          </>
+        )}
       </div>
 
       <QuoteBuilderModal open={quoteOpen} onClose={() => setQuoteOpen(false)} />

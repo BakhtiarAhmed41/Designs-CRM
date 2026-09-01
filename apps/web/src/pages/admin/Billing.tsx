@@ -27,9 +27,11 @@ import { invalidateWorkCaches } from '@/lib/queryCache';
 import { freshOnOpen } from '@/lib/queryRefresh';
 import { money, dateShort } from '@/lib/format';
 import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
+import { useDialog } from '@/components/ui/AppDialog';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
 
 export function AdminBilling() {
+  const dialog = useDialog();
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [payLink, setPayLink] = useState<string | null>(null);
@@ -284,9 +286,16 @@ export function AdminBilling() {
                   disabled={cancelMut.isPending}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (window.confirm('Cancel this invoice?')) {
-                      cancelMut.mutate(inv.id);
-                    }
+                    void dialog
+                      .confirm({
+                        title: 'Cancel this invoice?',
+                        message: 'The customer will no longer be able to pay it.',
+                        confirmLabel: 'Cancel invoice',
+                        danger: true,
+                      })
+                      .then((ok) => {
+                        if (ok) cancelMut.mutate(inv.id);
+                      });
                   }}
                 >
                   <i className="ti ti-x" />

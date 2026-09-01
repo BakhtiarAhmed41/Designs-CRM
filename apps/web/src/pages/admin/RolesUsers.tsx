@@ -17,6 +17,7 @@ import {
   type StaffUser,
 } from '@/lib/roles';
 import type { UserRole } from '@/lib/types';
+import { useDialog } from '@/components/ui/AppDialog';
 import { defaultFeaturesForRole } from '@/lib/permissions';
 
 type Tab = 'roles' | 'users';
@@ -170,6 +171,7 @@ export function AdminRolesUsers() {
 }
 
 function RolesPanel() {
+  const dialog = useDialog();
   const qc = useQueryClient();
   const [modal, setModal] = useState<'create' | CustomRole | null>(null);
   const { data, isLoading } = useQuery({ queryKey: ['admin-roles'], queryFn: listRoles });
@@ -239,13 +241,17 @@ function RolesPanel() {
                       className="btn btn-ghost btn-sm"
                       disabled={del.isPending}
                       onClick={() => {
-                        if (
-                          window.confirm(
-                            `Delete role “${r.name}”? Users with this role keep their system role but lose custom permissions.`,
-                          )
-                        ) {
-                          del.mutate(r.id);
-                        }
+                        void dialog
+                          .confirm({
+                            title: `Delete role “${r.name}”?`,
+                            message:
+                              'Users with this role keep their system role but lose custom permissions.',
+                            confirmLabel: 'Delete',
+                            danger: true,
+                          })
+                          .then((ok) => {
+                            if (ok) del.mutate(r.id);
+                          });
                       }}
                     >
                       Delete

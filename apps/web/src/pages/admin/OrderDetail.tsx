@@ -37,6 +37,7 @@ import {
   type Design,
   type DesignStatus,
 } from '@/lib/designs';
+import { useDialog } from '@/components/ui/AppDialog';
 import { apiFetch, downloadSignedFile, getErrorMessage, resolveFileUrl } from '@/lib/api';
 import { money, dateShort, lifecycleChip } from '@/lib/format';
 import { AdminCounterDecision } from '@/components/AdminCounterDecision';
@@ -202,6 +203,7 @@ export function AdminOrderDetail() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { user } = useAuth();
+  const dialog = useDialog();
   const showMoney = canFeature(user?.permissions, 'billing', user?.role);
   const canAssignDesigner =
     (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') &&
@@ -724,9 +726,16 @@ export function AdminOrderDetail() {
             className="btn btn-ghost btn-sm"
             disabled={deleteMut.isPending}
             onClick={() => {
-              if (window.confirm('Delete this order? This cannot be undone.')) {
-                deleteMut.mutate();
-              }
+              void dialog
+                .confirm({
+                  title: 'Delete this order?',
+                  message: 'This cannot be undone.',
+                  confirmLabel: 'Delete',
+                  danger: true,
+                })
+                .then((ok) => {
+                  if (ok) deleteMut.mutate();
+                });
             }}
           >
             <i className="ti ti-trash" /> {deleteMut.isPending ? 'Deleting…' : 'Delete'}

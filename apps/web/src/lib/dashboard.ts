@@ -16,6 +16,12 @@ export type DashboardStats = {
   byStatus: Array<{ status: OrderStatus; count: number }>;
 };
 
-export function getDashboardStats() {
-  return apiFetch<{ stats: DashboardStats }>('/admin/dashboard/stats');
+export function getDashboardStats(range?: { from?: string; to?: string }) {
+  const q = new URLSearchParams();
+  if (range?.from) q.set('from', range.from);
+  if (range?.to) q.set('to', range.to);
+  const qs = q.toString();
+  return apiFetch<{ stats: DashboardStats }>(
+    qs ? `/admin/dashboard/stats?${qs}` : '/admin/dashboard/stats',
+  );
 }

@@ -25,6 +25,7 @@ import { getCustomer } from '@/lib/customers';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import { money, dateShort, quoteLifecycleChip } from '@/lib/format';
 import { isAdminRecounter, isStaffCreatedOrder, lineTotal, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
+import { useDialog } from '@/components/ui/AppDialog';
 import { FormPreferencesDisplay } from '@/components/FormPreferencesDisplay';
 import { MessageAttachments } from '@/components/MessageAttachments';
 import type { Order } from '@/lib/types';
@@ -74,6 +75,7 @@ function linesFromQuote(quote?: QuoteWithLines): QuoteLine[] {
 }
 
 export function AdminQuoteDetail() {
+  const dialog = useDialog();
   const { user } = useAuth();
   const canApproveCounter = canSupport(user?.permissions, 'approve', user?.role);
   const { id = '' } = useParams();
@@ -335,9 +337,16 @@ export function AdminQuoteDetail() {
             className="btn btn-ghost btn-sm"
             disabled={deleteMut.isPending}
             onClick={() => {
-              if (window.confirm('Delete this quote? This cannot be undone.')) {
-                deleteMut.mutate();
-              }
+              void dialog
+                .confirm({
+                  title: 'Delete this quote?',
+                  message: 'This cannot be undone.',
+                  confirmLabel: 'Delete',
+                  danger: true,
+                })
+                .then((ok) => {
+                  if (ok) deleteMut.mutate();
+                });
             }}
           >
             <i className="ti ti-trash" /> Delete

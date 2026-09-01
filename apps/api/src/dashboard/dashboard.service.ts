@@ -42,6 +42,32 @@ function dateKey(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+function resolveRange(from?: string, to?: string, days = 0): { startKey: string; endKey: string } {
+  const fromOk = from && /^\d{4}-\d{2}-\d{2}$/.test(from);
+  const toOk = to && /^\d{4}-\d{2}-\d{2}$/.test(to);
+  let start: Date;
+  let end: Date;
+  if (fromOk && toOk) {
+    start = new Date(`${from}T00:00:00`);
+    end = new Date(`${to}T00:00:00`);
+    if (end < start) {
+      const tmp = start;
+      start = end;
+      end = tmp;
+    }
+  } else if (days > 0) {
+    const n = Math.min(Math.max(Math.trunc(days) || 14, 1), 90);
+    end = new Date();
+    start = new Date();
+    start.setDate(end.getDate() - (n - 1));
+  } else {
+    const today = new Date();
+    start = new Date(today.getFullYear(), today.getMonth(), 1);
+    end = today;
+  }
+  return { startKey: dateKey(start), endKey: dateKey(end) };
+}
+
 @Injectable()
 export class DashboardService {
   constructor(private db: DbService) {}
@@ -60,8 +86,9 @@ export class DashboardService {
     return Number(row?.n ?? 0);
   }
 
-  async getStats(user: AuthUser | undefined) {
+  async getStats(user: AuthUser | undefined, from?: string, to?: string) {
     this.assertStaff(user);
+    const { startKey, endKey } = resolveRange(from, to);
 
     const [
       ordersActive,
@@ -87,8 +114,9 @@ export class DashboardService {
            FROM orders
           WHERE status = ?
             AND completed_at IS NOT NULL
-            AND completed_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')`,
-        [OrderStatus.COMPLETED],
+            AND completed_at >= ?
+            AND completed_at < DATE_ADD(?, INTERVAL 1 DAY)`,
+        [OrderStatus.COMPLETED, startKey, endKey],
       ),
       this.db.queryOne<{ total: number | null }>(
         `SELECT COALESCE(SUM(GREATEST(0, amount_cents - COALESCE(amount_paid_cents, 0))), 0) AS total
@@ -148,27 +176,7 @@ export class DashboardService {
   ) {
     this.assertStaff(user);
 
-    let start: Date;
-    let end: Date;
-    const fromOk = from && /^\d{4}-\d{2}-\d{2}$/.test(from);
-    const toOk = to && /^\d{4}-\d{2}-\d{2}$/.test(to);
-    if (fromOk && toOk) {
-      start = new Date(`${from}T00:00:00`);
-      end = new Date(`${to}T00:00:00`);
-      if (end < start) {
-        const tmp = start;
-        start = end;
-        end = tmp;
-      }
-    } else {
-      const n = Math.min(Math.max(Math.trunc(days) || 14, 1), 90);
-      end = new Date();
-      start = new Date();
-      start.setDate(end.getDate() - (n - 1));
-    }
-
-    const startKey = dateKey(start);
-    const endKey = dateKey(end);
+    const { startKey, endKey } = resolveRange(from, to, days);
 
     const ordersRows = await this.db.query<{ d: string; c: number }>(
       `SELECT DATE_FORMAT(created_at, '%Y-%m-%d') AS d, COUNT(*) AS c
@@ -196,8 +204,8 @@ export class DashboardService {
       orders: number;
       deliveredValueCents: number;
     }> = [];
-    const cursor = new Date(start);
-    const last = new Date(end);
+    const cursor = new Date(`${startKey}T00:00:00`);
+    const last = new Date(`${endKey}T00:00:00`);
     while (cursor <= last) {
       const key = dateKey(cursor);
       series.push({

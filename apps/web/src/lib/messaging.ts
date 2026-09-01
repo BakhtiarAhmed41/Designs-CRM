@@ -256,6 +256,12 @@ export function updateAdminConversation(
   );
 }
 
+export function deleteAdminConversation(conversationId: string) {
+  return apiFetch<{ ok: boolean }>(`/admin/conversations/${conversationId}`, {
+    method: 'DELETE',
+  });
+}
+
 export function deleteAdminMessage(id: string) {
   return apiFetch<{ ok: boolean }>(`/admin/messages/${id}`, { method: 'DELETE' });
 }

@@ -17,14 +17,12 @@ type Props = {
   messages: Message[];
   mineDirection?: 'INBOUND' | 'OUTBOUND';
   emptyText?: string;
-  onDelete?: (id: string) => void;
 };
 
 export function ConversationThread({
   messages,
   mineDirection = 'OUTBOUND',
   emptyText = 'No messages yet.',
-  onDelete,
 }: Props) {
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -56,20 +54,7 @@ export function ConversationThread({
                   </a>
                 ))}
             </div>
-            <div className="msg-meta">
-              {formatMsgTime(m.createdAt)}
-              {onDelete && mine && !deleted && (
-                <button
-                  type="button"
-                  className="msg-del"
-                  aria-label="Delete message"
-                  title="Delete"
-                  onClick={() => onDelete(m.id)}
-                >
-                  <i className="ti ti-trash" />
-                </button>
-              )}
-            </div>
+            <div className="msg-meta">{formatMsgTime(m.createdAt)}</div>
           </div>
         );
       })}
