@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -164,6 +165,15 @@ export class AdminTeamController {
     @Param('peerId') peerId: string,
   ) {
     return this.team.markStaffChatRead(user.id, peerId);
+  }
+
+  @Delete('team-chat/:peerId')
+  @RequireFeatures('messages', 'messages_team_view')
+  async deleteChat(
+    @CurrentUser() user: AuthUser,
+    @Param('peerId') peerId: string,
+  ) {
+    return this.team.deleteStaffChat(user.id, peerId);
   }
 
   @Get('team-chat-owner')

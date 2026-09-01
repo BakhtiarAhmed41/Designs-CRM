@@ -124,6 +124,12 @@ export function getTeamChat(peerId: string) {
   }>(`/admin/team-chat/${peerId}`);
 }
 
+export function deleteTeamChat(peerId: string) {
+  return apiFetch<{ ok: boolean }>(`/admin/team-chat/${peerId}`, {
+    method: 'DELETE',
+  });
+}
+
 export function sendTeamChat(peerId: string, body: string, files?: File[]) {
   if (files?.length) {
     return apiFetchForm<{

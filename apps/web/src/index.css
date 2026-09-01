@@ -1,6 +1,6 @@
 /* Auto-ported from Admin_Final_-V2.html + Customer_Portal_Final_-V2 */
 :root{
-  --navy:#143F65; --navy-d:#0E2E4A; --maroon:#9A1E22;
+  --navy:#222222; --navy-d:#111111; --maroon:#9A1E22;
   --etsy-white:#F5F5F1;
   --ink:#222222; --muted:#4A4A4A; --faint:#6B6B6B;
   --line:rgba(34,34,34,.10); --line-s:rgba(0,0,0,.07);
@@ -1096,13 +1096,15 @@ button { font-family: inherit; }
   font:inherit;
 }
 .msg-thread-delete{
-  width:30px;
-  height:30px;
-  font-size:15px;
-  margin-top:2px;
+  width:22px;
+  height:22px;
+  font-size:12px;
+  margin-top:4px;
   flex-shrink:0;
   opacity:.7;
+  border-radius:6px;
 }
+.msg-thread-delete i{font-size:13px;line-height:1;}
 .msg-cust-card:hover .msg-thread-delete,
 .msg-cust-card.on .msg-thread-delete{
   opacity:1;

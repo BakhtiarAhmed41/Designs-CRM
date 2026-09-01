@@ -2,10 +2,12 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MessageComposer } from '@/components/messaging/MessageComposer';
+import { useDialog } from '@/components/ui/AppDialog';
 import { useAuth } from '@/context/AuthContext';
 import { getErrorMessage, resolveFileUrl } from '@/lib/api';
 import { canFeature } from '@/lib/permissions';
 import {
+  deleteTeamChat,
   getRecentTeamChats,
   getTeamChat,
   getTeamUnreadSummary,
@@ -42,6 +44,7 @@ function formatMsgTime(iso: string) {
 export function AdminTeamMessages() {
   const { user } = useAuth();
   const qc = useQueryClient();
+  const dialog = useDialog();
   const [searchParams, setSearchParams] = useSearchParams();
   const peerId = searchParams.get('peer');
   const groupMode = searchParams.get('group') === '1' || (!peerId && searchParams.get('group') !== '0');
@@ -151,6 +154,29 @@ export function AdminTeamMessages() {
     maybeRequestBrowserNotifications();
   }
 
+  const deleteChat = useMutation({
+    mutationFn: (id: string) => deleteTeamChat(id),
+    onSuccess: (_res, id) => {
+      setError(null);
+      if (peerId === id) setSearchParams(canGroup ? { group: '1' } : {});
+      void qc.invalidateQueries({ queryKey: ['team-chat', id] });
+      void qc.invalidateQueries({ queryKey: ['team-recent'] });
+      void qc.invalidateQueries({ queryKey: ['team-unread'] });
+    },
+    onError: (err) => setError(getErrorMessage(err)),
+  });
+
+  async function confirmDeleteChat(id: string, name: string) {
+    const ok = await dialog.confirm({
+      title: `Delete chat with ${name}?`,
+      message: 'This cannot be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+    deleteChat.mutate(id);
+  }
+
   return (
     <div className="msg-workspace team">
       <aside className="msg-left">
@@ -190,11 +216,18 @@ export function AdminTeamMessages() {
             const m = members.find((x) => x.id === c.peerId);
             if (!m) return null;
             return (
-              <button
+              <div
                 key={c.peerId}
-                type="button"
+                role="button"
+                tabIndex={0}
                 className={`msg-cust-card ${!groupMode && peerId === c.peerId ? 'on' : ''}`}
                 onClick={() => openPeer(c.peerId)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openPeer(c.peerId);
+                  }
+                }}
               >
                 <div className="av" style={{ position: 'relative' }}>
                   {(m.initials || memberLabel(m).slice(0, 2)).toUpperCase()}
@@ -215,7 +248,20 @@ export function AdminTeamMessages() {
                   </div>
                   <div className="msg-cust-preview">{c.lastBody}</div>
                 </div>
-              </button>
+                <button
+                  type="button"
+                  className="icon-btn danger msg-thread-delete"
+                  aria-label="Delete chat"
+                  title="Delete chat"
+                  disabled={deleteChat.isPending}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    confirmDeleteChat(c.peerId, memberLabel(m));
+                  }}
+                >
+                  <i className="ti ti-trash" />
+                </button>
+              </div>
             );
           })}
 
@@ -223,11 +269,18 @@ export function AdminTeamMessages() {
           {filtered
             .filter((m) => !recentIds.has(m.id))
             .map((m) => (
-              <button
+              <div
                 key={m.id}
-                type="button"
+                role="button"
+                tabIndex={0}
                 className={`msg-cust-card ${!groupMode && peerId === m.id ? 'on' : ''}`}
                 onClick={() => openPeer(m.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    openPeer(m.id);
+                  }
+                }}
               >
                 <div className="av" style={{ position: 'relative' }}>
                   {(m.initials || memberLabel(m).slice(0, 2)).toUpperCase()}
@@ -250,7 +303,20 @@ export function AdminTeamMessages() {
                   </div>
                   <div className="msg-cust-preview">{m.role.replace('_', ' ')}</div>
                 </div>
-              </button>
+                <button
+                  type="button"
+                  className="icon-btn danger msg-thread-delete"
+                  aria-label="Delete chat"
+                  title="Delete chat"
+                  disabled={deleteChat.isPending}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    confirmDeleteChat(m.id, memberLabel(m));
+                  }}
+                >
+                  <i className="ti ti-trash" />
+                </button>
+              </div>
             ))}
         </div>
       </aside>

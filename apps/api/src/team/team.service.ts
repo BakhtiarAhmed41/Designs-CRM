@@ -643,6 +643,44 @@ export class TeamService {
     };
   }
 
+  async deleteStaffChat(meId: string, peerId: string) {
+    const peer = await this.getStaffRow(peerId);
+    if (!peer || peer.role === UserRole.CLIENT) {
+      throw new NotFoundException('Team member not found');
+    }
+
+    const messages = await this.db.query<{ id: string }>(
+      `SELECT id FROM staff_messages
+        WHERE (from_user_id = ? AND to_user_id = ?)
+           OR (from_user_id = ? AND to_user_id = ?)`,
+      [meId, peerId, peerId, meId],
+    );
+    const ids = messages.map((m) => m.id);
+    if (ids.length) {
+      const placeholders = ids.map(() => '?').join(',');
+      const attachments = await this.db.query<{ storage_key: string }>(
+        `SELECT storage_key FROM staff_message_attachments
+          WHERE channel = 'DM' AND message_id IN (${placeholders})`,
+        ids,
+      );
+      await this.db.execute(
+        `DELETE FROM staff_message_attachments
+          WHERE channel = 'DM' AND message_id IN (${placeholders})`,
+        ids,
+      );
+      await this.db.execute(
+        `DELETE FROM staff_messages
+          WHERE (from_user_id = ? AND to_user_id = ?)
+             OR (from_user_id = ? AND to_user_id = ?)`,
+        [meId, peerId, peerId, meId],
+      );
+      for (const file of attachments) {
+        await this.storage.deleteObject(file.storage_key);
+      }
+    }
+    return { ok: true };
+  }
+
   async recentTeamConversations(meId: string) {
     const rows = await this.db.query<{
       peer_id: string;
