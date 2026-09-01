@@ -69,20 +69,11 @@ export function Login() {
           phone: phone || null,
         });
         if (res.pending) {
-          if (res.emailSent) {
-            setInfo(
-              'Check your email to verify your address. After verification, an admin will review your login request.',
-            );
-          } else if (res.verifyToken) {
-            setInfo(
-              'Account created. SMTP is not configured, so we could not email the verification link. Use this local-only link, then wait for admin approval: ' +
-                `${window.location.origin}/login?verify=${res.verifyToken}`,
-            );
-          } else {
-            setInfo(
-              'Account created. We could not send the verification email because SMTP is not configured. An admin can still approve your login request.',
-            );
-          }
+          setInfo(
+            res.emailSent
+              ? 'Account created. Check your email to verify your address. An admin will then approve your login.'
+              : 'Account created. An admin will approve your login. You can sign in after approval.',
+          );
           setMode('login');
           return;
         }

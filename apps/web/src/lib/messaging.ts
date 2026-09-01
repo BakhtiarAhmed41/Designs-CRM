@@ -305,6 +305,12 @@ export function createMyConversation(data: {
   });
 }
 
+export function deleteMyConversation(conversationId: string) {
+  return apiFetch<{ ok: boolean }>(`/conversations/${conversationId}`, {
+    method: 'DELETE',
+  });
+}
+
 export function sendMyMessage(
   conversationId: string,
   body: string,

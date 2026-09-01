@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -61,6 +62,14 @@ export class MessagingController {
   ) {
     const conversation = await this.messaging.getMyConversation(user, id);
     return { conversation };
+  }
+
+  @Delete(':id')
+  async remove(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('id') id: string,
+  ) {
+    return this.messaging.deleteMyConversation(user, id);
   }
 
   @Post()

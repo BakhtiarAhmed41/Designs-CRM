@@ -10,6 +10,7 @@ import {
   chatTypeLabel,
   conversationTitle,
   createMyConversation,
+  deleteMyConversation,
   getMyConversation,
   listMyConversations,
   sendMyMessage,
@@ -109,9 +110,31 @@ export function PortalMessages() {
     onError: (err) => setError(getErrorMessage(err)),
   });
 
+  const deleteTopic = useMutation({
+    mutationFn: (id: string) => deleteMyConversation(id),
+    onSuccess: (_res, id) => {
+      setError(null);
+      const remaining = conversations.filter((c) => c.id !== id);
+      if (conversationId === id) {
+        if (remaining[0]) setSearchParams({ c: remaining[0].id }, { replace: true });
+        else setSearchParams({}, { replace: true });
+      }
+      void qc.invalidateQueries({ queryKey: ['my-conversations'] });
+      void qc.invalidateQueries({ queryKey: ['my-conversation', id] });
+      void qc.invalidateQueries({ queryKey: ['portal-convos-nav'] });
+      void qc.invalidateQueries({ queryKey: ['portal-unread'] });
+    },
+    onError: (err) => setError(getErrorMessage(err)),
+  });
+
   function selectConvo(c: Conversation) {
     setSearchParams({ c: c.id });
     maybeRequestBrowserNotifications();
+  }
+
+  function confirmDelete(c: Conversation) {
+    if (!window.confirm('Delete this chat? It will be removed from your list.')) return;
+    deleteTopic.mutate(c.id);
   }
 
   return (
@@ -181,11 +204,18 @@ export function PortalMessages() {
         </div>
         <div className="msg-left-list">
           {conversations.map((c) => (
-            <button
+            <div
               key={c.id}
-              type="button"
+              role="button"
+              tabIndex={0}
               className={`msg-cust-card ${c.id === conversationId ? 'on' : ''}`}
               onClick={() => selectConvo(c)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  selectConvo(c);
+                }
+              }}
             >
               <div className="msg-cust-main" style={{ width: '100%' }}>
                 <div className="msg-cust-top">
@@ -204,7 +234,19 @@ export function PortalMessages() {
                   )}
                 </div>
               </div>
-            </button>
+              <button
+                type="button"
+                className="icon-btn danger msg-thread-delete"
+                aria-label="Delete chat"
+                disabled={deleteTopic.isPending}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  confirmDelete(c);
+                }}
+              >
+                <i className="ti ti-trash" />
+              </button>
+            </div>
           ))}
           {!convosQuery.isLoading && conversations.length === 0 && (
             <div className="msg-empty-state">

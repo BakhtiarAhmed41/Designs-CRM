@@ -1724,10 +1724,7 @@ export class OrdersService {
     if (data.type === OrderType.ORDER) {
       status = OrderStatus.IN_PROGRESS;
     } else {
-      status =
-        priceCents != null && priceCents > 0
-          ? OrderStatus.QUOTATION_PROVIDED
-          : OrderStatus.WAITING_FOR_QUOTATION;
+      status = OrderStatus.WAITING_FOR_QUOTATION;
     }
 
     await this.db.execute(
@@ -1871,23 +1868,20 @@ export class OrdersService {
 
     if (data.type === OrderType.QUOTE_REQUEST) {
       quoteUrl = `/admin/quotes/${id}`;
-      if (priceCents != null && priceCents > 0) {
-        await this.db.execute(
-          `INSERT INTO quotations
-             (id, order_id, version, status, created_by_role, created_by_id, amount_cents, currency, comment)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            randomUUID(),
-            id,
-            1,
-            QuotationStatus.PROPOSED,
-            user.role,
-            user.id,
-            priceCents,
-            'USD',
-            null,
-          ],
-        );
+      const sendLines =
+        pricedLines.length > 0
+          ? pricedLines.map((line) => ({
+              name: line.name.trim(),
+              note: line.note?.trim() || null,
+              priceCents:
+                typeof line.priceCents === 'number' ? line.priceCents : null,
+              sizes: line.sizes,
+            }))
+          : priceCents != null && priceCents > 0
+            ? [{ name, priceCents }]
+            : [];
+      if (sendLines.length > 0) {
+        await this.submitQuoteBuilder(user, id, { lines: sendLines });
       }
     }
 

@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { startMyOrderCheckout } from '@/lib/billing';
+import { confirmMyOrder, startMyOrderCheckout } from '@/lib/billing';
 import {
   acceptQuotation,
   counterQuotation,
@@ -42,6 +42,8 @@ export function PortalOrderDetail() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const paidReturn = searchParams.get('paid') === '1';
   const [counter, setCounter] = useState('');
   const [keepLineIds, setKeepLineIds] = useState<string[] | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -50,11 +52,20 @@ export function PortalOrderDetail() {
   const [revNote, setRevNote] = useState('');
   const [revDesignIds, setRevDesignIds] = useState<string[]>([]);
   const [payBusy, setPayBusy] = useState(false);
+  const paySyncStarted = useRef<number | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['my-order', id],
     queryFn: () => getMyOrder(id),
     ...freshOnOpen,
+    refetchInterval: (q) => {
+      if (!paidReturn) return false;
+      const o = q.state.data?.order as { status?: string; paymentStatus?: string } | undefined;
+      if (o?.paymentStatus === 'PAID' || (o && o.status !== 'PENDING_PAYMENT')) return false;
+      if (!paySyncStarted.current) paySyncStarted.current = Date.now();
+      if (Date.now() - paySyncStarted.current > 20_000) return false;
+      return 1500;
+    },
   });
 
   const editsQ = useQuery({
@@ -105,6 +116,56 @@ export function PortalOrderDetail() {
   const invalidate = () => {
     void invalidateWorkCaches(qc);
   };
+
+  useEffect(() => {
+    if (!id || !paidReturn) return;
+    if (data?.order?.paymentStatus === 'PAID') return;
+    let cancelled = false;
+    const askStripe = () => {
+      void confirmMyOrder(id)
+        .catch(() => null)
+        .then(() => {
+          if (cancelled) return;
+          void invalidateWorkCaches(qc);
+          void qc.invalidateQueries({ queryKey: ['my-order', id] });
+        });
+    };
+    askStripe();
+    const tick = window.setInterval(askStripe, 2000);
+    const stop = window.setTimeout(() => window.clearInterval(tick), 20_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(tick);
+      window.clearTimeout(stop);
+    };
+  }, [id, paidReturn, data?.order?.paymentStatus, qc]);
+
+  useEffect(() => {
+    if (!paidReturn) return;
+    const o = data?.order;
+    if (!o) return;
+    if (o.paymentStatus === 'PAID') {
+      searchParams.delete('paid');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [paidReturn, data?.order, searchParams, setSearchParams]);
+
+  async function handlePay(orderId: string) {
+    setPayBusy(true);
+    setActionError(null);
+    try {
+      const res = await startMyOrderCheckout(orderId);
+      if (res?.alreadyPaid) {
+        await confirmMyOrder(orderId).catch(() => null);
+        await invalidateWorkCaches(qc);
+        await qc.invalidateQueries({ queryKey: ['my-order', orderId] });
+      }
+    } catch (e) {
+      setActionError(getErrorMessage(e));
+    } finally {
+      setPayBusy(false);
+    }
+  }
 
   const uploadRefs = useMutation({
     mutationFn: (files: File[]) => uploadAttachments(id, files),
@@ -200,12 +261,7 @@ export function PortalOrderDetail() {
               className="btn btn-primary btn-sm"
               disabled={payBusy}
               onClick={() => {
-                setPayBusy(true);
-                setActionError(null);
-                void startMyOrderCheckout(order.id).catch((e) => {
-                  setActionError(getErrorMessage(e));
-                  setPayBusy(false);
-                });
+                void handlePay(order.id);
               }}
             >
               <i className="ti ti-credit-card" /> {payBusy ? 'Opening checkout…' : 'Pay with card'}
@@ -240,6 +296,11 @@ export function PortalOrderDetail() {
       />
 
       {actionError && <ErrorBanner>{actionError}</ErrorBanner>}
+      {paidReturn && order.paymentStatus !== 'PAID' && (
+        <div className="note" style={{ marginBottom: 14 }}>
+          <i className="ti ti-loader" /> Confirming payment with Stripe…
+        </div>
+      )}
 
       {openRevision && (
         <div className="card" style={{ marginBottom: 16 }}>
@@ -550,12 +611,7 @@ export function PortalOrderDetail() {
                   style={{ width: '100%', justifyContent: 'center' }}
                   disabled={payBusy}
                   onClick={() => {
-                    setPayBusy(true);
-                    setActionError(null);
-                    void startMyOrderCheckout(order.id).catch((e) => {
-                      setActionError(getErrorMessage(e));
-                      setPayBusy(false);
-                    });
+                    void handlePay(order.id);
                   }}
                 >
                   <i className="ti ti-credit-card" /> {payBusy ? 'Opening checkout…' : 'Pay this order'}

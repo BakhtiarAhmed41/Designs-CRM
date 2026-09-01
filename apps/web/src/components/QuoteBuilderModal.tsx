@@ -261,7 +261,7 @@ export function QuoteBuilderModal({
         },
       };
 
-      if (adminFor?.type === 'ORDER') {
+      if (adminFor) {
         setPendingPayload(payload);
         setFormFiles(cloneFiles(files));
         setExtraFiles([]);
@@ -271,34 +271,17 @@ export function QuoteBuilderModal({
         return;
       }
 
-      const { order } = adminFor
-        ? await adminCreateOrder({
-            type: adminFor.type,
-            customerId: adminFor.customerId,
-            customerName: adminFor.customerName,
-            source: 'PORTAL',
-            channel: 'ADMIN',
-            ...payload,
-          })
-        : await createOrder({
-            type: 'QUOTE_REQUEST',
-            ...payload,
-          });
+      const { order } = await createOrder({
+        type: 'QUOTE_REQUEST',
+        ...payload,
+      });
 
       if (files.length > 0) {
-        if (adminFor) {
-          await adminUploadAttachments(order.id, files);
-        } else {
-          await uploadAttachments(order.id, files);
-        }
+        await uploadAttachments(order.id, files);
       }
 
       await invalidateWorkCaches(qc);
-      setToast(
-        adminFor
-          ? 'Quote created for the customer. Price it next, then approve.'
-          : 'Quote submitted. Added to your Quotes as “Being priced.”',
-      );
+      setToast('Quote submitted. Added to your Quotes as “Being priced.”');
       onSubmitted?.(order.id);
       window.setTimeout(() => onClose(), 500);
     } catch (e) {
@@ -313,7 +296,7 @@ export function QuoteBuilderModal({
     return sum + (cents ?? 0);
   }, 0);
 
-  const createApprovedOrder = useCallback(async () => {
+  const finishAdminPriced = useCallback(async () => {
     if (!adminFor || !pendingPayload) return;
     const named = priceLines.filter((l) => l.name.trim());
     if (named.length === 0) {
@@ -329,7 +312,7 @@ export function QuoteBuilderModal({
     setBusy(true);
     try {
       const { order } = await adminCreateOrder({
-        type: 'ORDER',
+        type: adminFor.type,
         customerId: adminFor.customerId,
         customerName: adminFor.customerName,
         source: 'PORTAL',
@@ -347,7 +330,11 @@ export function QuoteBuilderModal({
         await adminUploadAttachments(order.id, files);
       }
       await invalidateWorkCaches(qc);
-      setToast('Order created as accepted and in progress.');
+      setToast(
+        adminFor.type === 'ORDER'
+          ? 'Order created as accepted and in progress.'
+          : 'Quote sent to the customer.',
+      );
       onSubmitted?.(order.id);
       window.setTimeout(() => onClose(), 500);
     } catch (e) {
@@ -377,6 +364,16 @@ export function QuoteBuilderModal({
       if (!data || typeof data !== 'object') return;
       if (data.type === 'lvd-form-ready') {
         const win = iframeRef.current?.contentWindow;
+        if (win) {
+          win.postMessage(
+            {
+              type: 'lvd-set-context',
+              role: isAdmin ? 'admin' : 'customer',
+              kind: isDirectOrder ? 'order' : 'quote',
+            },
+            '*',
+          );
+        }
         if (win && customerPrefs) {
           win.postMessage({ type: 'lvd-apply-prefs', prefs: customerPrefs }, '*');
         }
@@ -411,7 +408,7 @@ export function QuoteBuilderModal({
     }
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
-  }, [open, submitFromIframe, onClose, navigate, customerPrefs, service, isAdmin]);
+  }, [open, submitFromIframe, onClose, navigate, customerPrefs, service, isAdmin, isDirectOrder]);
 
   if (!open) return null;
 
@@ -430,7 +427,9 @@ export function QuoteBuilderModal({
               {priceStep
                 ? 'Add line prices'
                 : service
-                  ? `${service.label} ${kindLabel} request`
+                  ? isAdmin
+                    ? `${service.label} ${kindLabel}`
+                    : `${service.label} ${kindLabel} request`
                   : `Start a new ${kindLabel}`}
             </div>
             <button type="button" className="modal-x" onClick={onClose} aria-label="Close">
@@ -447,13 +446,13 @@ export function QuoteBuilderModal({
             <div className="steps" aria-hidden>
               <div className={`step${!service ? ' on' : ''}`} />
               <div className={`step${service && !priceStep ? ' on' : ''}`} />
-              {isDirectOrder && <div className={`step${priceStep ? ' on' : ''}`} />}
+              {isAdmin && <div className={`step${priceStep ? ' on' : ''}`} />}
             </div>
 
             {!service && (
               <>
                 <div className="pick-intro">
-                  Step 1 of {isDirectOrder ? 3 : 2}. Pick a service.{' '}
+                  Step 1 of {isAdmin ? 3 : 2}. Pick a service.{' '}
                   {isAdmin
                     ? 'This will be filed under the selected customer.'
                     : 'Your account details are already attached.'}
@@ -517,6 +516,18 @@ export function QuoteBuilderModal({
                     className="form-frame"
                     title={`${service.label} ${kindLabel} form`}
                     src={`/portal-forms/${service.key}.html`}
+                    onLoad={() => {
+                      const win = iframeRef.current?.contentWindow;
+                      if (!win) return;
+                      win.postMessage(
+                        {
+                          type: 'lvd-set-context',
+                          role: isAdmin ? 'admin' : 'customer',
+                          kind: isDirectOrder ? 'order' : 'quote',
+                        },
+                        '*',
+                      );
+                    }}
                   />
                   <div
                     style={{
@@ -536,8 +547,8 @@ export function QuoteBuilderModal({
                     </button>
                   </div>
                   <div className="muted" style={{ fontSize: 12, marginTop: 8, textAlign: 'right' }}>
-                    {isDirectOrder
-                      ? 'Use Submit inside the form. Next you will add line prices and files.'
+                    {isAdmin
+                      ? 'Use Continue to pricing inside the form. Next you will add prices and files.'
                       : 'Use the Submit button inside the form above to send your request.'}
                   </div>
                 </div>
@@ -567,7 +578,9 @@ export function QuoteBuilderModal({
                       </span>
                     </div>
                     <p className="muted" style={{ margin: '0 0 12px', fontSize: 13 }}>
-                      This order will be treated as already accepted by the customer and will start in progress.
+                      {isDirectOrder
+                        ? 'This order will be treated as already accepted by the customer and will start in progress.'
+                        : 'This quote will be sent to the customer. They can accept, reject, or reply with a different price.'}
                     </p>
                     <div
                       style={{
@@ -728,10 +741,16 @@ export function QuoteBuilderModal({
                       className="btn btn-primary"
                       style={{ width: '100%', justifyContent: 'center' }}
                       disabled={busy}
-                      onClick={() => void createApprovedOrder()}
+                      onClick={() => void finishAdminPriced()}
                     >
-                      <i className="ti ti-check" />
-                      {busy ? 'Creating…' : 'Create approved order'}
+                      <i className={`ti ${isDirectOrder ? 'ti-check' : 'ti-send'}`} />
+                      {busy
+                        ? isDirectOrder
+                          ? 'Creating…'
+                          : 'Sending…'
+                        : isDirectOrder
+                          ? 'Create approved order'
+                          : 'Send quote'}
                     </button>
                   </div>
                 )}

@@ -1,9 +1,10 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { startMyOrderCheckout } from '@/lib/billing';
 import { createOrder, getMyOrder, listMyOrders } from '@/lib/orders';
 import { listMyEdits, requestEdit } from '@/lib/edits';
+import { getMyCustomer } from '@/lib/customers';
 import { RevisionRequestForm } from '@/components/RevisionRequestForm';
 import { getErrorMessage } from '@/lib/api';
 import { money, dateShort, lifecycleChip } from '@/lib/format';
@@ -23,6 +24,32 @@ const DONE = ['COMPLETED', 'CLOSED'];
 
 function monthKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function monthKeyFromIso(value: string) {
+  const match = value.match(/^(\d{4})-(\d{2})/);
+  if (match) return `${match[1]}-${match[2]}`;
+  const d = new Date(value);
+  if (!Number.isNaN(d.getTime())) return monthKey(d);
+  return monthKey(new Date());
+}
+
+function monthsSinceJoin(joinKey: string, endKey: string) {
+  const keys: string[] = [];
+  let [y, m] = joinKey.split('-').map(Number);
+  const [ey, em] = endKey.split('-').map(Number);
+  if (!y || !m || !ey || !em) return [endKey];
+  if (y > ey || (y === ey && m > em)) return [endKey];
+
+  while (y < ey || (y === ey && m <= em)) {
+    keys.push(`${y}-${String(m).padStart(2, '0')}`);
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+  }
+  return keys.reverse();
 }
 
 function monthLabel(key: string) {
@@ -249,6 +276,7 @@ function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
 
 export function PortalOrders() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [month, setMonth] = useState<string>('all');
   const [filter, setFilter] = useState<OrderFilter>('all');
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -258,15 +286,21 @@ export function PortalOrders() {
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
 
+  const { data: meCustomer } = useQuery({
+    queryKey: ['portal-customer-me'],
+    queryFn: getMyCustomer,
+  });
+
   const months = useMemo(() => {
-    const now = new Date();
-    const keys = ['all'];
-    for (let i = 0; i < 12; i++) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      keys.push(monthKey(d));
-    }
-    return keys;
-  }, []);
+    const endKey = monthKey(new Date());
+    const joinRaw = meCustomer?.customer?.sinceDate || meCustomer?.customer?.createdAt;
+    const joinKey = joinRaw ? monthKeyFromIso(joinRaw) : endKey;
+    return ['all', ...monthsSinceJoin(joinKey, endKey)];
+  }, [meCustomer?.customer?.sinceDate, meCustomer?.customer?.createdAt]);
+
+  useEffect(() => {
+    if (!months.includes(month)) setMonth('all');
+  }, [months, month]);
 
   const monthFrom = month === 'all' ? dateFrom : `${month}-01`;
   const monthTo =
@@ -341,26 +375,22 @@ export function PortalOrders() {
           setDateTo(v);
           setPage(1);
         }}
-      />
-
-      <div className="period-bar">
-        <span className="plabel">Period</span>
-        <div className="month-pills">
+      >
+        <select
+          value={month}
+          onChange={(e) => {
+            setMonth(e.target.value);
+            setPage(1);
+          }}
+          aria-label="Period"
+        >
           {months.map((m) => (
-            <button
-              key={m}
-              type="button"
-              className={`mpill${m === 'all' ? ' all' : ''}${month === m ? ' on' : ''}`}
-              onClick={() => {
-                setMonth(m);
-                setPage(1);
-              }}
-            >
+            <option key={m} value={m}>
               {monthLabel(m)}
-            </button>
+            </option>
           ))}
-        </div>
-      </div>
+        </select>
+      </ListToolbar>
 
       <div className="period-sum">
         <div className="psum">
@@ -458,9 +488,15 @@ export function PortalOrders() {
                               className="btn btn-primary btn-sm"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                void startMyOrderCheckout(o.id).catch((err) =>
-                                  window.alert(getErrorMessage(err)),
-                                );
+                                void startMyOrderCheckout(o.id)
+                                  .then((res) => {
+                                    if (res?.alreadyPaid) {
+                                      void invalidateWorkCaches(qc);
+                                    }
+                                  })
+                                  .catch((err) =>
+                                    window.alert(getErrorMessage(err)),
+                                  );
                               }}
                             >
                               <i className="ti ti-credit-card" /> Pay

@@ -115,10 +115,9 @@ export function GenerateOrderModal({
         </div>
         <div className="modal-b">
           <p className="muted" style={{ margin: '0 0 14px' }}>
-            First pick the customer. Then the same quote request form from the customer portal opens
             {defaultMode === 'ORDER'
-              ? '. After you fill it, add line prices and files. The order starts as accepted and in progress.'
-              : '.'}
+              ? 'First pick the customer. Then fill in the job details and add prices. The order starts as accepted and in progress.'
+              : 'First pick the customer. Then fill in the job details and add prices. The quote is sent to the customer.'}
           </p>
           <div className="ff">
             <label>Customer (required)</label>

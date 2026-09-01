@@ -83,8 +83,14 @@ export class StripeService {
     return session;
   }
 
-  async retrieveSession(sessionId: string): Promise<Stripe.Checkout.Session> {
-    return this.getClient().checkout.sessions.retrieve(sessionId);
+  async retrieveSession(
+    sessionId: string,
+    opts?: { expandPaymentIntent?: boolean },
+  ): Promise<Stripe.Checkout.Session> {
+    return this.getClient().checkout.sessions.retrieve(
+      sessionId,
+      opts?.expandPaymentIntent ? { expand: ['payment_intent'] } : undefined,
+    );
   }
 
   constructWebhookEvent(rawBody: Buffer, signature: string): Stripe.Event {

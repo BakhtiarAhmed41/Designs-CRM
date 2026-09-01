@@ -249,31 +249,39 @@ export async function startMyInvoiceCheckout(
   id: string,
   returnPath?: string,
 ) {
-  const res = await apiFetch<{ url: string }>(`/invoices/${id}/checkout`, {
+  const res = await apiFetch<{ url?: string; alreadyPaid?: boolean }>(`/invoices/${id}/checkout`, {
     method: 'POST',
     body: JSON.stringify({
       returnOrigin: pageOrigin(),
       returnPath,
     }),
   });
+  if (res.alreadyPaid) return { alreadyPaid: true as const };
   if (!res.url) throw new Error('Stripe did not return a checkout URL');
   goToCheckout(res.url);
 }
 
 export async function startMyOrderCheckout(orderId: string) {
-  const res = await apiFetch<{ url: string }>(
+  const res = await apiFetch<{ url?: string; alreadyPaid?: boolean }>(
     `/invoices/by-order/${orderId}/checkout`,
     {
       method: 'POST',
       body: JSON.stringify({ returnOrigin: pageOrigin() }),
     },
   );
+  if (res.alreadyPaid) return { alreadyPaid: true as const };
   if (!res.url) throw new Error('Stripe did not return a checkout URL');
   goToCheckout(res.url);
 }
 
 export function confirmMyInvoice(id: string) {
   return apiFetch<{ invoice: Invoice | null }>(`/invoices/${id}/confirm`, {
+    method: 'POST',
+  });
+}
+
+export function confirmMyOrder(orderId: string) {
+  return apiFetch<{ invoice: Invoice | null }>(`/invoices/by-order/${orderId}/confirm`, {
     method: 'POST',
   });
 }

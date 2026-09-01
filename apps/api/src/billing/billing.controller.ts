@@ -49,6 +49,14 @@ export class BillingController {
     return this.billing.startCheckoutForMyOrder(user, orderId, data);
   }
 
+  @Post('invoices/by-order/:orderId/confirm')
+  async confirmMyOrder(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('orderId') orderId: string,
+  ) {
+    return this.billing.confirmMyOrder(user, orderId);
+  }
+
   @Get('invoices/:id/print')
   @Header('Content-Type', 'text/html; charset=utf-8')
   async printMine(

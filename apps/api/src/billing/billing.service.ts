@@ -1205,7 +1205,7 @@ export class BillingService {
     dest: { successPath: string; cancelPath: string; web: string },
   ) {
     if (invoice.status === InvoiceStatus.PAID) {
-      throw new BadRequestException('Invoice is already paid');
+      return { alreadyPaid: true as const };
     }
     if (!isOpenInvoiceStatus(invoice.status)) {
       throw new BadRequestException('Invoice is not awaiting payment');
@@ -1215,10 +1215,17 @@ export class BillingService {
     }
     const remaining = invoiceRemainingCents(invoice);
     if (remaining <= 0) {
-      throw new BadRequestException('Invoice is already paid');
+      return { alreadyPaid: true as const };
     }
     if (payment.stripe_checkout_session_id) {
       try {
+        const paidSession = await this.loadPaidStripeSession(
+          payment.stripe_checkout_session_id,
+        );
+        if (paidSession) {
+          await this.fulfillStripeSession(paidSession);
+          return { alreadyPaid: true as const };
+        }
         const existing = await this.stripe.retrieveSession(
           payment.stripe_checkout_session_id,
         );
@@ -1228,10 +1235,6 @@ export class BillingService {
           existing.amount_total === remaining
         ) {
           return { url: existing.url, sessionId: existing.id };
-        }
-        if (existing.payment_status === 'paid') {
-          await this.fulfillStripeSession(existing);
-          throw new BadRequestException('Invoice is already paid');
         }
       } catch (err) {
         if (err instanceof BadRequestException) throw err;
@@ -1256,16 +1259,33 @@ export class BillingService {
     return { url: session.url!, sessionId: session.id };
   }
 
+  private stripeSessionIsPaid(session: {
+    payment_status?: string | null;
+    payment_intent?: string | { id?: string; status?: string } | null;
+  }): boolean {
+    if (session.payment_status === 'paid') return true;
+    const intent = session.payment_intent;
+    return Boolean(
+      intent && typeof intent === 'object' && intent.status === 'succeeded',
+    );
+  }
+
+  private async loadPaidStripeSession(sessionId: string) {
+    if (!this.stripe.isConfigured()) return null;
+    const session = await this.stripe.retrieveSession(sessionId, {
+      expandPaymentIntent: true,
+    });
+    return this.stripeSessionIsPaid(session) ? session : null;
+  }
+
   private async confirmStripePayment(payment: PaymentRow) {
     if (!payment.stripe_checkout_session_id || !this.stripe.isConfigured()) {
       return;
     }
-    const session = await this.stripe.retrieveSession(
+    const session = await this.loadPaidStripeSession(
       payment.stripe_checkout_session_id,
     );
-    if (session.payment_status === 'paid') {
-      await this.fulfillStripeSession(session);
-    }
+    if (session) await this.fulfillStripeSession(session);
   }
 
   async handleStripeWebhook(rawBody: Buffer, signature: string) {
@@ -1274,26 +1294,23 @@ export class BillingService {
       event.type === 'checkout.session.completed' ||
       event.type === 'checkout.session.async_payment_succeeded'
     ) {
-      const session = event.data.object as {
-        id: string;
-        payment_status?: string;
-        amount_total?: number | null;
-        payment_intent?: string | { id: string } | null;
-        metadata?: Record<string, string> | null;
-        client_reference_id?: string | null;
-      };
-      if (session.payment_status && session.payment_status !== 'paid') return;
-      await this.fulfillStripeSession(session);
+      const sessionId = (event.data.object as { id?: string }).id;
+      if (!sessionId) return;
+      const paid = await this.loadPaidStripeSession(sessionId);
+      if (!paid) return;
+      await this.fulfillStripeSession(paid);
     }
   }
 
   private async fulfillStripeSession(session: {
     id: string;
+    payment_status?: string | null;
     amount_total?: number | null;
-    payment_intent?: string | { id: string } | null;
+    payment_intent?: string | { id: string; status?: string } | null;
     metadata?: Record<string, string> | null;
     client_reference_id?: string | null;
   }) {
+    if (!this.stripeSessionIsPaid(session)) return;
     const paymentId = session.metadata?.paymentId;
     const invoiceId =
       session.metadata?.invoiceId || session.client_reference_id || null;
@@ -1442,12 +1459,36 @@ export class BillingService {
       [orderId, customer.id, InvoiceStatus.AWAITING, InvoiceStatus.PARTIAL],
     );
     if (!invoice) {
+      const paid = await this.db.queryOne<InvoiceRow>(
+        `SELECT * FROM invoices
+          WHERE order_id = ? AND customer_id = ? AND status = ?
+          ORDER BY issued_at DESC LIMIT 1`,
+        [orderId, customer.id, InvoiceStatus.PAID],
+      );
+      if (paid) return { alreadyPaid: true as const };
       throw new NotFoundException('No unpaid invoice for this order');
     }
     return this.startCheckoutForMyInvoice(user, invoice.id, {
       returnOrigin: opts?.returnOrigin,
       returnPath: `/portal/orders/${orderId}`,
     });
+  }
+
+  async confirmMyOrder(user: AuthUser | undefined, orderId: string) {
+    const customer = await this.resolveMyCustomer(user);
+    const invoices = await this.db.query<InvoiceRow>(
+      `SELECT * FROM invoices
+        WHERE order_id = ? AND customer_id = ? AND status <> ?
+        ORDER BY issued_at DESC`,
+      [orderId, customer.id, InvoiceStatus.CANCELLED],
+    );
+    let last: { invoice: ReturnType<BillingService['invoiceDto']> | null } = {
+      invoice: null,
+    };
+    for (const invoice of invoices) {
+      last = await this.confirmMyInvoice(user, invoice.id);
+    }
+    return last;
   }
 
   async confirmMyInvoice(user: AuthUser | undefined, invoiceId: string) {

@@ -17,6 +17,7 @@ import {
   type StaffUser,
 } from '@/lib/roles';
 import type { UserRole } from '@/lib/types';
+import { defaultFeaturesForRole } from '@/lib/permissions';
 
 type Tab = 'roles' | 'users';
 type BaseRole = 'ADMIN' | 'SUPPORT' | 'DESIGNER';
@@ -104,6 +105,23 @@ function systemRoleLabel(role: UserRole | SystemStaffRole): string {
   }
 }
 
+const BASE_ROLES: Array<{
+  role: SystemStaffRole;
+  description: string;
+}> = [
+  { role: 'SUPER_ADMIN', description: 'Full access. Built-in and cannot be changed.' },
+  { role: 'ADMIN', description: 'Full studio access. Built-in and cannot be changed.' },
+  { role: 'SUPPORT', description: 'Orders, quotes, customers, and messaging.' },
+  { role: 'DESIGNER', description: 'Orders, edits, and messaging.' },
+];
+
+function enabledPermissionKeys(permissions: Record<string, boolean>) {
+  return Object.entries(permissions)
+    .filter(([, v]) => v)
+    .map(([k]) => k)
+    .join(', ') || 'None';
+}
+
 function loginLabel(status: StaffUser['loginStatus']): string {
   if (status === 'ACTIVE') return 'Active';
   if (status === 'DISABLED') return 'Disabled';
@@ -171,12 +189,7 @@ function RolesPanel() {
       </div>
       <div className="card">
         {isLoading && <div style={{ padding: 16 }}>Loading…</div>}
-        {!isLoading && roles.length === 0 && (
-          <div style={{ padding: 16, color: 'var(--muted)' }}>
-            No custom roles yet. Create one to assign feature permissions to users.
-          </div>
-        )}
-        {roles.length > 0 && (
+        {!isLoading && (
           <table className="qtable">
             <thead>
               <tr>
@@ -187,6 +200,22 @@ function RolesPanel() {
               </tr>
             </thead>
             <tbody>
+              {BASE_ROLES.map((b) => (
+                <tr key={b.role}>
+                  <td>
+                    <b>{systemRoleLabel(b.role)}</b>
+                    <span className="chip" style={{ marginLeft: 8, fontSize: 11 }}>
+                      Built-in
+                    </span>
+                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>{b.description}</div>
+                  </td>
+                  <td>{systemRoleLabel(b.role)}</td>
+                  <td style={{ fontSize: 12 }}>
+                    {enabledPermissionKeys(defaultFeaturesForRole(b.role))}
+                  </td>
+                  <td style={{ fontSize: 12, color: 'var(--faint)' }}>View only</td>
+                </tr>
+              ))}
               {roles.map((r) => (
                 <tr key={r.id}>
                   <td>
@@ -196,12 +225,7 @@ function RolesPanel() {
                     )}
                   </td>
                   <td>{systemRoleLabel(r.baseRole)}</td>
-                  <td style={{ fontSize: 12 }}>
-                    {Object.entries(r.permissions)
-                      .filter(([, v]) => v)
-                      .map(([k]) => k)
-                      .join(', ') || 'None'}
-                  </td>
+                  <td style={{ fontSize: 12 }}>{enabledPermissionKeys(r.permissions)}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>
                     <button
                       type="button"

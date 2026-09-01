@@ -369,6 +369,7 @@ CREATE TABLE IF NOT EXISTS conversations (
   label          ENUM('EDIT','PAYMENT','CUSTOM','IMPORTANT') NULL,
   source         ENUM('PORTAL','SITE_CHAT') NOT NULL DEFAULT 'PORTAL',
   archived       TINYINT(1) NOT NULL DEFAULT 0,
+  hidden_from_client TINYINT(1) NOT NULL DEFAULT 0,
   private_notes  TEXT NULL,
   last_message_at DATETIME NULL,
   unread_admin   INT NOT NULL DEFAULT 0,

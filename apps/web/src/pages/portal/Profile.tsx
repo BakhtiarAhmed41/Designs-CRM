@@ -74,6 +74,7 @@ export function PortalProfile() {
   const [placement, setPlacement] = useState('Left chest');
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
   const [hoopPick, setHoopPick] = useState(HOOP_OPTIONS[0]);
+  const [hoopCustom, setHoopCustom] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
   const [prefMsg, setPrefMsg] = useState<string | null>(null);
   const [prefError, setPrefError] = useState<string | null>(null);
@@ -174,8 +175,15 @@ export function PortalProfile() {
   }
 
   function addHoop() {
-    if (!hoopPick || prefs.hoops.includes(hoopPick)) return;
-    setPrefs((p) => ({ ...p, hoops: [...p.hoops, hoopPick] }));
+    const next = (hoopCustom.trim() || hoopPick).replace(/\s+/g, ' ').slice(0, 40);
+    if (!next) return;
+    const exists = prefs.hoops.some((h) => h.toLowerCase() === next.toLowerCase());
+    if (exists) {
+      setHoopCustom('');
+      return;
+    }
+    setPrefs((p) => ({ ...p, hoops: [...p.hoops, next] }));
+    setHoopCustom('');
   }
 
   return (
@@ -328,6 +336,7 @@ export function PortalProfile() {
               <select
                 value={hoopPick}
                 onChange={(e) => setHoopPick(e.target.value)}
+                aria-label="Common hoop sizes"
                 style={{
                   border: '0.5px solid var(--line)',
                   borderRadius: 8,
@@ -340,6 +349,27 @@ export function PortalProfile() {
                   <option key={o}>{o}</option>
                 ))}
               </select>
+              <input
+                value={hoopCustom}
+                onChange={(e) => setHoopCustom(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addHoop();
+                  }
+                }}
+                placeholder="Or type a size, e.g. 10x12"
+                aria-label="Custom hoop size"
+                maxLength={40}
+                style={{
+                  border: '0.5px solid var(--line)',
+                  borderRadius: 8,
+                  padding: '8px 10px',
+                  fontSize: 12.5,
+                  fontFamily: 'inherit',
+                  minWidth: 180,
+                }}
+              />
               <button type="button" className="btn btn-ghost" style={{ padding: '8px 14px' }} onClick={addHoop}>
                 <i className="ti ti-plus" /> Add hoop
               </button>

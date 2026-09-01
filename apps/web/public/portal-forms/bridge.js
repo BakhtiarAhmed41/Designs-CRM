@@ -449,6 +449,49 @@
       .catch(function () {});
   }
 
+  function rememberDefault(el, attr) {
+    if (!el.getAttribute(attr)) el.setAttribute(attr, el.textContent);
+    return el.getAttribute(attr);
+  }
+
+  function applyFormContext(ctx) {
+    var isAdmin = ctx && ctx.role === 'admin';
+    var isOrder = ctx && ctx.kind === 'order';
+
+    document.querySelectorAll('.msg-cta').forEach(function (el) {
+      el.style.display = isAdmin ? 'none' : '';
+    });
+    document.querySelectorAll('.btn-s').forEach(function (el) {
+      el.style.display = isAdmin ? 'none' : '';
+    });
+
+    document.querySelectorAll('.btn-p').forEach(function (btn) {
+      var original = rememberDefault(btn, 'data-default-label');
+      btn.textContent = isAdmin ? 'Continue to pricing →' : original;
+    });
+
+    document.querySelectorAll('.ct').forEach(function (el) {
+      var original = rememberDefault(el, 'data-default-label');
+      if (isAdmin && isOrder) {
+        el.textContent = original.replace(/quote request/i, 'new order');
+      } else if (isAdmin) {
+        el.textContent = original.replace(/quote request/i, 'new quote');
+      } else {
+        el.textContent = original;
+      }
+    });
+
+    if (!document.documentElement.getAttribute('data-default-title')) {
+      document.documentElement.setAttribute('data-default-title', document.title);
+    }
+    var titleBase = document.documentElement.getAttribute('data-default-title');
+    document.title = isAdmin && isOrder
+      ? titleBase.replace(/Quote Request/i, 'New Order')
+      : isAdmin
+        ? titleBase.replace(/Quote Request/i, 'New Quote')
+        : titleBase;
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     var svc = serviceKey();
     var restored = restoreDraft(svc);
@@ -495,6 +538,10 @@
     }
     if (data.type === 'lvd-apply-prefs') {
       window.LVD_APPLY_PREFS(data.prefs);
+      return;
+    }
+    if (data.type === 'lvd-set-context') {
+      applyFormContext(data);
     }
   });
 })();

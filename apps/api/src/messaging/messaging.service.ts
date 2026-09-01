@@ -36,6 +36,7 @@ type ConversationRow = {
   label: MessageLabel | null;
   source: MessageSource;
   archived: number | boolean;
+  hidden_from_client: number | boolean;
   private_notes: string | null;
   last_message_at: Date | null;
   unread_admin: number;
@@ -898,6 +899,7 @@ export class MessagingService {
          LEFT JOIN customers cust ON cust.id = c.customer_id
          LEFT JOIN orders o ON o.id = c.order_id
         WHERE c.customer_id = ?
+          AND (c.hidden_from_client = 0 OR c.hidden_from_client IS NULL)
         ORDER BY c.last_message_at IS NULL, c.last_message_at DESC, c.created_at DESC`,
       [customerId],
     );
@@ -918,7 +920,8 @@ export class MessagingService {
       `SELECT COALESCE(SUM(unread_client), 0) AS total,
               COALESCE(SUM(CASE WHEN unread_client > 0 THEN 1 ELSE 0 END), 0) AS conversations
          FROM conversations
-        WHERE customer_id = ?`,
+        WHERE customer_id = ?
+          AND (hidden_from_client = 0 OR hidden_from_client IS NULL)`,
       [customerId],
     );
     return {
@@ -934,9 +937,21 @@ export class MessagingService {
     const customerId = await this.getCustomerIdForUser(user.id);
     if (!customerId) throw new NotFoundException('Conversation not found');
     const convo = await this.getConversationRow(conversationId);
-    if (!convo || convo.customer_id !== customerId)
+    if (!convo || convo.customer_id !== customerId || Boolean(convo.hidden_from_client))
       throw new NotFoundException('Conversation not found');
     return { convo, customerId };
+  }
+
+  async deleteMyConversation(user: AuthUser | undefined, id: string) {
+    assertAuthUser(user);
+    if (user.role !== UserRole.CLIENT) throw new ForbiddenException();
+    const { convo } = await this.getOwnedConversation(user, id);
+    await this.db.execute(
+      'UPDATE conversations SET hidden_from_client = 1, unread_client = 0 WHERE id = ?',
+      [convo.id],
+    );
+    this.gateway?.emitToUser(user.id, 'unread:changed', { scope: 'customer' });
+    return { ok: true };
   }
 
   async getMyConversation(user: AuthUser | undefined, id: string) {

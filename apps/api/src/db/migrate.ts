@@ -92,6 +92,14 @@ async function main() {
     );
   }
 
+  if (!(await columnExists('conversations', 'hidden_from_client'))) {
+    // eslint-disable-next-line no-console
+    console.log('Adding conversations.hidden_from_client column ...');
+    await conn.query(
+      'ALTER TABLE conversations ADD COLUMN hidden_from_client TINYINT(1) NOT NULL DEFAULT 0',
+    );
+  }
+
   if (!(await columnExists('conversations', 'private_notes'))) {
     // eslint-disable-next-line no-console
     console.log('Adding conversations.private_notes column ...');

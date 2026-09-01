@@ -1090,6 +1090,17 @@ button { font-family: inherit; }
   cursor:pointer;
   font:inherit;
 }
+.msg-thread-delete{
+  width:30px;
+  height:30px;
+  font-size:15px;
+  margin-top:2px;
+  opacity:.7;
+}
+.msg-cust-card:hover .msg-thread-delete,
+.msg-cust-card.on .msg-thread-delete{
+  opacity:1;
+}
 .msg-cust-card:hover{background:#f3f5f7;}
 .msg-cust-card.on{background:var(--tint);}
 .msg-cust-card .av{

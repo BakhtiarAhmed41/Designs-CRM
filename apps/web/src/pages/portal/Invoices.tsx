@@ -111,7 +111,10 @@ export function PortalInvoices() {
           return;
         }
       }
-      await startMyInvoiceCheckout(inv.id);
+      const checkout = await startMyInvoiceCheckout(inv.id);
+      if (checkout?.alreadyPaid) {
+        await confirmMyInvoice(inv.id).catch(() => null);
+      }
     },
     onSuccess: () => {
       setError(null);
