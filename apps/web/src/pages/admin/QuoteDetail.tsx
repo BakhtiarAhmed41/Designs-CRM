@@ -23,7 +23,7 @@ import { applyOrderChange, invalidateWorkCaches } from '@/lib/queryCache';
 import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
 import { getCustomer } from '@/lib/customers';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
-import { money, dateShort, quoteLifecycleChip } from '@/lib/format';
+import { money, dateShort, quoteLifecycleChip, friendlyFileName } from '@/lib/format';
 import { isAdminRecounter, isStaffCreatedOrder, lineTotal, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
 import { useDialog } from '@/components/ui/AppDialog';
 import { FormPreferencesDisplay } from '@/components/FormPreferencesDisplay';
@@ -407,9 +407,11 @@ export function AdminQuoteDetail() {
                   type="button"
                   className="odf"
                   style={{ cursor: 'pointer' }}
+                  title={a.originalName}
                   onClick={() => downloadSignedFile(adminAttachmentUrl(order.id, a.id), a.originalName)}
                 >
-                  <i className="ti ti-photo" style={{ color: 'var(--navy)' }} /> {a.originalName}
+                  <i className="ti ti-photo" style={{ color: 'var(--navy)' }} />
+                  <span className="odf-name">{friendlyFileName(a.originalName)}</span>
                 </button>
               ))}
               <label className="odf up">
@@ -617,13 +619,13 @@ export function AdminQuoteDetail() {
                       <option value="">Attach a customer file (optional)</option>
                       {attachments.map((a) => (
                         <option key={a.id} value={a.id}>
-                          {a.originalName}
+                          {friendlyFileName(a.originalName)}
                         </option>
                       ))}
                     </select>
                     {line.attachedName && (
                       <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-                        Attached: {line.attachedName}
+                        Attached: {friendlyFileName(line.attachedName)}
                       </div>
                     )}
                   </div>

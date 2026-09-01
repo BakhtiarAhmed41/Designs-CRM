@@ -250,8 +250,9 @@ button.ghost.icon:hover:not(:disabled){color:var(--navy);background:var(--tint);
 .od-grid{display:grid;grid-template-columns:1fr 320px;gap:16px;align-items:start;}
 @media(max-width:900px){.od-grid{grid-template-columns:1fr;}}
 .od-files{display:flex;gap:9px;flex-wrap:wrap;padding:14px 16px;}
-.odf{border:0.5px solid var(--line);border-radius:9px;padding:10px 12px;font-size:12px;display:flex;align-items:center;gap:8px;color:var(--muted);}
-.odf i{font-size:17px;color:var(--navy);}
+.odf{border:0.5px solid var(--line);border-radius:9px;padding:10px 12px;font-size:12px;display:flex;align-items:center;gap:8px;color:var(--muted);max-width:100%;min-width:0;}
+.odf i{font-size:17px;color:var(--navy);flex-shrink:0;}
+.odf-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:min(280px,70vw);}
 .odf.up{border-style:dashed;cursor:pointer;color:var(--navy);font-weight:600;}
 .od-line{display:flex;justify-content:space-between;padding:10px 16px;border-bottom:0.5px solid var(--line);font-size:13px;}
 .od-line:last-child{border-bottom:none;}

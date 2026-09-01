@@ -39,7 +39,7 @@ import {
 } from '@/lib/designs';
 import { useDialog } from '@/components/ui/AppDialog';
 import { apiFetch, downloadSignedFile, getErrorMessage, resolveFileUrl } from '@/lib/api';
-import { money, dateShort, lifecycleChip } from '@/lib/format';
+import { money, dateShort, lifecycleChip, friendlyFileName } from '@/lib/format';
 import { AdminCounterDecision } from '@/components/AdminCounterDecision';
 import { FormPreferencesDisplay } from '@/components/FormPreferencesDisplay';
 import { MessageAttachments } from '@/components/MessageAttachments';
@@ -843,9 +843,11 @@ export function AdminOrderDetail() {
                   key={a.id}
                   type="button"
                   className="odf"
+                  title={a.originalName}
                   onClick={() => downloadSignedFile(adminAttachmentUrl(order.id, a.id), a.originalName)}
                 >
-                  <i className="ti ti-file" /> {a.originalName}
+                  <i className="ti ti-file" />
+                  <span className="odf-name">{friendlyFileName(a.originalName)}</span>
                 </button>
               ))}
               <label className="odf up">

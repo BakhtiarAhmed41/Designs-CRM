@@ -1,5 +1,41 @@
 import type { OrderPaymentStatus, OrderStatus } from './types';
 
+const IMAGE_EXTS = new Set([
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'webp',
+  'svg',
+  'bmp',
+  'heic',
+  'avif',
+]);
+
+/**
+ * Show a short label when a file was saved with a generated storage-style name
+ * (long random id + extension) instead of dumping the whole string in the UI.
+ */
+export function friendlyFileName(name: string | null | undefined): string {
+  const trimmed = (name ?? '').trim();
+  if (!trimmed) return 'File';
+
+  const lastDot = trimmed.lastIndexOf('.');
+  const ext = lastDot > 0 ? trimmed.slice(lastDot + 1) : '';
+  const extOk = /^[A-Za-z0-9]{1,8}$/.test(ext);
+  const base = extOk ? trimmed.slice(0, lastDot) : trimmed;
+  const generated = base.length >= 36 && /^[A-Za-z0-9_-]+$/.test(base);
+
+  if (generated) {
+    const lower = extOk ? ext.toLowerCase() : '';
+    if (IMAGE_EXTS.has(lower)) return 'Reference image';
+    if (lower === 'pdf') return 'Reference PDF';
+    return extOk ? `Reference file (.${lower})` : 'Reference file';
+  }
+
+  return trimmed;
+}
+
 export function money(cents: number | null | undefined, currency = 'USD'): string {
   if (cents == null) return '-';
   const amount = cents / 100;

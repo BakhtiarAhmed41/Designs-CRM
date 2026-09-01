@@ -14,7 +14,7 @@ import {
 import { listMyEdits, requestEdit } from '@/lib/edits';
 import { RevisionRequestForm } from '@/components/RevisionRequestForm';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
-import { money, lifecycleChip, dateShort, paymentChip } from '@/lib/format';
+import { money, lifecycleChip, dateShort, paymentChip, friendlyFileName } from '@/lib/format';
 import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import { createMyConversation, listMyConversations } from '@/lib/messaging';
 import {
@@ -632,7 +632,9 @@ export function PortalOrderDetail() {
                     <i className="ti ti-paperclip" />
                   </div>
                   <div className="oinfo">
-                    <div className="on">{a.originalName}</div>
+                    <div className="on" title={a.originalName}>
+                      {friendlyFileName(a.originalName)}
+                    </div>
                   </div>
                   <button
                     type="button"
