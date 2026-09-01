@@ -601,7 +601,10 @@ function UserFormModal({
           lastName: form.lastName || null,
           phone: form.phone || null,
           customRoleId,
-          role: customRoleId ? undefined : form.systemRole,
+          role:
+            customRoleId || user.role === 'SUPER_ADMIN'
+              ? undefined
+              : form.systemRole,
           loginStatus: form.loginStatus,
           password: form.password ? form.password : undefined,
         });
@@ -614,7 +617,7 @@ function UserFormModal({
         phone: form.phone || null,
         customRoleId,
         loginStatus: form.loginStatus === 'PENDING' ? 'ACTIVE' : form.loginStatus,
-        role: customRoleId ? undefined : form.systemRole,
+        role: customRoleId ? undefined : form.systemRole === 'SUPER_ADMIN' ? 'ADMIN' : form.systemRole,
       });
     },
     onSuccess: () => {
@@ -698,6 +701,7 @@ function UserFormModal({
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
             />
           </div>
+          {user?.role !== 'SUPER_ADMIN' && (
           <div className="ff">
             <label>Assign custom role</label>
             <select
@@ -712,20 +716,29 @@ function UserFormModal({
               ))}
             </select>
           </div>
+          )}
           {!form.customRoleId && (
             <div className="ff">
               <label>System role</label>
-              <select
-                value={form.systemRole}
-                onChange={(e) =>
-                  setForm({ ...form, systemRole: e.target.value as SystemStaffRole })
-                }
-              >
-                <option value="SUPPORT">Support</option>
-                <option value="DESIGNER">Designer</option>
-                <option value="ADMIN">Admin</option>
-                <option value="SUPER_ADMIN">Super Admin</option>
-              </select>
+              {editing && user?.role === 'SUPER_ADMIN' ? (
+                <>
+                  <input value="Super Admin" disabled style={{ color: 'var(--faint)' }} />
+                  <div style={{ fontSize: 11, color: 'var(--faint)', marginTop: 4 }}>
+                    Super Admin is the owner role. It cannot be assigned when adding a user.
+                  </div>
+                </>
+              ) : (
+                <select
+                  value={form.systemRole === 'SUPER_ADMIN' ? 'ADMIN' : form.systemRole}
+                  onChange={(e) =>
+                    setForm({ ...form, systemRole: e.target.value as SystemStaffRole })
+                  }
+                >
+                  <option value="SUPPORT">Support</option>
+                  <option value="DESIGNER">Designer</option>
+                  <option value="ADMIN">Admin</option>
+                </select>
+              )}
             </div>
           )}
           <div style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 10 }}>{roleHint}</div>

@@ -46,13 +46,8 @@ export function PayLink() {
     <div className="center-screen" style={{ padding: 24, alignItems: 'center' }}>
       <div className="pay-card">
         <div className="pay-brand">
-          <img src="/lvd-logo.png" alt="Las Vegas Designs USA" style={{ height: 32 }} />
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--navy)' }}>
-              Las Vegas Designs USA
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--faint)' }}>Invoice</div>
-          </div>
+          <img src="/lvd-logo-full.png" alt="Las Vegas Designs USA" />
+          <div style={{ fontSize: 12, color: 'var(--faint)' }}>Invoice</div>
         </div>
         <div className="card-b">
           {summaryQ.isLoading && (

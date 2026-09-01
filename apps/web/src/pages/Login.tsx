@@ -131,15 +131,12 @@ export function Login() {
     <div className="center-screen">
       <div className="login-card">
         <div className="login-brand">
-          <img src="/lvd-logo.png" alt="LVD" />
-          <div>
-            <div className="login-title">Las Vegas Designs</div>
-            <div className="login-sub">
-              {mode === 'login' && 'Sign in to your account'}
-              {mode === 'register' && 'Create your account'}
-              {mode === 'forgot' && 'Reset your password'}
-              {mode === 'reset' && 'Choose a new password'}
-            </div>
+          <img src="/lvd-logo-full.png" alt="Las Vegas Designs USA" />
+          <div className="login-sub">
+            {mode === 'login' && 'Sign in to your account'}
+            {mode === 'register' && 'Create your account'}
+            {mode === 'forgot' && 'Reset your password'}
+            {mode === 'reset' && 'Choose a new password'}
           </div>
         </div>
 

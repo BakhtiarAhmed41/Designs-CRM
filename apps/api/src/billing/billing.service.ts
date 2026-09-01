@@ -2378,13 +2378,13 @@ function buildInvoicePrintHtml(
     gap: 14px;
   }
   .logo {
-    height: 48px;
+    height: 52px;
     width: auto;
-    max-width: 120px;
+    max-width: 260px;
     object-fit: contain;
     flex-shrink: 0;
     background: #fff;
-    border-radius: 6px;
+    border-radius: 0;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
     color-adjust: exact;
@@ -2566,7 +2566,6 @@ function buildInvoicePrintHtml(
             : `<div class="logo" aria-hidden="true"></div>`
         }
         <div>
-          <div class="studio">Las Vegas Designs</div>
           <div class="place">USA · Custom embroidery &amp; design</div>
         </div>
       </div>

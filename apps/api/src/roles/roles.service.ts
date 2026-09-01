@@ -273,6 +273,11 @@ export class RolesService {
     if (role === UserRole.CLIENT) {
       throw new BadRequestException('Use customer screens to create clients');
     }
+    if (role === UserRole.SUPER_ADMIN) {
+      throw new BadRequestException(
+        'Super Admin cannot be assigned when creating a user',
+      );
+    }
 
     const id = randomUUID();
     const passwordHash = await hashSecret(data.password);
@@ -342,6 +347,14 @@ export class RolesService {
     if (data.role !== undefined && !data.customRoleId) {
       if (data.role === UserRole.CLIENT) {
         throw new BadRequestException('Cannot set staff user to CLIENT');
+      }
+      if (
+        data.role === UserRole.SUPER_ADMIN &&
+        existing.role !== UserRole.SUPER_ADMIN
+      ) {
+        throw new BadRequestException(
+          'Super Admin cannot be assigned from this screen',
+        );
       }
       sets.push('role = ?');
       params.push(data.role);

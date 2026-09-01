@@ -1010,8 +1010,15 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   padding: 18px 22px;
   border-bottom: 1px solid var(--line);
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.pay-brand img {
+  height: 40px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
 }
 .pay-amount {
   font-size: 36px;

@@ -38,9 +38,7 @@ const createUserSchema = z.object({
   firstName: z.string().max(120).optional().nullable(),
   lastName: z.string().max(120).optional().nullable(),
   phone: z.string().max(60).optional().nullable(),
-  role: z
-    .enum(['SUPER_ADMIN', 'ADMIN', 'SUPPORT', 'DESIGNER'])
-    .optional(),
+  role: z.enum(['ADMIN', 'SUPPORT', 'DESIGNER']).optional(),
   customRoleId: z.string().min(1).optional().nullable(),
   loginStatus: z
     .enum([LoginStatus.ACTIVE, LoginStatus.DISABLED, LoginStatus.PENDING])
@@ -51,9 +49,7 @@ const updateUserSchema = z.object({
   firstName: z.string().max(120).optional().nullable(),
   lastName: z.string().max(120).optional().nullable(),
   phone: z.string().max(60).optional().nullable(),
-  role: z
-    .enum(['SUPER_ADMIN', 'ADMIN', 'SUPPORT', 'DESIGNER'])
-    .optional(),
+  role: z.enum(['ADMIN', 'SUPPORT', 'DESIGNER']).optional(),
   customRoleId: z.string().min(1).optional().nullable(),
   loginStatus: z
     .enum([LoginStatus.ACTIVE, LoginStatus.DISABLED, LoginStatus.PENDING])

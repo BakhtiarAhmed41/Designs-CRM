@@ -120,7 +120,6 @@ export function AdminDashboard() {
     <div className="dash">
       <PageHeader
         title="What's happening today"
-        subtitle="Everything across Las Vegas Designs USA in one glance so nothing slips."
         actions={
           <>
             {can('quotes') && (
