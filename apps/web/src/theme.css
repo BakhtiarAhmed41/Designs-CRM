@@ -16,7 +16,13 @@
   --bg: #F5F5F1;
   --card: #F5F5F1;
   --tint: #EDEBE6;
-  --tint-m: #F6E9EA;
+  --tint-m: #EDEBE6;
+  --green: #222222;
+  --green-bg: #F5F5F1;
+  --amber: #222222;
+  --amber-bg: #F5F5F1;
+  --purple: #222222;
+  --purple-bg: #F5F5F1;
   --shadow-sec: 0 1px 2px rgba(14, 46, 74, 0.04), 0 8px 22px rgba(14, 46, 74, 0.08);
   --side-w: 228px;
   --top-h: 56px;
@@ -108,9 +114,12 @@ body {
 .logout-link i { color: var(--ink); }
 .logout-link:hover { background: var(--tint-m); color: var(--maroon); }
 .logout-link:hover i { color: var(--maroon); }
-.badge-acct { color: inherit; }
-.badge-net { background: var(--tint-m); color: var(--maroon); }
-.badge-pay { background: #EDEBE6; color: var(--ink); }
+.badge-acct,
+.badge-net,
+.badge-pay {
+  background: #EDEBE6;
+  color: var(--ink);
+}
 
 .app-topbar {
   height: var(--top-h);
@@ -915,9 +924,36 @@ button.ghost i { color: var(--ink); }
 .od-line { padding: 12px 20px; }
 
 /* Inner screens — one logo navy, even spacing */
-.c-quote, .nic.quote { background: var(--tint) !important; color: var(--navy) !important; }
-.rp-super, .rp-admin, .rp-support { background: var(--tint); color: var(--navy); }
-.rp-designer { background: var(--tint); color: var(--navy); }
+.c-new,
+.c-prog,
+.c-review,
+.c-done,
+.c-paid,
+.c-quote,
+.c-wait,
+.c-unpaid,
+.c-assigned,
+.nic.ord,
+.nic.msg,
+.nic.warn,
+.nic.quote,
+.nic.file,
+.nic.pay,
+.rp-super,
+.rp-admin,
+.rp-support,
+.rp-designer,
+.role-pill,
+.pay-unpaid,
+.pay-paid,
+.pay-deposit,
+.pay-badge,
+.fmtchip,
+.badge-net,
+.badge-pay {
+  background: #EDEBE6 !important;
+  color: var(--ink) !important;
+}
 .role-pill { border-radius: 6px; padding: 3px 8px; }
 
 .card { padding: 0; }
@@ -1417,8 +1453,22 @@ body,
 .od-line,
 .expand-row td,
 .qtable th,
-.itable th {
-  background-color: var(--etsy-white);
+.itable th,
+.card-b,
+.card-pad,
+.batch,
+.line,
+.approve-banner,
+.lbl-edit,
+.lbl-custom,
+.lbl-pay,
+.lbl-imp,
+.note,
+.note.amber,
+.alert-success,
+.alert-error {
+  background-color: var(--etsy-white) !important;
+  color: var(--ink);
 }
 
 input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
@@ -1518,9 +1568,10 @@ i.ti,
   color: var(--ink);
 }
 
-.c-prog,
-.c-assigned,
-.c-quote {
+.pres-on,
+.pres-away,
+.pres-off,
+.pres-txt {
   color: var(--ink);
 }
 

@@ -385,10 +385,7 @@ export function PortalOrderDetail() {
                           style={
                             decided
                               ? {
-                                  background:
-                                    decision === 'KEPT'
-                                      ? 'rgba(46, 125, 50, 0.08)'
-                                      : 'rgba(154, 30, 34, 0.08)',
+                                  background: 'var(--etsy-white)',
                                   borderRadius: 8,
                                   padding: '6px 8px',
                                 }
@@ -439,11 +436,7 @@ export function PortalOrderDetail() {
                             className="lp"
                             style={{
                               opacity: canDecide && !checked ? 0.4 : 1,
-                              color: decided
-                                ? decision === 'KEPT'
-                                  ? 'var(--green)'
-                                  : 'var(--maroon)'
-                                : undefined,
+                              color: 'var(--ink)',
                             }}
                           >
                             {money(lineTotal, latestQuote.currency)}

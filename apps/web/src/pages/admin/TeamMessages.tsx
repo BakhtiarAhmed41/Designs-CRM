@@ -30,7 +30,7 @@ function memberLabel(m: { firstName: string | null; lastName: string | null; ema
 }
 
 function presenceColor(p: Presence) {
-  if (p === 'ON') return 'var(--green)';
+  if (p === 'ON') return 'var(--ink)';
   if (p === 'AWAY') return 'var(--amber)';
   return '#c3c9d1';
 }

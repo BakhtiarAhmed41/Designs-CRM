@@ -59,7 +59,7 @@ export function TeamChatPanel({
         width: 340,
         maxWidth: 'calc(100vw - 24px)',
         height: 460,
-        background: '#fff',
+        background: 'var(--etsy-white)',
         border: '0.5px solid var(--line)',
         borderRadius: 14,
         boxShadow: '0 16px 48px rgba(0,0,0,.18)',

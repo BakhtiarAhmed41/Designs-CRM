@@ -33,31 +33,6 @@ function cloneFiles(files: File[]): File[] {
   return files.map((f) => new File([f], f.name, { type: f.type, lastModified: f.lastModified }));
 }
 
-function linesFromCollected(collected: Collected): PriceLine[] {
-  const designs = Array.isArray(collected.designs) ? collected.designs : [];
-  const fromDesigns = designs
-    .map((d) => {
-      const name = typeof d.name === 'string' ? d.name.trim() : '';
-      const size = typeof d.size === 'string' ? d.size.trim() : '';
-      const placement = typeof d.placement === 'string' ? d.placement.trim() : '';
-      const notes = typeof d.notes === 'string' ? d.notes.trim() : '';
-      return {
-        name: name || collected.designName || 'Design',
-        note: [placement, size, notes].filter(Boolean).join(' · '),
-        price: '',
-      };
-    })
-    .filter((l) => l.name);
-  if (fromDesigns.length > 0) return fromDesigns;
-  return [
-    {
-      name: collected.designName?.trim() || 'Design',
-      note: collected.size?.trim() || '',
-      price: '',
-    },
-  ];
-}
-
 export type AdminFormContext = {
   customerId: string;
   customerName: string;
@@ -265,7 +240,7 @@ export function QuoteBuilderModal({
         setPendingPayload(payload);
         setFormFiles(cloneFiles(files));
         setExtraFiles([]);
-        setPriceLines(linesFromCollected(collected));
+        setPriceLines([emptyPriceLine()]);
         setPriceStep(true);
         setBusy(false);
         return;

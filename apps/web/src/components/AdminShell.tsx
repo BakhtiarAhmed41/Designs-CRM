@@ -31,7 +31,7 @@ function roleKey(role: UserRole): keyof typeof ROLE_META {
 }
 
 function presenceColor(p: Presence) {
-  if (p === 'ON') return 'var(--green)';
+  if (p === 'ON') return 'var(--ink)';
   if (p === 'AWAY') return 'var(--amber)';
   return '#c3c9d1';
 }
@@ -247,7 +247,7 @@ export function AdminShell() {
                   });
                 }}
               >
-                <span className="tm-dot" style={{ background: 'var(--green)' }} /> Message owner
+                <span className="tm-dot" style={{ background: 'var(--ink)' }} /> Message owner
               </a>
             )}
           </>

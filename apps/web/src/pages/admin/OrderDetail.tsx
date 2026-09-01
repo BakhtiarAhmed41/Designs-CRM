@@ -1264,7 +1264,7 @@ export function AdminOrderDetail() {
                     bottom: '100%',
                     left: 14,
                     right: 14,
-                    background: '#fff',
+                    background: 'var(--etsy-white)',
                     border: '0.5px solid var(--line)',
                     borderRadius: 8,
                     boxShadow: '0 8px 24px rgba(0,0,0,.12)',

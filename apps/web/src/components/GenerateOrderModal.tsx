@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { QuoteBuilderModal } from '@/components/QuoteBuilderModal';
@@ -30,7 +30,9 @@ export function GenerateOrderModal({
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState('');
   const [customerSearch, setCustomerSearch] = useState('');
+  const [listOpen, setListOpen] = useState(false);
   const [ready, setReady] = useState(false);
+  const pickRef = useRef<HTMLDivElement>(null);
 
   const customersQ = useQuery({
     queryKey: ['admin-customers-gen'],
@@ -45,8 +47,19 @@ export function GenerateOrderModal({
     setCustomerId(prefill?.customerId ?? null);
     setCustomerName(prefill?.customerName ?? '');
     setCustomerSearch(prefill?.customerName ?? '');
+    setListOpen(false);
     setReady(Boolean(prefill?.customerId));
   }, [open, defaultMode, prefill?.customerId, prefill?.customerName]);
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (pickRef.current && !pickRef.current.contains(e.target as Node)) {
+        setListOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, []);
 
   const filteredCustomers = useMemo(() => {
     const term = customerSearch.trim().toLowerCase();
@@ -68,6 +81,7 @@ export function GenerateOrderModal({
     setCustomerId(c.id);
     setCustomerName(c.name);
     setCustomerSearch(c.name);
+    setListOpen(false);
   }
 
   function handleClose() {
@@ -103,7 +117,7 @@ export function GenerateOrderModal({
         if (e.target === e.currentTarget) handleClose();
       }}
     >
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480, overflow: 'visible' }}>
         <div className="modal-h">
           <div className="mh-t">
             <i className={`ti ${defaultMode === 'QUOTE_REQUEST' ? 'ti-file-dollar' : 'ti-plus'}`} />
@@ -121,57 +135,44 @@ export function GenerateOrderModal({
           </p>
           <div className="ff">
             <label>Customer (required)</label>
-            <input
-              placeholder="Search customers by name, email, phone…"
-              value={customerSearch}
-              onChange={(e) => {
-                setCustomerSearch(e.target.value);
-                setCustomerId(null);
-              }}
-            />
-            {!customerId && (
+            <div ref={pickRef} style={{ position: 'relative' }}>
+              <input
+                placeholder="Search customers by name, email, phone…"
+                value={customerSearch}
+                autoComplete="off"
+                onChange={(e) => {
+                  setCustomerSearch(e.target.value);
+                  setCustomerId(null);
+                  setListOpen(true);
+                }}
+                onFocus={() => setListOpen(true)}
+              />
+              {listOpen && (
+                <div className="search-drop open" style={{ maxHeight: 220, overflowY: 'auto' }}>
+                  {customersQ.isLoading && <div className="sd-empty">Loading customers…</div>}
+                  {!customersQ.isLoading && filteredCustomers.length === 0 && (
+                    <div className="sd-empty">No matches.</div>
+                  )}
+                  {filteredCustomers.map((c) => (
+                    <div key={c.id} className="sd-item" onClick={() => pickCustomer(c)}>
+                      <div>
+                        <div className="sd-t">{c.name}</div>
+                        <div className="sd-s">{c.email || c.phone || 'No contact'}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {customerId && selected ? (
+              <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 6 }}>
+                {selected.email || selected.phone || 'Customer selected'}
+              </div>
+            ) : (
               <div style={{ fontSize: 12, color: 'var(--amber)', marginTop: 6 }}>
                 Select an existing customer. Create them under Customers first if needed.
               </div>
             )}
-            <div
-              style={{
-                maxHeight: 220,
-                overflow: 'auto',
-                marginTop: 6,
-                border: '0.5px solid var(--line)',
-                borderRadius: 8,
-              }}
-            >
-              {customersQ.isLoading && (
-                <div style={{ padding: 12, color: 'var(--muted)', fontSize: 13 }}>Loading customers…</div>
-              )}
-              {filteredCustomers.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => pickCustomer(c)}
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '8px 10px',
-                    border: 'none',
-                    borderBottom: '0.5px solid var(--line-s)',
-                    background: customerId === c.id ? 'rgba(20,63,101,.08)' : '#fff',
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                    fontSize: 12.5,
-                  }}
-                >
-                  <b>{c.name}</b>
-                  <span style={{ color: 'var(--muted)' }}>
-                    {' '}
-                    · {c.email || c.phone || 'No contact'}
-                  </span>
-                </button>
-              ))}
-            </div>
           </div>
           <button
             type="button"

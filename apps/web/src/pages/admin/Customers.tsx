@@ -177,7 +177,7 @@ export function AdminCustomers() {
                   <td className="num">
                     {money(c.ltvCents)}
                     {c.storeCreditCents > 0 && (
-                      <div style={{ fontSize: 11, color: 'var(--green)', fontWeight: 600 }}>
+                      <div style={{ fontSize: 11, color: 'var(--ink)', fontWeight: 600 }}>
                         {money(c.storeCreditCents)} credit
                       </div>
                     )}

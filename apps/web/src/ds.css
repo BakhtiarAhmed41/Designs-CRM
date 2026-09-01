@@ -17,13 +17,13 @@
   --bg: #F5F5F1;
   --card: #F5F5F1;
   --tint: #EDEBE6;
-  --tint-m: #F6E9EA;
-  --green: #2f7d32;
-  --green-bg: #E7F1E4;
-  --amber: #8a5a10;
-  --amber-bg: #FBF0DC;
-  --purple: #5e35b1;
-  --purple-bg: #EDE7F6;
+  --tint-m: #EDEBE6;
+  --green: #222222;
+  --green-bg: #F5F5F1;
+  --amber: #222222;
+  --amber-bg: #F5F5F1;
+  --purple: #222222;
+  --purple-bg: #F5F5F1;
 
   --radius-xs: 6px;
   --radius-sm: 8px;
@@ -85,7 +85,7 @@ body {
 }
 .btn-ghost:hover:not(:disabled) { background: #e4e1da; }
 .btn-sm { padding: 5px 11px; font-size: 12.5px; min-height: 30px; border-radius: 7px; }
-.btn-green { background: var(--green); color: #fff; }
+.btn-green { background: var(--ink); color: #fff; }
 .btn-green:hover:not(:disabled) { filter: brightness(0.95); }
 .btn-danger { background: #EDEBE6; border: 1px solid var(--line); color: var(--maroon); }
 .btn-danger:hover:not(:disabled) { background: var(--tint-m); }
@@ -274,13 +274,18 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   background: currentColor;
   opacity: 0.7;
 }
-.c-new { background: var(--tint-m); color: var(--maroon); }
-.c-prog { background: var(--tint); color: var(--navy); }
-.c-review { background: var(--amber-bg); color: var(--amber); }
-.c-done, .c-paid { background: var(--green-bg); color: var(--green); }
-.c-quote { background: var(--purple-bg); color: var(--purple); }
-.c-wait, .c-unpaid { background: var(--amber-bg); color: var(--amber); }
-.c-assigned { background: var(--tint); color: var(--navy); }
+.c-new,
+.c-prog,
+.c-review,
+.c-done,
+.c-paid,
+.c-quote,
+.c-wait,
+.c-unpaid,
+.c-assigned {
+  background: #EDEBE6;
+  color: var(--ink);
+}
 
 .filters { display: flex; gap: 6px; flex-wrap: wrap; }
 .filters button {
@@ -1141,9 +1146,9 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
 }
 
 /* ---------- Presence ---------- */
-.pres-on { color: var(--green); }
-.pres-away { color: #c48a14; }
-.pres-off { color: #9aa1ab; }
+.pres-on,
+.pres-away,
+.pres-off { color: var(--ink); }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 1100px) {

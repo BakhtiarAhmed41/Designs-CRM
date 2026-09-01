@@ -81,7 +81,7 @@ function orderChip(o: Order, designs?: Design[]): { cls: string; label: string }
 
 function designLineIcon(status: Design['status']) {
   if (status === 'DELIVERED') {
-    return { icon: 'ti-check', color: 'var(--green)' };
+    return { icon: 'ti-check', color: 'var(--ink)' };
   }
   if (status === 'DONE') {
     return { icon: 'ti-circle-check', color: 'var(--navy)' };
