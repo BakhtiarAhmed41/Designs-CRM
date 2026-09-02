@@ -71,6 +71,7 @@ export function AdminShell() {
   const can = (key: FeatureKey) => Boolean(features[key]);
   const isDesigner = role === 'DESIGNER';
   const showReports = user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN';
+  const showColors = user?.role === 'SUPER_ADMIN';
   const showMessages = canAnyMessaging(features);
   const showCustomerMessages = can('messages_customer_view');
   const showTeamMessages = can('messages') || can('messages_team_view');
@@ -202,6 +203,14 @@ export function AdminShell() {
             <div className="divider">Billing</div>
             <NavLink to="/admin/billing" className={({ isActive }) => (isActive ? 'on' : undefined)}>
               <i className="ti ti-cash" /> Invoices
+            </NavLink>
+          </>
+        )}
+        {showColors && (
+          <>
+            <div className="divider">Settings</div>
+            <NavLink to="/admin/colors" className={({ isActive }) => (isActive ? 'on' : undefined)}>
+              <i className="ti ti-adjustments" /> Colors
             </NavLink>
           </>
         )}

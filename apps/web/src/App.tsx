@@ -5,7 +5,7 @@ import { STAFF_ROLES } from '@/lib/types';
 import { staffLandingPath } from '@/lib/permissions';
 import { PortalShell } from '@/components/PortalShell';
 import { AdminShell } from '@/components/AdminShell';
-import { RequireAdminRole, RequireFeature } from '@/components/RequireFeature';
+import { RequireAdminRole, RequireFeature, RequireSuperAdmin } from '@/components/RequireFeature';
 import { PageLoading } from '@/components/PageProgress';
 import { Login } from '@/pages/Login';
 import { PayLink } from '@/pages/PayLink';
@@ -91,6 +91,9 @@ const AdminProfile = lazy(() =>
 );
 const AdminReports = lazy(() =>
   import('@/pages/admin/Reports').then((m) => ({ default: m.AdminReports })),
+);
+const AdminAppearance = lazy(() =>
+  import('@/pages/admin/Appearance').then((m) => ({ default: m.AdminAppearance })),
 );
 
 function HomeRedirect() {
@@ -293,6 +296,14 @@ export function App() {
               <RequireFeature feature="customers">
                 <AdminLoginRequests />
               </RequireFeature>
+            }
+          />
+          <Route
+            path="colors"
+            element={
+              <RequireSuperAdmin>
+                <AdminAppearance />
+              </RequireSuperAdmin>
             }
           />
         </Route>

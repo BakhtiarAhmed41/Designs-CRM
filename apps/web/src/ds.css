@@ -8,22 +8,22 @@
   --navy: #222222;
   --navy-d: #111111;
   --maroon: #9A1E22;
-  --etsy-white: #F5F5F1;
+  --etsy-white: #FFFFFF;
   --ink: #222222;
   --muted: #4A4A4A;
   --faint: #6B6B6B;
   --line: rgba(34, 34, 34, 0.10);
   --line-s: rgba(16, 24, 40, 0.06);
-  --bg: #F5F5F1;
-  --card: #F5F5F1;
-  --tint: #EDEBE6;
-  --tint-m: #EDEBE6;
+  --bg: #FFFFFF;
+  --card: #FFFFFF;
+  --tint: #FFFFFF;
+  --tint-m: #FFFFFF;
   --green: #222222;
-  --green-bg: #F5F5F1;
+  --green-bg: #FFFFFF;
   --amber: #222222;
-  --amber-bg: #F5F5F1;
+  --amber-bg: #FFFFFF;
   --purple: #222222;
-  --purple-bg: #F5F5F1;
+  --purple-bg: #FFFFFF;
 
   --radius-xs: 6px;
   --radius-sm: 8px;
@@ -35,6 +35,16 @@
   --focus: 0 0 0 3px rgba(34, 34, 34, 0.16);
   --ease: 160ms cubic-bezier(0.2, 0.7, 0.2, 1);
   --side-w: 244px;
+  --tint-hover: #F2F2F2;
+  --button-bg: #222222;
+  --button-text: #ffffff;
+  --button-bg-hover: #111111;
+  --maroon-d: #7d181b;
+  --sidebar-bg: #FFFFFF;
+  --sidebar-text: #222222;
+  --sidebar-active-bg: #FFFFFF;
+  --sidebar-active-text: #222222;
+  --topbar-bg: #FFFFFF;
 }
 
 html { color-scheme: light; }
@@ -76,27 +86,27 @@ body {
 }
 .btn:active:not(:disabled) { transform: translateY(0.5px); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-primary { background: var(--ink); color: #fff; }
-.btn-primary:hover:not(:disabled) { background: #111; }
+.btn-primary { background: var(--button-bg, var(--ink)); color: var(--button-text, #fff); }
+.btn-primary:hover:not(:disabled) { background: var(--button-bg-hover, #111); }
 .btn-ghost {
-  background: #EDEBE6;
+  background: var(--tint);
   border: 1px solid var(--line);
   color: var(--ink);
 }
-.btn-ghost:hover:not(:disabled) { background: #e4e1da; }
+.btn-ghost:hover:not(:disabled) { background: var(--tint-hover, #F2F2F2); }
 .btn-sm { padding: 5px 11px; font-size: 12.5px; min-height: 30px; border-radius: 7px; }
-.btn-green { background: var(--ink); color: #fff; }
+.btn-green { background: var(--button-bg, var(--ink)); color: var(--button-text, #fff); }
 .btn-green:hover:not(:disabled) { filter: brightness(0.95); }
-.btn-danger { background: #EDEBE6; border: 1px solid var(--line); color: var(--maroon); }
+.btn-danger { background: var(--tint); border: 1px solid var(--line); color: var(--maroon); }
 .btn-danger:hover:not(:disabled) { background: var(--tint-m); }
 .btn-danger-solid { background: var(--maroon); color: #fff; }
-.btn-danger-solid:hover:not(:disabled) { background: #7d181b; }
+.btn-danger-solid:hover:not(:disabled) { background: var(--maroon-d, #7d181b); }
 .icon-btn {
   width: 36px;
   height: 36px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line);
-  background: #EDEBE6;
+  background: var(--tint);
   color: var(--ink);
   display: inline-flex;
   align-items: center;
@@ -111,14 +121,14 @@ button.primary, .btn.primary {
   border: none; border-radius: var(--radius-sm); font-size: 13.5px; font-weight: 600;
   cursor: pointer; font-family: inherit; padding: 8px 14px; min-height: 36px;
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  background: var(--ink); color: #fff;
+  background: var(--button-bg, var(--ink)); color: var(--button-text, #fff);
 }
-button.primary:hover:not(:disabled) { background: #111; }
+button.primary:hover:not(:disabled) { background: var(--button-bg-hover, #111); }
 button.ghost {
   border: 1px solid var(--line); border-radius: var(--radius-sm); font-size: 13.5px; font-weight: 600;
   cursor: pointer; font-family: inherit; padding: 8px 14px; min-height: 36px;
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  background: #EDEBE6; color: var(--ink);
+  background: var(--tint); color: var(--ink);
 }
 button.ghost:hover:not(:disabled) { background: var(--tint); }
 button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; color: var(--muted); }
@@ -183,7 +193,7 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  background: var(--etsy-white, #F5F5F1);
+  background: var(--etsy-white, #FFFFFF);
 }
 .card-h .ct {
   font-size: 13.5px;
@@ -283,7 +293,7 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
 .c-wait,
 .c-unpaid,
 .c-assigned {
-  background: #EDEBE6;
+  background: var(--tint);
   color: var(--ink);
 }
 
@@ -473,7 +483,7 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   font-size: 13.5px;
   font-family: inherit;
   outline: none;
-  background: #EDEBE6;
+  background: var(--tint);
   color: var(--ink);
   width: 100%;
   box-sizing: border-box;
@@ -494,7 +504,7 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   grid-template-columns: var(--side-w) 1fr;
 }
 .app-frame .side {
-  background: var(--etsy-white);
+  background: var(--sidebar-bg, var(--etsy-white));
   border-right: 1px solid #e8eaed;
   padding: 18px 12px 12px;
   display: flex;
@@ -526,7 +536,7 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   gap: 0;
   padding: 8px 10px;
   border-radius: 8px;
-  color: #2a3038;
+  color: var(--sidebar-text, #2a3038);
   text-decoration: none;
   font-size: 13.5px;
   font-weight: 550;
@@ -540,7 +550,7 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   width: 26px;
   flex-shrink: 0;
   text-align: left;
-  color: #4a5560;
+  color: var(--sidebar-text, #4a5560);
 }
 .nav a .cnt {
   margin-left: auto;
@@ -558,15 +568,15 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   border-radius: 50%;
   background: var(--maroon);
 }
-.nav a:hover { background: #f4f6f8; color: var(--ink); }
+.nav a:hover { background: var(--sidebar-active-bg, #f4f6f8); color: var(--sidebar-active-text, var(--ink)); }
 .nav a.on {
-  background: var(--tint);
-  color: var(--navy);
+  background: var(--sidebar-active-bg, var(--tint));
+  color: var(--sidebar-active-text, var(--navy));
   font-weight: 600;
-  box-shadow: inset 2px 0 0 var(--navy);
+  box-shadow: inset 2px 0 0 var(--sidebar-active-text, var(--navy));
 }
-.nav a.on i { color: var(--navy); }
-.nav a.on .cnt { background: var(--navy); color: #fff; }
+.nav a.on i { color: var(--sidebar-active-text, var(--navy)); }
+.nav a.on .cnt { background: var(--sidebar-active-text, var(--navy)); color: var(--sidebar-active-bg, #fff); }
 .nav .divider {
   font-size: 10.5px;
   text-transform: uppercase;
@@ -679,7 +689,7 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   font-size: 13.5px;
   font-family: inherit;
   outline: none;
-  background: #EDEBE6;
+  background: var(--tint);
   color: var(--ink);
 }
 .searchbar input:focus { border-color: var(--ink); box-shadow: var(--focus); }
@@ -709,7 +719,7 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   border-radius: 8px;
   padding: 7px 10px;
   font-size: 13px;
-  background: #EDEBE6;
+  background: var(--tint);
   font-family: inherit;
   color: var(--ink);
 }
@@ -1131,7 +1141,7 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   height: 36px;
   border-radius: 8px;
   border: 1px solid var(--line);
-  background: #EDEBE6;
+  background: var(--tint);
   color: var(--ink);
 }
 .notif-drop, .search-drop {
@@ -1163,7 +1173,7 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
     align-items: center;
     gap: 10px;
     padding: 10px 12px;
-    background: var(--etsy-white);
+    background: var(--topbar-bg, var(--etsy-white));
     border-bottom: 1px solid var(--line);
     z-index: 80;
     flex-shrink: 0;
@@ -1210,7 +1220,7 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
     right: 0;
     bottom: 0;
     z-index: 90;
-    background: var(--etsy-white);
+    background: var(--topbar-bg, var(--etsy-white));
     border-top: 1px solid var(--line);
     padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
     justify-content: space-around;

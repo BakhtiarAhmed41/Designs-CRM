@@ -13,6 +13,7 @@ import { MessagingModule } from './messaging/messaging.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OrdersModule } from './orders/orders.module';
 import { SearchModule } from './search/search.module';
+import { SettingsModule } from './settings/settings.module';
 import { StorageModule } from './storage/storage.module';
 import { RolesModule } from './roles/roles.module';
 import { TeamModule } from './team/team.module';
@@ -36,6 +37,7 @@ import { UsersModule } from './users/users.module';
     EditsModule,
     DashboardModule,
     ReportsModule,
+    SettingsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

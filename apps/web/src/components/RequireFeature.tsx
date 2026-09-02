@@ -47,3 +47,18 @@ export function RequireAdminRole({ children }: { children: React.ReactNode }) {
 
   return <>{children}</>;
 }
+
+/** Blocks a route unless the signed-in user is Super Admin. */
+export function RequireSuperAdmin({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <PageLoading />;
+  }
+
+  if (user?.role !== 'SUPER_ADMIN') {
+    return <Navigate to={staffLandingPath(user?.role, user?.permissions)} replace />;
+  }
+
+  return <>{children}</>;
+}

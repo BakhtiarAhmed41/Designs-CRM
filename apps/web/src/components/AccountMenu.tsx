@@ -85,6 +85,18 @@ export function AccountMenu({ contextLabel }: { contextLabel?: string }) {
               <i className="ti ti-user" /> Profile
             </button>
           )}
+          {user?.role === 'SUPER_ADMIN' && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                navigate('/admin/colors');
+              }}
+            >
+              <i className="ti ti-adjustments" /> Colors
+            </button>
+          )}
           <button
             type="button"
             role="menuitem"
