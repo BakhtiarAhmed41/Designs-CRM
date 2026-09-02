@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTheme } from '@/context/ThemeContext';
 import { getErrorMessage } from '@/lib/api';
 import {
@@ -13,32 +13,20 @@ import { ErrorBanner, SuccessBanner } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 
 export function AdminAppearance() {
-  const { colors: saved, loaded, preview, persist } = useTheme();
+  const { colors: saved, loaded, persist } = useTheme();
   const [draft, setDraft] = useState<ThemeColors>(saved);
   const [hexDraft, setHexDraft] = useState<Record<ThemeColorKey, string>>(saved);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const savedRef = useRef(saved);
-  savedRef.current = saved;
-
   useEffect(() => {
     if (!loaded) return;
     setDraft(saved);
     setHexDraft(saved);
-    preview(saved);
     // Only sync when the server theme finishes loading.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded]);
-
-  useEffect(() => {
-    return () => {
-      preview(savedRef.current);
-    };
-    // Revert unsaved preview when leaving the page.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const dirty = !themesEqual(draft, saved);
 
@@ -46,9 +34,7 @@ export function AdminAppearance() {
     setHexDraft((prev) => ({ ...prev, [key]: value }));
     const hex = normalizeHex(value);
     if (!hex) return;
-    const next = { ...draft, [key]: hex };
-    setDraft(next);
-    preview(next);
+    setDraft((prev) => ({ ...prev, [key]: hex }));
     setMsg(null);
   }
 
@@ -71,7 +57,6 @@ export function AdminAppearance() {
   function onReset() {
     setDraft(DEFAULT_THEME_COLORS);
     setHexDraft(DEFAULT_THEME_COLORS);
-    preview(DEFAULT_THEME_COLORS);
     setMsg(null);
     setError(null);
   }
@@ -83,7 +68,7 @@ export function AdminAppearance() {
     <div>
       <PageHeader
         title="Colors"
-        subtitle="Change how the whole app looks. Updates show right away. Click Save to keep them."
+        subtitle="Pick colors here, then click Save. Nothing changes for anyone until you save."
         actions={
           <>
             <button type="button" className="btn btn-ghost" onClick={onReset} disabled={busy}>
@@ -122,16 +107,40 @@ export function AdminAppearance() {
           ))}
         </div>
         <div className="theme-preview">
-          <button type="button" className="btn btn-primary btn-sm">
+          <button
+            type="button"
+            className="btn btn-sm"
+            style={{ background: draft.buttonBg, color: draft.buttonText, border: 'none' }}
+          >
             Primary
           </button>
-          <button type="button" className="btn btn-ghost btn-sm">
+          <button
+            type="button"
+            className="btn btn-sm"
+            style={{
+              background: draft.pageBg,
+              color: draft.mainText,
+              border: `1px solid ${draft.mainText}1a`,
+            }}
+          >
             Secondary
           </button>
-          <button type="button" className="btn btn-danger btn-sm">
+          <button
+            type="button"
+            className="btn btn-sm"
+            style={{
+              background: draft.pageBg,
+              color: draft.accent,
+              border: `1px solid ${draft.mainText}1a`,
+            }}
+          >
             Danger
           </button>
-          <button type="button" className="btn btn-danger-solid btn-sm">
+          <button
+            type="button"
+            className="btn btn-sm"
+            style={{ background: draft.accent, color: '#fff', border: 'none' }}
+          >
             Delete
           </button>
         </div>
@@ -166,26 +175,41 @@ function ColorField({
   hex: string;
   onChange: (value: string) => void;
 }) {
-  const pickerValue = (normalizeHex(hex) ?? '#000000').toLowerCase();
+  const valid = normalizeHex(hex);
+  const pickerValue = (valid ?? '#000000').toLowerCase();
+  const digits = hex.replace(/^#/, '').toUpperCase();
+
+  function onDigits(raw: string) {
+    const cleaned = raw.replace(/[^0-9a-fA-F]/g, '').slice(0, 6);
+    onChange(cleaned ? `#${cleaned}` : '#');
+  }
+
   return (
     <label className="theme-field">
       <span className="theme-field-text">
         <span className="theme-field-label">{label}</span>
         <span className="theme-field-hint">{hint}</span>
       </span>
-      <span className="theme-field-controls">
-        <input
-          type="color"
-          value={pickerValue}
-          onChange={(e) => onChange(e.target.value)}
-          aria-label={label}
-        />
+      <span className={`theme-hex${valid ? '' : ' invalid'}`}>
+        <span className="theme-hex-swatch" style={{ background: pickerValue }}>
+          <input
+            type="color"
+            value={pickerValue}
+            onChange={(e) => onChange(e.target.value)}
+            aria-label={`${label} picker`}
+          />
+        </span>
+        <span className="theme-hex-hash" aria-hidden>
+          #
+        </span>
         <input
           type="text"
-          value={hex}
-          onChange={(e) => onChange(e.target.value)}
+          className="theme-hex-input"
+          value={digits}
+          onChange={(e) => onDigits(e.target.value)}
           spellCheck={false}
-          maxLength={7}
+          maxLength={6}
+          placeholder="222222"
           aria-label={`${label} hex`}
         />
       </span>

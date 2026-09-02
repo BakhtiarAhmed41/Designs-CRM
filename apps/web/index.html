@@ -26,11 +26,27 @@
       />
     </noscript>
     <style>
-      html,body{margin:0;background:#fff}
+      html,body{margin:0;background:#fff;color-scheme:light}
+      #root{min-height:100vh;background:#fff}
+      .boot-loader{
+        min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+        background:#fff;color:#222
+      }
+      .boot-loader img{width:48px;height:48px;object-fit:contain;border-radius:50%}
+      .boot-spinner{
+        width:22px;height:22px;border:2px solid rgba(34,34,34,.12);border-top-color:#222;
+        border-radius:50%;animation:boot-spin .7s linear infinite
+      }
+      @keyframes boot-spin{to{transform:rotate(360deg)}}
     </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot-loader" role="status" aria-label="Loading">
+        <img src="/lvd-logo.png" alt="" />
+        <div class="boot-spinner"></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

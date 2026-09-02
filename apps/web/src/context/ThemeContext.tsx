@@ -49,7 +49,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       colors,
       loaded,
       preview: (next) => {
-        setColors(next);
         applyTheme(next);
       },
       persist: async (next) => {
