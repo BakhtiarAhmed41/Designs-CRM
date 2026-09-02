@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '@/context/ThemeContext';
 import { getErrorMessage } from '@/lib/api';
 import {
@@ -13,12 +13,15 @@ import { ErrorBanner, SuccessBanner } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 
 export function AdminAppearance() {
-  const { colors: saved, loaded, persist } = useTheme();
+  const { colors: saved, loaded, preview, persist } = useTheme();
   const [draft, setDraft] = useState<ThemeColors>(saved);
   const [hexDraft, setHexDraft] = useState<Record<ThemeColorKey, string>>(saved);
   const [msg, setMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const savedRef = useRef(saved);
+  savedRef.current = saved;
 
   useEffect(() => {
     if (!loaded) return;
@@ -28,13 +31,23 @@ export function AdminAppearance() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded]);
 
+  useEffect(() => {
+    return () => {
+      preview(savedRef.current);
+    };
+    // Put the last saved colors back if this page is left without Save.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const dirty = !themesEqual(draft, saved);
 
   function setColor(key: ThemeColorKey, value: string) {
     setHexDraft((prev) => ({ ...prev, [key]: value }));
     const hex = normalizeHex(value);
     if (!hex) return;
-    setDraft((prev) => ({ ...prev, [key]: hex }));
+    const next = { ...draft, [key]: hex };
+    setDraft(next);
+    preview(next);
     setMsg(null);
   }
 
@@ -54,11 +67,20 @@ export function AdminAppearance() {
     }
   }
 
-  function onReset() {
-    setDraft(DEFAULT_THEME_COLORS);
-    setHexDraft(DEFAULT_THEME_COLORS);
+  async function onReset() {
+    setBusy(true);
     setMsg(null);
     setError(null);
+    try {
+      const next = await persist(DEFAULT_THEME_COLORS);
+      setDraft(next);
+      setHexDraft(next);
+      setMsg('Default colors are back.');
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
   }
 
   const appFields = THEME_FIELDS.filter((f) => f.group === 'app');
@@ -68,10 +90,10 @@ export function AdminAppearance() {
     <div>
       <PageHeader
         title="Colors"
-        subtitle="Pick colors here, then click Save. Nothing changes for anyone until you save."
+        subtitle="Try colors on this page. Click Save to keep them. Reset puts the default look back right away."
         actions={
           <>
-            <button type="button" className="btn btn-ghost" onClick={onReset} disabled={busy}>
+            <button type="button" className="btn btn-ghost" onClick={() => void onReset()} disabled={busy}>
               Reset to default
             </button>
             <button
