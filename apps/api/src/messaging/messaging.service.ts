@@ -293,17 +293,28 @@ export class MessagingService {
     ]);
   }
 
-  private async findOpenTypedChat(
-    customerId: string,
-    chatType: ChatType,
-    orderId: string,
-  ) {
+  private async findLinkedOrderChat(customerId: string, orderId: string) {
     return this.db.queryOne<ConversationRow>(
       `SELECT * FROM conversations
-        WHERE customer_id = ? AND chat_type = ? AND order_id = ? AND status = 'OPEN'
-        ORDER BY created_at DESC LIMIT 1`,
-      [customerId, chatType, orderId],
+        WHERE customer_id = ? AND order_id = ?
+          AND chat_type IN ('ORDER', 'QUOTE')
+        ORDER BY (status = 'OPEN') DESC, created_at DESC
+        LIMIT 1`,
+      [customerId, orderId],
     );
+  }
+
+  private async reactivateLinkedChat(row: ConversationRow) {
+    const hidden = Boolean(row.hidden_from_client);
+    const closed = row.status === ConversationStatus.CLOSED;
+    if (!hidden && !closed) return row;
+    await this.db.execute(
+      `UPDATE conversations
+          SET hidden_from_client = 0, status = ?
+        WHERE id = ?`,
+      [ConversationStatus.OPEN, row.id],
+    );
+    return (await this.getConversationRow(row.id)) ?? row;
   }
 
   private async saveAttachments(messageId: string, files: UploadFile[]) {
@@ -707,12 +718,14 @@ export class MessagingService {
       input.orderId &&
       (chatType === ChatType.ORDER || chatType === ChatType.QUOTE)
     ) {
-      const existing = await this.findOpenTypedChat(
+      const existing = await this.findLinkedOrderChat(
         customerId,
-        chatType,
         input.orderId,
       );
-      if (existing) return this.conversationDto(existing);
+      if (existing) {
+        const revived = await this.reactivateLinkedChat(existing);
+        return this.conversationDto(revived);
+      }
     }
 
     const subject =
@@ -1113,12 +1126,15 @@ export class MessagingService {
     }
 
     if (orderId && (chatType === ChatType.ORDER || chatType === ChatType.QUOTE)) {
-      const existing = await this.findOpenTypedChat(
-        customerId,
-        chatType,
-        orderId,
-      );
-      if (existing) return this.conversationDto(existing, true);
+      const existing = await this.findLinkedOrderChat(customerId, orderId);
+      if (existing) {
+        const revived = await this.reactivateLinkedChat(existing);
+        const dto = this.conversationDto(revived, true);
+        this.gateway?.server?.emit('conversation:updated', {
+          conversation: dto,
+        });
+        return dto;
+      }
     }
 
     const subject =
@@ -1159,9 +1175,6 @@ export class MessagingService {
       throw new BadRequestException('Message body or attachment is required');
 
     const { convo } = await this.getOwnedConversation(user, conversationId);
-    if (convo.status === ConversationStatus.CLOSED) {
-      throw new BadRequestException('Conversation is closed');
-    }
 
     const messageId = this.db.uuid();
     await this.db.execute(

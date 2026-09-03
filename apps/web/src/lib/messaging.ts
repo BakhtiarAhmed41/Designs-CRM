@@ -311,6 +311,27 @@ export function createMyConversation(data: {
   });
 }
 
+/** Open the one quote/order chat for this record, or create it if none exists. */
+export async function openLinkedChat(opts: {
+  orderId: string;
+  chatType: 'ORDER' | 'QUOTE';
+  subject?: string;
+}) {
+  const listed = await listMyConversations();
+  const existing = listed.conversations.find(
+    (c) =>
+      c.orderId === opts.orderId &&
+      (c.chatType === 'ORDER' || c.chatType === 'QUOTE'),
+  );
+  if (existing) return existing;
+  const created = await createMyConversation({
+    orderId: opts.orderId,
+    chatType: opts.chatType,
+    subject: opts.subject,
+  });
+  return created.conversation;
+}
+
 export function deleteMyConversation(conversationId: string) {
   return apiFetch<{ ok: boolean }>(`/conversations/${conversationId}`, {
     method: 'DELETE',

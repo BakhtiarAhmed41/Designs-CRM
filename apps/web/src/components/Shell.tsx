@@ -13,7 +13,10 @@ export type MobileNavItem = {
   end?: boolean;
 };
 
-function isMessagingPath(pathname: string) {
+function isMessagingPath(pathname: string, search = '') {
+  if (pathname.startsWith('/portal/messages')) {
+    return new URLSearchParams(search).has('c');
+  }
   return pathname.includes('/messages');
 }
 
@@ -32,9 +35,9 @@ export function Shell({
   topbarSearch?: ReactNode;
   contextLabel?: string;
 }) {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const [navOpen, setNavOpen] = useState(false);
-  const messaging = isMessagingPath(pathname);
+  const messaging = isMessagingPath(pathname, search);
 
   useEffect(() => {
     setNavOpen(false);

@@ -16,7 +16,7 @@ import { RevisionRequestForm } from '@/components/RevisionRequestForm';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import { money, lifecycleChip, dateShort, paymentChip, friendlyFileName } from '@/lib/format';
 import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
-import { createMyConversation, listMyConversations } from '@/lib/messaging';
+import { openLinkedChat } from '@/lib/messaging';
 import {
   designStatusChipClass,
   designStatusLabel,
@@ -92,22 +92,16 @@ export function PortalOrderDetail() {
   });
 
   const startChat = useMutation({
-    mutationFn: async () => {
-      const listed = await listMyConversations();
-      const existing = listed.conversations.find(
-        (c) => c.orderId === id && (c.chatType === 'ORDER' || c.chatType === 'QUOTE'),
-      );
-      if (existing) return existing;
+    mutationFn: () => {
       const orderType = data?.order?.type;
-      const created = await createMyConversation({
+      const isQuote = orderType === 'QUOTE_REQUEST';
+      return openLinkedChat({
         orderId: id,
-        chatType: orderType === 'QUOTE_REQUEST' ? 'QUOTE' : 'ORDER',
-        subject:
-          orderType === 'QUOTE_REQUEST'
-            ? `Quotation ${data?.order?.humanRef ?? ''} Chat`.trim()
-            : `Order ${data?.order?.humanRef ?? ''} Chat`.trim(),
+        chatType: isQuote ? 'QUOTE' : 'ORDER',
+        subject: isQuote
+          ? `Quotation ${data?.order?.humanRef ?? ''} Chat`.trim()
+          : `Order ${data?.order?.humanRef ?? ''} Chat`.trim(),
       });
-      return created.conversation;
     },
     onSuccess: (convo) => navigate(`/portal/messages?c=${convo.id}`),
     onError: (e) => setUploadError(getErrorMessage(e)),
@@ -242,6 +236,10 @@ export function PortalOrderDetail() {
     order.status === 'CLOSED' ||
     order.status === 'REVISION_REQUESTED' ||
     (order.designs ?? []).some((d) => d.status === 'DELIVERED');
+  const isPostDelivery =
+    order.status === 'COMPLETED' ||
+    order.status === 'CLOSED' ||
+    order.status === 'REVISION_REQUESTED';
   const payChip = paymentChip(order.paymentStatus);
 
   return (
@@ -273,7 +271,8 @@ export function PortalOrderDetail() {
             disabled={startChat.isPending}
             onClick={() => startChat.mutate()}
           >
-            <i className="ti ti-message" /> Message team
+            <i className={`ti ${isPostDelivery ? 'ti-help' : 'ti-message'}`} />
+            {isPostDelivery ? 'Help Request' : 'Start Chat'}
           </button>
           {canRequestRevision && (
             <button
@@ -471,14 +470,6 @@ export function PortalOrderDetail() {
                         disabled={reject.isPending}
                       >
                         Reject
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        disabled={startChat.isPending}
-                        onClick={() => startChat.mutate()}
-                      >
-                        <i className="ti ti-message" /> Start Chat
                       </button>
                     </div>
                     <div className="pf" style={{ marginTop: 14 }}>

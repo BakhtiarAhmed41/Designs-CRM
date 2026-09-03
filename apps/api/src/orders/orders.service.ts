@@ -2901,7 +2901,8 @@ export class OrdersService {
       if (order.customer_id) {
         const existing = await tx.queryOne<{ id: string }>(
           `SELECT id FROM conversations
-            WHERE customer_id = ? AND order_id = ? AND chat_type = 'QUOTE' AND status = 'OPEN'
+            WHERE customer_id = ? AND order_id = ?
+              AND chat_type IN ('QUOTE', 'ORDER')
             ORDER BY created_at DESC LIMIT 1`,
           [order.customer_id, orderId],
         );

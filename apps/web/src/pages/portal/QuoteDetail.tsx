@@ -8,7 +8,7 @@ import {
   myAttachmentUrl,
   rejectQuotation,
 } from '@/lib/orders';
-import { createMyConversation, listMyConversations } from '@/lib/messaging';
+import { openLinkedChat } from '@/lib/messaging';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import { dateShort, money, quoteLifecycleChip } from '@/lib/format';
 import { isAdminRecounter, isStaffCreatedOrder, latestCounter, lineTotal, studioQuotation } from '@/lib/quoteHelpers';
@@ -96,21 +96,14 @@ export function PortalQuoteDetail() {
   });
 
   const startChat = useMutation({
-    mutationFn: async () => {
-      const listed = await listMyConversations();
-      const existing = listed.conversations.find(
-        (c) => c.orderId === id && c.chatType === 'QUOTE',
-      );
-      if (existing) return existing;
-      const created = await createMyConversation({
+    mutationFn: () =>
+      openLinkedChat({
         orderId: id,
         chatType: 'QUOTE',
         subject: order?.humanRef
           ? `Quotation ${order.humanRef} Chat`
           : 'Quotation Chat',
-      });
-      return created.conversation;
-    },
+      }),
     onSuccess: (convo) => navigate(`/portal/messages?c=${convo.id}`),
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -187,7 +180,7 @@ export function PortalQuoteDetail() {
               disabled={startChat.isPending}
               onClick={() => startChat.mutate()}
             >
-              <i className="ti ti-message" /> Message team
+              <i className="ti ti-message" /> Start Chat
             </button>
           </div>
         }

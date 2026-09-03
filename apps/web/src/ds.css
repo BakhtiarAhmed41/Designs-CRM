@@ -681,6 +681,7 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
 
 /* ---------- Search / toolbar ---------- */
 .searchbar { position: relative; flex: 1; max-width: 420px; }
+.searchbar.inbox-search { max-width: none; }
 .searchbar input {
   width: 100%;
   border: 1px solid var(--line);

@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDialog } from '@/components/ui/AppDialog';
 import { ConversationThread } from '@/components/messaging/ConversationThread';
 import { MessageComposer } from '@/components/messaging/MessageComposer';
+import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { SkeletonRows } from '@/components/ui/Skeleton';
 import { getErrorMessage } from '@/lib/api';
 import { whenVisible } from '@/lib/queryRefresh';
-import { dateShort } from '@/lib/format';
 import {
   chatTypeLabel,
   conversationTitle,
@@ -23,15 +25,30 @@ import {
   useMessagingSocket,
 } from '@/hooks/useMessagingSocket';
 
-function relativeTime(iso: string | null | undefined) {
+function inboxTime(iso: string | null | undefined) {
   if (!iso) return '';
-  const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return 'just now';
-  if (m < 60) return `${m}m`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h`;
-  return dateShort(iso);
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) {
+    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  }
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    ...(d.getFullYear() === now.getFullYear() ? {} : { year: 'numeric' }),
+  });
+}
+
+function conversationContext(c: Conversation) {
+  if (c.orderRef) {
+    return c.chatType === 'QUOTE' ? `Quote ${c.orderRef}` : `Order ${c.orderRef}`;
+  }
+  if (c.chatType === 'GENERAL') return chatTypeLabel(c.chatType);
+  return null;
 }
 
 export function PortalMessages() {
@@ -60,14 +77,6 @@ export function PortalMessages() {
     });
   }, [convosQuery.data?.conversations, q]);
 
-  useEffect(() => {
-    if (conversationId || convosQuery.isLoading) return;
-    const all = convosQuery.data?.conversations ?? [];
-    if (all.length > 0) {
-      setSearchParams({ c: all[0].id }, { replace: true });
-    }
-  }, [conversationId, convosQuery.data?.conversations, convosQuery.isLoading, setSearchParams]);
-
   const threadQuery = useQuery({
     queryKey: ['my-conversation', conversationId],
     queryFn: () => getMyConversation(conversationId as string),
@@ -83,6 +92,7 @@ export function PortalMessages() {
       if (conversationId) {
         void qc.invalidateQueries({ queryKey: ['my-conversation', conversationId] });
       }
+      void qc.invalidateQueries({ queryKey: ['my-conversations'] });
     },
   });
 
@@ -116,11 +126,7 @@ export function PortalMessages() {
     mutationFn: (id: string) => deleteMyConversation(id),
     onSuccess: (_res, id) => {
       setError(null);
-      const remaining = conversations.filter((c) => c.id !== id);
-      if (conversationId === id) {
-        if (remaining[0]) setSearchParams({ c: remaining[0].id }, { replace: true });
-        else setSearchParams({}, { replace: true });
-      }
+      if (conversationId === id) setSearchParams({}, { replace: true });
       void qc.invalidateQueries({ queryKey: ['my-conversations'] });
       void qc.invalidateQueries({ queryKey: ['my-conversation', id] });
       void qc.invalidateQueries({ queryKey: ['portal-convos-nav'] });
@@ -134,7 +140,12 @@ export function PortalMessages() {
     maybeRequestBrowserNotifications();
   }
 
-  async function confirmDelete(c: Conversation) {
+  function backToInbox() {
+    setSearchParams({}, { replace: true });
+    setError(null);
+  }
+
+  async function confirmDelete(id: string) {
     const ok = await dialog.confirm({
       title: 'Delete this chat?',
       message: 'It will be removed from your list.',
@@ -142,81 +153,181 @@ export function PortalMessages() {
       danger: true,
     });
     if (!ok) return;
-    deleteTopic.mutate(c.id);
+    deleteTopic.mutate(id);
+  }
+
+  const startActions = !topicFormOpen ? (
+    <button
+      type="button"
+      className="btn btn-primary"
+      onClick={() => setTopicFormOpen(true)}
+      disabled={startTopic.isPending}
+    >
+      <i className="ti ti-plus" />
+      Start New Conversation
+    </button>
+  ) : null;
+
+  if (conversationId) {
+    return (
+      <div className="msg-workspace portal portal-thread">
+        <section className="msg-center">
+          <div className="msg-center-head">
+            <div>
+              <button type="button" className="msg-back" onClick={backToInbox}>
+                <i className="ti ti-chevron-left" /> Messages
+              </button>
+              <div className="h2" style={{ margin: '6px 0 0' }}>
+                {active ? conversationTitle(active) : 'Conversation'}
+              </div>
+              {active && (
+                <div className="muted" style={{ fontSize: 12.5, marginTop: 3 }}>
+                  {conversationContext(active) ?? (active.status === 'OPEN' ? 'Open' : 'Closed')}
+                </div>
+              )}
+            </div>
+            {active && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                disabled={deleteTopic.isPending}
+                onClick={() => confirmDelete(active.id)}
+              >
+                <i className="ti ti-trash" /> Delete
+              </button>
+            )}
+          </div>
+          {error && <div className="err" style={{ margin: '0 12px' }}>{error}</div>}
+          {threadQuery.isLoading && (
+            <EmptyState icon="ti-loader" title="Loading conversation…" />
+          )}
+          {threadQuery.isError && (
+            <EmptyState
+              icon="ti-alert-circle"
+              title="Could not open this chat"
+              description="It may have been removed."
+              action={
+                <button type="button" className="btn btn-ghost btn-sm" onClick={backToInbox}>
+                  Back to messages
+                </button>
+              }
+            />
+          )}
+          {active && (
+            <>
+              <ConversationThread
+                messages={active.messages ?? []}
+                mineDirection="INBOUND"
+              />
+              <MessageComposer
+                onSend={async (body, files) => {
+                  await sendMutation.mutateAsync({ body, files });
+                }}
+              />
+            </>
+          )}
+        </section>
+      </div>
+    );
   }
 
   return (
-    <div className="msg-workspace portal">
-      <aside className="msg-left">
-        <div className="msg-left-head">
-          <div className="h2" style={{ margin: 0 }}>Messages</div>
+    <div>
+      <PageHeader
+        title="Messages"
+        subtitle="Chat with the studio about a quote, order, or anything else."
+        actions={startActions}
+      />
+
+      {error && <ErrorBanner>{error}</ErrorBanner>}
+
+      {topicFormOpen && (
+        <form
+          className="card inbox-start-card"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const subject = topicDraft.trim();
+            if (!subject) return;
+            startTopic.mutate(subject);
+          }}
+        >
+          <label className="inbox-start-label" htmlFor="new-conversation-topic">
+            What is this about?
+          </label>
           <input
-            className="msg-search"
-            placeholder="Search chats…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onFocus={() => maybeRequestBrowserNotifications()}
+            id="new-conversation-topic"
+            className="inbox-start-input"
+            autoFocus
+            placeholder="e.g. Question about a file format"
+            value={topicDraft}
+            onChange={(e) => setTopicDraft(e.target.value)}
+            maxLength={120}
           />
-          {!topicFormOpen ? (
+          <div className="inbox-start-actions">
             <button
               type="button"
-              className="btn btn-primary"
-              style={{ width: '100%', marginTop: 10 }}
-              onClick={() => setTopicFormOpen(true)}
-              disabled={startTopic.isPending}
-            >
-              <i className="ti ti-message" />
-              Start new chat
-            </button>
-          ) : (
-            <form
-              className="msg-topic-form"
-              style={{ marginTop: 10 }}
-              onSubmit={(e) => {
-                e.preventDefault();
-                const subject = topicDraft.trim();
-                if (!subject) return;
-                startTopic.mutate(subject);
+              className="btn btn-ghost btn-sm"
+              onClick={() => {
+                setTopicFormOpen(false);
+                setTopicDraft('');
               }}
             >
-              <input
-                className="msg-search"
-                style={{ marginTop: 0 }}
-                autoFocus
-                placeholder="What’s this about?"
-                value={topicDraft}
-                onChange={(e) => setTopicDraft(e.target.value)}
-                maxLength={120}
-              />
-              <div className="msg-topic-actions">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary btn-sm"
+              disabled={!topicDraft.trim() || startTopic.isPending}
+            >
+              {startTopic.isPending ? 'Starting…' : 'Start Conversation'}
+            </button>
+          </div>
+        </form>
+      )}
+
+      <div className="searchbar inbox-search">
+        <i className="ti ti-search si" aria-hidden />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onFocus={() => maybeRequestBrowserNotifications()}
+          placeholder="Search conversations…"
+          aria-label="Search conversations"
+        />
+      </div>
+
+      <div className="card">
+        {convosQuery.isLoading && <SkeletonRows rows={5} />}
+        {!convosQuery.isLoading && conversations.length === 0 && (
+          <EmptyState
+            icon="ti-message"
+            title={q.trim() ? 'No matching conversations' : 'No conversations yet'}
+            description={
+              q.trim()
+                ? 'Try a different search, or start a new conversation.'
+                : 'Start a new conversation, or open chat from a quote or order.'
+            }
+            action={
+              !q.trim() ? (
                 <button
                   type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => {
-                    setTopicFormOpen(false);
-                    setTopicDraft('');
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
                   className="btn btn-primary btn-sm"
-                  disabled={!topicDraft.trim() || startTopic.isPending}
+                  onClick={() => setTopicFormOpen(true)}
                 >
-                  {startTopic.isPending ? 'Starting…' : 'Start'}
+                  <i className="ti ti-plus" /> Start New Conversation
                 </button>
-              </div>
-            </form>
-          )}
-        </div>
-        <div className="msg-left-list">
-          {conversations.map((c) => (
+              ) : undefined
+            }
+          />
+        )}
+        {conversations.map((c) => {
+          const context = conversationContext(c);
+          return (
             <div
               key={c.id}
               role="button"
               tabIndex={0}
-              className={`msg-cust-card ${c.id === conversationId ? 'on' : ''}`}
+              className="orow inbox-row"
               onClick={() => selectConvo(c)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -225,76 +336,30 @@ export function PortalMessages() {
                 }
               }}
             >
-              <div className="msg-cust-main" style={{ width: '100%' }}>
-                <div className="msg-cust-top">
-                  <strong>{conversationTitle(c)}</strong>
-                  <span>{relativeTime(c.lastMessageAt)}</span>
-                </div>
-                <div className="msg-cust-preview">
+              <div className="thumb">
+                <i className="ti ti-message" />
+              </div>
+              <div className="oinfo">
+                <div className="on">{conversationTitle(c)}</div>
+                {context && <div className="om">{context}</div>}
+                <div className="om inbox-snippet">
                   {c.lastMessagePreview || 'No messages yet'}
                 </div>
-                <div className="msg-cust-meta">
-                  {c.chatType === 'GENERAL' && (
-                    <span className="msg-type">{chatTypeLabel(c.chatType)}</span>
-                  )}
-                  {c.unreadClient > 0 && (
-                    <span className="msg-badge">{c.unreadClient}</span>
-                  )}
-                </div>
               </div>
-              <button
-                type="button"
-                className="icon-btn danger msg-thread-delete"
-                aria-label="Delete chat"
-                disabled={deleteTopic.isPending}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  confirmDelete(c);
-                }}
-              >
-                <i className="ti ti-trash" />
-              </button>
-            </div>
-          ))}
-          {!convosQuery.isLoading && conversations.length === 0 && (
-            <div className="msg-empty-state">
-              <div className="empty-state-title">No conversations yet</div>
-              <p className="empty-state-desc">Start a topic or open chat from an order or quote.</p>
-            </div>
-          )}
-        </div>
-      </aside>
-
-      <section className="msg-center">
-        {active ? (
-          <>
-            <div className="msg-center-head">
-              <div>
-                <div className="h2" style={{ margin: 0 }}>
-                  {conversationTitle(active)}
-                </div>
-                <div className="muted" style={{ fontSize: 12.5, marginTop: 3 }}>
-                  {active.status === 'OPEN' ? 'Open' : 'Closed'}
-                </div>
+              <div className="inbox-meta">
+                <span>{inboxTime(c.lastMessageAt)}</span>
+                {c.unreadClient > 0 && (
+                  <span className="msg-badge">{c.unreadClient}</span>
+                )}
               </div>
+              <i className="ti ti-chevron-right inbox-chevron" aria-hidden />
             </div>
-            {error && <div className="err" style={{ margin: '0 12px' }}>{error}</div>}
-            <ConversationThread
-              messages={active?.messages ?? []}
-              mineDirection="INBOUND"
-            />
-            <MessageComposer
-              onSend={async (body, files) => {
-                await sendMutation.mutateAsync({ body, files });
-              }}
-            />
-          </>
-        ) : (
-          <div className="msg-empty-state">
-            Select a conversation or start a new topic chat.
-          </div>
+          );
+        })}
+        {!convosQuery.isLoading && conversations.length > 0 && (
+          <div className="inbox-hint">Select a conversation to view messages.</div>
         )}
-      </section>
+      </div>
     </div>
   );
 }
