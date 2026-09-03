@@ -51,7 +51,7 @@ export function quoteHistoryLabel(
   const hadClientBefore = all.some(
     (other) => other.createdByRole === 'CLIENT' && other.version < q.version,
   );
-  return hadClientBefore ? 'Re-counter from studio' : 'Studio quote';
+  return hadClientBefore ? 'Updated quote' : 'Team quote';
 }
 
 export function lineTotal(l: QuotationLine) {

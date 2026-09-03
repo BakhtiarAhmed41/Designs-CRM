@@ -47,7 +47,6 @@ function conversationContext(c: Conversation) {
   if (c.orderRef) {
     return c.chatType === 'QUOTE' ? `Quote ${c.orderRef}` : `Order ${c.orderRef}`;
   }
-  if (c.chatType === 'GENERAL') return chatTypeLabel(c.chatType);
   return null;
 }
 
@@ -169,31 +168,34 @@ export function PortalMessages() {
   ) : null;
 
   if (conversationId) {
+    const threadContext = active ? conversationContext(active) : null;
     return (
       <div className="msg-workspace portal portal-thread">
         <section className="msg-center">
-          <div className="msg-center-head">
-            <div>
-              <button type="button" className="msg-back" onClick={backToInbox}>
-                <i className="ti ti-chevron-left" /> Messages
-              </button>
-              <div className="h2" style={{ margin: '6px 0 0' }}>
+          <div className="msg-center-head portal-thread-head">
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label="Back to messages"
+              onClick={backToInbox}
+            >
+              <i className="ti ti-arrow-left" />
+            </button>
+            <div className="portal-thread-title">
+              <div className="on">
                 {active ? conversationTitle(active) : 'Conversation'}
               </div>
-              {active && (
-                <div className="muted" style={{ fontSize: 12.5, marginTop: 3 }}>
-                  {conversationContext(active) ?? (active.status === 'OPEN' ? 'Open' : 'Closed')}
-                </div>
-              )}
+              {threadContext && <div className="om">{threadContext}</div>}
             </div>
             {active && (
               <button
                 type="button"
-                className="btn btn-ghost btn-sm"
+                className="icon-btn danger"
+                aria-label="Delete chat"
                 disabled={deleteTopic.isPending}
                 onClick={() => confirmDelete(active.id)}
               >
-                <i className="ti ti-trash" /> Delete
+                <i className="ti ti-trash" />
               </button>
             )}
           </div>
@@ -235,7 +237,7 @@ export function PortalMessages() {
     <div>
       <PageHeader
         title="Messages"
-        subtitle="Chat with the studio about a quote, order, or anything else."
+        subtitle="Chat with the team about a quote, order, or anything else."
         actions={startActions}
       />
 

@@ -2,7 +2,7 @@ import * as bcrypt from 'bcryptjs';
 
 const ROUNDS = 10;
 
-/** Hash a password or refresh token. Pure JS — no native build on Hostinger. */
+/** Hash a password or refresh token. Pure JS - no native build on Hostinger. */
 export async function hashSecret(value: string): Promise<string> {
   return bcrypt.hash(value, ROUNDS);
 }

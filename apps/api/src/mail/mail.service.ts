@@ -70,7 +70,7 @@ export class MailService {
     const transport = this.getTransport();
     if (!transport) {
       this.logger.warn(
-        `SMTP not configured — skipped email to ${to}: ${opts.subject}`,
+        `SMTP not configured - skipped email to ${to}: ${opts.subject}`,
       );
       return false;
     }
@@ -93,7 +93,7 @@ export class MailService {
     const link = `${webBase()}/login?verify=${encodeURIComponent(token)}`;
     return this.sendMail({
       to,
-      subject: 'Verify your email — Las Vegas Designs',
+      subject: 'Verify your email - Las Vegas Designs',
       text: `Thanks for creating an account.\n\nConfirm this email address:\n${link}\n\nThe link expires in 48 hours. After you verify, our team reviews the login request before you can sign in.`,
       html: wrapHtml(
         'Confirm your email address',
@@ -108,7 +108,7 @@ export class MailService {
     const link = `${webBase()}/login?reset=${encodeURIComponent(token)}`;
     return this.sendMail({
       to,
-      subject: 'Reset your password — Las Vegas Designs',
+      subject: 'Reset your password - Las Vegas Designs',
       text: `We received a request to reset your password.\n\n${link}\n\nThis link expires in 1 hour. If you did not ask for this, ignore this email.`,
       html: wrapHtml(
         'Reset your password',
@@ -122,7 +122,7 @@ export class MailService {
     const link = `${webBase()}/login?emailChange=${encodeURIComponent(token)}`;
     return this.sendMail({
       to,
-      subject: 'Confirm your new email — Las Vegas Designs',
+      subject: 'Confirm your new email - Las Vegas Designs',
       text: `Confirm this new email address for your account:\n\n${link}\n\nThe link expires in 24 hours.`,
       html: wrapHtml(
         'Confirm your new email',
@@ -159,15 +159,29 @@ export class MailService {
     });
   }
 
+  async sendQuoteUpdated(to: string, orderName: string, orderId: string) {
+    const link = `${webBase()}/portal/quotes/${orderId}`;
+    return this.sendMail({
+      to,
+      subject: `Your quote was updated: ${orderName}`,
+      text: `We updated the quote for ${orderName}. Open it to review:\n\n${link}`,
+      html: wrapHtml(
+        'Your quote was updated',
+        `<p>We updated the quote for <strong>${orderName}</strong>.</p>
+         <p><a href="${link}">Review quote</a></p>`,
+      ),
+    });
+  }
+
   async sendQuoteReady(to: string, orderName: string, orderId: string) {
     const link = `${webBase()}/portal/quotes/${orderId}`;
     return this.sendMail({
       to,
       subject: `Your quote is ready: ${orderName}`,
-      text: `We priced ${orderName}. Open the quote to accept, decline, or send a counter:\n\n${link}`,
+      text: `We priced ${orderName}. Open the quote to review it:\n\n${link}`,
       html: wrapHtml(
         'Your quote is ready',
-        `<p>We priced <strong>${orderName}</strong>. Open it to accept, decline, or send a counter.</p>
+        `<p>We priced <strong>${orderName}</strong>. Open it to review.</p>
          <p><a href="${link}">Review quote</a></p>`,
       ),
     });

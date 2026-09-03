@@ -1255,6 +1255,16 @@ export class OrdersService {
     if (lines.length > 0 && keepIds.size === 0) {
       throw new BadRequestException('Keep at least one line to approve');
     }
+    if (
+      lines.length > 0 &&
+      input?.keepLineIds &&
+      input.keepLineIds.length > 0 &&
+      !lines.some((l) => keepIds.has(l.id))
+    ) {
+      throw new BadRequestException(
+        'This quote was updated. Refresh the page and review the new price.',
+      );
+    }
 
     const customer = order.customer_id
       ? await this.db.queryOne<{ account_type: AccountType }>(
@@ -1343,10 +1353,10 @@ export class OrdersService {
       title: 'Quotation approved',
       body:
         approvedBy === 'admin'
-          ? `Admin approved a studio-created quote — converted to order - ${order.name ?? ''}`
+          ? `Admin approved a studio-created quote - converted to order - ${order.name ?? ''}`
           : keepIds.size < lines.length
-            ? `Customer partially accepted — converted to order - ${order.name ?? ''}`
-            : `Customer accepted — converted to order - ${order.name ?? ''}`,
+            ? `Customer partially accepted - converted to order - ${order.name ?? ''}`
+            : `Customer accepted - converted to order - ${order.name ?? ''}`,
       link: `/admin/orders/${orderId}`,
     });
     return this.assembleOrder(orderId);
@@ -1385,16 +1395,14 @@ export class OrdersService {
 
   async clientCounterQuotation(
     user: AuthUser | undefined,
-    orderId: string,
-    input: { amountCents?: number | null; currency?: string | null; comment?: string | null },
+    _orderId: string,
+    _input: { amountCents?: number | null; currency?: string | null; comment?: string | null },
   ) {
     assertAuthUser(user);
     if (user.role !== UserRole.CLIENT) throw new ForbiddenException();
-    const order = await this.getOrderRow(orderId);
-    if (!order || order.client_user_id !== user.id)
-      throw new NotFoundException('Order not found');
-    if (order.status !== OrderStatus.QUOTATION_PROVIDED)
-      throw new BadRequestException('Order is not awaiting client decision');
+    throw new BadRequestException(
+      'This action is not available.',
+    );
 
     const latest = await this.getLatestQuotation(orderId);
     const nextVersion = (latest?.version ?? 0) + 1;
@@ -1586,7 +1594,7 @@ export class OrdersService {
 
     await this.notifyAdmins({
       title: 'Order duplicated',
-      body: `Copied from ${source.name ?? source.human_ref ?? 'order'} — review and price as needed`,
+      body: `Copied from ${source.name ?? source.human_ref ?? 'order'} - review and price as needed`,
       link: `/admin/orders/${id}`,
     });
 
@@ -2086,7 +2094,7 @@ export class OrdersService {
 
     if (order.client_user_id) {
       await this.notifications.createFor(order.client_user_id, {
-        title: 'Counter approved — now an order',
+        title: 'Counter approved - now an order',
         body: 'Your counter was approved. Status is now In progress.',
         link: `/portal/orders/${orderId}`,
       });
@@ -2215,8 +2223,8 @@ export class OrdersService {
     );
     if (order.client_user_id) {
       await this.notifications.createFor(order.client_user_id, {
-        title: 'Re-counter from the studio',
-        body: note,
+        title: 'Quote updated',
+        body: `Your quote was updated - ${order.name ?? ''}`,
         link: `/portal/quotes/${orderId}`,
       });
     }
@@ -2813,6 +2821,12 @@ export class OrdersService {
 
     const currency = order.currency || 'USD';
 
+    const priorQuote = await this.db.queryOne<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM quotations WHERE order_id = ?',
+      [orderId],
+    );
+    const isUpdate = Number(priorQuote?.n ?? 0) > 0;
+
     const latestProposed = await this.db.queryOne<QuotationRow>(
       `SELECT * FROM quotations
         WHERE order_id = ? AND status = ?
@@ -2820,7 +2834,11 @@ export class OrdersService {
         LIMIT 1`,
       [orderId, QuotationStatus.PROPOSED],
     );
-    if (latestProposed && Number(latestProposed.amount_cents ?? 0) === total) {
+    if (
+      !isUpdate &&
+      latestProposed &&
+      Number(latestProposed.amount_cents ?? 0) === total
+    ) {
       return {
         ...this.quotationDto(latestProposed),
         lines: await this.getQuotationLines(latestProposed.id),
@@ -2831,6 +2849,10 @@ export class OrdersService {
       const latest = await tx.queryOne<{ version: number }>(
         'SELECT version FROM quotations WHERE order_id = ? ORDER BY version DESC LIMIT 1',
         [orderId],
+      );
+      await tx.execute(
+        `UPDATE quotations SET status = ? WHERE order_id = ? AND status = ?`,
+        [QuotationStatus.SENT, orderId, QuotationStatus.PROPOSED],
       );
       const nextVersion = (latest?.version ?? 0) + 1;
       const qId = randomUUID();
@@ -2884,18 +2906,7 @@ export class OrdersService {
         [OrderStatus.QUOTATION_PROVIDED, total, orderId],
       );
 
-      if (order.client_user_id) {
-        await tx.execute(
-          'INSERT INTO notifications (id, user_id, title, body, link) VALUES (?, ?, ?, ?, ?)',
-          [
-            randomUUID(),
-            order.client_user_id,
-            'Quotation provided',
-            `Review your quote - ${order.name ?? ''}`,
-            `/portal/quotes/${orderId}`,
-          ],
-        );
-      }
+      // Customer notice is sent after commit so the bell updates live.
 
       // Ensure a quote-linked conversation exists for messaging about this quote.
       if (order.customer_id) {
@@ -2930,9 +2941,22 @@ export class OrdersService {
       'SELECT * FROM quotations WHERE id = ? LIMIT 1',
       [quotationId],
     );
+    if (order.client_user_id) {
+      await this.notifications.createFor(order.client_user_id, {
+        title: isUpdate ? 'Quote updated' : 'Quotation provided',
+        body: isUpdate
+          ? `Your quote was updated - ${order.name ?? ''}`
+          : `Review your quote - ${order.name ?? ''}`,
+        link: `/portal/quotes/${orderId}`,
+      });
+    }
     const email = await this.customerEmailForOrder(order);
     if (email) {
-      void this.mail.sendQuoteReady(email, order.name ?? 'your quote', orderId);
+      if (isUpdate) {
+        void this.mail.sendQuoteUpdated(email, order.name ?? 'your quote', orderId);
+      } else {
+        void this.mail.sendQuoteReady(email, order.name ?? 'your quote', orderId);
+      }
     }
     return {
       ...this.quotationDto(row!),

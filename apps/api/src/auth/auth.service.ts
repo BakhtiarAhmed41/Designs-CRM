@@ -292,7 +292,7 @@ export class AuthService {
     const emailSent = await this.mail.sendPasswordReset(user.email, token);
     const env = getEnv();
     // Only expose the raw token when explicitly opted in (local tooling).
-    // Never return it just because SMTP is off — that enables account takeover.
+    // Never return it just because SMTP is off - that enables account takeover.
     const resetToken =
       !emailSent && env.AUTH_EXPOSE_RESET_TOKEN ? token : null;
     return { ok: true, resetToken, emailSent };

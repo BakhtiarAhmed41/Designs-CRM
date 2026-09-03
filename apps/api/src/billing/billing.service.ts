@@ -47,7 +47,7 @@ function currentPeriodMonth(): string {
   return `${y}-${m}`;
 }
 
-/** The month that just ended — default for month-end statements. */
+/** The month that just ended - default for month-end statements. */
 function previousPeriodMonth(): string {
   const now = new Date();
   const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
@@ -525,7 +525,7 @@ export class BillingService {
 
   /**
    * After a customer accepts a quote: create a per-order invoice + pay link.
-   * No admin check — the customer already owns the order.
+   * No admin check - the customer already owns the order.
    */
   async billPayPerOrderQuote(data: {
     customerId: string;
@@ -2280,7 +2280,7 @@ function buildInvoicePrintHtml(
       const signed =
         p.type === PaymentType.REFUND ? `−${money(p.amount_cents)}` : money(p.amount_cents);
       return `<tr>
-        <td>${escapeHtml(when || '—')}</td>
+        <td>${escapeHtml(when || '-')}</td>
         <td>${escapeHtml(label)}</td>
         <td class="num">${escapeHtml(signed)}</td>
       </tr>`;
@@ -2584,7 +2584,7 @@ function buildInvoicePrintHtml(
       <div>
         <div class="k">Details</div>
         <dl class="facts">
-          <dt>Issued</dt><dd>${escapeHtml(issued || '—')}</dd>
+          <dt>Issued</dt><dd>${escapeHtml(issued || '-')}</dd>
           ${dueOn ? `<dt>Due</dt><dd>${escapeHtml(dueOn)}</dd>` : ''}
           ${paidOn ? `<dt>Paid</dt><dd>${escapeHtml(paidOn)}</dd>` : ''}
           ${period ? `<dt>Period</dt><dd>${escapeHtml(period)}</dd>` : ''}

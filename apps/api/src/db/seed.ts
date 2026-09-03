@@ -15,7 +15,7 @@ async function main() {
     return;
   }
   // eslint-disable-next-line no-console
-  console.log('No demo seed. SEED_ADMIN_EMAIL is empty — no users will be created.');
+  console.log('No demo seed. SEED_ADMIN_EMAIL is empty - no users will be created.');
 }
 
 main().catch((err) => {

@@ -244,7 +244,7 @@ export function AdminQuoteDetail() {
       }),
     onSuccess: (res) => {
       setRevising(false);
-      setToast('Quote sent. Waiting for the customer.');
+      setToast(revising ? 'Revised quote sent. The customer will be notified.' : 'Quote sent. Waiting for the customer.');
       void applyOrderChange(qc, res.order);
       refreshThread();
     },

@@ -3,7 +3,6 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   acceptQuotation,
-  counterQuotation,
   getMyOrder,
   myAttachmentUrl,
   rejectQuotation,
@@ -26,14 +25,13 @@ export function PortalQuoteDetail() {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [kept, setKept] = useState<string[] | null>(null);
-  const [counterAmount, setCounterAmount] = useState('');
-  const [counterNote, setCounterNote] = useState('');
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['my-order', id],
     queryFn: () => getMyOrder(id),
     enabled: !!id,
     ...freshOnOpen,
+    refetchOnWindowFocus: 'always',
   });
 
   useEffect(() => {
@@ -75,22 +73,6 @@ export function PortalQuoteDetail() {
     onSuccess: (res) => {
       void applyOrderChange(qc, res.order);
       setToast('Quote declined.');
-    },
-    onError: (e) => setError(getErrorMessage(e)),
-  });
-
-  const counterMut = useMutation({
-    mutationFn: () =>
-      counterQuotation(id, {
-        amountCents: counterAmount
-          ? Math.round(parseFloat(counterAmount) * 100)
-          : undefined,
-        comment: counterNote.trim() || undefined,
-      }),
-    onSuccess: (res) => {
-      setError(null);
-      void applyOrderChange(qc, res.order);
-      setToast('Counter sent. We’ll review it.');
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -166,7 +148,7 @@ export function PortalQuoteDetail() {
     <div>
       <PageHeader
         title={order.name ?? 'Quote request'}
-        subtitle={`Q-${order.humanRef ?? order.id.slice(0, 6)} · ${dateShort(order.createdAt)}${isStaffCreatedOrder(order) ? ' · Created by the studio' : ''}`}
+        subtitle={`Q-${order.humanRef ?? order.id.slice(0, 6)} · ${dateShort(order.createdAt)}${isStaffCreatedOrder(order) ? ' · Created by the team' : ''}`}
         crumbs={[
           { label: 'Quotes', to: '/portal/quotes' },
           { label: order.humanRef ?? 'Quote' },
@@ -198,14 +180,14 @@ export function PortalQuoteDetail() {
           <div className="quote-counter-head">
             <i className="ti ti-scale" aria-hidden />
             <div>
-              <strong>Re-counter from admin</strong>
-              <p>The studio sent a new price. You can accept it or counter again.</p>
+              <strong>Updated quote</strong>
+              <p>The team sent a new price.</p>
             </div>
           </div>
           <div className="quote-counter-field">
-            <span>Studio offered</span>
+            <span>Quoted total</span>
             <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--navy)' }}>
-              {studio?.amountCents != null ? money(studio.amountCents, studio.currency) : '—'}
+              {studio?.amountCents != null ? money(studio.amountCents, studio.currency) : '-'}
             </div>
           </div>
           {studio?.comment && (
@@ -221,7 +203,7 @@ export function PortalQuoteDetail() {
 
       {declinedByStudio && (
         <div className="note amber" style={{ marginBottom: 12 }}>
-          <i className="ti ti-x" /> This quote was declined by the studio
+          <i className="ti ti-x" /> This quote was declined by the team
           {order.rejectionReason ? `: ${order.rejectionReason}` : '.'}
         </div>
       )}
@@ -232,7 +214,7 @@ export function PortalQuoteDetail() {
             <i className="ti ti-scale" aria-hidden />
             <div>
               <strong>Your counter-offer</strong>
-              <p>The studio is reviewing this. You don’t need to approve it.</p>
+              <p>The team is reviewing this. You don’t need to approve it.</p>
             </div>
           </div>
           {counterQuote ? (
@@ -242,7 +224,7 @@ export function PortalQuoteDetail() {
                 <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--navy)' }}>
                   {counterQuote.amountCents != null
                     ? money(counterQuote.amountCents, counterQuote.currency)
-                    : '—'}
+                    : '-'}
                 </div>
               </div>
               {counterQuote.comment && (
@@ -255,13 +237,13 @@ export function PortalQuoteDetail() {
               )}
               {studio?.amountCents != null && (
                 <div className="muted" style={{ fontSize: 13, marginTop: 12 }}>
-                  Studio quote was {money(studio.amountCents, studio.currency)}
+                  Previous quote was {money(studio.amountCents, studio.currency)}
                 </div>
               )}
             </>
           ) : (
             <p className="muted" style={{ margin: 0 }}>
-              Your counter is with the studio.
+              Your counter is with the team.
             </p>
           )}
         </div>
@@ -273,7 +255,7 @@ export function PortalQuoteDetail() {
             {order.status === 'WAITING_FOR_QUOTATION' || order.status === 'CREATED'
               ? 'Your request is being priced. You’ll see line items here when a quote is ready.'
               : order.status === 'REJECTED'
-                ? 'This request was declined by the studio.'
+                ? 'This request was declined by the team.'
                 : 'No quotation lines yet.'}
           </div>
         )}
@@ -365,54 +347,6 @@ export function PortalQuoteDetail() {
                 </div>
               )}
             </div>
-            {canDecide && (
-              <div className="quote-counter">
-                <div className="quote-counter-head">
-                  <i className="ti ti-scale" aria-hidden />
-                  <div>
-                    <strong>{adminRecounter ? 'Counter again' : 'Counter this quote'}</strong>
-                    <p>Suggest a different total. We’ll review it and reply.</p>
-                  </div>
-                </div>
-                <div className="quote-counter-grid">
-                  <label className="quote-counter-field">
-                    <span>Your amount</span>
-                    <div className="quote-counter-amount">
-                      <span aria-hidden>$</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        inputMode="decimal"
-                        placeholder="0.00"
-                        value={counterAmount}
-                        onChange={(e) => setCounterAmount(e.target.value)}
-                      />
-                    </div>
-                  </label>
-                  <label className="quote-counter-field">
-                    <span>Note for the team</span>
-                    <textarea
-                      rows={2}
-                      placeholder="Optional — why this price works for you"
-                      value={counterNote}
-                      onChange={(e) => setCounterNote(e.target.value)}
-                    />
-                  </label>
-                </div>
-                <div className="quote-counter-actions">
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    disabled={counterMut.isPending || !counterAmount}
-                    onClick={() => counterMut.mutate()}
-                  >
-                    <i className="ti ti-send" />
-                    {counterMut.isPending ? 'Sending…' : 'Send counter-offer'}
-                  </button>
-                </div>
-              </div>
-            )}
           </>
         )}
       </div>

@@ -59,7 +59,7 @@ export class MessagingGateway
       });
   }
 
-  /** Staff who currently have an open socket — source of truth for Online. */
+  /** Staff who currently have an open socket - source of truth for Online. */
   connectedUserIds(): Set<string> {
     const ids = new Set<string>();
     for (const [userId, sockets] of this.socketsByUser) {

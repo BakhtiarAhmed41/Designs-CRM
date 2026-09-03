@@ -36,7 +36,7 @@ export function mapMulterFiles(files?: Express.Multer.File[]) {
     const raw = f.buffer as Buffer | Uint8Array | undefined;
     if (!raw || (typeof (raw as Buffer).length === 'number' && raw.length === 0 && f.size > 0)) {
       throw new BadRequestException(
-        `Upload failed for "${f.originalname || 'file'}" — empty file buffer`,
+        `Upload failed for "${f.originalname || 'file'}" - empty file buffer`,
       );
     }
     const buffer = Buffer.isBuffer(raw)
@@ -44,7 +44,7 @@ export function mapMulterFiles(files?: Express.Multer.File[]) {
       : Buffer.from(raw ?? []);
     if (!buffer.length && !f.size) {
       throw new BadRequestException(
-        `Upload failed for "${f.originalname || 'file'}" — empty file`,
+        `Upload failed for "${f.originalname || 'file'}" - empty file`,
       );
     }
     return {

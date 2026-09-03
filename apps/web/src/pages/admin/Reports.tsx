@@ -60,7 +60,7 @@ function pretty(value: string | null | undefined) {
 }
 
 function hoursLabel(hours: number | null | undefined) {
-  if (hours == null) return '—';
+  if (hours == null) return '-';
   if (hours < 24) return `${hours}h`;
   const days = Math.round((hours / 24) * 10) / 10;
   return `${days}d`;

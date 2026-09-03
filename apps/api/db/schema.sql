@@ -505,9 +505,9 @@ CREATE TABLE IF NOT EXISTS app_settings (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT IGNORE INTO app_settings (setting_key, setting_value) VALUES
-  ('turnaround.standard.label', 'Standard (12–24 hrs)'),
+  ('turnaround.standard.label', 'Standard (12-24 hrs)'),
   ('turnaround.standard.hours', '24'),
-  ('turnaround.urgent.label', 'Rush (4–8 hrs)'),
+  ('turnaround.urgent.label', 'Rush (4-8 hrs)'),
   ('turnaround.urgent.hours', '8');
 
 CREATE TABLE IF NOT EXISTS quote_drafts (

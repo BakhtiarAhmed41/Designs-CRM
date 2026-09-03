@@ -155,7 +155,7 @@ export function AdminCounterDecision({
                   <span>Note for the customer</span>
                   <textarea
                     rows={2}
-                    placeholder="Required — why this price"
+                    placeholder="Required - why this price"
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                   />
@@ -190,7 +190,7 @@ export function AdminCounterDecision({
                   <span>Note for the customer</span>
                   <textarea
                     rows={2}
-                    placeholder="Required — why this is closed"
+                    placeholder="Required - why this is closed"
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                   />

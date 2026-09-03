@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { confirmMyOrder, startMyOrderCheckout } from '@/lib/billing';
 import {
   acceptQuotation,
-  counterQuotation,
   getMyOrder,
   myAttachmentUrl,
   myDeliveryFileUrl,
@@ -44,7 +43,6 @@ export function PortalOrderDetail() {
   const qc = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const paidReturn = searchParams.get('paid') === '1';
-  const [counter, setCounter] = useState('');
   const [keepLineIds, setKeepLineIds] = useState<string[] | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -58,6 +56,7 @@ export function PortalOrderDetail() {
     queryKey: ['my-order', id],
     queryFn: () => getMyOrder(id),
     ...freshOnOpen,
+    refetchOnWindowFocus: 'always',
     refetchInterval: (q) => {
       if (!paidReturn) return false;
       const o = q.state.data?.order as { status?: string; paymentStatus?: string } | undefined;
@@ -182,18 +181,6 @@ export function PortalOrderDetail() {
     mutationFn: () => rejectQuotation(id),
     onSuccess: (res) => {
       setActionError(null);
-      void applyOrderChange(qc, res.order);
-    },
-    onError: (e) => setActionError(getErrorMessage(e)),
-  });
-  const counterM = useMutation({
-    mutationFn: () =>
-      counterQuotation(id, {
-        amountCents: Math.round(parseFloat(counter || '0') * 100),
-      }),
-    onSuccess: (res) => {
-      setActionError(null);
-      setCounter('');
       void applyOrderChange(qc, res.order);
     },
     onError: (e) => setActionError(getErrorMessage(e)),
@@ -471,24 +458,6 @@ export function PortalOrderDetail() {
                       >
                         Reject
                       </button>
-                    </div>
-                    <div className="pf" style={{ marginTop: 14 }}>
-                      <label>Or propose your own price (counter)</label>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <input
-                          placeholder="$"
-                          value={counter}
-                          onChange={(e) => setCounter(e.target.value)}
-                        />
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-sm"
-                          onClick={() => counterM.mutate()}
-                          disabled={!counter || counterM.isPending}
-                        >
-                          Send counter
-                        </button>
-                      </div>
                     </div>
                   </>
                 )}

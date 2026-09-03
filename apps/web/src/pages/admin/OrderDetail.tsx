@@ -1029,7 +1029,7 @@ export function AdminOrderDetail() {
               </div>
               <div className="muted" style={{ padding: '10px 16px 0', fontSize: 12.5 }}>
                 Upload the export, then send it. Leave the fee blank to send free.
-                Enter a fee to invoice first — the file is held until they pay.
+                Enter a fee to invoice first - the file is held until they pay.
               </div>
               {formatReqQ.data?.requests.map((r) => {
                 const picked = formatFiles[r.id] ?? [];
@@ -1613,7 +1613,7 @@ export function AdminOrderDetail() {
               {publishFiles.length > 0 && (
                 <>
                   <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
-                    {publishFiles.length} of 10 files — click the trash on a picture to remove it
+                    {publishFiles.length} of 10 files - click the trash on a picture to remove it
                   </div>
                   <LocalPublishFiles
                     files={publishFiles}

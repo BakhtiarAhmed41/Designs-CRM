@@ -104,7 +104,7 @@ export function PortalQuotes() {
     <div>
       <PageHeader
         title="Quotes"
-        subtitle="See our price, then approve to start, or message us to adjust."
+        subtitle="See our price, then approve to start."
         actions={
           <>
             {drafts.length > 0 && (
@@ -229,7 +229,7 @@ export function PortalQuotes() {
                       <div className="os">Open quote</div>
                     </>
                   ) : declined ? (
-                    <span style={{ color: 'var(--faint)', fontWeight: 500 }}>—</span>
+                    <span style={{ color: 'var(--faint)', fontWeight: 500 }}>-</span>
                   ) : (
                     <span style={{ color: 'var(--faint)', fontWeight: 500 }}>Pending</span>
                   )}

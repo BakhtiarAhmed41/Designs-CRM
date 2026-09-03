@@ -1,5 +1,5 @@
 /* ============================================================
-   Las Vegas Designs — product theme
+   Las Vegas Designs - product theme
    New chrome and surfaces. Brand navy + maroon stay.
    Login screen is left to index.css / original login-card.
    ============================================================ */
@@ -933,7 +933,7 @@ button.ghost i { color: var(--ink); }
 }
 .od-line { padding: 12px 20px; }
 
-/* Inner screens — one logo navy, even spacing */
+/* Inner screens - one logo navy, even spacing */
 .c-new,
 .c-prog,
 .c-review,

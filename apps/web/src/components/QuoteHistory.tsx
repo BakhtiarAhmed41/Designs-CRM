@@ -3,7 +3,7 @@ import { quoteHistoryLabel, type QuoteWithLines } from '@/lib/quoteHelpers';
 
 const STATUS_LABEL: Record<string, string> = {
   PROPOSED: 'Open',
-  SENT: 'Sent',
+  SENT: 'Replaced',
   COUNTERED: 'Countered',
   APPROVED: 'Accepted',
   REJECTED: 'Rejected',

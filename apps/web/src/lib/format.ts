@@ -208,7 +208,7 @@ export function quoteLifecycleChip(
     const isCustomer = audience === 'customer';
     return {
       cls: 'chip c-quote',
-      label: isCustomer ? 'Re-counter from admin' : 'Re-counter sent',
+      label: isCustomer ? 'Updated quote' : 'Updated quote sent',
     };
   }
   return lifecycleChip(status, audience, opts);
