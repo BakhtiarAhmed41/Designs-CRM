@@ -967,6 +967,7 @@ button.ghost i { color: var(--ink); }
 .role-pill { border-radius: 6px; padding: 3px 8px; }
 
 .card { padding: 0; }
+.card.inbox-start-card { padding: 20px 22px 18px; }
 .card + .card { margin-top: 0; }
 .card-b { padding: 18px 12px; }
 .card-pad { padding: 20px 12px; }

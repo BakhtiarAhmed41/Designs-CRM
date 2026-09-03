@@ -983,14 +983,19 @@ button { font-family: inherit; }
 .msg-workspace.portal.portal-thread{grid-template-columns:1fr;}
 .searchbar.inbox-search{max-width:none;width:100%;}
 .searchbar.inbox-search input{border-radius:12px;padding:11px 14px 11px 40px;}
-.inbox-start-card{padding:16px 18px;}
-.inbox-start-label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-bottom:8px;}
+.card.inbox-start-card{
+  padding:20px 22px 18px;
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+.inbox-start-label{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin:0;}
 .inbox-start-input{
   width:100%;border:0.5px solid var(--line);border-radius:10px;
   padding:10px 12px;font:inherit;font-size:13.5px;outline:none;background:#fff;
 }
 .inbox-start-input:focus{border-color:var(--navy);}
-.inbox-start-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;}
+.inbox-start-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:4px;}
 .orow.inbox-row{grid-template-columns:40px minmax(0,1fr) auto 18px;}
 .inbox-snippet{
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
