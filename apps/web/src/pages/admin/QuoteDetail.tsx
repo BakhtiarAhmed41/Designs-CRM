@@ -697,14 +697,14 @@ export function AdminQuoteDetail() {
             <div className="card" style={{ border: '1.5px solid var(--navy)' }}>
               <div className="card-h">
                 <span className="ct">
-                  <i className="ti ti-circle-check" /> {declined ? 'Quote closed' : isStaffCreatedOrder(order) ? 'Priced — customer or admin can approve' : 'Priced — awaiting customer'}
+                  <i className="ti ti-circle-check" /> {declined ? 'Quote closed' : isStaffCreatedOrder(order) ? 'Priced - customer or admin can approve' : 'Priced - awaiting customer'}
                 </span>
               </div>
               <div className="card-b">
-                <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 6 }}>
+                <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 6, textAlign: 'center' }}>
                   Quoted total
                 </div>
-                <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--navy)', marginBottom: 12 }}>
+                <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--navy)', marginBottom: 12, textAlign: 'center' }}>
                   {money(studioQuote?.amountCents ?? order.priceCents)}
                 </div>
                 {studioLines.length > 0 && (
