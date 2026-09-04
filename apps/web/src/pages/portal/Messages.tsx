@@ -246,6 +246,9 @@ export function PortalMessages() {
       />
 
       {error && <ErrorBanner>{error}</ErrorBanner>}
+      {convosQuery.isError && (
+        <ErrorBanner>{getErrorMessage(convosQuery.error)}</ErrorBanner>
+      )}
 
       <div className="searchbar inbox-search">
         <i className="ti ti-search si" aria-hidden />
@@ -260,7 +263,7 @@ export function PortalMessages() {
 
       <div className="card">
         {convosQuery.isLoading && <SkeletonRows rows={5} />}
-        {!convosQuery.isLoading && conversations.length === 0 && (
+        {!convosQuery.isLoading && !convosQuery.isError && conversations.length === 0 && (
           <EmptyState
             icon="ti-message"
             title={q.trim() ? 'No matching conversations' : 'No conversations yet'}

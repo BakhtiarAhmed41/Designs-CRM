@@ -26,7 +26,6 @@ import {
 import { useDialog } from '@/components/ui/AppDialog';
 import { canFeature } from '@/lib/permissions';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
-import { PageHeader } from '@/components/ui/PageHeader';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 import {
   maybeRequestBrowserNotifications,
@@ -69,6 +68,16 @@ function inboxTitle(c: Conversation, hideCustomerDetails: boolean) {
 }
 
 type FilterKey = 'all' | 'unread' | 'open' | 'closed' | 'GENERAL' | 'ORDER' | 'QUOTE';
+
+const FILTERS: Array<{ key: FilterKey; label: string; icon: string }> = [
+  { key: 'all', label: 'Inbox', icon: 'ti-inbox' },
+  { key: 'unread', label: 'Unread', icon: 'ti-mail' },
+  { key: 'open', label: 'Open', icon: 'ti-circle' },
+  { key: 'closed', label: 'Closed', icon: 'ti-circle-check' },
+  { key: 'GENERAL', label: 'Topics', icon: 'ti-message' },
+  { key: 'ORDER', label: 'Orders', icon: 'ti-package' },
+  { key: 'QUOTE', label: 'Quotes', icon: 'ti-file-invoice' },
+];
 
 export function AdminCustomerMessages() {
   const { conversationId } = useParams();
@@ -251,6 +260,33 @@ export function AdminCustomerMessages() {
       'Customer';
 
   const workLine = active ? conversationWorkLine(active) : null;
+  const visibleFilters = hideCustomerDetails
+    ? FILTERS.filter((f) => f.key !== 'QUOTE')
+    : FILTERS;
+
+  function filterNav() {
+    return (
+      <aside className="admin-inbox-nav" aria-label="Message folders">
+        <div className="admin-inbox-nav-title">
+          {hideCustomerDetails ? 'Order chats' : 'Customer messages'}
+        </div>
+        {visibleFilters.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            className={filter === item.key ? 'on' : undefined}
+            onClick={() => {
+              setFilter(item.key);
+              if (activeConversationId) backToInbox();
+            }}
+          >
+            <i className={`ti ${item.icon}`} aria-hidden />
+            {item.label}
+          </button>
+        ))}
+      </aside>
+    );
+  }
 
   if (activeConversationId) {
     return (
@@ -429,16 +465,9 @@ export function AdminCustomerMessages() {
   }
 
   return (
-    <div>
-      <PageHeader
-        title={hideCustomerDetails ? 'Order chats' : 'Customer inbox'}
-        subtitle={
-          hideCustomerDetails
-            ? 'Chats linked to orders.'
-            : 'Messages from customers about quotes, orders, and general topics.'
-        }
-      />
-
+    <div className="admin-inbox-page">
+      {filterNav()}
+      <div className="admin-inbox-main">
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
       <div className="searchbar inbox-search">
@@ -450,29 +479,6 @@ export function AdminCustomerMessages() {
           placeholder={hideCustomerDetails ? 'Search by order no…' : 'Search messages…'}
           aria-label="Search messages"
         />
-      </div>
-
-      <div className="inbox-filters">
-        {(
-          [
-            ['all', 'All'],
-            ['unread', 'Unread'],
-            ['open', 'Open'],
-            ['closed', 'Closed'],
-            ['GENERAL', 'Topics'],
-            ['ORDER', 'Orders'],
-            ...((hideCustomerDetails ? [] : [['QUOTE', 'Quotes']]) as Array<[FilterKey, string]>),
-          ] as Array<[FilterKey, string]>
-        ).map(([key, label]) => (
-          <button
-            key={key}
-            type="button"
-            className={`chip-btn${filter === key ? ' on' : ''}`}
-            onClick={() => setFilter(key)}
-          >
-            {label}
-          </button>
-        ))}
       </div>
 
       <div className="card">
@@ -526,6 +532,7 @@ export function AdminCustomerMessages() {
         {!listQuery.isLoading && conversations.length > 0 && (
           <div className="inbox-hint">Select a conversation to view messages.</div>
         )}
+      </div>
       </div>
     </div>
   );

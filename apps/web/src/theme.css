@@ -339,6 +339,18 @@ body {
   max-width: 1140px;
   margin-inline: auto;
 }
+.main:not(.main-messaging) > div.admin-inbox-page {
+  display: grid;
+  grid-template-columns: 228px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+  max-width: 1280px;
+}
+@media (max-width: 800px) {
+  .main:not(.main-messaging) > div.admin-inbox-page {
+    grid-template-columns: 1fr;
+  }
+}
 .main:not(.main-messaging) > div > .metric-row,
 .main:not(.main-messaging) > div > .hero,
 .main:not(.main-messaging) > div > .board,

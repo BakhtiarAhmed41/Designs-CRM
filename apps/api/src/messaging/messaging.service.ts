@@ -230,10 +230,43 @@ export class MessagingService {
 
   private async getCustomerIdForUser(userId: string): Promise<string | null> {
     const row = await this.db.queryOne<{ id: string }>(
-      'SELECT id FROM customers WHERE user_id = ? LIMIT 1',
+      `SELECT COALESCE(merged_into_id, id) AS id
+         FROM customers
+        WHERE user_id = ?
+        ORDER BY (merged_into_id IS NULL) DESC
+        LIMIT 1`,
       [userId],
     );
     return row?.id ?? null;
+  }
+
+  private async userCanAccessConversation(
+    userId: string,
+    customerId: string | null,
+    convo: ConversationRow,
+  ) {
+    if (Boolean(convo.hidden_from_client)) return false;
+    if (customerId && convo.customer_id === customerId) return true;
+    if (convo.order_id) {
+      const order = await this.db.queryOne<{ id: string }>(
+        customerId
+          ? `SELECT id FROM orders
+              WHERE id = ? AND (client_user_id = ? OR customer_id = ?)
+              LIMIT 1`
+          : `SELECT id FROM orders WHERE id = ? AND client_user_id = ? LIMIT 1`,
+        customerId
+          ? [convo.order_id, userId, customerId]
+          : [convo.order_id, userId],
+      );
+      if (order) return true;
+    }
+    const sent = await this.db.queryOne<{ id: string }>(
+      `SELECT id FROM messages
+        WHERE conversation_id = ? AND sender_user_id = ?
+        LIMIT 1`,
+      [convo.id, userId],
+    );
+    return Boolean(sent);
   }
 
   private async staffUserIds(): Promise<string[]> {
@@ -1022,7 +1055,6 @@ export class MessagingService {
     if (user.role !== UserRole.CLIENT) throw new ForbiddenException();
 
     const customerId = await this.getCustomerIdForUser(user.id);
-    if (!customerId) return [];
 
     const rows = await this.db.query<ConversationListRow>(
       `SELECT c.*,
@@ -1038,10 +1070,17 @@ export class MessagingService {
          FROM conversations c
          LEFT JOIN customers cust ON cust.id = c.customer_id
          LEFT JOIN orders o ON o.id = c.order_id
-        WHERE c.customer_id = ?
-          AND (c.hidden_from_client = 0 OR c.hidden_from_client IS NULL)
+        WHERE (c.hidden_from_client = 0 OR c.hidden_from_client IS NULL)
+          AND (
+            (? IS NOT NULL AND c.customer_id = ?)
+            OR o.client_user_id = ?
+            OR EXISTS (
+              SELECT 1 FROM messages m
+               WHERE m.conversation_id = c.id AND m.sender_user_id = ?
+            )
+          )
         ORDER BY c.last_message_at IS NULL, c.last_message_at DESC, c.created_at DESC`,
-      [customerId],
+      [customerId, customerId, user.id, user.id],
     );
     return rows.map((r) => this.conversationListDto(r, true));
   }
@@ -1050,19 +1089,24 @@ export class MessagingService {
     assertAuthUser(user);
     if (user.role !== UserRole.CLIENT) throw new ForbiddenException();
     const customerId = await this.getCustomerIdForUser(user.id);
-    if (!customerId) {
-      return { unreadMessages: 0, unreadConversations: 0 };
-    }
     const row = await this.db.queryOne<{
       total: number;
       conversations: number;
     }>(
       `SELECT COALESCE(SUM(unread_client), 0) AS total,
               COALESCE(SUM(CASE WHEN unread_client > 0 THEN 1 ELSE 0 END), 0) AS conversations
-         FROM conversations
-        WHERE customer_id = ?
-          AND (hidden_from_client = 0 OR hidden_from_client IS NULL)`,
-      [customerId],
+         FROM conversations c
+         LEFT JOIN orders o ON o.id = c.order_id
+        WHERE (c.hidden_from_client = 0 OR c.hidden_from_client IS NULL)
+          AND (
+            (? IS NOT NULL AND c.customer_id = ?)
+            OR o.client_user_id = ?
+            OR EXISTS (
+              SELECT 1 FROM messages m
+               WHERE m.conversation_id = c.id AND m.sender_user_id = ?
+            )
+          )`,
+      [customerId, customerId, user.id, user.id],
     );
     return {
       unreadMessages: Number(row?.total ?? 0),
@@ -1075,11 +1119,14 @@ export class MessagingService {
     conversationId: string,
   ): Promise<{ convo: ConversationRow; customerId: string }> {
     const customerId = await this.getCustomerIdForUser(user.id);
-    if (!customerId) throw new NotFoundException('Conversation not found');
     const convo = await this.getConversationRow(conversationId);
-    if (!convo || convo.customer_id !== customerId || Boolean(convo.hidden_from_client))
+    if (
+      !convo ||
+      !(await this.userCanAccessConversation(user.id, customerId, convo))
+    ) {
       throw new NotFoundException('Conversation not found');
-    return { convo, customerId };
+    }
+    return { convo, customerId: customerId ?? convo.customer_id ?? '' };
   }
 
   async deleteMyConversation(user: AuthUser | undefined, id: string) {
