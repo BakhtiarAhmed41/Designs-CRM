@@ -134,8 +134,6 @@ export function AdminCustomerMessages() {
     function onDoc(e: MouseEvent) {
       if (!startMenuRef.current?.contains(e.target as Node)) {
         setStartMenuOpen(false);
-        setTopicFormOpen(false);
-        setTopicDraft('');
       }
     }
     document.addEventListener('mousedown', onDoc);
