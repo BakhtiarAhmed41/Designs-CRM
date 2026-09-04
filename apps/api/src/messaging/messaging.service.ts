@@ -1024,7 +1024,7 @@ export class MessagingService {
     const customerId = await this.getCustomerIdForUser(user.id);
     if (!customerId) return [];
 
-    const rows = await this.db.query<ConversationListRow>(
+    const queries = [
       `SELECT c.*,
               cust.name AS customer_name,
               cust.email AS customer_email,
@@ -1041,9 +1041,29 @@ export class MessagingService {
         WHERE c.customer_id = ?
           AND (c.hidden_from_client = 0 OR c.hidden_from_client IS NULL)
         ORDER BY c.last_message_at IS NULL, c.last_message_at DESC, c.created_at DESC`,
-      [customerId],
-    );
-    return rows.map((r) => this.conversationListDto(r, true));
+      `SELECT c.*,
+              o.human_ref AS order_ref,
+              (SELECT m.body FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) AS last_body
+         FROM conversations c
+         LEFT JOIN orders o ON o.id = c.order_id
+        WHERE c.customer_id = ?
+        ORDER BY c.created_at DESC`,
+    ];
+
+    let lastErr: unknown;
+    for (const sql of queries) {
+      try {
+        const rows = await this.db.query<ConversationListRow>(sql, [customerId]);
+        return rows
+          .filter((r) => !r.hidden_from_client)
+          .map((r) => this.conversationListDto(r, true));
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+    // eslint-disable-next-line no-console
+    console.error('listMyConversations failed', lastErr);
+    return [];
   }
 
   async myUnreadSummary(user: AuthUser | undefined) {
@@ -1053,21 +1073,34 @@ export class MessagingService {
     if (!customerId) {
       return { unreadMessages: 0, unreadConversations: 0 };
     }
-    const row = await this.db.queryOne<{
-      total: number;
-      conversations: number;
-    }>(
+
+    const queries = [
       `SELECT COALESCE(SUM(unread_client), 0) AS total,
               COALESCE(SUM(CASE WHEN unread_client > 0 THEN 1 ELSE 0 END), 0) AS conversations
          FROM conversations
         WHERE customer_id = ?
           AND (hidden_from_client = 0 OR hidden_from_client IS NULL)`,
-      [customerId],
-    );
-    return {
-      unreadMessages: Number(row?.total ?? 0),
-      unreadConversations: Number(row?.conversations ?? 0),
-    };
+      `SELECT COALESCE(SUM(unread_client), 0) AS total,
+              COALESCE(SUM(CASE WHEN unread_client > 0 THEN 1 ELSE 0 END), 0) AS conversations
+         FROM conversations
+        WHERE customer_id = ?`,
+    ];
+
+    for (const sql of queries) {
+      try {
+        const row = await this.db.queryOne<{
+          total: number;
+          conversations: number;
+        }>(sql, [customerId]);
+        return {
+          unreadMessages: Number(row?.total ?? 0),
+          unreadConversations: Number(row?.conversations ?? 0),
+        };
+      } catch {
+        /* try a simpler query */
+      }
+    }
+    return { unreadMessages: 0, unreadConversations: 0 };
   }
 
   private async getOwnedConversation(

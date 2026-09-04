@@ -108,6 +108,14 @@ async function main() {
     );
   }
 
+  if (!(await columnExists('messages', 'deleted_at'))) {
+    // eslint-disable-next-line no-console
+    console.log('Adding messages.deleted_at column ...');
+    await conn.query(
+      'ALTER TABLE messages ADD COLUMN deleted_at DATETIME NULL',
+    );
+  }
+
   // Expand invoices.status ENUM (safe to re-run).
   // eslint-disable-next-line no-console
   console.log('Ensuring invoices.status includes PARTIAL and CANCELLED ...');
