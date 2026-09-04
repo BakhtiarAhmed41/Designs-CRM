@@ -1,15 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ConversationThread } from '@/components/messaging/ConversationThread';
 import { MessageComposer } from '@/components/messaging/MessageComposer';
 import { useAuth } from '@/context/AuthContext';
 import { getErrorMessage } from '@/lib/api';
 import { whenVisible } from '@/lib/queryRefresh';
-import { dateShort, money, statusChipClass, statusLabel } from '@/lib/format';
 import {
-  chatTypeLabel,
   conversationTitle,
+  conversationWorkLine,
   createAdminConversation,
   deleteAdminConversation,
   getAdminConversation,
@@ -26,7 +25,9 @@ import {
 } from '@/lib/messaging';
 import { useDialog } from '@/components/ui/AppDialog';
 import { canFeature } from '@/lib/permissions';
-import type { OrderStatus } from '@/lib/types';
+import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { SkeletonRows } from '@/components/ui/Skeleton';
 import {
   maybeRequestBrowserNotifications,
   showBrowserNotification,
@@ -39,30 +40,38 @@ function initials(name: string) {
     .map((p) => p[0])
     .join('')
     .slice(0, 2)
-    .toUpperCase();
+    .toUpperCase() || 'C';
 }
 
-function relativeTime(iso: string | null | undefined) {
+function inboxTime(iso: string | null | undefined) {
   if (!iso) return '';
-  const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return 'just now';
-  if (m < 60) return `${m}m`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h`;
-  return dateShort(iso);
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) {
+    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  }
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    ...(d.getFullYear() === now.getFullYear() ? {} : { year: 'numeric' }),
+  });
+}
+
+function inboxTitle(c: Conversation, hideCustomerDetails: boolean) {
+  if (hideCustomerDetails) {
+    return c.orderRef ? `Order ${c.orderRef}` : conversationTitle(c);
+  }
+  return c.customerName?.trim() || 'Customer';
 }
 
 type FilterKey = 'all' | 'unread' | 'open' | 'closed' | 'GENERAL' | 'ORDER' | 'QUOTE';
 
-/**
- * ChatGPT-style layout:
- * 1) No customer selected → left lists customers
- * 2) Customer selected → left lists THAT customer's chats; right is the thread (+ optional context)
- */
 export function AdminCustomerMessages() {
   const { conversationId } = useParams();
-  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { user } = useAuth();
@@ -75,17 +84,11 @@ export function AdminCustomerMessages() {
     canFeature(user?.permissions, 'messages', user?.role);
   const hideCustomerDetails = user?.role === 'DESIGNER';
 
-  const [q, setQ] = useState(searchParams.get('q') ?? '');
-  const [chatSearch, setChatSearch] = useState('');
+  const [q, setQ] = useState('');
   const [filter, setFilter] = useState<FilterKey>('all');
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
-    searchParams.get('customer') || null,
-  );
   const [error, setError] = useState<string | null>(null);
   const [notesDraft, setNotesDraft] = useState('');
   const [startMenuOpen, setStartMenuOpen] = useState(false);
-  const [topicDraft, setTopicDraft] = useState('');
-  const [topicFormOpen, setTopicFormOpen] = useState(false);
   const startMenuRef = useRef<HTMLDivElement>(null);
 
   const listFilters = useMemo(() => {
@@ -105,46 +108,10 @@ export function AdminCustomerMessages() {
     refetchInterval: whenVisible(30_000),
   });
 
-  const conversations = listQuery.data?.conversations ?? [];
-
-  const customerGroups = useMemo(() => {
-    const visible = hideCustomerDetails
-      ? conversations.filter((c) => c.chatType !== 'QUOTE')
-      : conversations;
-    const map = new Map<
-      string,
-      { customerId: string; name: string; items: Conversation[]; unread: number; lastAt: string | null }
-    >();
-    for (const c of visible) {
-      const key = c.customerId ?? 'unknown';
-      const cur = map.get(key) ?? {
-        customerId: key,
-        name: hideCustomerDetails
-          ? c.orderRef
-            ? `Order ${c.orderRef}`
-            : conversationTitle(c)
-          : c.customerName || 'Unknown customer',
-        items: [],
-        unread: 0,
-        lastAt: null,
-      };
-      cur.items.push(c);
-      cur.unread += Number(c.unreadAdmin || 0);
-      if (!cur.lastAt || (c.lastMessageAt && c.lastMessageAt > cur.lastAt)) {
-        cur.lastAt = c.lastMessageAt;
-        if (hideCustomerDetails) {
-          cur.name = c.orderRef ? `Order ${c.orderRef}` : conversationTitle(c);
-        }
-      }
-      if (!hideCustomerDetails && c.customerName) {
-        cur.name = c.customerName;
-      }
-      map.set(key, cur);
-    }
-    return Array.from(map.values()).sort((a, b) =>
-      (b.lastAt || '').localeCompare(a.lastAt || ''),
-    );
-  }, [conversations, hideCustomerDetails]);
+  const conversations = useMemo(() => {
+    const all = listQuery.data?.conversations ?? [];
+    return hideCustomerDetails ? all.filter((c) => c.chatType !== 'QUOTE') : all;
+  }, [listQuery.data?.conversations, hideCustomerDetails]);
 
   const activeConversationId = conversationId ?? null;
 
@@ -156,8 +123,7 @@ export function AdminCustomerMessages() {
   });
 
   const active = threadQuery.data?.conversation;
-  const customerId = active?.customerId ?? selectedCustomerId;
-  const customerSelected = !!customerId && customerId !== 'unknown';
+  const customerId = active?.customerId ?? null;
 
   useEffect(() => {
     setNotesDraft(active?.privateNotes ?? '');
@@ -179,7 +145,7 @@ export function AdminCustomerMessages() {
   const contextQuery = useQuery({
     queryKey: ['msg-customer-context', customerId],
     queryFn: () => getCustomerMessagingContext(customerId as string),
-    enabled: customerSelected,
+    enabled: !!customerId && customerId !== 'unknown',
   });
 
   const templatesQuery = useQuery({
@@ -200,6 +166,7 @@ export function AdminCustomerMessages() {
       if (activeConversationId) {
         void qc.invalidateQueries({ queryKey: ['admin-conversation', activeConversationId] });
       }
+      void qc.invalidateQueries({ queryKey: ['admin-conversations'] });
     },
   });
 
@@ -221,7 +188,7 @@ export function AdminCustomerMessages() {
       subject?: string;
     }) =>
       createAdminConversation({
-        customerId: customerId,
+        customerId,
         chatType: input.chatType,
         orderId: input.orderId ?? null,
         subject: input.subject,
@@ -229,11 +196,7 @@ export function AdminCustomerMessages() {
     onSuccess: (res) => {
       setError(null);
       setStartMenuOpen(false);
-      setTopicFormOpen(false);
-      setTopicDraft('');
-      navigate(
-        `/admin/messages/customers/${res.conversation.id}?customer=${customerId}`,
-      );
+      navigate(`/admin/messages/customers/${res.conversation.id}`);
       void qc.invalidateQueries({ queryKey: ['admin-conversations'] });
       void qc.invalidateQueries({ queryKey: ['msg-customer-context', customerId] });
     },
@@ -249,71 +212,18 @@ export function AdminCustomerMessages() {
     },
   });
 
-  function selectCustomer(id: string) {
-    setSelectedCustomerId(id);
-    setChatSearch('');
-    const next = new URLSearchParams(searchParams);
-    next.set('customer', id);
-    setSearchParams(next, { replace: true });
-    const first = conversations
-      .filter((c) => c.customerId === id)
-      .sort((a, b) => (b.lastMessageAt || '').localeCompare(a.lastMessageAt || ''))[0];
-    if (first) navigate(`/admin/messages/customers/${first.id}?customer=${id}`);
-    else navigate(`/admin/messages/customers?customer=${id}`);
-  }
-
-  function clearCustomer() {
-    setSelectedCustomerId(null);
-    setChatSearch('');
-    setSearchParams({}, { replace: true });
-    navigate('/admin/messages/customers');
-  }
-
-  const customerThreads = useMemo(() => {
-    const threads = (
-      contextQuery.data?.conversations ??
-      conversations.filter((c) => c.customerId === customerId)
-    ).filter((c) => !hideCustomerDetails || c.chatType !== 'QUOTE');
-    const term = chatSearch.trim().toLowerCase();
-    const filtered = !term
-      ? threads
-      : threads.filter((t) => {
-          const hay = `${t.subject || ''} ${t.orderRef || ''} ${chatTypeLabel(t.chatType)} ${t.lastMessagePreview || ''}`.toLowerCase();
-          return hay.includes(term);
-        });
-    return [...filtered].sort((a, b) =>
-      (b.lastMessageAt || '').localeCompare(a.lastMessageAt || ''),
-    );
-  }, [
-    contextQuery.data?.conversations,
-    conversations,
-    customerId,
-    chatSearch,
-    hideCustomerDetails,
-  ]);
-
   const deleteChat = useMutation({
     mutationFn: (id: string) => deleteAdminConversation(id),
-    onSuccess: (_res, id) => {
+    onSuccess: () => {
       setError(null);
-      const remaining = customerThreads.filter((c) => c.id !== id);
-      if (id === activeConversationId) {
-        if (remaining[0] && customerId) {
-          navigate(`/admin/messages/customers/${remaining[0].id}?customer=${customerId}`);
-        } else if (customerId) {
-          navigate(`/admin/messages/customers?customer=${customerId}`);
-        } else {
-          navigate('/admin/messages/customers');
-        }
-      }
+      navigate('/admin/messages/customers');
       void qc.invalidateQueries({ queryKey: ['admin-conversations'] });
-      void qc.invalidateQueries({ queryKey: ['admin-conversation', id] });
-      void qc.invalidateQueries({ queryKey: ['msg-customer-context', customerId] });
+      void qc.invalidateQueries({ queryKey: ['admin-conversation'] });
     },
     onError: (err) => setError(getErrorMessage(err)),
   });
 
-  async function confirmDeleteChat(t: Conversation) {
+  async function confirmDeleteChat(id: string) {
     const ok = await dialog.confirm({
       title: 'Delete this chat?',
       message: 'This cannot be undone.',
@@ -321,319 +231,110 @@ export function AdminCustomerMessages() {
       danger: true,
     });
     if (!ok) return;
-    deleteChat.mutate(t.id);
+    deleteChat.mutate(id);
   }
 
-  const customerName = hideCustomerDetails
-    ? active?.orderRef
-      ? `Order ${active.orderRef}`
-      : customerGroups.find((g) => g.customerId === customerId)?.name || 'Order chats'
-    : contextQuery.data?.customer.name ||
-      active?.customerName ||
-      customerGroups.find((g) => g.customerId === customerId)?.name ||
+  function openConvo(c: Conversation) {
+    navigate(`/admin/messages/customers/${c.id}`);
+    maybeRequestBrowserNotifications();
+  }
+
+  function backToInbox() {
+    setError(null);
+    navigate('/admin/messages/customers');
+  }
+
+  const displayName = hideCustomerDetails
+    ? active
+      ? inboxTitle(active, true)
+      : 'Conversation'
+    : active?.customerName?.trim() ||
+      contextQuery.data?.customer.name ||
       'Customer';
 
-  return (
-    <div className={`msg-workspace ${customerSelected ? 'chatgpt' : ''}`}>
-      <aside className="msg-left">
-        {!customerSelected ? (
-          <>
-            <div className="msg-left-head">
-              <div className="h2" style={{ margin: 0 }}>
-                {hideCustomerDetails ? 'Order chats' : 'Customer Messages'}
-              </div>
-              <input
-                className="msg-search"
-                placeholder={hideCustomerDetails ? 'Search by order no…' : 'Search customers…'}
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                onFocus={() => maybeRequestBrowserNotifications()}
-              />
-              <div className="msg-filters">
-                <div className="msg-filters-row cols-4">
-                  {(
-                    [
-                      ['all', 'All'],
-                      ['unread', 'Unread'],
-                      ['open', 'Open'],
-                      ['closed', 'Closed'],
-                    ] as Array<[FilterKey, string]>
-                  ).map(([key, label]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      className={filter === key ? 'on' : ''}
-                      onClick={() => setFilter(key)}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                <div className={`msg-filters-row ${hideCustomerDetails ? 'cols-2' : 'cols-3'}`}>
-                  {(
-                    [
-                      ['GENERAL', 'Topics'],
-                      ['ORDER', 'Orders'],
-                      ...((hideCustomerDetails ? [] : [['QUOTE', 'Quotes']]) as Array<
-                        [FilterKey, string]
-                      >),
-                    ] as Array<[FilterKey, string]>
-                  ).map(([key, label]) => (
-                    <button
-                      key={key}
-                      type="button"
-                      className={filter === key ? 'on' : ''}
-                      onClick={() => setFilter(key)}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="msg-left-list">
-              {customerGroups.map((g) => {
-                const top = g.items[0];
-                return (
-                  <button
-                    key={g.customerId}
-                    type="button"
-                    className="msg-cust-card"
-                    onClick={() => selectCustomer(g.customerId)}
-                  >
-                    <div className="av">
-                      {hideCustomerDetails ? (
-                        <i className="ti ti-package" />
-                      ) : (
-                        initials(g.name)
-                      )}
-                    </div>
-                    <div className="msg-cust-main">
-                      <div className="msg-cust-top">
-                        <strong>{g.name}</strong>
-                        <span>{relativeTime(g.lastAt)}</span>
-                      </div>
-                      <div className="msg-cust-preview">
-                        {top?.lastMessagePreview || top?.subject || 'No messages'}
-                      </div>
-                      <div className="msg-cust-meta">
-                        <span className="msg-type">{g.items.length} chat{g.items.length === 1 ? '' : 's'}</span>
-                        {g.unread > 0 && <span className="msg-badge">{g.unread}</span>}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-              {!listQuery.isLoading && customerGroups.length === 0 && (
-                <div className="msg-empty">No conversations match.</div>
-              )}
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="msg-left-head">
-              <button type="button" className="msg-back" onClick={clearCustomer}>
-                <i className="ti ti-arrow-left" /> {hideCustomerDetails ? 'All chats' : 'All customers'}
-              </button>
-              <div className="h2" style={{ margin: '8px 0 0' }}>{customerName}</div>
-              <input
-                className="msg-search"
-                placeholder={hideCustomerDetails ? 'Search by order no…' : 'Search chats…'}
-                value={chatSearch}
-                onChange={(e) => setChatSearch(e.target.value)}
-                onFocus={() => maybeRequestBrowserNotifications()}
-              />
-              {canStart && (
-                <div ref={startMenuRef} style={{ position: 'relative', marginTop: 10 }}>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    style={{ width: '100%' }}
-                    onClick={() => {
-                      setStartMenuOpen((v) => {
-                        if (v) {
-                          setTopicFormOpen(false);
-                          setTopicDraft('');
-                        }
-                        return !v;
-                      });
-                    }}
-                    disabled={startChat.isPending}
-                  >
-                    <i className="ti ti-plus" />
-                    {startChat.isPending ? 'Starting…' : 'New chat'}
-                  </button>
-                  {startMenuOpen && (
-                    <div className="msg-start-menu">
-                      {!topicFormOpen ? (
-                        <button
-                          type="button"
-                          onClick={() => setTopicFormOpen(true)}
-                        >
-                          <i className="ti ti-message" /> Topic chat…
-                        </button>
-                      ) : (
-                        <form
-                          className="msg-topic-form"
-                          onSubmit={(e) => {
-                            e.preventDefault();
-                            const subject = topicDraft.trim();
-                            if (!subject) return;
-                            startChat.mutate({
-                              chatType: 'GENERAL',
-                              subject,
-                            });
-                          }}
-                        >
-                          <input
-                            className="msg-search"
-                            style={{ marginTop: 0 }}
-                            autoFocus
-                            placeholder="What’s this chat about?"
-                            value={topicDraft}
-                            onChange={(e) => setTopicDraft(e.target.value)}
-                            maxLength={120}
-                          />
-                          <div className="msg-topic-actions">
-                            <button
-                              type="button"
-                              className="btn btn-ghost btn-sm"
-                              onClick={() => {
-                                setTopicFormOpen(false);
-                                setTopicDraft('');
-                              }}
-                            >
-                              Back
-                            </button>
-                            <button
-                              type="submit"
-                              className="btn btn-primary btn-sm"
-                              disabled={!topicDraft.trim() || startChat.isPending}
-                            >
-                              {startChat.isPending ? 'Starting…' : 'Start'}
-                            </button>
-                          </div>
-                        </form>
-                      )}
-                      {(contextQuery.data?.recentOrders ?? []).slice(0, 5).map((o) => (
-                        <button
-                          key={o.id}
-                          type="button"
-                          onClick={() =>
-                            startChat.mutate({
-                              chatType: 'ORDER',
-                              orderId: o.id,
-                              subject: o.humanRef
-                                ? `Order ${o.humanRef} Chat`
-                                : 'Order Chat',
-                            })
-                          }
-                        >
-                          <i className="ti ti-package" /> Order {o.humanRef || o.id.slice(0, 6)}
-                        </button>
-                      ))}
-                      {!hideCustomerDetails &&
-                        (contextQuery.data?.recentQuotes ?? []).slice(0, 5).map((o) => (
-                        <button
-                          key={o.id}
-                          type="button"
-                          onClick={() =>
-                            startChat.mutate({
-                              chatType: 'QUOTE',
-                              orderId: o.id,
-                              subject: o.humanRef
-                                ? `Quotation ${o.humanRef} Chat`
-                                : 'Quotation Chat',
-                            })
-                          }
-                        >
-                          <i className="ti ti-file-invoice" /> Quote {o.humanRef || o.id.slice(0, 6)}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-            <div className="msg-left-list">
-              {customerThreads.map((t) => (
-                <div
-                  key={t.id}
-                  role="button"
-                  tabIndex={0}
-                  className={`msg-cust-card ${t.id === activeConversationId ? 'on' : ''}`}
-                  onClick={() =>
-                    navigate(`/admin/messages/customers/${t.id}?customer=${customerId}`)
-                  }
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      navigate(`/admin/messages/customers/${t.id}?customer=${customerId}`);
-                    }
-                  }}
-                >
-                  <div className="msg-cust-main" style={{ width: '100%' }}>
-                    <div className="msg-cust-top">
-                      <strong>{conversationTitle(t)}</strong>
-                      <span>{relativeTime(t.lastMessageAt)}</span>
-                    </div>
-                    <div className="msg-cust-preview">
-                      {t.lastMessagePreview || 'No messages yet'}
-                    </div>
-                    <div className="msg-cust-meta">
-                      {t.chatType === 'GENERAL' && (
-                        <span className="msg-type">{chatTypeLabel(t.chatType)}</span>
-                      )}
-                      {t.unreadAdmin > 0 && <span className="msg-badge">{t.unreadAdmin}</span>}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className="icon-btn danger msg-thread-delete"
-                    aria-label="Delete chat"
-                    title="Delete chat"
-                    disabled={deleteChat.isPending}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      confirmDeleteChat(t);
-                    }}
-                  >
-                    <i className="ti ti-trash" />
-                  </button>
-                </div>
-              ))}
-              {customerThreads.length === 0 && (
-                <div className="msg-empty">No chats yet. Start a new conversation.</div>
-              )}
-            </div>
-          </>
-        )}
-      </aside>
+  const workLine = active ? conversationWorkLine(active) : null;
 
-      <section className="msg-center">
-        {!customerSelected ? (
-          <div className="msg-empty-state">
-            {hideCustomerDetails
-              ? 'Select an order chat to open it.'
-              : 'Select a customer to open their chats.'}
-          </div>
-        ) : activeConversationId && active ? (
-          <>
-            <div className="msg-center-head">
-              <div>
-                <div className="h2" style={{ margin: 0 }}>
-                  {conversationTitle(active)}
-                </div>
-                <div
-                  className="muted"
-                  style={{ fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}
-                >
-                  <span className={`chip ${active.status === 'OPEN' ? 'c-done' : 'c-wait'}`}>
-                    {active.status === 'OPEN' ? 'Open' : 'Closed'}
-                  </span>
-                </div>
-              </div>
+  if (activeConversationId) {
+    return (
+      <div className="msg-workspace portal portal-thread">
+        <section className="msg-center">
+          <div className="msg-center-head portal-thread-head">
+            <button
+              type="button"
+              className="icon-btn"
+              aria-label="Back to inbox"
+              onClick={backToInbox}
+            >
+              <i className="ti ti-arrow-left" />
+            </button>
+            <div className="thumb" aria-hidden>
+              {hideCustomerDetails ? (
+                <i className="ti ti-package" />
+              ) : (
+                initials(displayName)
+              )}
+            </div>
+            <div className="portal-thread-title">
+              <div className="on">{displayName}</div>
+              {workLine && <div className="om">{workLine}</div>}
+            </div>
+            {active && (
               <div className="msg-center-actions">
+                {canStart && customerId && (
+                  <div ref={startMenuRef} style={{ position: 'relative' }}>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => setStartMenuOpen((v) => !v)}
+                      disabled={startChat.isPending}
+                    >
+                      <i className="ti ti-plus" /> New chat
+                    </button>
+                    {startMenuOpen && (
+                      <div className="msg-start-menu" style={{ left: 'auto', right: 0, minWidth: 220 }}>
+                        <button
+                          type="button"
+                          onClick={() => startChat.mutate({ chatType: 'GENERAL' })}
+                        >
+                          <i className="ti ti-message" /> Topic chat
+                        </button>
+                        {(contextQuery.data?.recentOrders ?? []).slice(0, 5).map((o) => (
+                          <button
+                            key={o.id}
+                            type="button"
+                            onClick={() =>
+                              startChat.mutate({
+                                chatType: 'ORDER',
+                                orderId: o.id,
+                                subject: o.humanRef ? `Order ${o.humanRef} Chat` : 'Order Chat',
+                              })
+                            }
+                          >
+                            <i className="ti ti-package" /> Order {o.humanRef || o.id.slice(0, 6)}
+                          </button>
+                        ))}
+                        {!hideCustomerDetails &&
+                          (contextQuery.data?.recentQuotes ?? []).slice(0, 5).map((o) => (
+                            <button
+                              key={o.id}
+                              type="button"
+                              onClick={() =>
+                                startChat.mutate({
+                                  chatType: 'QUOTE',
+                                  orderId: o.id,
+                                  subject: o.humanRef
+                                    ? `Quotation ${o.humanRef} Chat`
+                                    : 'Quotation Chat',
+                                })
+                              }
+                            >
+                              <i className="ti ti-file-invoice" /> Quote {o.humanRef || o.id.slice(0, 6)}
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <button
                   type="button"
                   className="btn btn-ghost btn-sm"
@@ -647,167 +348,187 @@ export function AdminCustomerMessages() {
                   <i className={`ti ${active.status === 'OPEN' ? 'ti-x' : 'ti-refresh'}`} />
                   {active.status === 'OPEN' ? 'Close' : 'Reopen'}
                 </button>
-              </div>
-            </div>
-            <ConversationThread
-              messages={active.messages ?? []}
-              mineDirection="OUTBOUND"
-            />
-            {error && <div className="err" style={{ margin: '0 12px' }}>{error}</div>}
-            {!canReply && active.status === 'OPEN' && (
-              <div className="muted" style={{ margin: '0 12px 8px', fontSize: 12.5 }}>
-                You don’t have permission to reply in customer chats.
+                <button
+                  type="button"
+                  className="icon-btn danger"
+                  aria-label="Delete chat"
+                  disabled={deleteChat.isPending}
+                  onClick={() => confirmDeleteChat(active.id)}
+                >
+                  <i className="ti ti-trash" />
+                </button>
               </div>
             )}
-            <MessageComposer
-              disabled={!canReply || active.status === 'CLOSED'}
-              placeholder={
-                !canReply
-                  ? 'No reply permission'
-                  : active.status === 'CLOSED'
-                    ? 'Conversation is closed'
-                    : 'Type a message…'
+          </div>
+          {error && <div className="err" style={{ margin: '0 12px' }}>{error}</div>}
+          {threadQuery.isLoading && (
+            <EmptyState icon="ti-loader" title="Loading conversation…" />
+          )}
+          {threadQuery.isError && (
+            <EmptyState
+              icon="ti-alert-circle"
+              title="Could not open this chat"
+              action={
+                <button type="button" className="btn btn-ghost btn-sm" onClick={backToInbox}>
+                  Back to inbox
+                </button>
               }
-              templates={templatesQuery.data?.templates}
-              onCreateTemplate={async (title, body) => {
-                await createMessageTemplate({ title, body });
-                void qc.invalidateQueries({ queryKey: ['message-templates'] });
-              }}
-              onDeleteTemplate={async (templateId) => {
-                await deleteMessageTemplate(templateId);
-                void qc.invalidateQueries({ queryKey: ['message-templates'] });
-              }}
-              onSend={async (body, files) => {
-                await sendMutation.mutateAsync({ body, files });
-              }}
             />
-          </>
-        ) : (
-          <div className="msg-empty-state">Select a chat on the left, or start a new one.</div>
-        )}
-      </section>
-
-      {customerSelected && (
-        <aside className="msg-right">
-          {!contextQuery.data ? (
-            <div className="msg-empty">
-              {hideCustomerDetails ? 'Order details appear here.' : 'Customer context appears here.'}
-            </div>
-          ) : (
+          )}
+          {active && (
             <>
-              {!hideCustomerDetails && (
-              <div className="msg-right-section">
-                <div className="msg-right-title">Customer Information</div>
-                <div className="msg-kv"><span>Name</span><b>{contextQuery.data.customer.name}</b></div>
-                <div className="msg-kv"><span>Phone</span><b>{contextQuery.data.customer.phone || 'None'}</b></div>
-                <div className="msg-kv"><span>Email</span><b>{contextQuery.data.customer.email || 'None'}</b></div>
-                <div className="msg-kv">
-                  <span>Customer since</span>
-                  <b>{dateShort(contextQuery.data.customer.customerSince)}</b>
-                </div>
-                <div className="msg-kv">
-                  <span>Total orders</span>
-                  <b>{contextQuery.data.customer.totalOrders}</b>
-                </div>
-                <div className="msg-kv">
-                  <span>Total spending</span>
-                  <b>{money(contextQuery.data.customer.totalSpentCents)}</b>
-                </div>
-              </div>
-              )}
-
-              <div className="msg-right-section">
-                <div className="msg-right-title">Recent Orders</div>
-                {contextQuery.data.recentOrders.map((o) => (
-                  <div key={o.id} className="msg-side-row" style={{ gap: 8 }}>
-                    <Link to={`/admin/orders/${o.id}`} style={{ flex: 1, textDecoration: 'none', color: 'inherit' }}>
-                      <b>{o.humanRef || o.id.slice(0, 8)}</b>
-                      <div className="muted">{dateShort(o.createdAt)}</div>
-                    </Link>
-                    {canStart && (
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        title="Start order chat"
-                        onClick={() =>
-                          startChat.mutate({
-                            chatType: 'ORDER',
-                            orderId: o.id,
-                            subject: o.humanRef ? `Order ${o.humanRef} Chat` : 'Order Chat',
-                          })
-                        }
-                      >
-                        <i className="ti ti-message" />
-                      </button>
-                    )}
-                    <span className={`chip ${statusChipClass(o.status as OrderStatus)}`}>
-                      {statusLabel(o.status as OrderStatus)}
-                    </span>
-                  </div>
-                ))}
-                {contextQuery.data.recentOrders.length === 0 && (
-                  <div className="muted">No orders</div>
-                )}
-              </div>
-
-              {!hideCustomerDetails && (
-              <div className="msg-right-section">
-                <div className="msg-right-title">Recent Quotations</div>
-                {contextQuery.data.recentQuotes.map((o) => (
-                  <div key={o.id} className="msg-side-row" style={{ gap: 8 }}>
-                    <Link to={`/admin/quotes/${o.id}`} style={{ flex: 1, textDecoration: 'none', color: 'inherit' }}>
-                      <b>{o.humanRef || o.id.slice(0, 8)}</b>
-                      <div className="muted">{dateShort(o.createdAt)}</div>
-                    </Link>
-                    {canStart && (
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        title="Start quote chat"
-                        onClick={() =>
-                          startChat.mutate({
-                            chatType: 'QUOTE',
-                            orderId: o.id,
-                            subject: o.humanRef
-                              ? `Quotation ${o.humanRef} Chat`
-                              : 'Quotation Chat',
-                          })
-                        }
-                      >
-                        <i className="ti ti-message" />
-                      </button>
-                    )}
-                    <span className={`chip ${statusChipClass(o.status as OrderStatus)}`}>
-                      {statusLabel(o.status as OrderStatus)}
-                    </span>
-                  </div>
-                ))}
-                {contextQuery.data.recentQuotes.length === 0 && (
-                  <div className="muted">No quotes</div>
-                )}
-              </div>
-              )}
-
-              {active && (
-                <div className="msg-right-section">
-                  <div className="msg-right-title">Private notes</div>
-                  <textarea
-                    rows={4}
-                    value={notesDraft}
-                    onChange={(e) => setNotesDraft(e.target.value)}
-                    onBlur={() => {
-                      if (notesDraft !== (active.privateNotes || '')) {
-                        updateMutation.mutate({ privateNotes: notesDraft });
-                      }
-                    }}
-                    placeholder="Visible to staff only"
-                  />
+              <ConversationThread
+                messages={active.messages ?? []}
+                mineDirection="OUTBOUND"
+              />
+              {!canReply && active.status === 'OPEN' && (
+                <div className="muted" style={{ margin: '0 12px 8px', fontSize: 12.5 }}>
+                  You don’t have permission to reply in customer chats.
                 </div>
               )}
+              <MessageComposer
+                disabled={!canReply || active.status === 'CLOSED'}
+                placeholder={
+                  !canReply
+                    ? 'No reply permission'
+                    : active.status === 'CLOSED'
+                      ? 'Conversation is closed'
+                      : 'Write a reply…'
+                }
+                templates={templatesQuery.data?.templates}
+                onCreateTemplate={async (title, body) => {
+                  await createMessageTemplate({ title, body });
+                  void qc.invalidateQueries({ queryKey: ['message-templates'] });
+                }}
+                onDeleteTemplate={async (templateId) => {
+                  await deleteMessageTemplate(templateId);
+                  void qc.invalidateQueries({ queryKey: ['message-templates'] });
+                }}
+                onSend={async (body, files) => {
+                  await sendMutation.mutateAsync({ body, files });
+                }}
+              />
+              <div className="admin-thread-notes">
+                <label htmlFor="admin-private-notes">Private notes</label>
+                <textarea
+                  id="admin-thread-notes"
+                  rows={2}
+                  value={notesDraft}
+                  onChange={(e) => setNotesDraft(e.target.value)}
+                  onBlur={() => {
+                    if (notesDraft !== (active.privateNotes || '')) {
+                      updateMutation.mutate({ privateNotes: notesDraft });
+                    }
+                  }}
+                  placeholder="Visible to staff only"
+                />
+              </div>
             </>
           )}
-        </aside>
-      )}
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <PageHeader
+        title={hideCustomerDetails ? 'Order chats' : 'Customer inbox'}
+        subtitle={
+          hideCustomerDetails
+            ? 'Chats linked to orders.'
+            : 'Messages from customers about quotes, orders, and general topics.'
+        }
+      />
+
+      {error && <ErrorBanner>{error}</ErrorBanner>}
+
+      <div className="searchbar inbox-search">
+        <i className="ti ti-search si" aria-hidden />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onFocus={() => maybeRequestBrowserNotifications()}
+          placeholder={hideCustomerDetails ? 'Search by order no…' : 'Search messages…'}
+          aria-label="Search messages"
+        />
+      </div>
+
+      <div className="inbox-filters">
+        {(
+          [
+            ['all', 'All'],
+            ['unread', 'Unread'],
+            ['open', 'Open'],
+            ['closed', 'Closed'],
+            ['GENERAL', 'Topics'],
+            ['ORDER', 'Orders'],
+            ...((hideCustomerDetails ? [] : [['QUOTE', 'Quotes']]) as Array<[FilterKey, string]>),
+          ] as Array<[FilterKey, string]>
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            className={`chip-btn${filter === key ? ' on' : ''}`}
+            onClick={() => setFilter(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="card">
+        {listQuery.isLoading && <SkeletonRows rows={6} />}
+        {!listQuery.isLoading && conversations.length === 0 && (
+          <EmptyState
+            icon="ti-inbox"
+            title={q.trim() || filter !== 'all' ? 'No matching conversations' : 'No conversations yet'}
+            description="Chats show up here when a customer messages you from a quote, order, or the inbox."
+          />
+        )}
+        {conversations.map((c) => {
+          const work = conversationWorkLine(c);
+          const name = inboxTitle(c, hideCustomerDetails);
+          return (
+            <div
+              key={c.id}
+              role="button"
+              tabIndex={0}
+              className="orow inbox-row"
+              onClick={() => openConvo(c)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  openConvo(c);
+                }
+              }}
+            >
+              <div className="thumb">
+                {hideCustomerDetails ? (
+                  <i className="ti ti-package" />
+                ) : (
+                  initials(name)
+                )}
+              </div>
+              <div className="oinfo">
+                <div className="on">{name}</div>
+                <div className="om inbox-snippet">
+                  {c.lastMessagePreview || 'No messages yet'}
+                </div>
+                {work && <div className="om inbox-work">{work}</div>}
+              </div>
+              <div className="inbox-meta">
+                <span>{inboxTime(c.lastMessageAt)}</span>
+                {c.unreadAdmin > 0 && <span className="msg-badge">{c.unreadAdmin}</span>}
+              </div>
+              <i className="ti ti-chevron-right inbox-chevron" aria-hidden />
+            </div>
+          );
+        })}
+        {!listQuery.isLoading && conversations.length > 0 && (
+          <div className="inbox-hint">Select a conversation to view messages.</div>
+        )}
+      </div>
     </div>
   );
 }

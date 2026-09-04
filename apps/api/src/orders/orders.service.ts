@@ -2918,6 +2918,10 @@ export class OrdersService {
           [order.customer_id, orderId],
         );
         if (!existing) {
+          const prior = await tx.queryOne<{ n: number }>(
+            'SELECT COUNT(*) AS n FROM conversations WHERE customer_id = ?',
+            [order.customer_id],
+          );
           await tx.execute(
             `INSERT INTO conversations
                (id, customer_id, order_id, chat_type, status, subject, source, last_message_at)
@@ -2926,9 +2930,7 @@ export class OrdersService {
               randomUUID(),
               order.customer_id,
               orderId,
-              order.human_ref
-                ? `Quotation ${order.human_ref} Chat`
-                : 'Quotation Chat',
+              `Conversation #${Number(prior?.n ?? 0) + 1}`,
             ],
           );
         }

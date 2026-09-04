@@ -25,6 +25,8 @@ export type Conversation = {
   customerEmail?: string | null;
   customerPhone?: string | null;
   orderRef?: string | null;
+  orderName?: string | null;
+  serviceType?: string | null;
   orderType?: string | null;
   orderStatus?: string | null;
   lastMessagePreview?: string | null;
@@ -134,6 +136,47 @@ export function isPlaceholderSubject(subject: string | null | undefined) {
   );
 }
 
+/** True when the stored subject is still a number or an old default name. */
+export function isAutoCustomerSubject(subject: string | null | undefined) {
+  if (!subject?.trim()) return true;
+  const s = subject.trim();
+  if (/^conversation #\s*\d+$/i.test(s)) return true;
+  const lower = s.toLowerCase();
+  if (
+    isPlaceholderSubject(s) ||
+    lower === 'quotation chat' ||
+    lower === 'order chat' ||
+    lower === 'quote chat'
+  ) {
+    return true;
+  }
+  return /^(quotation|quote|order)(\s+\S+)?(\s+chat)?$/i.test(s);
+}
+
+/** Customer-facing chat name: Conversation #N until a topic title is ready. */
+export function customerChatTitle(
+  c: { subject?: string | null },
+  fallbackNumber?: number,
+) {
+  const subject = c.subject?.trim() || '';
+  if (subject && !isAutoCustomerSubject(subject)) return subject;
+  const numbered = subject.match(/^conversation #\s*(\d+)$/i);
+  if (numbered) return `Conversation #${numbered[1]}`;
+  if (fallbackNumber) return `Conversation #${fallbackNumber}`;
+  return 'Conversation';
+}
+
+export function conversationInboxNumbers(
+  conversations: Array<{ id: string; createdAt?: string | null }>,
+) {
+  const sorted = [...conversations].sort((a, b) => {
+    const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return ta - tb;
+  });
+  return new Map(sorted.map((c, i) => [c.id, i + 1]));
+}
+
 function truncateTitle(text: string, max = 72) {
   const t = text.trim().replace(/\s+/g, ' ');
   if (t.length <= max) return t;
@@ -165,6 +208,30 @@ export function conversationTitle(c: {
   }
   if (c.subject?.trim()) return c.subject.trim();
   return 'New chat';
+}
+
+function formatServiceType(serviceType?: string | null) {
+  if (!serviceType?.trim()) return '';
+  return serviceType
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (ch) => ch.toUpperCase());
+}
+
+/** Third inbox line for quote/order chats: service - Quote/Order number. */
+export function conversationWorkLine(c: {
+  chatType?: ChatType;
+  orderRef?: string | null;
+  orderName?: string | null;
+  serviceType?: string | null;
+}) {
+  if (c.chatType !== 'ORDER' && c.chatType !== 'QUOTE') return null;
+  const kind = c.chatType === 'QUOTE' ? 'Quote' : 'Order';
+  const ref = c.orderRef?.trim() || '';
+  const work = (c.orderName || formatServiceType(c.serviceType)).trim();
+  if (work && ref) return `${work} - ${kind} ${ref}`;
+  if (ref) return `${kind} ${ref}`;
+  if (work) return `${work} - ${kind}`;
+  return kind;
 }
 
 // --- admin ----------------------------------------------------------------

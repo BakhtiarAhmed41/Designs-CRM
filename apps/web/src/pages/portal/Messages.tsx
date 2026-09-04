@@ -11,7 +11,8 @@ import { getErrorMessage } from '@/lib/api';
 import { whenVisible } from '@/lib/queryRefresh';
 import {
   chatTypeLabel,
-  conversationTitle,
+  conversationInboxNumbers,
+  customerChatTitle,
   createMyConversation,
   deleteMyConversation,
   getMyConversation,
@@ -56,8 +57,6 @@ export function PortalMessages() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState('');
-  const [topicDraft, setTopicDraft] = useState('');
-  const [topicFormOpen, setTopicFormOpen] = useState(false);
   const conversationId = searchParams.get('c');
 
   const convosQuery = useQuery({
@@ -66,15 +65,21 @@ export function PortalMessages() {
     refetchInterval: whenVisible(20_000),
   });
 
+  const allConversations = convosQuery.data?.conversations ?? [];
+  const inboxNumbers = useMemo(
+    () => conversationInboxNumbers(allConversations),
+    [allConversations],
+  );
+
   const conversations = useMemo(() => {
-    const all = convosQuery.data?.conversations ?? [];
     const term = q.trim().toLowerCase();
-    if (!term) return all;
-    return all.filter((c) => {
-      const hay = `${conversationTitle(c)} ${c.subject || ''} ${c.orderRef || ''} ${chatTypeLabel(c.chatType)} ${c.lastMessagePreview || ''}`.toLowerCase();
+    if (!term) return allConversations;
+    return allConversations.filter((c) => {
+      const title = customerChatTitle(c, inboxNumbers.get(c.id));
+      const hay = `${title} ${c.subject || ''} ${c.orderRef || ''} ${chatTypeLabel(c.chatType)} ${c.lastMessagePreview || ''}`.toLowerCase();
       return hay.includes(term);
     });
-  }, [convosQuery.data?.conversations, q]);
+  }, [allConversations, inboxNumbers, q]);
 
   const threadQuery = useQuery({
     queryKey: ['my-conversation', conversationId],
@@ -110,11 +115,8 @@ export function PortalMessages() {
   });
 
   const startTopic = useMutation({
-    mutationFn: (subject: string) =>
-      createMyConversation({ chatType: 'GENERAL', subject }),
+    mutationFn: () => createMyConversation({ chatType: 'GENERAL' }),
     onSuccess: (res) => {
-      setTopicFormOpen(false);
-      setTopicDraft('');
       setSearchParams({ c: res.conversation.id });
       void qc.invalidateQueries({ queryKey: ['my-conversations'] });
     },
@@ -155,17 +157,17 @@ export function PortalMessages() {
     deleteTopic.mutate(id);
   }
 
-  const startActions = !topicFormOpen ? (
+  const startActions = (
     <button
       type="button"
       className="btn btn-primary"
-      onClick={() => setTopicFormOpen(true)}
+      onClick={() => startTopic.mutate()}
       disabled={startTopic.isPending}
     >
       <i className="ti ti-plus" />
-      Start New Conversation
+      {startTopic.isPending ? 'Starting…' : 'Start New Conversation'}
     </button>
-  ) : null;
+  );
 
   if (conversationId) {
     const threadContext = active ? conversationContext(active) : null;
@@ -183,7 +185,9 @@ export function PortalMessages() {
             </button>
             <div className="portal-thread-title">
               <div className="on">
-                {active ? conversationTitle(active) : 'Conversation'}
+                {active
+                  ? customerChatTitle(active, inboxNumbers.get(active.id))
+                  : 'Conversation'}
               </div>
               {threadContext && <div className="om">{threadContext}</div>}
             </div>
@@ -243,50 +247,6 @@ export function PortalMessages() {
 
       {error && <ErrorBanner>{error}</ErrorBanner>}
 
-      {topicFormOpen && (
-        <form
-          className="card inbox-start-card"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const subject = topicDraft.trim();
-            if (!subject) return;
-            startTopic.mutate(subject);
-          }}
-        >
-          <label className="inbox-start-label" htmlFor="new-conversation-topic">
-            What is this about?
-          </label>
-          <input
-            id="new-conversation-topic"
-            className="inbox-start-input"
-            autoFocus
-            placeholder="e.g. Question about a file format"
-            value={topicDraft}
-            onChange={(e) => setTopicDraft(e.target.value)}
-            maxLength={120}
-          />
-          <div className="inbox-start-actions">
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => {
-                setTopicFormOpen(false);
-                setTopicDraft('');
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary btn-sm"
-              disabled={!topicDraft.trim() || startTopic.isPending}
-            >
-              {startTopic.isPending ? 'Starting…' : 'Start Conversation'}
-            </button>
-          </div>
-        </form>
-      )}
-
       <div className="searchbar inbox-search">
         <i className="ti ti-search si" aria-hidden />
         <input
@@ -314,7 +274,7 @@ export function PortalMessages() {
                 <button
                   type="button"
                   className="btn btn-primary btn-sm"
-                  onClick={() => setTopicFormOpen(true)}
+                  onClick={() => startTopic.mutate()}
                 >
                   <i className="ti ti-plus" /> Start New Conversation
                 </button>
@@ -342,7 +302,7 @@ export function PortalMessages() {
                 <i className="ti ti-message" />
               </div>
               <div className="oinfo">
-                <div className="on">{conversationTitle(c)}</div>
+                <div className="on">{customerChatTitle(c, inboxNumbers.get(c.id))}</div>
                 {context && <div className="om">{context}</div>}
                 <div className="om inbox-snippet">
                   {c.lastMessagePreview || 'No messages yet'}

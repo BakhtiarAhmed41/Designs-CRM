@@ -53,6 +53,8 @@ type ConversationListRow = ConversationRow & {
   customer_email: string | null;
   customer_phone: string | null;
   order_ref: string | null;
+  order_name: string | null;
+  service_type: string | null;
   order_type: string | null;
   order_status: string | null;
   last_body: string | null;
@@ -136,6 +138,8 @@ export class MessagingService {
       customerEmail: stripCustomer ? null : c.customer_email ?? null,
       customerPhone: stripCustomer ? null : c.customer_phone ?? null,
       orderRef: c.order_ref,
+      orderName: c.order_name ?? null,
+      serviceType: c.service_type ?? null,
       orderType: c.order_type ?? null,
       orderStatus: c.order_status ?? null,
       lastMessagePreview: c.last_body,
@@ -263,33 +267,78 @@ export class MessagingService {
     return orderRef ? `Order ${orderRef} Chat` : 'Order Chat';
   }
 
-  private isPlaceholderGeneralSubject(
-    subject: string | null,
-    chatType: string | ChatType,
-  ) {
-    if (chatType !== ChatType.GENERAL) return false;
-    if (!subject?.trim()) return true;
-    const s = subject.trim().toLowerCase();
-    return (
-      s === 'general' ||
-      s === 'general inquiry' ||
-      s === 'new chat' ||
-      s === 'new inquiry'
+  private async nextCustomerConversationTitle(customerId: string) {
+    const row = await this.db.queryOne<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM conversations WHERE customer_id = ?',
+      [customerId],
     );
+    return `Conversation #${Number(row?.n ?? 0) + 1}`;
   }
 
-  private async adoptSubjectFromFirstMessage(
-    convo: ConversationRow,
-    text: string,
-  ) {
-    if (!this.isPlaceholderGeneralSubject(convo.subject, convo.chat_type)) {
-      return;
+  private isAutoCustomerSubject(subject: string | null) {
+    if (!subject?.trim()) return true;
+    const s = subject.trim();
+    if (/^conversation #\s*\d+$/i.test(s)) return true;
+    const lower = s.toLowerCase();
+    if (
+      lower === 'general' ||
+      lower === 'general inquiry' ||
+      lower === 'new chat' ||
+      lower === 'new inquiry' ||
+      lower === 'quotation chat' ||
+      lower === 'order chat'
+    ) {
+      return true;
     }
-    const title = text.trim().replace(/\s+/g, ' ').slice(0, 80);
-    if (!title || title === '(attachment)') return;
+    return /^(quotation|quote|order)(\s+\S+)?(\s+chat)?$/i.test(s);
+  }
+
+  private summarizeTopic(bodies: string[]) {
+    const texts = bodies
+      .map((b) => b.replace(/\s+/g, ' ').trim())
+      .filter((b) => b && b !== '(attachment)');
+    if (texts.length === 0) return null;
+    const question = texts.find((t) => t.includes('?') && t.length >= 8);
+    const longest = texts.reduce((a, b) => (a.length >= b.length ? a : b));
+    let title = (question || longest)
+      .replace(/^(hi|hello|hey|good morning|good afternoon|good evening)[,!.\s]+/i, '')
+      .replace(/^["']+|["']+$/g, '')
+      .trim();
+    if (title.length < 4) return null;
+    if (title.length > 56) {
+      title = title.slice(0, 56).replace(/\s+\S*$/, '').trim();
+    }
+    return title || null;
+  }
+
+  private async maybeAdoptTopicTitle(conversationId: string) {
+    const convo = await this.getConversationRow(conversationId);
+    if (!convo || !this.isAutoCustomerSubject(convo.subject)) return;
+    const count = await this.db.queryOne<{ n: number }>(
+      `SELECT COUNT(*) AS n
+         FROM messages
+        WHERE conversation_id = ? AND deleted_at IS NULL`,
+      [conversationId],
+    );
+    if (Number(count?.n ?? 0) < 5) return;
+    const rows = await this.db.query<{ body: string; direction: string }>(
+      `SELECT body, direction
+         FROM messages
+        WHERE conversation_id = ? AND deleted_at IS NULL
+        ORDER BY created_at ASC
+        LIMIT 12`,
+      [conversationId],
+    );
+    const customerTexts = rows
+      .filter((r) => r.direction === MessageDirection.INBOUND)
+      .map((r) => r.body);
+    const title = this.summarizeTopic(
+      customerTexts.length > 0 ? customerTexts : rows.map((r) => r.body),
+    );
+    if (!title) return;
     await this.db.execute('UPDATE conversations SET subject = ? WHERE id = ?', [
       title,
-      convo.id,
+      conversationId,
     ]);
   }
 
@@ -454,6 +503,8 @@ export class MessagingService {
               cust.email AS customer_email,
               cust.phone AS customer_phone,
               o.human_ref AS order_ref,
+              o.name AS order_name,
+              o.service_type AS service_type,
               o.type AS order_type,
               o.status AS order_status,
               (SELECT m.body FROM messages m WHERE m.conversation_id = c.id AND m.deleted_at IS NULL ORDER BY m.created_at DESC LIMIT 1) AS last_body
@@ -503,6 +554,8 @@ export class MessagingService {
 
     let customerName: string | null = null;
     let orderRef: string | null = null;
+    let orderName: string | null = null;
+    let serviceType: string | null = null;
     let orderType: string | null = null;
     let orderStatus: string | null = null;
     if (row.customer_id && !hideCustomerDetails(user)) {
@@ -515,13 +568,17 @@ export class MessagingService {
     if (row.order_id) {
       const o = await this.db.queryOne<{
         human_ref: string | null;
+        name: string | null;
+        service_type: string | null;
         type: string | null;
         status: string | null;
       }>(
-        'SELECT human_ref, type, status FROM orders WHERE id = ? LIMIT 1',
+        'SELECT human_ref, name, service_type, type, status FROM orders WHERE id = ? LIMIT 1',
         [row.order_id],
       );
       orderRef = o?.human_ref ?? null;
+      orderName = o?.name ?? null;
+      serviceType = o?.service_type ?? null;
       orderType = o?.type ?? null;
       orderStatus = o?.status ?? null;
     }
@@ -530,6 +587,8 @@ export class MessagingService {
       ...this.conversationDto(row),
       customerName,
       orderRef,
+      orderName,
+      serviceType,
       orderType,
       orderStatus,
       messages: await this.getMessages(id),
@@ -728,8 +787,9 @@ export class MessagingService {
       }
     }
 
-    const subject =
-      input.subject?.trim() || this.defaultSubject(chatType, orderRef);
+    const subject = customerId
+      ? await this.nextCustomerConversationTitle(customerId)
+      : input.subject?.trim() || this.defaultSubject(chatType, orderRef);
     const id = this.db.uuid();
     await this.db.execute(
       `INSERT INTO conversations
@@ -782,11 +842,11 @@ export class MessagingService {
       ],
     );
     const attachments = await this.saveAttachments(messageId, files);
-    await this.adoptSubjectFromFirstMessage(convo, text || '(attachment)');
     await this.db.execute(
       'UPDATE conversations SET last_message_at = NOW(), unread_client = unread_client + 1, status = ? WHERE id = ?',
       [ConversationStatus.OPEN, conversationId],
     );
+    await this.maybeAdoptTopicTitle(conversationId);
 
     if (convo.customer_id) {
       const cust = await this.db.queryOne<{ user_id: string | null }>(
@@ -970,6 +1030,8 @@ export class MessagingService {
               cust.email AS customer_email,
               cust.phone AS customer_phone,
               o.human_ref AS order_ref,
+              o.name AS order_name,
+              o.service_type AS service_type,
               o.type AS order_type,
               o.status AS order_status,
               (SELECT m.body FROM messages m WHERE m.conversation_id = c.id AND m.deleted_at IS NULL ORDER BY m.created_at DESC LIMIT 1) AS last_body
@@ -1137,8 +1199,7 @@ export class MessagingService {
       }
     }
 
-    const subject =
-      input.subject?.trim() || this.defaultSubject(chatType, orderRef);
+    const subject = await this.nextCustomerConversationTitle(customerId);
     const id = this.db.uuid();
     await this.db.execute(
       `INSERT INTO conversations
@@ -1191,11 +1252,11 @@ export class MessagingService {
       ],
     );
     const attachments = await this.saveAttachments(messageId, files);
-    await this.adoptSubjectFromFirstMessage(convo, text || '(attachment)');
     await this.db.execute(
       'UPDATE conversations SET last_message_at = NOW(), unread_admin = unread_admin + 1, status = ? WHERE id = ?',
       [ConversationStatus.OPEN, conversationId],
     );
+    await this.maybeAdoptTopicTitle(conversationId);
 
     await this.notifications.createForMany(await this.staffUserIds(), {
       title: 'New customer message',

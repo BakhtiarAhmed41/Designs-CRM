@@ -1038,6 +1038,25 @@ button { font-family: inherit; }
   padding:16px 18px 18px;text-align:center;
   color:var(--faint);font-size:13px;
 }
+.inbox-filters{display:flex;flex-wrap:wrap;gap:8px;}
+.chip-btn{
+  border:0.5px solid var(--line);background:#fff;color:var(--muted);
+  border-radius:999px;padding:6px 12px;font:inherit;font-size:12.5px;font-weight:600;
+  cursor:pointer;
+}
+.chip-btn.on{background:var(--navy);color:#fff;border-color:var(--navy);}
+.inbox-work{margin-top:2px;}
+.admin-thread-notes{
+  border-top:0.5px solid var(--line);padding:10px 16px 14px;background:#fff;flex-shrink:0;
+}
+.admin-thread-notes label{
+  display:block;font-size:11px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.04em;color:var(--faint);margin-bottom:6px;
+}
+.admin-thread-notes textarea{
+  width:100%;border:0.5px solid var(--line);border-radius:9px;
+  padding:8px 10px;font:inherit;font-size:12.5px;resize:vertical;
+}
 .msg-workspace.chatgpt,
 .msg-workspace.team{grid-template-columns:300px 1fr 280px;}
 .msg-back{

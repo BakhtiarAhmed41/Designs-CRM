@@ -17,6 +17,9 @@ function isMessagingPath(pathname: string, search = '') {
   if (pathname.startsWith('/portal/messages')) {
     return new URLSearchParams(search).has('c');
   }
+  if (pathname.startsWith('/admin/messages/customers')) {
+    return /\/admin\/messages\/customers\/[^/]+/.test(pathname);
+  }
   return pathname.includes('/messages');
 }
 
