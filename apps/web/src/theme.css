@@ -1521,7 +1521,7 @@ textarea,
 .msg-bubble.theirs .msg-bubble-body,
 .tmsg.them,
 .msg.them {
-  background-color: var(--tint);
+  background-color: #f2f2f2;
 }
 
 /* Charcoal text and icons on every role view */

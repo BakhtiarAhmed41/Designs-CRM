@@ -1082,7 +1082,7 @@ button { font-family: inherit; }
 .admin-inbox-nav button.on{
   background:var(--tint-hover);
   font-weight:650;
-  box-shadow:inset 3px 0 0 var(--maroon);
+  box-shadow:inset 2px 0 0 var(--sidebar-active-text);
 }
 .admin-inbox-nav button.on i{color:var(--ink);}
 .admin-inbox-main{display:flex;flex-direction:column;gap:14px;min-width:0;}

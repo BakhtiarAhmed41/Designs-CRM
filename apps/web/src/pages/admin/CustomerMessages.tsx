@@ -71,8 +71,8 @@ type FilterKey = 'all' | 'unread' | 'open' | 'closed' | 'GENERAL' | 'ORDER' | 'Q
 
 const FILTERS: Array<{ key: FilterKey; label: string; icon: string }> = [
   { key: 'all', label: 'Inbox', icon: 'ti-inbox' },
-  { key: 'unread', label: 'Unread', icon: 'ti-mail' },
-  { key: 'open', label: 'Open', icon: 'ti-circle' },
+  { key: 'unread', label: 'Unread', icon: 'ti-messages' },
+  { key: 'open', label: 'Open', icon: 'ti-point' },
   { key: 'closed', label: 'Closed', icon: 'ti-circle-check' },
   { key: 'GENERAL', label: 'Topics', icon: 'ti-message' },
   { key: 'ORDER', label: 'Orders', icon: 'ti-package' },
