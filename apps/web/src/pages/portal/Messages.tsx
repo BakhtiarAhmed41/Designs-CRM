@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDialog } from '@/components/ui/AppDialog';
 import { ConversationThread } from '@/components/messaging/ConversationThread';
+import { HelpRequestBadge, InboxBulkBar, InboxStarButton } from '@/components/messaging/InboxTools';
 import { MessageComposer } from '@/components/messaging/MessageComposer';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -13,11 +14,16 @@ import {
   chatTypeLabel,
   conversationInboxNumbers,
   customerChatTitle,
+  sortConversationsNewestFirst,
+  bulkMyConversations,
   createMyConversation,
   deleteMyConversation,
   getMyConversation,
+  isHelpRequest,
+  isStarred,
   listMyConversations,
   sendMyMessage,
+  updateMyConversation,
   type Conversation,
 } from '@/lib/messaging';
 import {
@@ -57,6 +63,8 @@ export function PortalMessages() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState('');
+  const [showStarred, setShowStarred] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
   const conversationId = searchParams.get('c');
 
   const convosQuery = useQuery({
@@ -65,7 +73,10 @@ export function PortalMessages() {
     refetchInterval: whenVisible(20_000),
   });
 
-  const allConversations = convosQuery.data?.conversations ?? [];
+  const allConversations = useMemo(
+    () => sortConversationsNewestFirst(convosQuery.data?.conversations ?? []),
+    [convosQuery.data?.conversations],
+  );
   const inboxNumbers = useMemo(
     () => conversationInboxNumbers(allConversations),
     [allConversations],
@@ -73,13 +84,21 @@ export function PortalMessages() {
 
   const conversations = useMemo(() => {
     const term = q.trim().toLowerCase();
-    if (!term) return allConversations;
     return allConversations.filter((c) => {
+      if (showStarred && !isStarred(c, 'client')) return false;
+      if (!term) return true;
       const title = customerChatTitle(c, inboxNumbers.get(c.id));
       const hay = `${title} ${c.subject || ''} ${c.orderRef || ''} ${chatTypeLabel(c.chatType)} ${c.lastMessagePreview || ''}`.toLowerCase();
       return hay.includes(term);
     });
-  }, [allConversations, inboxNumbers, q]);
+  }, [allConversations, inboxNumbers, q, showStarred]);
+
+  useEffect(() => {
+    setSelected((ids) => {
+      const next = ids.filter((id) => conversations.some((c) => c.id === id));
+      return next.length === ids.length ? ids : next;
+    });
+  }, [conversations]);
 
   const threadQuery = useQuery({
     queryKey: ['my-conversation', conversationId],
@@ -123,6 +142,30 @@ export function PortalMessages() {
     onError: (err) => setError(getErrorMessage(err)),
   });
 
+  const starChat = useMutation({
+    mutationFn: ({ id, starred }: { id: string; starred: boolean }) =>
+      updateMyConversation(id, { starred }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['my-conversations'] });
+    },
+    onError: (err) => setError(getErrorMessage(err)),
+  });
+
+  const bulkChats = useMutation({
+    mutationFn: (input: { ids: string[]; action: 'delete' | 'star' | 'unstar' }) =>
+      bulkMyConversations(input),
+    onSuccess: (_res, input) => {
+      setSelected([]);
+      if (input.action === 'delete' && input.ids.includes(conversationId ?? '')) {
+        setSearchParams({}, { replace: true });
+      }
+      void qc.invalidateQueries({ queryKey: ['my-conversations'] });
+      void qc.invalidateQueries({ queryKey: ['portal-convos-nav'] });
+      void qc.invalidateQueries({ queryKey: ['portal-unread'] });
+    },
+    onError: (err) => setError(getErrorMessage(err)),
+  });
+
   const deleteTopic = useMutation({
     mutationFn: (id: string) => deleteMyConversation(id),
     onSuccess: (_res, id) => {
@@ -144,6 +187,28 @@ export function PortalMessages() {
   function backToInbox() {
     setSearchParams({}, { replace: true });
     setError(null);
+  }
+
+  function toggleSelected(id: string) {
+    setSelected((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  }
+
+  function toggleAll() {
+    setSelected((ids) =>
+      ids.length === conversations.length ? [] : conversations.map((c) => c.id),
+    );
+  }
+
+  async function confirmBulkDelete() {
+    if (selected.length === 0) return;
+    const ok = await dialog.confirm({
+      title: `Delete ${selected.length} chat${selected.length === 1 ? '' : 's'}?`,
+      message: 'They will be removed from your list.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+    bulkChats.mutate({ ids: selected, action: 'delete' });
   }
 
   async function confirmDelete(id: string) {
@@ -185,9 +250,12 @@ export function PortalMessages() {
             </button>
             <div className="portal-thread-title">
               <div className="on">
-                {active
-                  ? customerChatTitle(active, inboxNumbers.get(active.id))
-                  : 'Conversation'}
+                <span className="portal-thread-name">
+                  {active
+                    ? customerChatTitle(active, inboxNumbers.get(active.id))
+                    : 'Conversation'}
+                </span>
+                {isHelpRequest(active) && <HelpRequestBadge />}
               </div>
               {threadContext && <div className="om">{threadContext}</div>}
             </div>
@@ -261,6 +329,31 @@ export function PortalMessages() {
         />
       </div>
 
+      <div className="inbox-filters">
+        <button
+          type="button"
+          className={`chip-btn${showStarred ? '' : ' on'}`}
+          onClick={() => setShowStarred(false)}
+        >
+          Inbox
+        </button>
+        <button
+          type="button"
+          className={`chip-btn${showStarred ? ' on' : ''}`}
+          onClick={() => setShowStarred(true)}
+        >
+          Starred
+        </button>
+      </div>
+
+      <InboxBulkBar
+        selectedCount={selected.length}
+        totalCount={conversations.length}
+        onToggleAll={toggleAll}
+        onDelete={() => void confirmBulkDelete()}
+        deleting={bulkChats.isPending}
+      />
+
       <div className="card">
         {convosQuery.isLoading && <SkeletonRows rows={5} />}
         {!convosQuery.isLoading && !convosQuery.isError && conversations.length === 0 && (
@@ -285,14 +378,15 @@ export function PortalMessages() {
             }
           />
         )}
-        {conversations.map((c) => {
+        {conversations.map((c, index) => {
           const context = conversationContext(c);
+          const number = inboxNumbers.get(c.id) ?? index + 1;
           return (
             <div
               key={c.id}
               role="button"
               tabIndex={0}
-              className="orow inbox-row"
+              className={`orow inbox-row${selected.includes(c.id) ? ' is-selected' : ''}`}
               onClick={() => selectConvo(c)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -301,11 +395,28 @@ export function PortalMessages() {
                 }
               }}
             >
-              <div className="thumb">
-                <i className="ti ti-message" />
+              <label className="inbox-check" onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="checkbox"
+                  checked={selected.includes(c.id)}
+                  onChange={() => toggleSelected(c.id)}
+                  aria-label={`Select ${customerChatTitle(c, number)}`}
+                />
+              </label>
+              <InboxStarButton
+                on={isStarred(c, 'client')}
+                onClick={() =>
+                  starChat.mutate({ id: c.id, starred: !isStarred(c, 'client') })
+                }
+              />
+              <div className="thumb inbox-index" aria-hidden>
+                {number}
               </div>
               <div className="oinfo">
-                <div className="on">{customerChatTitle(c, inboxNumbers.get(c.id))}</div>
+                <div className="on inbox-title-row">
+                  <span>{customerChatTitle(c, number)}</span>
+                  {isHelpRequest(c) && <HelpRequestBadge />}
+                </div>
                 {context && <div className="om">{context}</div>}
                 <div className="om inbox-snippet">
                   {c.lastMessagePreview || 'No messages yet'}

@@ -92,14 +92,21 @@ export function PortalOrderDetail() {
 
   const startChat = useMutation({
     mutationFn: () => {
-      const orderType = data?.order?.type;
+      const order = data?.order;
+      const orderType = order?.type;
       const isQuote = orderType === 'QUOTE_REQUEST';
+      const isHelp =
+        !isQuote &&
+        (order?.status === 'COMPLETED' ||
+          order?.status === 'CLOSED' ||
+          order?.status === 'REVISION_REQUESTED');
       return openLinkedChat({
         orderId: id,
         chatType: isQuote ? 'QUOTE' : 'ORDER',
         subject: isQuote
-          ? `Quotation ${data?.order?.humanRef ?? ''} Chat`.trim()
-          : `Order ${data?.order?.humanRef ?? ''} Chat`.trim(),
+          ? `Quotation ${order?.humanRef ?? ''} Chat`.trim()
+          : `Order ${order?.humanRef ?? ''} Chat`.trim(),
+        label: isHelp ? 'HELP' : undefined,
       });
     },
     onSuccess: (convo) => navigate(`/portal/messages?c=${convo.id}`),
@@ -239,7 +246,7 @@ export function PortalOrderDetail() {
           { label: order.humanRef ?? 'Order' },
         ]}
         actions={
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <>
           {order.status === 'PENDING_PAYMENT' && (
             <button
               type="button"
@@ -254,12 +261,16 @@ export function PortalOrderDetail() {
           )}
           <button
             type="button"
-            className="btn btn-ghost btn-sm"
+            className={`btn btn-sm ${isPostDelivery ? 'btn-primary help-request-btn' : 'btn-ghost'}`}
             disabled={startChat.isPending}
             onClick={() => startChat.mutate()}
           >
-            <i className={`ti ${isPostDelivery ? 'ti-help' : 'ti-message'}`} />
-            {isPostDelivery ? 'Help Request' : 'Start Chat'}
+            <i className="ti ti-message-circle" />
+            {startChat.isPending
+              ? 'Opening…'
+              : isPostDelivery
+                ? 'Help Request'
+                : 'Start Chat'}
           </button>
           {canRequestRevision && (
             <button
@@ -277,7 +288,7 @@ export function PortalOrderDetail() {
             });
             return <span className={chip.cls}>{chip.label}</span>;
           })()}
-          </div>
+          </>
         }
       />
 

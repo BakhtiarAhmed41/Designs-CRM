@@ -35,6 +35,7 @@ const labelSchema = z.enum([
   MessageLabel.PAYMENT,
   MessageLabel.CUSTOM,
   MessageLabel.IMPORTANT,
+  MessageLabel.HELP,
 ]);
 
 const chatTypeSchema = z.enum([
@@ -63,6 +64,7 @@ const updateConversationSchema = z
     archived: z.boolean().optional(),
     privateNotes: z.string().nullable().optional(),
     status: statusSchema.optional(),
+    starred: z.boolean().optional(),
   })
   .refine(
     (v) =>
@@ -70,7 +72,8 @@ const updateConversationSchema = z
       v.subject !== undefined ||
       v.archived !== undefined ||
       v.privateNotes !== undefined ||
-      v.status !== undefined,
+      v.status !== undefined ||
+      v.starred !== undefined,
     { message: 'Nothing to update' },
   );
 
@@ -98,6 +101,7 @@ export class AdminMessagingController {
     @Query('chatType') chatType: string | undefined,
     @Query('customerId') customerId: string | undefined,
     @Query('orderId') orderId: string | undefined,
+    @Query('starred') starred: string | undefined,
     @Query('limit') limit: string | undefined,
   ) {
     const parsedLimit = limit ? Number(limit) : undefined;
@@ -115,6 +119,7 @@ export class AdminMessagingController {
         : undefined,
       customerId: customerId || undefined,
       orderId: z.string().uuid().safeParse(orderId).success ? orderId : undefined,
+      starred: starred === '1' || starred === 'true',
       limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
     });
     return { conversations };
@@ -143,6 +148,21 @@ export class AdminMessagingController {
   ) {
     const conversation = await this.messaging.getAdminConversation(user, id);
     return { conversation };
+  }
+
+  @Post('conversations/bulk')
+  @RequireFeatures('messages', 'messages_customer_view')
+  async bulk(
+    @CurrentUser() user: AuthUser | undefined,
+    @Body() body: unknown,
+  ) {
+    const data = z
+      .object({
+        ids: z.array(z.string().uuid()).min(1).max(50),
+        action: z.enum(['delete', 'star', 'unstar']),
+      })
+      .parse(body);
+    return this.messaging.bulkAdminConversations(user, data);
   }
 
   @Post('conversations')

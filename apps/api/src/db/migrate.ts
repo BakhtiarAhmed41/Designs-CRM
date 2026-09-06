@@ -108,6 +108,22 @@ async function main() {
     );
   }
 
+  if (!(await columnExists('conversations', 'starred_admin'))) {
+    // eslint-disable-next-line no-console
+    console.log('Adding conversations.starred_admin column ...');
+    await conn.query(
+      'ALTER TABLE conversations ADD COLUMN starred_admin TINYINT(1) NOT NULL DEFAULT 0',
+    );
+  }
+
+  if (!(await columnExists('conversations', 'starred_client'))) {
+    // eslint-disable-next-line no-console
+    console.log('Adding conversations.starred_client column ...');
+    await conn.query(
+      'ALTER TABLE conversations ADD COLUMN starred_client TINYINT(1) NOT NULL DEFAULT 0',
+    );
+  }
+
   if (!(await columnExists('messages', 'deleted_at'))) {
     // eslint-disable-next-line no-console
     console.log('Adding messages.deleted_at column ...');
@@ -244,6 +260,20 @@ async function main() {
     console.log('Adding quotation_lines.attachment_id column ...');
     await conn.query(
       'ALTER TABLE quotation_lines ADD COLUMN attachment_id CHAR(36) NULL',
+    );
+  }
+
+  const [labelCols] = await conn.query<mysql.RowDataPacket[]>(
+    `SELECT COLUMN_TYPE AS t FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'conversations' AND COLUMN_NAME = 'label'`,
+    [env.DB_NAME],
+  );
+  const labelType = String(labelCols[0]?.t ?? '');
+  if (labelType && !labelType.includes('HELP')) {
+    console.log('Adding conversations.label HELP ...');
+    await conn.query(
+      `ALTER TABLE conversations MODIFY COLUMN label
+         ENUM('EDIT','PAYMENT','CUSTOM','IMPORTANT','HELP') NULL`,
     );
   }
 

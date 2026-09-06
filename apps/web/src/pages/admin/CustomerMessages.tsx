@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ConversationThread } from '@/components/messaging/ConversationThread';
 import { MessageComposer } from '@/components/messaging/MessageComposer';
@@ -7,12 +7,16 @@ import { useAuth } from '@/context/AuthContext';
 import { getErrorMessage } from '@/lib/api';
 import { whenVisible } from '@/lib/queryRefresh';
 import {
+  bulkAdminConversations,
   conversationTitle,
   conversationWorkLine,
+  helpRequestTitle,
+  isHelpRequest,
   createAdminConversation,
   deleteAdminConversation,
   getAdminConversation,
   getCustomerMessagingContext,
+  isStarred,
   listAdminConversations,
   createMessageTemplate,
   deleteMessageTemplate,
@@ -23,6 +27,8 @@ import {
   type Conversation,
   type ConversationStatus,
 } from '@/lib/messaging';
+import { HelpRequestBadge, InboxBulkBar, InboxStarButton } from '@/components/messaging/InboxTools';
+import { dateShort, money, statusChipClass, statusLabel } from '@/lib/format';
 import { useDialog } from '@/components/ui/AppDialog';
 import { canFeature } from '@/lib/permissions';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
@@ -60,6 +66,20 @@ function inboxTime(iso: string | null | undefined) {
   });
 }
 
+function accountTypeLabel(type: string | null | undefined) {
+  if (type === 'NET_MONTHLY') return 'Net monthly';
+  if (type === 'PAY_PER_ORDER') return 'Pay per order';
+  if (!type?.trim()) return '—';
+  return type.replace(/_/g, ' ');
+}
+
+function sinceLabel(iso: string | null | undefined) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
 function inboxTitle(c: Conversation, hideCustomerDetails: boolean) {
   if (hideCustomerDetails) {
     return c.orderRef ? `Order ${c.orderRef}` : conversationTitle(c);
@@ -67,10 +87,11 @@ function inboxTitle(c: Conversation, hideCustomerDetails: boolean) {
   return c.customerName?.trim() || 'Customer';
 }
 
-type FilterKey = 'all' | 'unread' | 'open' | 'closed' | 'GENERAL' | 'ORDER' | 'QUOTE';
+type FilterKey = 'all' | 'starred' | 'unread' | 'open' | 'closed' | 'GENERAL' | 'ORDER' | 'QUOTE';
 
 const FILTERS: Array<{ key: FilterKey; label: string; icon: string }> = [
   { key: 'all', label: 'Inbox', icon: 'ti-inbox' },
+  { key: 'starred', label: 'Starred', icon: 'ti-user-star' },
   { key: 'unread', label: 'Unread', icon: 'ti-messages' },
   { key: 'open', label: 'Open', icon: 'ti-point' },
   { key: 'closed', label: 'Closed', icon: 'ti-circle-check' },
@@ -98,10 +119,12 @@ export function AdminCustomerMessages() {
   const [error, setError] = useState<string | null>(null);
   const [notesDraft, setNotesDraft] = useState('');
   const [startMenuOpen, setStartMenuOpen] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
   const startMenuRef = useRef<HTMLDivElement>(null);
 
   const listFilters = useMemo(() => {
     const base: Parameters<typeof listAdminConversations>[0] = { q: q || undefined };
+    if (filter === 'starred') base.starred = true;
     if (filter === 'unread') base.unread = true;
     if (filter === 'open') base.status = 'OPEN';
     if (filter === 'closed') base.status = 'CLOSED';
@@ -119,8 +142,14 @@ export function AdminCustomerMessages() {
 
   const conversations = useMemo(() => {
     const all = listQuery.data?.conversations ?? [];
-    return hideCustomerDetails ? all.filter((c) => c.chatType !== 'QUOTE') : all;
-  }, [listQuery.data?.conversations, hideCustomerDetails]);
+    const visible = hideCustomerDetails ? all.filter((c) => c.chatType !== 'QUOTE') : all;
+    if (filter === 'starred') return visible.filter((c) => isStarred(c, 'admin'));
+    return visible;
+  }, [listQuery.data?.conversations, hideCustomerDetails, filter]);
+
+  useEffect(() => {
+    setSelected((ids) => ids.filter((id) => conversations.some((c) => c.id === id)));
+  }, [conversations]);
 
   const activeConversationId = conversationId ?? null;
 
@@ -132,7 +161,8 @@ export function AdminCustomerMessages() {
   });
 
   const active = threadQuery.data?.conversation;
-  const customerId = active?.customerId ?? null;
+  const listedActive = conversations.find((c) => c.id === activeConversationId);
+  const customerId = active?.customerId ?? listedActive?.customerId ?? null;
 
   useEffect(() => {
     setNotesDraft(active?.privateNotes ?? '');
@@ -219,6 +249,29 @@ export function AdminCustomerMessages() {
     },
   });
 
+  const starChat = useMutation({
+    mutationFn: ({ id, starred }: { id: string; starred: boolean }) =>
+      updateAdminConversation(id, { starred }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['admin-conversations'] });
+    },
+    onError: (err) => setError(getErrorMessage(err)),
+  });
+
+  const bulkChats = useMutation({
+    mutationFn: (input: { ids: string[]; action: 'delete' | 'star' | 'unstar' }) =>
+      bulkAdminConversations(input),
+    onSuccess: (_res, input) => {
+      setSelected([]);
+      if (input.action === 'delete' && input.ids.includes(activeConversationId ?? '')) {
+        navigate('/admin/messages/customers');
+      }
+      void qc.invalidateQueries({ queryKey: ['admin-conversations'] });
+      void qc.invalidateQueries({ queryKey: ['admin-conversation'] });
+    },
+    onError: (err) => setError(getErrorMessage(err)),
+  });
+
   const deleteChat = useMutation({
     mutationFn: (id: string) => deleteAdminConversation(id),
     onSuccess: () => {
@@ -229,6 +282,28 @@ export function AdminCustomerMessages() {
     },
     onError: (err) => setError(getErrorMessage(err)),
   });
+
+  function toggleSelected(id: string) {
+    setSelected((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+  }
+
+  function toggleAll() {
+    setSelected((ids) =>
+      ids.length === conversations.length ? [] : conversations.map((c) => c.id),
+    );
+  }
+
+  async function confirmBulkDelete() {
+    if (selected.length === 0) return;
+    const ok = await dialog.confirm({
+      title: `Delete ${selected.length} chat${selected.length === 1 ? '' : 's'}?`,
+      message: 'This cannot be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+    bulkChats.mutate({ ids: selected, action: 'delete' });
+  }
 
   async function confirmDeleteChat(id: string) {
     const ok = await dialog.confirm({
@@ -251,13 +326,17 @@ export function AdminCustomerMessages() {
     navigate('/admin/messages/customers');
   }
 
-  const displayName = hideCustomerDetails
-    ? active
-      ? inboxTitle(active, true)
-      : 'Conversation'
-    : active?.customerName?.trim() ||
-      contextQuery.data?.customer.name ||
-      'Customer';
+  const helpThread = isHelpRequest(active) || isHelpRequest(listedActive);
+  const displayName = helpThread
+    ? helpRequestTitle(active?.orderRef ?? listedActive?.orderRef)
+    : hideCustomerDetails
+      ? active
+        ? inboxTitle(active, true)
+        : 'Conversation'
+      : active?.customerName?.trim() ||
+        listedActive?.customerName?.trim() ||
+        contextQuery.data?.customer.name ||
+        'Customer';
 
   const workLine = active ? conversationWorkLine(active) : null;
   const visibleFilters = hideCustomerDetails
@@ -290,7 +369,7 @@ export function AdminCustomerMessages() {
 
   if (activeConversationId) {
     return (
-      <div className="msg-workspace portal portal-thread">
+      <div className="msg-workspace portal portal-thread admin-thread">
         <section className="msg-center">
           <div className="msg-center-head portal-thread-head">
             <button
@@ -309,7 +388,10 @@ export function AdminCustomerMessages() {
               )}
             </div>
             <div className="portal-thread-title">
-              <div className="on">{displayName}</div>
+              <div className="on">
+                <span className="portal-thread-name">{displayName}</span>
+                {helpThread && <HelpRequestBadge />}
+              </div>
               {workLine && <div className="om">{workLine}</div>}
             </div>
             {active && (
@@ -442,24 +524,119 @@ export function AdminCustomerMessages() {
                   await sendMutation.mutateAsync({ body, files });
                 }}
               />
-              <div className="admin-thread-notes">
-                <label htmlFor="admin-private-notes">Private notes</label>
-                <textarea
-                  id="admin-thread-notes"
-                  rows={2}
-                  value={notesDraft}
-                  onChange={(e) => setNotesDraft(e.target.value)}
-                  onBlur={() => {
-                    if (notesDraft !== (active.privateNotes || '')) {
-                      updateMutation.mutate({ privateNotes: notesDraft });
-                    }
-                  }}
-                  placeholder="Visible to staff only"
-                />
-              </div>
             </>
           )}
         </section>
+        <aside className="msg-right admin-thread-side" aria-label="Customer details">
+          <div className="msg-right-body">
+            <div className="msg-right-section">
+              <div className="msg-right-title">Customer</div>
+              {hideCustomerDetails ? (
+                <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+                  Customer details are hidden for this role.
+                </p>
+              ) : (
+                <>
+                  <div className="msg-cust-hero">
+                    <div className="thumb" aria-hidden>
+                      {initials(displayName)}
+                    </div>
+                    <div className="msg-cust-hero-text">
+                      <b>{displayName}</b>
+                      {customerId && customerId !== 'unknown' && (
+                        <Link to={`/admin/customers?open=${customerId}`}>
+                          View profile
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                  <div className="msg-kv">
+                    <span>Email</span>
+                    <b>
+                      {contextQuery.data?.customer.email ||
+                        active?.customerEmail ||
+                        '—'}
+                    </b>
+                  </div>
+                  <div className="msg-kv">
+                    <span>Phone</span>
+                    <b>
+                      {contextQuery.data?.customer.phone ||
+                        active?.customerPhone ||
+                        '—'}
+                    </b>
+                  </div>
+                  <div className="msg-kv">
+                    <span>Account</span>
+                    <b>{accountTypeLabel(contextQuery.data?.customer.accountType)}</b>
+                  </div>
+                  <div className="msg-kv">
+                    <span>Customer since</span>
+                    <b>
+                      {sinceLabel(
+                        contextQuery.data?.customer.customerSince ||
+                          contextQuery.data?.customer.createdAt,
+                      )}
+                    </b>
+                  </div>
+                  <div className="msg-kv">
+                    <span>Orders</span>
+                    <b>{contextQuery.data?.customer.totalOrders ?? '—'}</b>
+                  </div>
+                  <div className="msg-kv">
+                    <span>Total spent</span>
+                    <b>{money(contextQuery.data?.customer.totalSpentCents)}</b>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="msg-right-section">
+              <div className="msg-right-title">Order history</div>
+              {contextQuery.isLoading && (
+                <div className="muted" style={{ fontSize: 13 }}>Loading orders…</div>
+              )}
+              {!contextQuery.isLoading &&
+                (contextQuery.data?.recentOrders ?? []).length === 0 && (
+                  <div className="muted" style={{ fontSize: 13 }}>No orders yet.</div>
+                )}
+              {(contextQuery.data?.recentOrders ?? []).map((o) => (
+                <Link key={o.id} to={`/admin/orders/${o.id}`} className="msg-order-row">
+                  <div>
+                    <b>{o.humanRef ? `Order ${o.humanRef}` : 'Order'}</b>
+                    <div className="msg-order-date">{dateShort(o.createdAt)}</div>
+                  </div>
+                  <div className="msg-order-meta">
+                    {!hideCustomerDetails && o.totalCents != null && (
+                      <b>{money(o.totalCents)}</b>
+                    )}
+                    <span className={statusChipClass(o.status)}>
+                      {statusLabel(o.status, 'admin')}
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+          {active && (
+            <div className="msg-right-section msg-right-notes">
+              <label className="msg-right-title" htmlFor="admin-private-notes">
+                Private notes
+              </label>
+              <textarea
+                id="admin-private-notes"
+                rows={4}
+                value={notesDraft}
+                onChange={(e) => setNotesDraft(e.target.value)}
+                onBlur={() => {
+                  if (notesDraft !== (active.privateNotes || '')) {
+                    updateMutation.mutate({ privateNotes: notesDraft });
+                  }
+                }}
+                placeholder="Visible to staff only"
+              />
+            </div>
+          )}
+        </aside>
       </div>
     );
   }
@@ -481,6 +658,14 @@ export function AdminCustomerMessages() {
         />
       </div>
 
+      <InboxBulkBar
+        selectedCount={selected.length}
+        totalCount={conversations.length}
+        onToggleAll={toggleAll}
+        onDelete={() => void confirmBulkDelete()}
+        deleting={bulkChats.isPending}
+      />
+
       <div className="card">
         {listQuery.isLoading && <SkeletonRows rows={6} />}
         {!listQuery.isLoading && conversations.length === 0 && (
@@ -498,7 +683,7 @@ export function AdminCustomerMessages() {
               key={c.id}
               role="button"
               tabIndex={0}
-              className="orow inbox-row"
+              className={`orow inbox-row${selected.includes(c.id) ? ' is-selected' : ''}`}
               onClick={() => openConvo(c)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -507,6 +692,20 @@ export function AdminCustomerMessages() {
                 }
               }}
             >
+              <label className="inbox-check" onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="checkbox"
+                  checked={selected.includes(c.id)}
+                  onChange={() => toggleSelected(c.id)}
+                  aria-label={`Select ${name}`}
+                />
+              </label>
+              <InboxStarButton
+                on={isStarred(c, 'admin')}
+                onClick={() =>
+                  starChat.mutate({ id: c.id, starred: !isStarred(c, 'admin') })
+                }
+              />
               <div className="thumb">
                 {hideCustomerDetails ? (
                   <i className="ti ti-package" />
@@ -515,11 +714,16 @@ export function AdminCustomerMessages() {
                 )}
               </div>
               <div className="oinfo">
-                <div className="on">{name}</div>
-                <div className="om inbox-snippet">
-                  {c.lastMessagePreview || 'No messages yet'}
+                <div className="on inbox-title-row">
+                  <span>{name}</span>
+                  {isHelpRequest(c) && <HelpRequestBadge />}
                 </div>
-                {work && <div className="om inbox-work">{work}</div>}
+                <div className={`inbox-sub${work ? ' has-work' : ''}`}>
+                  {work && <span className="inbox-work">{work}</span>}
+                  <span className="inbox-snippet">
+                    {c.lastMessagePreview || 'No messages yet'}
+                  </span>
+                </div>
               </div>
               <div className="inbox-meta">
                 <span>{inboxTime(c.lastMessageAt)}</span>

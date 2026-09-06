@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   UploadedFiles,
   UseGuards,
@@ -24,6 +25,7 @@ const labelSchema = z.enum([
   MessageLabel.PAYMENT,
   MessageLabel.CUSTOM,
   MessageLabel.IMPORTANT,
+  MessageLabel.HELP,
 ]);
 
 const chatTypeSchema = z.enum([
@@ -53,6 +55,39 @@ export class MessagingController {
   @Get('unread-summary')
   async unreadSummary(@CurrentUser() user: AuthUser | undefined) {
     return this.messaging.myUnreadSummary(user);
+  }
+
+  @Post('bulk')
+  async bulk(
+    @CurrentUser() user: AuthUser | undefined,
+    @Body() body: unknown,
+  ) {
+    const data = z
+      .object({
+        ids: z.array(z.string().uuid()).min(1).max(50),
+        action: z.enum(['delete', 'star', 'unstar']),
+      })
+      .parse(body);
+    return this.messaging.bulkMyConversations(user, data);
+  }
+
+  @Patch(':id')
+  async update(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    const data = z
+      .object({
+        starred: z.boolean().optional(),
+        label: z.literal(MessageLabel.HELP).optional(),
+      })
+      .refine((v) => v.starred !== undefined || v.label !== undefined, {
+        message: 'Nothing to update',
+      })
+      .parse(body);
+    const conversation = await this.messaging.updateMyConversation(user, id, data);
+    return { conversation };
   }
 
   @Get(':id')

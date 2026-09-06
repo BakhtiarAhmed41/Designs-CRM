@@ -215,6 +215,7 @@ export const MessageLabel = {
   PAYMENT: 'PAYMENT',
   CUSTOM: 'CUSTOM',
   IMPORTANT: 'IMPORTANT',
+  HELP: 'HELP',
 } as const;
 export type MessageLabel = (typeof MessageLabel)[keyof typeof MessageLabel];
 

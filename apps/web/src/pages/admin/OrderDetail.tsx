@@ -27,7 +27,10 @@ import {
   listMessageTemplates,
   sendAdminMessage,
   createAdminConversation,
+  isHelpRequest,
+  updateAdminConversation,
 } from '@/lib/messaging';
+import { HelpRequestBadge } from '@/components/messaging/InboxTools';
 import { createInvoice, createPayLink, listInvoices, payInvoice, refundOrder, type RefundTo } from '@/lib/billing';
 import { assignOrder, listTeam, unassignOrder } from '@/lib/team';
 import {
@@ -532,6 +535,32 @@ export function AdminOrderDetail() {
     onError: (e) => setError(getErrorMessage(e)),
   });
 
+  const openHelpRequest = useMutation({
+    mutationFn: async () => {
+      if (convo) {
+        if (convo.label !== 'HELP') {
+          await updateAdminConversation(convo.id, { label: 'HELP' });
+        }
+        return convo;
+      }
+      const created = await createAdminConversation({
+        orderId: id,
+        customerId: order?.customerId ?? null,
+        chatType: order?.type === 'QUOTE_REQUEST' ? 'QUOTE' : 'ORDER',
+        label: 'HELP',
+        subject: order?.humanRef
+          ? `Help with order #${order.humanRef}`
+          : 'Help request',
+      });
+      return created.conversation;
+    },
+    onSuccess: (conversation) => {
+      void qc.invalidateQueries({ queryKey: ['admin-conversations'] });
+      navigate(`/admin/messages/customers/${conversation.id}`);
+    },
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
   async function uploadReferenceFiles(selected: FileList | null) {
     const list = Array.from(selected ?? []);
     if (!list.length || !id) return;
@@ -679,6 +708,11 @@ export function AdminOrderDetail() {
   const messages = threadQ.data?.conversation.messages ?? [];
   const activity = activityQ.data?.activity ?? [];
   const hasDeliveries = (order.deliveries ?? []).length > 0;
+  const canHelpRequest =
+    order.type !== 'QUOTE_REQUEST' &&
+    (order.status === 'COMPLETED' ||
+      order.status === 'CLOSED' ||
+      order.status === 'REVISION_REQUESTED');
 
   return (
     <div>
@@ -707,6 +741,17 @@ export function AdminOrderDetail() {
           </div>
         </div>
         <div className="ph-actions">
+          {canHelpRequest && (
+            <button
+              type="button"
+              className="btn btn-sm btn-primary help-request-btn"
+              disabled={openHelpRequest.isPending}
+              onClick={() => openHelpRequest.mutate()}
+            >
+              <i className="ti ti-message-circle" />
+              {openHelpRequest.isPending ? 'Opening…' : 'Help Request'}
+            </button>
+          )}
           <button
             type="button"
             className="btn btn-ghost btn-sm"
@@ -1218,6 +1263,7 @@ export function AdminOrderDetail() {
             <div className="card-h">
               <span className="ct">
                 <i className="ti ti-message" /> Messages on this order
+                {isHelpRequest(convo) && <HelpRequestBadge />}
               </span>
               <button
                 type="button"

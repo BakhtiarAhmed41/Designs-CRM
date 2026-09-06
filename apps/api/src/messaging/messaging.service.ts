@@ -41,6 +41,8 @@ type ConversationRow = {
   source: MessageSource;
   archived: number | boolean;
   hidden_from_client: number | boolean;
+  starred_admin?: number | boolean;
+  starred_client?: number | boolean;
   private_notes: string | null;
   last_message_at: Date | null;
   unread_admin: number;
@@ -119,6 +121,8 @@ export class MessagingService {
       label: c.label,
       source: c.source,
       archived: Boolean(c.archived),
+      starredAdmin: Boolean(c.starred_admin),
+      starredClient: Boolean(c.starred_client),
       privateNotes: stripPrivate ? null : c.private_notes,
       lastMessageAt: c.last_message_at,
       unreadAdmin: Number(c.unread_admin ?? 0),
@@ -366,6 +370,18 @@ export class MessagingService {
     return (await this.getConversationRow(row.id)) ?? row;
   }
 
+  private async applyLabelIfProvided(
+    row: ConversationRow,
+    label?: MessageLabel | null,
+  ) {
+    if (label === undefined || row.label === label) return row;
+    await this.db.execute('UPDATE conversations SET label = ? WHERE id = ?', [
+      label,
+      row.id,
+    ]);
+    return (await this.getConversationRow(row.id)) ?? { ...row, label };
+  }
+
   private async saveAttachments(messageId: string, files: UploadFile[]) {
     const out = [];
     for (const file of files) {
@@ -432,6 +448,7 @@ export class MessagingService {
       chatType?: ChatType;
       customerId?: string;
       orderId?: string;
+      starred?: boolean;
       limit?: number;
     },
   ) {
@@ -451,6 +468,7 @@ export class MessagingService {
       params.push(filters.label);
     }
 
+    if (filters.starred) where.push('c.starred_admin = 1');
     if (filters.unread) where.push('c.unread_admin > 0');
     if (filters.read) where.push('c.unread_admin = 0');
     if (filters.status) {
@@ -783,7 +801,8 @@ export class MessagingService {
       );
       if (existing) {
         const revived = await this.reactivateLinkedChat(existing);
-        return this.conversationDto(revived);
+        const labeled = await this.applyLabelIfProvided(revived, input.label);
+        return this.conversationDto(labeled);
       }
     }
 
@@ -892,6 +911,7 @@ export class MessagingService {
       archived?: boolean;
       privateNotes?: string | null;
       status?: ConversationStatus;
+      starred?: boolean;
     },
   ) {
     assertAuthUser(user);
@@ -919,6 +939,10 @@ export class MessagingService {
     if (input.status !== undefined) {
       sets.push('status = ?');
       params.push(input.status);
+    }
+    if (input.starred !== undefined) {
+      sets.push('starred_admin = ?');
+      params.push(input.starred ? 1 : 0);
     }
     if (sets.length === 0) return this.conversationDto(convo);
 
@@ -1040,14 +1064,14 @@ export class MessagingService {
          LEFT JOIN orders o ON o.id = c.order_id
         WHERE c.customer_id = ?
           AND (c.hidden_from_client = 0 OR c.hidden_from_client IS NULL)
-        ORDER BY c.last_message_at IS NULL, c.last_message_at DESC, c.created_at DESC`,
+        ORDER BY COALESCE(c.last_message_at, c.created_at) DESC, c.created_at DESC`,
       `SELECT c.*,
               o.human_ref AS order_ref,
               (SELECT m.body FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) AS last_body
          FROM conversations c
          LEFT JOIN orders o ON o.id = c.order_id
         WHERE c.customer_id = ?
-        ORDER BY c.created_at DESC`,
+        ORDER BY COALESCE(c.last_message_at, c.created_at) DESC, c.created_at DESC`,
     ];
 
     let lastErr: unknown;
@@ -1125,6 +1149,71 @@ export class MessagingService {
     );
     this.gateway?.emitToUser(user.id, 'unread:changed', { scope: 'customer' });
     return { ok: true };
+  }
+
+  async updateMyConversation(
+    user: AuthUser | undefined,
+    conversationId: string,
+    input: { starred?: boolean; label?: MessageLabel | null },
+  ) {
+    assertAuthUser(user);
+    if (user.role !== UserRole.CLIENT) throw new ForbiddenException();
+    const { convo } = await this.getOwnedConversation(user, conversationId);
+    const sets: string[] = [];
+    const params: unknown[] = [];
+    if (input.starred !== undefined) {
+      sets.push('starred_client = ?');
+      params.push(input.starred ? 1 : 0);
+    }
+    if (input.label !== undefined) {
+      sets.push('label = ?');
+      params.push(input.label);
+    }
+    if (sets.length === 0) return this.conversationDto(convo, true);
+    params.push(convo.id);
+    await this.db.execute(
+      `UPDATE conversations SET ${sets.join(', ')} WHERE id = ?`,
+      params,
+    );
+    const row = await this.getConversationRow(convo.id);
+    return this.conversationDto(row!, true);
+  }
+
+  async bulkMyConversations(
+    user: AuthUser | undefined,
+    input: { ids: string[]; action: 'delete' | 'star' | 'unstar' },
+  ) {
+    assertAuthUser(user);
+    if (user.role !== UserRole.CLIENT) throw new ForbiddenException();
+    const ids = [...new Set(input.ids)].slice(0, 50);
+    for (const id of ids) {
+      if (input.action === 'delete') {
+        await this.deleteMyConversation(user, id);
+      } else {
+        await this.updateMyConversation(user, id, {
+          starred: input.action === 'star',
+        });
+      }
+    }
+    return { ok: true, count: ids.length };
+  }
+
+  async bulkAdminConversations(
+    user: AuthUser | undefined,
+    input: { ids: string[]; action: 'delete' | 'star' | 'unstar' },
+  ) {
+    assertAuthUser(user);
+    const ids = [...new Set(input.ids)].slice(0, 50);
+    for (const id of ids) {
+      if (input.action === 'delete') {
+        await this.deleteAdminConversation(user, id);
+      } else {
+        await this.updateAdminConversation(user, id, {
+          starred: input.action === 'star',
+        });
+      }
+    }
+    return { ok: true, count: ids.length };
   }
 
   async getMyConversation(user: AuthUser | undefined, id: string) {
@@ -1224,7 +1313,8 @@ export class MessagingService {
       const existing = await this.findLinkedOrderChat(customerId, orderId);
       if (existing) {
         const revived = await this.reactivateLinkedChat(existing);
-        const dto = this.conversationDto(revived, true);
+        const labeled = await this.applyLabelIfProvided(revived, input.label);
+        const dto = this.conversationDto(labeled, true);
         this.gateway?.server?.emit('conversation:updated', {
           conversation: dto,
         });

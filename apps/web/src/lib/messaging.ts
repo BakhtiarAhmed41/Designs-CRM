@@ -1,6 +1,6 @@
 import { apiFetch, apiFetchForm } from './api';
 
-export type MessageLabel = 'EDIT' | 'PAYMENT' | 'CUSTOM' | 'IMPORTANT';
+export type MessageLabel = 'EDIT' | 'PAYMENT' | 'CUSTOM' | 'IMPORTANT' | 'HELP';
 export type MessageDirection = 'INBOUND' | 'OUTBOUND';
 export type MessageSource = 'PORTAL' | 'SITE_CHAT';
 export type ChatType = 'GENERAL' | 'ORDER' | 'QUOTE';
@@ -30,7 +30,25 @@ export type Conversation = {
   orderType?: string | null;
   orderStatus?: string | null;
   lastMessagePreview?: string | null;
+  starredAdmin?: boolean;
+  starredClient?: boolean;
 };
+
+export function isStarred(
+  c: Pick<Conversation, 'starredAdmin' | 'starredClient'>,
+  viewer: 'admin' | 'client',
+) {
+  return viewer === 'client' ? Boolean(c.starredClient) : Boolean(c.starredAdmin);
+}
+
+export function isHelpRequest(c: { label?: string | null } | null | undefined) {
+  return c?.label === 'HELP';
+}
+
+export function helpRequestTitle(orderRef?: string | null) {
+  const ref = orderRef?.trim();
+  return ref ? `Help with order #${ref}` : 'Help request';
+}
 
 export type MessageAttachment = {
   id: string;
@@ -155,9 +173,10 @@ export function isAutoCustomerSubject(subject: string | null | undefined) {
 
 /** Customer-facing chat name: Conversation #N until a topic title is ready. */
 export function customerChatTitle(
-  c: { subject?: string | null },
+  c: { subject?: string | null; label?: string | null; orderRef?: string | null },
   fallbackNumber?: number,
 ) {
+  if (isHelpRequest(c)) return helpRequestTitle(c.orderRef);
   const subject = c.subject?.trim() || '';
   if (subject && !isAutoCustomerSubject(subject)) return subject;
   const numbered = subject.match(/^conversation #\s*(\d+)$/i);
@@ -166,14 +185,30 @@ export function customerChatTitle(
   return 'Conversation';
 }
 
+function conversationTime(iso?: string | null) {
+  if (!iso) return 0;
+  const t = new Date(iso).getTime();
+  return Number.isNaN(t) ? 0 : t;
+}
+
+/** Newest activity first. New chats with no messages still sit at the top. */
+export function sortConversationsNewestFirst<
+  T extends { lastMessageAt?: string | null; createdAt?: string | null },
+>(conversations: T[]) {
+  return [...conversations].sort((a, b) => {
+    const ta = conversationTime(a.lastMessageAt) || conversationTime(a.createdAt);
+    const tb = conversationTime(b.lastMessageAt) || conversationTime(b.createdAt);
+    return tb - ta;
+  });
+}
+
+/** Stable #1 = first created chat. */
 export function conversationInboxNumbers(
   conversations: Array<{ id: string; createdAt?: string | null }>,
 ) {
-  const sorted = [...conversations].sort((a, b) => {
-    const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-    const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-    return ta - tb;
-  });
+  const sorted = [...conversations].sort(
+    (a, b) => conversationTime(a.createdAt) - conversationTime(b.createdAt),
+  );
   return new Map(sorted.map((c, i) => [c.id, i + 1]));
 }
 
@@ -189,7 +224,9 @@ export function conversationTitle(c: {
   subject?: string | null;
   orderRef?: string | null;
   lastMessagePreview?: string | null;
+  label?: string | null;
 }) {
+  if (isHelpRequest(c)) return helpRequestTitle(c.orderRef);
   if (c.chatType === 'ORDER') {
     if (c.orderRef) return `Order ${c.orderRef}`;
     if (c.subject?.trim() && !isPlaceholderSubject(c.subject)) return c.subject.trim();
@@ -245,6 +282,7 @@ export function listAdminConversations(params?: {
   chatType?: ChatType;
   customerId?: string;
   orderId?: string;
+  starred?: boolean;
   limit?: number;
 }) {
   const q = new URLSearchParams();
@@ -257,6 +295,7 @@ export function listAdminConversations(params?: {
   if (params?.chatType) q.set('chatType', params.chatType);
   if (params?.customerId) q.set('customerId', params.customerId);
   if (params?.orderId) q.set('orderId', params.orderId);
+  if (params?.starred) q.set('starred', '1');
   if (params?.limit) q.set('limit', String(params.limit));
   const suffix = q.toString() ? `?${q.toString()}` : '';
   return apiFetch<{ conversations: Conversation[] }>(
@@ -315,12 +354,23 @@ export function updateAdminConversation(
     archived?: boolean;
     privateNotes?: string | null;
     status?: ConversationStatus;
+    starred?: boolean;
   },
 ) {
   return apiFetch<{ conversation: Conversation }>(
     `/admin/conversations/${conversationId}`,
     { method: 'PATCH', body: JSON.stringify(data) },
   );
+}
+
+export function bulkAdminConversations(data: {
+  ids: string[];
+  action: 'delete' | 'star' | 'unstar';
+}) {
+  return apiFetch<{ ok: boolean; count: number }>('/admin/conversations/bulk', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
 }
 
 export function deleteAdminConversation(conversationId: string) {
@@ -383,6 +433,7 @@ export async function openLinkedChat(opts: {
   orderId: string;
   chatType: 'ORDER' | 'QUOTE';
   subject?: string;
+  label?: MessageLabel | null;
 }) {
   const listed = await listMyConversations();
   const existing = listed.conversations.find(
@@ -390,13 +441,42 @@ export async function openLinkedChat(opts: {
       c.orderId === opts.orderId &&
       (c.chatType === 'ORDER' || c.chatType === 'QUOTE'),
   );
-  if (existing) return existing;
+  if (existing) {
+    if (opts.label && existing.label !== opts.label) {
+      const updated = await updateMyConversation(existing.id, {
+        label: opts.label,
+      });
+      return updated.conversation;
+    }
+    return existing;
+  }
   const created = await createMyConversation({
     orderId: opts.orderId,
     chatType: opts.chatType,
     subject: opts.subject,
+    label: opts.label,
   });
   return created.conversation;
+}
+
+export function updateMyConversation(
+  conversationId: string,
+  data: { starred?: boolean; label?: MessageLabel | null },
+) {
+  return apiFetch<{ conversation: Conversation }>(
+    `/conversations/${conversationId}`,
+    { method: 'PATCH', body: JSON.stringify(data) },
+  );
+}
+
+export function bulkMyConversations(data: {
+  ids: string[];
+  action: 'delete' | 'star' | 'unstar';
+}) {
+  return apiFetch<{ ok: boolean; count: number }>('/conversations/bulk', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
 }
 
 export function deleteMyConversation(conversationId: string) {
