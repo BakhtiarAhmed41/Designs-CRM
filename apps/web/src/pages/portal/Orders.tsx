@@ -19,7 +19,7 @@ import { invalidateWorkCaches } from '@/lib/queryCache';
 import { freshOnOpen } from '@/lib/queryRefresh';
 import { PageHeader } from '@/components/ui/PageHeader';
 
-type OrderFilter = 'all' | 'active' | 'delivered';
+type OrderFilter = 'all' | 'in_progress' | 'revision' | 'delivered';
 
 const DONE = ['COMPLETED', 'CLOSED'];
 
@@ -144,6 +144,20 @@ function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
 
   if (!open) return null;
 
+  const expandLinks = (
+    <div className="order-expand-actions">
+      <Link to={`/portal/orders/${orderId}`} className="btn btn-primary btn-sm" onClick={(e) => e.stopPropagation()}>
+        View order
+      </Link>
+      <Link to="/portal/messages" className="btn btn-ghost btn-sm" onClick={(e) => e.stopPropagation()}>
+        Need help
+      </Link>
+      <Link to="/portal/invoices" className="btn btn-ghost btn-sm" onClick={(e) => e.stopPropagation()}>
+        View invoice
+      </Link>
+    </div>
+  );
+
   if (designs.length === 0 && !isDelivered) {
     return (
       <div className="batch">
@@ -152,6 +166,7 @@ function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
             No design breakdown yet.
           </span>
         </div>
+        {expandLinks}
       </div>
     );
   }
@@ -225,7 +240,12 @@ function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
   ) : null;
 
   if (designs.length === 0) {
-    return <div className="batch">{deliveredActions}</div>;
+    return (
+      <div className="batch">
+        {deliveredActions}
+        {expandLinks}
+      </div>
+    );
   }
 
   return (
@@ -251,6 +271,7 @@ function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
         );
       })}
       {deliveredActions}
+      {expandLinks}
     </div>
   );
 }
@@ -301,8 +322,7 @@ export function PortalOrders() {
     queryFn: () =>
       listMyOrders({
         type: 'ORDER',
-        customerStatus: status || undefined,
-        lifecycle: filter === 'all' ? undefined : filter,
+        customerStatus: status || (filter === 'all' ? undefined : filter),
         q: q.trim() || undefined,
         dateFrom: monthFrom || undefined,
         dateTo: monthTo || undefined,
@@ -399,13 +419,14 @@ export function PortalOrders() {
       <div className="card">
         <div className="card-h">
           <span className="ct">
-            {monthLabel(month)} ({summary.count} order{summary.count === 1 ? '' : 's'})
+            Your orders ({summary.count})
           </span>
           <div className="filters">
             {(
               [
                 ['all', 'All'],
-                ['active', 'In progress'],
+                ['in_progress', 'In progress'],
+                ['revision', 'Revisions'],
                 ['delivered', 'Delivered'],
               ] as const
             ).map(([k, label]) => (

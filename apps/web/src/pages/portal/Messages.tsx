@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDialog } from '@/components/ui/AppDialog';
 import { ConversationThread } from '@/components/messaging/ConversationThread';
-import { HelpRequestBadge, InboxBulkBar, InboxStarButton } from '@/components/messaging/InboxTools';
+import { HelpRequestBadge, InboxStarButton } from '@/components/messaging/InboxTools';
 import { MessageComposer } from '@/components/messaging/MessageComposer';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -11,10 +11,7 @@ import { SkeletonRows } from '@/components/ui/Skeleton';
 import { getErrorMessage } from '@/lib/api';
 import { whenVisible } from '@/lib/queryRefresh';
 import {
-  conversationInboxNumbers,
-  customerChatTitle,
   sortConversationsNewestFirst,
-  bulkMyConversations,
   createMyConversation,
   deleteMyConversation,
   getMyConversation,
@@ -50,10 +47,17 @@ function inboxTime(iso: string | null | undefined) {
 }
 
 function conversationContext(c: Conversation) {
-  if (c.orderRef) {
-    return c.chatType === 'QUOTE' ? `Quote ${c.orderRef}` : `Order ${c.orderRef}`;
-  }
+  if (c.label === 'EDIT' && c.orderRef) return `Revision ${c.orderRef}`;
+  if (c.chatType === 'QUOTE' && c.orderRef) return `Quote ${c.orderRef}`;
+  if (c.orderRef) return `Order ${c.orderRef}`;
   return null;
+}
+
+function conversationKind(c: Conversation): 'order' | 'quote' | 'revision' | 'general' {
+  if (c.label === 'EDIT') return 'revision';
+  if (c.chatType === 'QUOTE') return 'quote';
+  if (c.chatType === 'ORDER') return 'order';
+  return 'general';
 }
 
 export function PortalMessages() {
@@ -63,7 +67,8 @@ export function PortalMessages() {
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [inboxFilter, setInboxFilter] = useState<'all' | 'unread' | 'starred' | 'archived'>('all');
-  const [selected, setSelected] = useState<string[]>([]);
+  const [typeFilter, setTypeFilter] = useState<'all' | 'order' | 'quote' | 'revision'>('all');
+  const [menuFor, setMenuFor] = useState<string | null>(null);
   const conversationId = searchParams.get('c');
 
   const convosQuery = useQuery({
@@ -76,11 +81,6 @@ export function PortalMessages() {
     () => sortConversationsNewestFirst(convosQuery.data?.conversations ?? []),
     [convosQuery.data?.conversations],
   );
-  const inboxNumbers = useMemo(
-    () => conversationInboxNumbers(allConversations),
-    [allConversations],
-  );
-
   const conversations = useMemo(() => {
     const term = q.trim().toLowerCase();
     return allConversations.filter((c) => {
@@ -92,19 +92,23 @@ export function PortalMessages() {
       }
       if (inboxFilter === 'starred' && !isStarred(c, 'client')) return false;
       if (inboxFilter === 'unread' && !(c.unreadClient > 0)) return false;
+      if (typeFilter !== 'all' && conversationKind(c) !== typeFilter) return false;
       if (!term) return true;
       const ref = conversationContext(c) || '';
       const hay = `${ref} ${c.orderRef || ''} ${c.lastMessagePreview || ''}`.toLowerCase();
       return hay.includes(term);
     });
-  }, [allConversations, q, inboxFilter]);
+  }, [allConversations, q, inboxFilter, typeFilter]);
+
+  const unreadCount = allConversations.filter((c) => !c.archived && c.unreadClient > 0).length;
 
   useEffect(() => {
-    setSelected((ids) => {
-      const next = ids.filter((id) => conversations.some((c) => c.id === id));
-      return next.length === ids.length ? ids : next;
-    });
-  }, [conversations]);
+    function onDoc() {
+      setMenuFor(null);
+    }
+    document.addEventListener('click', onDoc);
+    return () => document.removeEventListener('click', onDoc);
+  }, []);
 
   const threadQuery = useQuery({
     queryKey: ['my-conversation', conversationId],
@@ -157,21 +161,6 @@ export function PortalMessages() {
     onError: (err) => setError(getErrorMessage(err)),
   });
 
-  const bulkChats = useMutation({
-    mutationFn: (input: { ids: string[]; action: 'delete' | 'star' | 'unstar' }) =>
-      bulkMyConversations(input),
-    onSuccess: (_res, input) => {
-      setSelected([]);
-      if (input.action === 'delete' && input.ids.includes(conversationId ?? '')) {
-        setSearchParams({}, { replace: true });
-      }
-      void qc.invalidateQueries({ queryKey: ['my-conversations'] });
-      void qc.invalidateQueries({ queryKey: ['portal-convos-nav'] });
-      void qc.invalidateQueries({ queryKey: ['portal-unread'] });
-    },
-    onError: (err) => setError(getErrorMessage(err)),
-  });
-
   const deleteTopic = useMutation({
     mutationFn: (id: string) => deleteMyConversation(id),
     onSuccess: (_res, id) => {
@@ -193,28 +182,6 @@ export function PortalMessages() {
   function backToInbox() {
     setSearchParams({}, { replace: true });
     setError(null);
-  }
-
-  function toggleSelected(id: string) {
-    setSelected((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
-  }
-
-  function toggleAll() {
-    setSelected((ids) =>
-      ids.length === conversations.length ? [] : conversations.map((c) => c.id),
-    );
-  }
-
-  async function confirmBulkDelete() {
-    if (selected.length === 0) return;
-    const ok = await dialog.confirm({
-      title: `Delete ${selected.length} chat${selected.length === 1 ? '' : 's'}?`,
-      message: 'They will be removed from your list.',
-      confirmLabel: 'Delete',
-      danger: true,
-    });
-    if (!ok) return;
-    bulkChats.mutate({ ids: selected, action: 'delete' });
   }
 
   async function confirmDelete(id: string) {
@@ -257,9 +224,7 @@ export function PortalMessages() {
             <div className="portal-thread-title">
               <div className="on">
                 <span className="portal-thread-name">
-                  {active
-                    ? customerChatTitle(active, inboxNumbers.get(active.id))
-                    : 'Conversation'}
+                  {active ? conversationContext(active) || 'New conversation' : 'Conversation'}
                 </span>
                 {isHelpRequest(active) && <HelpRequestBadge />}
               </div>
@@ -346,17 +311,26 @@ export function PortalMessages() {
             {id === 'all' ? 'All' : id === 'unread' ? 'Unread' : id === 'starred' ? 'Starred' : 'Archived'}
           </button>
         ))}
+        <label className="inbox-type">
+          Type:
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}
+            aria-label="Conversation type"
+          >
+            <option value="all">All</option>
+            <option value="order">Orders</option>
+            <option value="quote">Quotes</option>
+            <option value="revision">Revisions</option>
+          </select>
+        </label>
       </div>
 
-      <InboxBulkBar
-        selectedCount={selected.length}
-        totalCount={conversations.length}
-        onToggleAll={toggleAll}
-        onDelete={() => void confirmBulkDelete()}
-        deleting={bulkChats.isPending}
-      />
-
       <div className="card">
+        <div className="card-h">
+          <span className="ct">Conversations</span>
+          {unreadCount > 0 && <span className="msg-unread-count">{unreadCount} unread</span>}
+        </div>
         {convosQuery.isLoading && <SkeletonRows rows={5} />}
         {!convosQuery.isLoading && !convosQuery.isError && conversations.length === 0 && (
           <EmptyState
@@ -380,15 +354,15 @@ export function PortalMessages() {
             }
           />
         )}
-        {conversations.map((c, index) => {
+        {conversations.map((c) => {
           const context = conversationContext(c);
-          const number = inboxNumbers.get(c.id) ?? index + 1;
+          const starred = isStarred(c, 'client');
           return (
             <div
               key={c.id}
               role="button"
               tabIndex={0}
-              className={`orow inbox-row msg-compact${selected.includes(c.id) ? ' is-selected' : ''}`}
+              className="orow inbox-row msg-compact"
               onClick={() => selectConvo(c)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -397,46 +371,65 @@ export function PortalMessages() {
                 }
               }}
             >
-              <label className="inbox-check" onClick={(e) => e.stopPropagation()}>
-                <input
-                  type="checkbox"
-                  checked={selected.includes(c.id)}
-                  onChange={() => toggleSelected(c.id)}
-                  aria-label={`Select ${context || 'conversation'}`}
-                />
-              </label>
               <InboxStarButton
-                on={isStarred(c, 'client')}
-                onClick={() =>
-                  starChat.mutate({ id: c.id, starred: !isStarred(c, 'client') })
-                }
+                on={starred}
+                onClick={() => starChat.mutate({ id: c.id, starred: !starred })}
               />
               <div className="oinfo msg-compact-main">
                 <span className="on">{context || 'New conversation'}</span>
                 <span className="om inbox-snippet">{c.lastMessagePreview || 'No messages yet'}</span>
                 <span className="msg-time">{inboxTime(c.lastMessageAt)}</span>
               </div>
-              {c.unreadClient > 0 && <span className="msg-badge">{c.unreadClient}</span>}
-              <button
-                type="button"
-                className="icon-btn"
-                aria-label={c.archived ? 'Unarchive' : 'Archive'}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void updateMyConversation(c.id, { archived: !c.archived }).then(() => {
-                    void qc.invalidateQueries({ queryKey: ['my-conversations'] });
-                  });
-                }}
-              >
-                <i className={`ti ${c.archived ? 'ti-inbox' : 'ti-archive'}`} />
-              </button>
-              <span className="sr-only">{number}</span>
+              {c.unreadClient > 0 && <span className="msg-dot" aria-label="Unread" />}
+              <div className="msg-kebab" onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  className="msg-kebab-btn"
+                  aria-label="Conversation actions"
+                  onClick={() => setMenuFor((id) => (id === c.id ? null : c.id))}
+                >
+                  <i className="ti ti-dots-vertical" />
+                </button>
+                {menuFor === c.id && (
+                  <div className="msg-menu" role="menu">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        starChat.mutate({ id: c.id, starred: !starred });
+                        setMenuFor(null);
+                      }}
+                    >
+                      {starred ? 'Unstar conversation' : 'Star conversation'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void updateMyConversation(c.id, { unread: c.unreadClient === 0 }).then(() => {
+                          void qc.invalidateQueries({ queryKey: ['my-conversations'] });
+                          void qc.invalidateQueries({ queryKey: ['portal-unread'] });
+                        });
+                        setMenuFor(null);
+                      }}
+                    >
+                      {c.unreadClient > 0 ? 'Mark as read' : 'Mark as unread'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void updateMyConversation(c.id, { archived: !c.archived }).then(() => {
+                          void qc.invalidateQueries({ queryKey: ['my-conversations'] });
+                        });
+                        setMenuFor(null);
+                      }}
+                    >
+                      {c.archived ? 'Unarchive' : 'Archive'}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           );
         })}
-        {!convosQuery.isLoading && conversations.length > 0 && (
-          <div className="inbox-hint">Select a conversation to view messages.</div>
-        )}
       </div>
     </div>
   );

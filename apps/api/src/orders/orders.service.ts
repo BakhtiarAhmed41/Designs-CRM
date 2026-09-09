@@ -930,9 +930,13 @@ export class OrdersService {
       where.push(`type = 'QUOTE_REQUEST' AND status = 'CREATED'`);
       return;
     }
+    if (status === 'submitted') {
+      where.push(`type = 'QUOTE_REQUEST' AND status = 'WAITING_FOR_QUOTATION'`);
+      return;
+    }
     if (status === 'in_progress') {
       where.push(
-        `type = 'QUOTE_REQUEST' AND status IN ('WAITING_FOR_QUOTATION','WAITING_FOR_ADMIN_QUOTATION_APPROVAL')`,
+        `type = 'QUOTE_REQUEST' AND status = 'WAITING_FOR_ADMIN_QUOTATION_APPROVAL'`,
       );
       return;
     }
@@ -986,7 +990,9 @@ export class OrdersService {
     const params: unknown[] = [user.id];
     if (filters?.quoteHistory) {
       where.push(
-        `(type = 'QUOTE_REQUEST' OR EXISTS (SELECT 1 FROM quotations q WHERE q.order_id = orders.id))`,
+        `(type = 'QUOTE_REQUEST'
+          OR EXISTS (SELECT 1 FROM quotations q WHERE q.order_id = orders.id)
+          OR status IN ('PENDING_PAYMENT','CLIENT_REJECTED_QUOTATION','WAITING_FOR_QUOTATION','QUOTATION_PROVIDED','WAITING_FOR_ADMIN_QUOTATION_APPROVAL'))`,
       );
     } else if (filters?.type) {
       where.push('type = ?');

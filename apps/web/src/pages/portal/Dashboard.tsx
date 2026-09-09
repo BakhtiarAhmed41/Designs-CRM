@@ -167,7 +167,7 @@ export function PortalDashboard() {
         title={`Welcome back, ${firstName}`}
         actions={
           <Link to="/portal/quotes/new" className="btn btn-primary">
-            <i className="ti ti-plus" /> Start new quote
+            <i className="ti ti-plus" /> Request a quote
           </Link>
         }
       />
@@ -339,7 +339,7 @@ export function PortalDashboard() {
                 description="Start a new quote when you are ready."
                 action={
                   <button type="button" className="btn btn-primary btn-sm" onClick={() => navigate('/portal/quotes/new')}>
-                    Start new quote
+                    Request a quote
                   </button>
                 }
               />

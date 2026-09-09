@@ -222,7 +222,7 @@ export function quoteLifecycleChip(
     }
     if (status === 'CREATED') return { cls: 'chip c-new', label: 'Draft' };
     if (status === 'WAITING_FOR_QUOTATION') {
-      return { cls: 'chip c-quote', label: 'Quote in Progress' };
+      return { cls: 'chip c-quote', label: 'Submitted' };
     }
     if (status === 'WAITING_FOR_ADMIN_QUOTATION_APPROVAL') {
       return { cls: 'chip c-quote', label: 'Quote in Progress' };

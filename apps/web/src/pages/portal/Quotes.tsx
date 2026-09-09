@@ -83,7 +83,7 @@ export function PortalQuotes() {
     <div>
       <PageHeader
         title="Quotes"
-        subtitle="Your quote is ready to review."
+        subtitle="Review your quotes and approve when you’re ready to proceed."
         actions={
           <>
             {drafts.length > 0 && (
@@ -104,7 +104,7 @@ export function PortalQuotes() {
         <div className="metric" style={{ cursor: 'default' }}>
           <div className="ml">Awaiting your approval</div>
           <div className={`mv${awaiting ? ' alert' : ''}`}>{awaiting}</div>
-          <div className="md">Review your quotes and approve when you’re ready to proceed.</div>
+          <div className="md">Your quote is ready to review.</div>
         </div>
         <div className="metric" style={{ cursor: 'default' }}>
           <div className="ml">Quotes in progress</div>
@@ -128,8 +128,9 @@ export function PortalQuotes() {
         statusOptions={[
           { value: '', label: 'All statuses' },
           { value: 'draft', label: 'Draft' },
-          { value: 'in_progress', label: 'Quote in Progress' },
+          { value: 'submitted', label: 'Submitted' },
           { value: 'info_needed', label: 'Info Needed' },
+          { value: 'in_progress', label: 'Quote in Progress' },
           { value: 'ready', label: 'Ready for Approval' },
           { value: 'approved', label: 'Approved' },
           { value: 'declined', label: 'Declined' },

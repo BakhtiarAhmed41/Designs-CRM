@@ -81,10 +81,15 @@ export class MessagingController {
       .object({
         starred: z.boolean().optional(),
         archived: z.boolean().optional(),
+        unread: z.boolean().optional(),
         label: z.literal(MessageLabel.HELP).optional(),
       })
       .refine(
-        (v) => v.starred !== undefined || v.label !== undefined || v.archived !== undefined,
+        (v) =>
+          v.starred !== undefined ||
+          v.label !== undefined ||
+          v.archived !== undefined ||
+          v.unread !== undefined,
         { message: 'Nothing to update' },
       )
       .parse(body);

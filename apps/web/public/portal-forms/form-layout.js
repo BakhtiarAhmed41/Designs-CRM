@@ -1,6 +1,10 @@
 (function () {
   var css = document.createElement('style');
   css.textContent = [
+    'html,body,.wrap,.card{background:transparent!important;}',
+    '.ff input,.ff select,.ff textarea,.upload-area,.mini-up,.qbig,.ref-area,.dcard,.drow,.qbox{background:#fff!important;}',
+    '.mtab,.adv-tgl,.qtogrow,.ibox,.cond{background:transparent!important;}',
+    '.mtab.sel,.topt.sel,.sopt.sel,.uopt.sel,.fmt-chip.sel,.var-chip.sel,.ropt.sel-s,.ropt.sel-w,.svc.sel{background:#fff!important;}',
     '.sl{margin:14px 0 8px!important;padding-top:10px!important;}',
     '#mode-d .sl{margin:16px 0 8px!important;padding-top:10px!important;}',
     '.mode-tabs{margin-bottom:14px;}',
