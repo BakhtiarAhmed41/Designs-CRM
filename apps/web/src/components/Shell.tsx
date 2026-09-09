@@ -1,10 +1,20 @@
-import { cloneElement, Suspense, useEffect, useState } from 'react';
+import { cloneElement, createContext, Suspense, useContext, useEffect, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { NotificationBell } from './NotificationBell';
 import { AccountMenu } from './AccountMenu';
 import { PageLoading } from './PageProgress';
+
+const TopbarLeadContext = createContext<(node: ReactNode | null) => void>(() => {});
+
+export function useTopbarLead(node: ReactNode | null) {
+  const setLead = useContext(TopbarLeadContext);
+  useEffect(() => {
+    setLead(node);
+    return () => setLead(null);
+  }, [node, setLead]);
+}
 
 export type MobileNavItem = {
   to: string;
@@ -40,6 +50,7 @@ export function Shell({
 }) {
   const { pathname, search } = useLocation();
   const [navOpen, setNavOpen] = useState(false);
+  const [topbarLead, setTopbarLead] = useState<ReactNode>(null);
   const messaging = isMessagingPath(pathname, search);
 
   useEffect(() => {
@@ -62,6 +73,7 @@ export function Shell({
   });
 
   return (
+    <TopbarLeadContext.Provider value={setTopbarLead}>
     <div className={`app-frame${rolebar ? ' with-rolebar' : ''}`}>
       {rolebar}
       <header className="mobile-top">
@@ -89,7 +101,13 @@ export function Shell({
         {side}
         <div className="workspace-col">
           <header className="app-topbar">
-            {topbarSearch ? <div className="top-search">{topbarSearch}</div> : <div className="top-spacer" />}
+            {topbarLead ? (
+              <div className="topbar-lead">{topbarLead}</div>
+            ) : topbarSearch ? (
+              <div className="top-search">{topbarSearch}</div>
+            ) : (
+              <div className="top-spacer" />
+            )}
             <div className="top-right">
               <NotificationBell />
               <AccountMenu contextLabel={contextLabel} />
@@ -122,6 +140,7 @@ export function Shell({
         </nav>
       )}
     </div>
+    </TopbarLeadContext.Provider>
   );
 }
 

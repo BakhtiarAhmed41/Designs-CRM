@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { createOrder, getQuoteDraft, saveQuoteDraft, uploadAttachments } from '@/lib/orders';
 import { getErrorMessage } from '@/lib/api';
 import { getMyCustomer } from '@/lib/customers';
-import { useAuth } from '@/context/AuthContext';
 import { invalidateWorkCaches } from '@/lib/queryCache';
 import { useDialog } from '@/components/ui/AppDialog';
+import { useTopbarLead } from '@/components/Shell';
 
 type ServiceKey = 'embroidery' | 'svg' | 'vector' | 'laser';
 
@@ -71,16 +71,12 @@ export function QuoteFormPage() {
   const navigate = useNavigate();
   const dialog = useDialog();
   const qc = useQueryClient();
-  const { user } = useAuth();
   const [params] = useSearchParams();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const dirtyRef = useRef(false);
   const initial = params.get('service');
   const found = SERVICES.find((s) => s.key === initial);
   const [service, setService] = useState<(typeof SERVICES)[number] | null>(found ?? null);
-  const fallbackName =
-    [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email || 'Your account';
-  const [accountName, setAccountName] = useState(fallbackName);
   const [customerPrefs, setCustomerPrefs] = useState<Record<string, unknown> | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,21 +90,37 @@ export function QuoteFormPage() {
   useEffect(() => {
     void getMyCustomer()
       .then((res) => {
-        setAccountName(res.customer?.name?.trim() || fallbackName);
         const prefs = res.customer?.preferences;
         setCustomerPrefs(prefs && typeof prefs === 'object' ? (prefs as Record<string, unknown>) : null);
       })
       .catch(() => {
-        setAccountName(fallbackName);
         setCustomerPrefs(null);
       });
-  }, [fallbackName]);
+  }, []);
 
   useEffect(() => {
     if (!toast) return;
     const t = window.setTimeout(() => setToast(null), 3200);
     return () => window.clearTimeout(t);
   }, [toast]);
+
+  const changeService = useCallback(() => {
+    void (async () => {
+      if (dirtyRef.current) {
+        const ok = await dialog.confirm({
+          title: 'Discard this quote request?',
+          message: 'Your unsaved information will be lost.',
+          confirmLabel: 'Discard & Close',
+          cancelLabel: 'Continue Editing',
+          danger: true,
+        });
+        if (!ok) return;
+      }
+      dirtyRef.current = false;
+      setService(null);
+      navigate('/portal/quotes/new', { replace: true });
+    })();
+  }, [dialog, navigate]);
 
   const closePage = useCallback(async () => {
     if (dirtyRef.current) {
@@ -222,44 +234,36 @@ export function QuoteFormPage() {
     return () => window.removeEventListener('message', onMsg);
   }, [submitFromIframe, navigate, customerPrefs, service, qc]);
 
+  const topbarLead = useMemo(
+    () => (
+      <div className="quote-topbar-lead">
+        <i className={`ti ${service?.icon ?? 'ti-file-pencil'}`} />
+        <strong>{service ? `${service.label} quote` : 'Request a quote'}</strong>
+        {service && (
+          <button type="button" className="change-service" onClick={changeService}>
+            ← Change service
+          </button>
+        )}
+      </div>
+    ),
+    [service, changeService],
+  );
+  useTopbarLead(topbarLead);
+
   return (
     <div className="quote-page">
-      <header className="quote-page-h">
+      <header className="quote-page-h quote-page-h-mobile">
         <div className="service-icon">
           <i className={`ti ${service?.icon ?? 'ti-file-pencil'}`} />
         </div>
         <div className="title-wrap">
           <h1>{service ? `${service.label} quote` : 'Request a quote'}</h1>
-          <p>{service ? 'Upload your artwork and tell us what you need.' : 'Pick a service to begin.'}</p>
         </div>
         {service && (
-          <button
-            type="button"
-            className="change-service"
-            onClick={() => {
-              void (async () => {
-                if (dirtyRef.current) {
-                  const ok = await dialog.confirm({
-                    title: 'Discard this quote request?',
-                    message: 'Your unsaved information will be lost.',
-                    confirmLabel: 'Discard & Close',
-                    cancelLabel: 'Continue Editing',
-                    danger: true,
-                  });
-                  if (!ok) return;
-                }
-                dirtyRef.current = false;
-                setService(null);
-                navigate('/portal/quotes/new', { replace: true });
-              })();
-            }}
-          >
+          <button type="button" className="change-service" onClick={changeService}>
             ← Change service
           </button>
         )}
-        <span className="submitting">
-          Submitting as <strong>{accountName}</strong>
-        </span>
         <button type="button" className="close-form" onClick={() => void closePage()} aria-label="Close quote form">
           ×
         </button>

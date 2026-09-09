@@ -145,6 +145,21 @@ body {
 .app-topbar .top-search { flex: 0 1 320px; max-width: 320px; }
 .app-topbar .top-search .searchbar { max-width: none; }
 .app-topbar .top-spacer { flex: 1; }
+.topbar-lead { flex: 1; min-width: 0; }
+.quote-topbar-lead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.quote-topbar-lead i { font-size: 18px; color: var(--ink); flex-shrink: 0; }
+.quote-topbar-lead strong {
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.quote-topbar-lead .change-service { margin-left: 6px; }
 .app-topbar .top-right {
   display: flex;
   align-items: center;
@@ -2086,8 +2101,8 @@ button.primary i,
   gap: 0;
 }
 .quote-page-h {
-  display: grid;
-  grid-template-columns: auto 1fr auto auto auto;
+  display: none;
+  grid-template-columns: auto 1fr auto auto;
   align-items: center;
   gap: 10px;
   padding-bottom: 8px;
@@ -2166,7 +2181,8 @@ button.primary i,
 }
 @media (max-width: 900px) {
   .quote-layout { grid-template-columns: 1fr; }
-  .quote-page-h { grid-template-columns: auto 1fr auto; }
+  .quote-page-h,
+  .quote-page-h-mobile { display: grid; grid-template-columns: auto 1fr auto auto; }
   .msg-compact-main { grid-template-columns: 1fr; }
 }
 @media (max-height: 800px) {
