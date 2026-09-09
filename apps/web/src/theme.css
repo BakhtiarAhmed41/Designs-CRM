@@ -2011,7 +2011,13 @@ button.primary i,
   margin: 0;
 }
 .inbox-type {
+  position: relative;
   margin-left: auto;
+  font-size: 13px;
+  color: var(--dash-muted);
+  white-space: nowrap;
+}
+.inbox-type-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -2020,23 +2026,46 @@ button.primary i,
   border: 1px solid var(--line);
   border-radius: 999px;
   background: #fff;
-  font-size: 13px;
-  color: var(--dash-muted);
-  white-space: nowrap;
-}
-.inbox-type span { font-weight: 600; }
-.inbox-type select {
-  appearance: none;
-  -webkit-appearance: none;
-  border: 0;
-  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23222222' d='M1.2 1.4 6 6.2l4.8-4.8'/%3E%3C/svg%3E") no-repeat right center;
-  padding: 0 18px 0 0;
   font: inherit;
-  font-weight: 700;
+  color: inherit;
+  cursor: pointer;
+}
+.inbox-type-btn.open,
+.inbox-type-btn:hover { border-color: var(--ink); }
+.inbox-type-btn span { font-weight: 600; }
+.inbox-type-btn strong { font-weight: 700; color: var(--ink); }
+.inbox-type-btn i { font-size: 14px; color: var(--ink); }
+.inbox-type-btn.open i { transform: rotate(180deg); }
+.inbox-type-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  min-width: 168px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(20, 31, 41, 0.12);
+}
+.inbox-type-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: none;
+  border-radius: 7px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 13px;
   color: var(--ink);
   cursor: pointer;
 }
-.inbox-type select:focus { outline: none; }
+.inbox-type-menu button:hover { background: var(--tint, #f4f5f7); }
+.inbox-type-menu button.on {
+  background: var(--tint, #f4f5f7);
+  font-weight: 650;
+}
 @media (max-width: 900px) {
   .inbox-toolbar { flex-wrap: wrap; }
   .inbox-toolbar .searchbar.inbox-search { max-width: none; flex-basis: 100%; }

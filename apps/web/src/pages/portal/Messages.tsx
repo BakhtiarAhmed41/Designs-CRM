@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDialog } from '@/components/ui/AppDialog';
@@ -60,6 +60,13 @@ function conversationKind(c: Conversation): 'order' | 'quote' | 'revision' | 'ge
   return 'general';
 }
 
+const TYPE_OPTIONS = [
+  { id: 'all', label: 'All' },
+  { id: 'order', label: 'Orders' },
+  { id: 'quote', label: 'Quotes' },
+  { id: 'revision', label: 'Revisions' },
+] as const;
+
 export function PortalMessages() {
   const dialog = useDialog();
   const qc = useQueryClient();
@@ -68,6 +75,8 @@ export function PortalMessages() {
   const [q, setQ] = useState('');
   const [inboxFilter, setInboxFilter] = useState<'all' | 'unread' | 'starred' | 'archived'>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | 'order' | 'quote' | 'revision'>('all');
+  const [typeOpen, setTypeOpen] = useState(false);
+  const typeRef = useRef<HTMLDivElement>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const conversationId = searchParams.get('c');
 
@@ -173,6 +182,22 @@ export function PortalMessages() {
     },
     onError: (err) => setError(getErrorMessage(err)),
   });
+
+  useEffect(() => {
+    if (!typeOpen) return;
+    function onDoc(e: MouseEvent) {
+      if (!typeRef.current?.contains(e.target as Node)) setTypeOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setTypeOpen(false);
+    }
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [typeOpen]);
 
   function selectConvo(c: Conversation) {
     setSearchParams({ c: c.id });
@@ -312,19 +337,39 @@ export function PortalMessages() {
             </button>
           ))}
         </div>
-        <label className="inbox-type">
-          <span>Type</span>
-          <select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}
+        <div className="inbox-type" ref={typeRef}>
+          <button
+            type="button"
+            className={`inbox-type-btn${typeOpen ? ' open' : ''}`}
             aria-label="Conversation type"
+            aria-expanded={typeOpen}
+            aria-haspopup="listbox"
+            onClick={() => setTypeOpen((open) => !open)}
           >
-            <option value="all">All</option>
-            <option value="order">Orders</option>
-            <option value="quote">Quotes</option>
-            <option value="revision">Revisions</option>
-          </select>
-        </label>
+            <span>Type</span>
+            <strong>{TYPE_OPTIONS.find((o) => o.id === typeFilter)?.label ?? 'All'}</strong>
+            <i className="ti ti-chevron-down" aria-hidden />
+          </button>
+          {typeOpen && (
+            <div className="inbox-type-menu" role="listbox" aria-label="Conversation type">
+              {TYPE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  role="option"
+                  aria-selected={typeFilter === opt.id}
+                  className={typeFilter === opt.id ? 'on' : undefined}
+                  onClick={() => {
+                    setTypeFilter(opt.id);
+                    setTypeOpen(false);
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="card">
