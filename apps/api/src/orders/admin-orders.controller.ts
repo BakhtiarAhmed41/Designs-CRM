@@ -345,6 +345,17 @@ export class AdminOrdersController {
     return { order };
   }
 
+  @Patch(':id/info-needed')
+  async setInfoNeeded(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    const data = z.object({ needsCustomerInfo: z.boolean() }).parse(body);
+    const order = await this.orders.setNeedsCustomerInfo(user, id, data.needsCustomerInfo);
+    return { order };
+  }
+
   @Patch(':id/status')
   async updateStatus(
     @CurrentUser() user: AuthUser | undefined,

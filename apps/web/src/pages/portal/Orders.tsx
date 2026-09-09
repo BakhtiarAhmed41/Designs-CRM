@@ -7,7 +7,7 @@ import { listMyEdits, requestEdit } from '@/lib/edits';
 import { getMyCustomer } from '@/lib/customers';
 import { RevisionRequestForm } from '@/components/RevisionRequestForm';
 import { getErrorMessage } from '@/lib/api';
-import { money, dateShort, lifecycleChip } from '@/lib/format';
+import { money, dateShort, customerOrderChip, deliveryMethodLabel } from '@/lib/format';
 import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import { designStatusChipClass, designStatusLabel, type Design } from '@/lib/designs';
 import type { Order } from '@/lib/types';
@@ -57,26 +57,6 @@ function monthLabel(key: string) {
   if (key === 'all') return 'All time';
   const [y, m] = key.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-}
-
-function orderChip(o: Order, designs?: Design[]): { cls: string; label: string } {
-  if (DONE.includes(o.status)) return { cls: 'chip c-done', label: 'Delivered' };
-  if (['REVISION_REQUESTED', 'PENDING_PAYMENT'].includes(o.status)) {
-    return lifecycleChip(o.status, 'customer');
-  }
-  if (o.partiallyDelivered) {
-    return { cls: 'chip c-prog', label: 'Partially delivered' };
-  }
-  if (designs && designs.length > 1) {
-    const delivered = designs.filter((d) => d.status === 'DELIVERED').length;
-    if (delivered > 0 && delivered < designs.length) {
-      return { cls: 'chip c-prog', label: 'Partially delivered' };
-    }
-  }
-  return lifecycleChip(o.status, 'customer', {
-    partiallyAccepted: o.partiallyAccepted,
-    partiallyDelivered: o.partiallyDelivered,
-  });
 }
 
 function designLineIcon(status: Design['status']) {
@@ -283,7 +263,9 @@ export function PortalOrders() {
   const [filter, setFilter] = useState<OrderFilter>('all');
   const [expanded, setExpanded] = useState<string | null>(null);
   const [q, setQ] = useState('');
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState<
+    '' | 'in_progress' | 'ready' | 'revision' | 'delivered' | 'cancelled'
+  >('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
@@ -319,7 +301,7 @@ export function PortalOrders() {
     queryFn: () =>
       listMyOrders({
         type: 'ORDER',
-        status: status || undefined,
+        customerStatus: status || undefined,
         lifecycle: filter === 'all' ? undefined : filter,
         q: q.trim() || undefined,
         dateFrom: monthFrom || undefined,
@@ -343,7 +325,7 @@ export function PortalOrders() {
     <div>
       <PageHeader
         title="Orders"
-        subtitle="Active production and delivered work. Filter by month or status."
+        subtitle="View all your orders and track their current status."
       />
 
       <ListToolbar
@@ -355,17 +337,18 @@ export function PortalOrders() {
         searchPlaceholder="Search by name or order #…"
         status={status}
         onStatus={(v) => {
-          setStatus(v);
+          setStatus(
+            v as '' | 'in_progress' | 'ready' | 'revision' | 'delivered' | 'cancelled',
+          );
           setPage(1);
         }}
         statusOptions={[
           { value: '', label: 'All statuses' },
-          { value: 'IN_PROGRESS', label: 'In progress' },
-          { value: 'READY_TO_SEND', label: 'Ready to send' },
-          { value: 'REVISION_REQUESTED', label: 'Revision requested' },
-          { value: 'PENDING_PAYMENT', label: 'Pending payment' },
-          { value: 'COMPLETED', label: 'Delivered' },
-          { value: 'CLOSED', label: 'Closed' },
+          { value: 'in_progress', label: 'In Progress' },
+          { value: 'ready', label: 'Ready for Review' },
+          { value: 'revision', label: 'Revision Requested' },
+          { value: 'delivered', label: 'Delivered' },
+          { value: 'cancelled', label: 'Cancelled' },
         ]}
         dateFrom={dateFrom}
         dateTo={dateTo}
@@ -455,7 +438,9 @@ export function PortalOrders() {
             <thead>
               <tr>
                 <th>Order</th>
+                <th>Designs</th>
                 <th>Status</th>
+                <th>File delivery</th>
                 <th>Date</th>
                 <th className="num">Amount</th>
               </tr>
@@ -463,7 +448,7 @@ export function PortalOrders() {
             <tbody>
               {pageItems.map((o) => {
                 const open = expanded === o.id;
-                const chip = orderChip(o);
+                const chip = customerOrderChip(o);
                 return (
                   <Fragment key={o.id}>
                     <tr className="click-row" onClick={() => navigate(`/portal/orders/${o.id}`)}>
@@ -478,9 +463,11 @@ export function PortalOrders() {
                           </div>
                         </div>
                       </td>
+                      <td>{o.designCount ? `${o.designCount} design${o.designCount === 1 ? '' : 's'}` : '—'}</td>
                       <td>
                         <span className={chip.cls}>{chip.label}</span>
                       </td>
+                      <td className="muted">{deliveryMethodLabel(o.deliveredVia)}</td>
                       <td className="muted">{dateShort(o.createdAt)}</td>
                       <td className="num">
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
@@ -524,7 +511,7 @@ export function PortalOrders() {
                     </tr>
                     {open && (
                       <tr className="expand-row">
-                        <td colSpan={4}>
+                        <td colSpan={6}>
                           <OrderBatch orderId={o.id} open={open} />
                         </td>
                       </tr>

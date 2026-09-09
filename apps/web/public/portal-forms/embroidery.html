@@ -189,7 +189,7 @@ body{font-family:system-ui,sans-serif;background:#F5F5F1;padding:8px 4px 24px;fo
     <div class="mode-body vis" id="mode-q">
       <div class="sl" style="margin-top:14px;">Tell us about your order</div>
       <div class="qbig">
-        <textarea placeholder="e.g. 3 logos attached : the eagle for left chest 3.5&quot; AND cap 2.5&quot;, the other two just left chest. Need DST + PES. (Photos of your garment? Put them in Reference images above : we won&#39;t digitize those.)"></textarea>
+        <textarea placeholder="e.g. left chest 3.5&quot;, cap 2.5&quot;, need DST + PES"></textarea>
       </div>
       <div class="fg" style="margin-top:11px;">
         <div class="ff"><label>Sizing</label><select id="q-sizing" onchange="qSizeNote(this)"><option>Keep proportional (recommended)</option><option>Exact size : I'll mention it above</option><option>Multiple sizes : I'll describe above</option><option>Not sure : let team decide</option></select></div>
@@ -386,6 +386,7 @@ function setMode(m){
 }
 
 </script>
+<script src="form-layout.js"></script>
 <script src="bridge.js"></script>
 </body>
 </html>

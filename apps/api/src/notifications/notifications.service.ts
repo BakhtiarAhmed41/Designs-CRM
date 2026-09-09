@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import type { AuthUser } from '../auth/auth.types';
+import { normalizePage, pageResult } from '../common/pagination';
 import { DbService } from '../db/db.service';
 import { NotificationEvents } from './notification.events';
 
@@ -55,25 +56,38 @@ export class NotificationsService {
     }
   }
 
-  async list(user: AuthUser | undefined) {
+  async list(
+    user: AuthUser | undefined,
+    paging?: { page?: number; pageSize?: number },
+  ) {
     assertAuthUser(user);
+    const { page, pageSize, offset } = normalizePage({
+      page: paging?.page,
+      pageSize: paging?.pageSize ?? 10,
+    });
     const items = await this.db.query<NotificationRow>(
-      'SELECT id, user_id, title, body, link, read_at, created_at FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 15',
+      'SELECT id, user_id, title, body, link, read_at, created_at FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?',
+      [user.id, pageSize, offset],
+    );
+    const totalRow = await this.db.queryOne<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM notifications WHERE user_id = ?',
       [user.id],
     );
     const countRow = await this.db.queryOne<{ n: number }>(
       'SELECT COUNT(*) AS n FROM notifications WHERE user_id = ? AND read_at IS NULL',
       [user.id],
     );
+    const mapped = items.map((n) => ({
+      id: n.id,
+      title: n.title,
+      body: n.body,
+      link: n.link,
+      readAt: n.read_at,
+      createdAt: n.created_at,
+    }));
     return {
-      notifications: items.map((n) => ({
-        id: n.id,
-        title: n.title,
-        body: n.body,
-        link: n.link,
-        readAt: n.read_at,
-        createdAt: n.created_at,
-      })),
+      ...pageResult(mapped, Number(totalRow?.n ?? 0), page, pageSize),
+      notifications: mapped,
       unreadCount: Number(countRow?.n ?? 0),
     };
   }

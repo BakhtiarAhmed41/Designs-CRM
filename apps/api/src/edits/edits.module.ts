@@ -6,5 +6,6 @@ import { EditsService } from './edits.service';
 @Module({
   controllers: [AdminEditsController, EditsController],
   providers: [EditsService],
+  exports: [EditsService],
 })
 export class EditsModule {}

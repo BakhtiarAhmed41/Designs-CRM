@@ -119,6 +119,21 @@ export function PortalShell() {
           </NavLink>
         ))}
       </nav>
+      <p className="nav-label">Request a quote</p>
+      <nav className="service-nav" aria-label="Quote services">
+        <NavLink to="/portal/quotes/new?service=embroidery">
+          <i className="ti ti-needle-thread" /> Embroidery Digitizing
+        </NavLink>
+        <NavLink to="/portal/quotes/new?service=vector">
+          <i className="ti ti-vector-bezier" /> Vector &amp; Print
+        </NavLink>
+        <NavLink to="/portal/quotes/new?service=svg">
+          <i className="ti ti-vector-triangle" /> SVG &amp; Cricut Files
+        </NavLink>
+        <NavLink to="/portal/quotes/new?service=laser">
+          <i className="ti ti-router" /> CNC &amp; Laser Files
+        </NavLink>
+      </nav>
       <div className="foot">
         <LogoutLink onClick={() => void onLogout()} />
       </div>

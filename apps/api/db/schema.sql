@@ -134,6 +134,7 @@ CREATE TABLE IF NOT EXISTS orders (
   rejected_at          DATETIME NULL,
   completed_at         DATETIME NULL,
   closed_at            DATETIME NULL,
+  needs_customer_info  TINYINT(1) NOT NULL DEFAULT 0,
   created_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),

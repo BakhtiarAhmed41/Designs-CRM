@@ -152,7 +152,7 @@ export function lifecycleChip(
         label: isCustomer ? 'Declined by studio' : isAdmin ? 'Declined by staff' : 'Rejected',
       };
     case 'CANCELLED':
-      return { cls: 'chip c-wait', label: 'Expired' };
+      return { cls: 'chip c-wait', label: isCustomer ? 'Cancelled' : 'Cancelled' };
     case 'PENDING_PAYMENT':
       return { cls: 'chip c-wait', label: 'Pending payment' };
     case 'IN_PROGRESS':
@@ -202,14 +202,77 @@ export function paymentChip(status: OrderPaymentStatus | null | undefined): Stat
 export function quoteLifecycleChip(
   status: OrderStatus | string,
   audience: StatusAudience,
-  opts?: { partiallyAccepted?: boolean; adminRecounter?: boolean },
+  opts?: {
+    partiallyAccepted?: boolean;
+    adminRecounter?: boolean;
+    needsCustomerInfo?: boolean;
+    createdAt?: string | null;
+    type?: string;
+  },
 ): StatusChip {
+  if (audience === 'customer') {
+    if (opts?.type === 'ORDER') {
+      return { cls: 'chip c-done', label: 'Approved' };
+    }
+    if (opts?.needsCustomerInfo) {
+      return { cls: 'chip c-wait', label: 'Info Needed' };
+    }
+    if (status === 'QUOTATION_PROVIDED' && isQuoteExpired(opts?.createdAt)) {
+      return { cls: 'chip c-wait', label: 'Expired' };
+    }
+    if (status === 'CREATED') return { cls: 'chip c-new', label: 'Draft' };
+    if (status === 'WAITING_FOR_QUOTATION') {
+      return { cls: 'chip c-quote', label: 'Quote in Progress' };
+    }
+    if (status === 'WAITING_FOR_ADMIN_QUOTATION_APPROVAL') {
+      return { cls: 'chip c-quote', label: 'Quote in Progress' };
+    }
+    if (status === 'QUOTATION_PROVIDED') {
+      return {
+        cls: 'chip c-prog',
+        label: opts?.adminRecounter ? 'Updated quote' : 'Ready for Approval',
+      };
+    }
+    if (status === 'CLIENT_REJECTED_QUOTATION' || status === 'REJECTED') {
+      return { cls: 'chip c-wait', label: 'Declined' };
+    }
+    if (status === 'CANCELLED') return { cls: 'chip c-wait', label: 'Cancelled' };
+  }
   if (status === 'QUOTATION_PROVIDED' && opts?.adminRecounter) {
-    const isCustomer = audience === 'customer';
     return {
       cls: 'chip c-quote',
-      label: isCustomer ? 'Updated quote' : 'Updated quote sent',
+      label: 'Updated quote sent',
     };
   }
   return lifecycleChip(status, audience, opts);
+}
+
+export function isQuoteExpired(createdAt?: string | null) {
+  if (!createdAt) return false;
+  const d = new Date(createdAt);
+  if (Number.isNaN(d.getTime())) return false;
+  return Date.now() - d.getTime() > 30 * 24 * 60 * 60 * 1000;
+}
+
+export function customerOrderChip(o: {
+  status: OrderStatus | string;
+  partiallyDelivered?: boolean;
+}): StatusChip {
+  if (o.status === 'CANCELLED') return { cls: 'portal-chip c-cancelled', label: 'Cancelled' };
+  if (o.status === 'COMPLETED' || o.status === 'CLOSED') {
+    return { cls: 'portal-chip c-delivered', label: 'Delivered' };
+  }
+  if (o.status === 'REVISION_REQUESTED') {
+    return { cls: 'portal-chip c-revision', label: 'Revision Requested' };
+  }
+  if (o.status === 'READY_TO_SEND') {
+    return { cls: 'portal-chip c-review', label: 'Ready for Review' };
+  }
+  return { cls: 'portal-chip c-progress', label: 'In Progress' };
+}
+
+export function deliveryMethodLabel(via?: string | null): string {
+  if (via === 'EMAIL') return 'Sent by email';
+  if (via === 'PORTAL') return 'Available here';
+  return 'Not delivered';
 }

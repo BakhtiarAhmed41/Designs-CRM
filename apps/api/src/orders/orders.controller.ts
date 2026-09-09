@@ -17,6 +17,7 @@ import { z } from 'zod';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { AuthUser } from '../auth/auth.types';
+import { EditsService } from '../edits/edits.service';
 import { OrdersService } from './orders.service';
 import { OrderStatus, OrderType } from '../common/enums';
 
@@ -60,7 +61,10 @@ const counterQuotationSchema = z.object({
 @Controller('orders')
 @UseGuards(JwtAuthGuard)
 export class OrdersController {
-  constructor(private orders: OrdersService) {}
+  constructor(
+    private orders: OrdersService,
+    private edits: EditsService,
+  ) {}
 
   @Post()
   async create(@CurrentUser() user: AuthUser | undefined, @Body() body: unknown) {
@@ -75,6 +79,9 @@ export class OrdersController {
     @Query('type') type?: string,
     @Query('status') status?: string,
     @Query('lifecycle') lifecycle?: string,
+    @Query('customerStatus') customerStatus?: string,
+    @Query('quoteHistory') quoteHistory?: string,
+    @Query('quoteStatus') quoteStatus?: string,
     @Query('q') q?: string,
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
@@ -88,6 +95,16 @@ export class OrdersController {
       status: status && statuses.includes(status) ? (status as OrderStatus) : undefined,
       lifecycle:
         lifecycle === 'active' || lifecycle === 'delivered' ? lifecycle : undefined,
+      customerStatus:
+        customerStatus === 'in_progress' ||
+        customerStatus === 'ready' ||
+        customerStatus === 'revision' ||
+        customerStatus === 'delivered' ||
+        customerStatus === 'cancelled'
+          ? customerStatus
+          : undefined,
+      quoteHistory: quoteHistory === '1' || quoteHistory === 'true',
+      quoteStatus: quoteStatus?.trim() || undefined,
       q: q?.trim() || undefined,
       dateFrom: dateFrom || null,
       dateTo: dateTo || null,
@@ -109,6 +126,12 @@ export class OrdersController {
   @Get('summary')
   async mySummary(@CurrentUser() user: AuthUser | undefined) {
     return this.orders.myOrderSummary(user);
+  }
+
+  @Get('my-edits')
+  async listMyEdits(@CurrentUser() user: AuthUser | undefined) {
+    const edits = await this.edits.listMyAllEdits(user);
+    return { edits };
   }
 
   @Get('my-files')

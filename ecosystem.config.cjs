@@ -6,8 +6,7 @@
  * Usage on the VPS:
  *   npm ci
  *   npm run -w @designs-crm/api build
- *   npm run db:migrate            # or import apps/api/db/schema.sql via phpMyAdmin
- *   pm2 start ecosystem.config.cjs
+ *   pm2 start ecosystem.config.cjs   # API runs pending DB migrations on boot
  *   pm2 save && pm2 startup
  */
 module.exports = {
@@ -15,7 +14,7 @@ module.exports = {
     {
       name: 'designs-crm-api',
       cwd: './apps/api',
-      script: 'dist/src/main.js',
+      script: 'dist/main.js',
       instances: 1,
       exec_mode: 'fork',
       env: {

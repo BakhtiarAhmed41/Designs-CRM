@@ -126,7 +126,10 @@ export type Order = {
   turnaroundHours?: number | null;
   preferences: unknown;
   status: OrderStatus;
+  needsCustomerInfo?: boolean;
   designCount?: number;
+  deliveredVia?: string | null;
+  deliveryEmail?: string | null;
   priceCents: number | null;
   paymentStatus?: OrderPaymentStatus;
   currency: string;

@@ -69,6 +69,8 @@ export type MyFile = {
   originalName: string;
   formatLabel: string | null;
   deliveredAt: string;
+  deliveredVia?: string | null;
+  deliveryEmail?: string | null;
 };
 
 export type QuoteBuilderLineInput = {

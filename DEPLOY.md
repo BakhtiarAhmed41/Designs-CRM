@@ -33,9 +33,11 @@ VITE_API_BASE_URL=https://your-domain.com/api
 ```
 
 ## 4. Database schema
-Either run the migration runner:
+The API applies `apps/api/db/schema.sql` and any unused files in `apps/api/db/migrations` **automatically on startup**. You do not need a separate migrate step after deploy.
+
+Optional first-time setup:
 ```bash
-npm run db:migrate     # applies apps/api/db/schema.sql (idempotent)
+npm run db:migrate     # same runner, if you want to prepare the DB before start
 npm run db:seed        # optional: SEED_ADMIN + Sara portal sample
 ```
 …or paste `apps/api/db/schema.sql` into **phpMyAdmin** (SQL tab) against your database.
@@ -69,8 +71,7 @@ git pull
 npm ci
 npm run -w @designs-crm/api build
 npm run -w @designs-crm/web build
-npm run db:migrate      # applies any new .sql files in apps/api/db/migrations
-pm2 restart designs-crm-api
+pm2 restart designs-crm-api   # migrations run automatically on API start
 ```
 
 ## Notes

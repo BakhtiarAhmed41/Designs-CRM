@@ -5,8 +5,16 @@ import { getEnv } from './config/env';
 import { AuthService } from './auth/auth.service';
 import { MulterExceptionFilter } from './common/multer-errors';
 import { ZodExceptionFilter } from './common/zod-exception.filter';
+import { runMigrations } from './db/migrate';
 
 async function bootstrap() {
+  try {
+    await runMigrations();
+  } catch (err) {
+    console.error('Database migration failed. API will not start until this is fixed.', err);
+    process.exit(1);
+  }
+
   const env = getEnv();
   const app = await NestFactory.create(AppModule, { rawBody: true });
 

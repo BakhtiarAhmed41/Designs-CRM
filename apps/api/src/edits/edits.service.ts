@@ -566,6 +566,23 @@ export class EditsService {
     return this.loadEdit(editId);
   }
 
+  async listMyAllEdits(user: AuthUser | undefined) {
+    assertAuthUser(user);
+    const rows = await this.db.query<EditJoinRow>(
+      `SELECT e.*, o.human_ref AS order_ref, o.name AS order_name, o.currency AS order_currency,
+              ro.human_ref AS revision_ref,
+              d.initials AS designer_initials, d.first_name AS designer_first
+         FROM edit_requests e
+         JOIN orders o ON o.id = e.order_id
+         LEFT JOIN orders ro ON ro.id = e.revision_order_id
+         LEFT JOIN users d ON d.id = e.assigned_designer_id
+        WHERE o.client_user_id = ?
+        ORDER BY e.created_at DESC`,
+      [user.id],
+    );
+    return rows.map((r) => this.editDto(r));
+  }
+
   async listMyEdits(user: AuthUser | undefined, orderId: string) {
     assertAuthUser(user);
     const order = await this.getOrderRow(orderId);

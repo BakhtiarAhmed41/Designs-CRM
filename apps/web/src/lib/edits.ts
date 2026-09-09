@@ -109,3 +109,7 @@ export function requestEdit(orderId: string, note: string, designIds?: string[])
 export function listMyEdits(orderId: string) {
   return apiFetch<{ edits: EditRequest[] }>(`/orders/${orderId}/edits`);
 }
+
+export function listMyAllEdits() {
+  return apiFetch<{ edits: EditRequest[] }>('/orders/my-edits');
+}

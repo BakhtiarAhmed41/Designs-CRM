@@ -1,21 +1,36 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
-import { DateRangeBar } from '@/components/ui/DateRangeBar';
-import { QuoteBuilderModal } from '@/components/QuoteBuilderModal';
+import { Link, useNavigate } from 'react-router-dom';
+import { DateRangeSelect } from '@/components/ui/DateRangeSelect';
 import { listMyOrders } from '@/lib/orders';
 import { listMyInvoices } from '@/lib/billing';
-import { datesForPreset, inDateRange, type RangePreset } from '@/lib/dateRange';
+import { listMyAllEdits } from '@/lib/edits';
+import { listNotifications } from '@/lib/notifications';
+import { datesForPortalPreset, inDateRange, type PortalRangePreset } from '@/lib/dateRange';
 import { useAuth } from '@/context/AuthContext';
 import { freshOnOpen } from '@/lib/queryRefresh';
-import { money, statusChipClass, statusLabel } from '@/lib/format';
+import { money, quoteLifecycleChip, customerOrderChip } from '@/lib/format';
 import { serviceTi } from '@/lib/serviceIcon';
 import type { Order } from '@/lib/types';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 
-type WorkTab = 'orders' | 'quotes' | 'invoices';
+type WorkTab = 'orders' | 'quotes' | 'revisions' | 'invoices';
+
+const ACTIVE_ORDER = new Set([
+  'CREATED',
+  'PENDING_PAYMENT',
+  'IN_PROGRESS',
+  'READY_TO_SEND',
+  'REVISION_REQUESTED',
+]);
+const ACTIVE_QUOTE = new Set([
+  'CREATED',
+  'WAITING_FOR_QUOTATION',
+  'QUOTATION_PROVIDED',
+  'WAITING_FOR_ADMIN_QUOTATION_APPROVAL',
+]);
 
 function isQuote(o: Order) {
   return (
@@ -26,33 +41,60 @@ function isQuote(o: Order) {
   );
 }
 
+function activityAction(title: string, link: string | null) {
+  const t = title.toLowerCase();
+  if (t.includes('quote')) return { label: 'Review quote', to: link || '/portal/quotes' };
+  if (t.includes('deliver') || t.includes('file')) return { label: 'Download files', to: link || '/portal/files' };
+  if (t.includes('invoice') || t.includes('payment')) return { label: 'View invoice', to: link || '/portal/invoices' };
+  if (link) return { label: 'View', to: link };
+  return null;
+}
+
+function relativeTime(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const diff = Date.now() - d.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins} minute${mins === 1 ? '' : 's'} ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days} days ago`;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 export function PortalDashboard() {
   const { user } = useAuth();
-  const [quoteOpen, setQuoteOpen] = useState(false);
-  const [preset, setPreset] = useState<RangePreset>('thisMonth');
+  const navigate = useNavigate();
+  const [preset, setPreset] = useState<PortalRangePreset>('thisMonth');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [tab, setTab] = useState<WorkTab>('orders');
+  const [activityPage, setActivityPage] = useState(1);
 
-  const dates = datesForPreset(preset, customFrom, customTo);
-  const rangeReady = Boolean(dates.from && dates.to);
+  const dates = datesForPortalPreset(preset, customFrom, customTo);
+  const rangeReady = preset === 'allTime' || Boolean(dates.from && dates.to);
+  const dateFrom = dates.from || undefined;
+  const dateTo = dates.to || undefined;
 
   const { data: ordersData, isLoading: ordersLoading } = useQuery({
-    queryKey: ['my-orders', 'dash', dates.from, dates.to],
+    queryKey: ['my-orders', 'dash', dateFrom, dateTo],
     queryFn: () =>
-      listMyOrders({ type: 'ORDER', page: 1, pageSize: 8, dateFrom: dates.from, dateTo: dates.to }),
+      listMyOrders({ type: 'ORDER', page: 1, pageSize: 8, dateFrom, dateTo }),
     enabled: rangeReady,
     ...freshOnOpen,
   });
   const { data: quotesData, isLoading: quotesLoading } = useQuery({
-    queryKey: ['my-quotes', 'dash', dates.from, dates.to],
+    queryKey: ['my-quotes', 'dash', dateFrom, dateTo],
     queryFn: () =>
       listMyOrders({
         type: 'QUOTE_REQUEST',
         page: 1,
         pageSize: 8,
-        dateFrom: dates.from,
-        dateTo: dates.to,
+        dateFrom,
+        dateTo,
       }),
     enabled: rangeReady,
     ...freshOnOpen,
@@ -61,34 +103,50 @@ export function PortalDashboard() {
     queryKey: ['my-invoices'],
     queryFn: listMyInvoices,
   });
+  const { data: editsData } = useQuery({
+    queryKey: ['my-edits'],
+    queryFn: listMyAllEdits,
+    ...freshOnOpen,
+  });
+  const { data: activityData, isLoading: activityLoading } = useQuery({
+    queryKey: ['my-activity', activityPage],
+    queryFn: () => listNotifications({ page: activityPage, pageSize: 10 }),
+    ...freshOnOpen,
+  });
 
-  const orders = (ordersData?.orders ?? []).filter((o) => !isQuote(o));
-  const quotes = quotesData?.orders ?? [];
-  const invoices = (invoicesData?.invoices ?? []).filter((i) =>
-    rangeReady ? inDateRange(i.issuedAt, dates.from, dates.to) : true,
-  );
+  const orders = (ordersData?.orders ?? []).filter((o) => !isQuote(o) && ACTIVE_ORDER.has(o.status));
+  const quotes = (quotesData?.orders ?? []).filter((o) => ACTIVE_QUOTE.has(o.status));
+  const revisions = (editsData?.edits ?? []).filter((e) => e.status !== 'DONE');
   const unpaidInvoices = (invoicesData?.invoices ?? []).filter(
     (i) => i.status === 'AWAITING' || i.status === 'PARTIAL',
   );
+  const rangeInvoices = (invoicesData?.invoices ?? []).filter((i) =>
+    rangeReady && dateFrom && dateTo ? inDateRange(i.issuedAt, dateFrom, dateTo) : true,
+  );
   const unpaidTotal = unpaidInvoices.reduce((s, i) => s + (i.remainingCents ?? i.amountCents), 0);
-  const spentCents = invoices.reduce((s, i) => s + (i.amountCents ?? 0), 0);
+  const paidCents = rangeInvoices
+    .filter((i) => i.status === 'PAID' || i.status === 'PARTIAL')
+    .reduce((s, i) => s + (i.amountCents - (i.remainingCents ?? (i.status === 'PAID' ? 0 : i.amountCents))), 0);
   const isLoading = ordersLoading || quotesLoading;
   const firstName = user?.firstName || 'there';
+  const activities = activityData?.notifications ?? [];
+  const activityPages = activityData?.totalPages ?? 1;
 
   const statTiles = useMemo(
     () => [
       { label: 'Orders', value: String(ordersData?.total ?? orders.length), sub: 'placed in this range' },
       { label: 'Quotes', value: String(quotesData?.total ?? quotes.length), sub: 'requests in this range' },
-      { label: 'Spent', value: money(spentCents), sub: 'invoices in this range' },
-      { label: 'Balance due', value: money(unpaidTotal), sub: unpaidInvoices.length ? `${unpaidInvoices.length} open` : 'all paid', alert: unpaidTotal > 0 },
+      { label: 'Paid', value: money(paidCents), sub: 'Payments completed' },
+      { label: 'Balance due', value: money(unpaidTotal), sub: unpaidInvoices.length ? `${unpaidInvoices.length} open` : 'All paid', alert: unpaidTotal > 0 },
     ],
-    [orders.length, ordersData?.total, quotes.length, quotesData?.total, spentCents, unpaidInvoices.length, unpaidTotal],
+    [orders.length, ordersData?.total, quotes.length, quotesData?.total, paidCents, unpaidInvoices.length, unpaidTotal],
   );
 
-  const tabs: Array<{ id: WorkTab; label: string; count: number; to: string }> = [
-    { id: 'orders', label: 'Orders', count: orders.length, to: '/portal/orders' },
-    { id: 'quotes', label: 'Quotes', count: quotes.length, to: '/portal/quotes' },
-    { id: 'invoices', label: 'Invoices', count: invoices.length, to: '/portal/invoices' },
+  const tabs: Array<{ id: WorkTab; label: string; count: number; to: string; viewAll: string }> = [
+    { id: 'orders', label: 'Orders', count: orders.length, to: '/portal/orders', viewAll: 'View All Orders' },
+    { id: 'quotes', label: 'Quotes', count: quotes.length, to: '/portal/quotes', viewAll: 'View All Quotes' },
+    { id: 'revisions', label: 'Revisions', count: revisions.length, to: '/portal/revisions', viewAll: 'View All Revisions' },
+    { id: 'invoices', label: 'Invoices', count: unpaidInvoices.length, to: '/portal/invoices', viewAll: 'View All Invoices' },
   ];
   const activeMeta = tabs.find((t) => t.id === tab);
 
@@ -97,9 +155,9 @@ export function PortalDashboard() {
       <PageHeader
         title={`Welcome back, ${firstName}`}
         actions={
-          <button type="button" className="btn btn-primary" onClick={() => setQuoteOpen(true)}>
+          <Link to="/portal/quotes/new" className="btn btn-primary">
             <i className="ti ti-plus" /> Start new quote
-          </button>
+          </Link>
         }
       />
 
@@ -107,7 +165,7 @@ export function PortalDashboard() {
         <div className="pulse-h">
           <h3>Statistics</h3>
           <div className="pulse-tools">
-            <DateRangeBar
+            <DateRangeSelect
               preset={preset}
               onPreset={setPreset}
               customFrom={customFrom}
@@ -135,7 +193,82 @@ export function PortalDashboard() {
         )}
       </section>
 
+      <section className="panel">
+        <div className="panel-head">
+          <div>
+            <h3>Recent Activity</h3>
+            <p className="panel-sub">Your latest order, quote, revision and payment updates.</p>
+          </div>
+          {activityPages > 1 && (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={() => setActivityPage((p) => (p < activityPages ? p + 1 : 1))}
+            >
+              View all activity
+            </button>
+          )}
+        </div>
+        {activityLoading && <SkeletonRows rows={3} />}
+        {!activityLoading && activities.length === 0 && (
+          <EmptyState icon="ti-bell" title="No recent activity" description="Updates will appear here as work moves along." />
+        )}
+        {activities.map((n) => {
+          const action = activityAction(n.title, n.link);
+          return (
+            <div key={n.id} className="activity-row">
+              <div className="activity-icon">
+                <i className="ti ti-bell" />
+              </div>
+              <div className="oinfo">
+                <div className="on">{n.title}</div>
+                <div className="om">
+                  {n.body ? <span>{n.body}</span> : null}
+                  <span>{relativeTime(n.createdAt)}</span>
+                </div>
+              </div>
+              {action && (
+                <Link to={action.to} className="activity-link">
+                  {action.label} <i className="ti ti-chevron-right" />
+                </Link>
+              )}
+            </div>
+          );
+        })}
+        {activityPages > 1 && (
+          <div className="activity-pager">
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              disabled={activityPage <= 1}
+              onClick={() => setActivityPage((p) => Math.max(1, p - 1))}
+            >
+              Previous
+            </button>
+            <span>
+              Page {activityPage} of {activityPages}
+            </span>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              disabled={activityPage >= activityPages}
+              onClick={() => setActivityPage((p) => p + 1)}
+            >
+              Next
+            </button>
+          </div>
+        )}
+      </section>
+
       <div className="panel">
+        <div className="panel-head">
+          <div>
+            <h3>Active Requests</h3>
+            <p className="panel-sub">
+              Track your active orders, quotes, revisions and invoices here. View your complete history anytime.
+            </p>
+          </div>
+        </div>
         <div className="dash-tabs" role="tablist">
           {tabs.map((t) => (
             <button
@@ -152,7 +285,7 @@ export function PortalDashboard() {
           ))}
           {activeMeta && (
             <Link to={activeMeta.to} className="btn btn-ghost btn-sm dash-tab-link">
-              View all
+              {activeMeta.viewAll}
             </Link>
           )}
         </div>
@@ -164,25 +297,28 @@ export function PortalDashboard() {
             {orders.length === 0 && (
               <EmptyState
                 icon="ti-package"
-                title="No orders yet"
+                title="No active orders"
                 description="Approve a quote and it will show up here."
               />
             )}
-            {orders.map((o) => (
-              <Link key={o.id} to={`/portal/orders/${o.id}`} className="orow">
-                <div className="othumb">
-                  <i className={`ti ${serviceTi(o.serviceType)}`} />
-                </div>
-                <div className="oinfo">
-                  <div className="on">{o.name ?? o.serviceType ?? 'Order'}</div>
-                  <div className="om">
-                    <span>{o.humanRef ?? o.id.slice(0, 6)}</span>
+            {orders.map((o) => {
+              const chip = customerOrderChip(o);
+              return (
+                <Link key={o.id} to={`/portal/orders/${o.id}`} className="orow">
+                  <div className="othumb">
+                    <i className={`ti ${serviceTi(o.serviceType)}`} />
                   </div>
-                </div>
-                <span className={statusChipClass(o.status)}>{statusLabel(o.status)}</span>
-                <div className="oprice">{money(o.priceCents)}</div>
-              </Link>
-            ))}
+                  <div className="oinfo">
+                    <div className="on">{o.name ?? o.serviceType ?? 'Order'}</div>
+                    <div className="om">
+                      <span>{o.humanRef ?? o.id.slice(0, 6)}</span>
+                    </div>
+                  </div>
+                  <span className={chip.cls}>{chip.label}</span>
+                  <div className="oprice">{money(o.priceCents)}</div>
+                </Link>
+              );
+            })}
           </>
         )}
 
@@ -191,28 +327,58 @@ export function PortalDashboard() {
             {quotes.length === 0 && (
               <EmptyState
                 icon="ti-file-invoice"
-                title="No quotes in this range"
+                title="No open quotes"
                 description="Start a new quote when you are ready."
                 action={
-                  <button type="button" className="btn btn-primary btn-sm" onClick={() => setQuoteOpen(true)}>
+                  <button type="button" className="btn btn-primary btn-sm" onClick={() => navigate('/portal/quotes/new')}>
                     Start new quote
                   </button>
                 }
               />
             )}
-            {quotes.map((o) => (
-              <Link key={o.id} to={`/portal/quotes/${o.id}`} className="orow">
+            {quotes.map((o) => {
+              const chip = quoteLifecycleChip(o.status, 'customer', {
+                partiallyAccepted: o.partiallyAccepted,
+                needsCustomerInfo: o.needsCustomerInfo,
+                createdAt: o.createdAt,
+                type: o.type,
+              });
+              return (
+                <Link key={o.id} to={`/portal/quotes/${o.id}`} className="orow">
+                  <div className="othumb">
+                    <i className={`ti ${serviceTi(o.serviceType)}`} />
+                  </div>
+                  <div className="oinfo">
+                    <div className="on">{o.name ?? 'Quote request'}</div>
+                    <div className="om">
+                      <span>{o.humanRef ?? o.id.slice(0, 6)}</span>
+                    </div>
+                  </div>
+                  <span className={chip.cls}>{chip.label}</span>
+                  <div className="oprice">{money(o.priceCents)}</div>
+                </Link>
+              );
+            })}
+          </>
+        )}
+
+        {!isLoading && tab === 'revisions' && (
+          <>
+            {revisions.length === 0 && (
+              <EmptyState icon="ti-refresh" title="No open revisions" description="Requested changes will show up here." />
+            )}
+            {revisions.map((e) => (
+              <Link key={e.id} to={`/portal/orders/${e.orderId}`} className="orow">
                 <div className="othumb">
-                  <i className={`ti ${serviceTi(o.serviceType)}`} />
+                  <i className="ti ti-refresh" />
                 </div>
                 <div className="oinfo">
-                  <div className="on">{o.name ?? 'Quote request'}</div>
+                  <div className="on">{e.orderName ?? 'Revision'}</div>
                   <div className="om">
-                    <span>Q-{o.humanRef ?? o.id.slice(0, 6)}</span>
+                    <span>{e.orderRef ?? e.orderId.slice(0, 6)}</span>
                   </div>
                 </div>
-                <span className={statusChipClass(o.status)}>{statusLabel(o.status)}</span>
-                <div className="oprice">{money(o.priceCents)}</div>
+                <span className="portal-chip c-revision">In progress</span>
               </Link>
             ))}
           </>
@@ -220,10 +386,10 @@ export function PortalDashboard() {
 
         {!isLoading && tab === 'invoices' && (
           <>
-            {invoices.length === 0 && (
-              <EmptyState icon="ti-receipt" title="No invoices in this range" description="New invoices will show up here." />
+            {unpaidInvoices.length === 0 && (
+              <EmptyState icon="ti-receipt" title="No unpaid invoices" description="Open invoices will show up here." />
             )}
-            {invoices.map((inv) => (
+            {unpaidInvoices.map((inv) => (
               <Link key={inv.id} to="/portal/invoices" className="orow">
                 <div className="othumb">
                   <i className="ti ti-receipt" />
@@ -231,20 +397,16 @@ export function PortalDashboard() {
                 <div className="oinfo">
                   <div className="on">{inv.coversText ?? 'Invoice'}</div>
                   <div className="om">
-                    <span>{inv.status === 'PARTIAL' ? 'Partial' : inv.status === 'PAID' ? 'Paid' : 'Unpaid'}</span>
+                    <span>{inv.status === 'PARTIAL' ? 'Partial' : 'Unpaid'}</span>
                   </div>
                 </div>
-                <span className={`chip ${inv.status === 'PAID' ? 'c-paid' : 'c-review'}`}>
-                  {inv.status === 'PAID' ? 'Paid' : inv.status === 'PARTIAL' ? 'Partial' : 'Unpaid'}
-                </span>
+                <span className="chip c-review">{inv.status === 'PARTIAL' ? 'Partial' : 'Unpaid'}</span>
                 <div className="oprice">{money(inv.remainingCents ?? inv.amountCents)}</div>
               </Link>
             ))}
           </>
         )}
       </div>
-
-      <QuoteBuilderModal open={quoteOpen} onClose={() => setQuoteOpen(false)} />
     </div>
   );
 }

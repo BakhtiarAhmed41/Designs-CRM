@@ -9,6 +9,7 @@ import {
   approveCounter,
   deleteAdminOrder,
   getAdminOrder,
+  setOrderInfoNeeded,
 } from '@/lib/orders';
 import { AdminCounterDecision } from '@/components/AdminCounterDecision';
 import { QuoteHistory } from '@/components/QuoteHistory';
@@ -260,6 +261,14 @@ export function AdminQuoteDetail() {
     onError: (e) => setError(getErrorMessage(e)),
   });
 
+  const infoNeededMut = useMutation({
+    mutationFn: (needsCustomerInfo: boolean) => setOrderInfoNeeded(id, needsCustomerInfo),
+    onSuccess: (res) => {
+      void applyOrderChange(qc, res.order);
+    },
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
   const counterApprove = useMutation({
     mutationFn: () => approveCounter(id),
     onSuccess: (res) => {
@@ -332,6 +341,14 @@ export function AdminQuoteDetail() {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <span className={statusChip.cls}>{statusChip.label}</span>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            disabled={infoNeededMut.isPending}
+            onClick={() => infoNeededMut.mutate(!order.needsCustomerInfo)}
+          >
+            {order.needsCustomerInfo ? 'Clear info needed' : 'Mark info needed'}
+          </button>
           <button
             type="button"
             className="btn btn-ghost btn-sm"

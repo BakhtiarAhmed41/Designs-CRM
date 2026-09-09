@@ -40,6 +40,9 @@ const PortalInvoices = lazy(() =>
 const PortalMessages = lazy(() =>
   import('@/pages/portal/Messages').then((m) => ({ default: m.PortalMessages })),
 );
+const PortalRevisions = lazy(() =>
+  import('@/pages/portal/Revisions').then((m) => ({ default: m.PortalRevisions })),
+);
 
 const AdminDashboard = lazy(() =>
   import('@/pages/admin/Dashboard').then((m) => ({ default: m.AdminDashboard })),
@@ -145,6 +148,7 @@ export function App() {
           <Route path="quotes/:id" element={<PortalQuoteDetail />} />
           <Route path="orders" element={<PortalOrders />} />
           <Route path="orders/:id" element={<PortalOrderDetail />} />
+          <Route path="revisions" element={<PortalRevisions />} />
           <Route path="files" element={<PortalFiles />} />
           <Route path="invoices" element={<PortalInvoices />} />
           <Route path="messages" element={<PortalMessages />} />

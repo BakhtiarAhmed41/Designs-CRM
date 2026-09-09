@@ -461,7 +461,7 @@ export async function openLinkedChat(opts: {
 
 export function updateMyConversation(
   conversationId: string,
-  data: { starred?: boolean; label?: MessageLabel | null },
+  data: { starred?: boolean; label?: MessageLabel | null; archived?: boolean },
 ) {
   return apiFetch<{ conversation: Conversation }>(
     `/conversations/${conversationId}`,

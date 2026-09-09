@@ -11,10 +11,27 @@ import { getEnv } from '../config/env';
  * 3. Applies any numbered db/migrations/*.sql not yet recorded in _migrations.
  *
  * You can also paste these .sql files straight into phpMyAdmin.
+ * The API also calls `runMigrations()` on boot so production stays up to date.
  */
-async function main() {
+function resolveDbRoot(): string {
+  const candidates = [
+    join(__dirname, 'db'),
+    join(__dirname, '..', 'db'),
+    join(__dirname, '..', '..', 'db'),
+    join(process.cwd(), 'db'),
+    join(process.cwd(), 'apps', 'api', 'db'),
+  ];
+  for (const dir of candidates) {
+    if (existsSync(join(dir, 'schema.sql')) || existsSync(join(dir, 'migrations'))) {
+      return dir;
+    }
+  }
+  return candidates[0];
+}
+
+export async function runMigrations() {
   const env = getEnv();
-  const dbRoot = join(__dirname, '..', '..', 'db');
+  const dbRoot = resolveDbRoot();
   const schemaPath = join(dbRoot, 'schema.sql');
   const migrationsDir = join(dbRoot, 'migrations');
 
@@ -341,6 +358,14 @@ async function main() {
     `);
   }
 
+  if (!(await columnExists('orders', 'needs_customer_info'))) {
+    // eslint-disable-next-line no-console
+    console.log('Adding orders.needs_customer_info column ...');
+    await conn.query(
+      'ALTER TABLE orders ADD COLUMN needs_customer_info TINYINT(1) NOT NULL DEFAULT 0',
+    );
+  }
+
   if (existsSync(migrationsDir)) {
     const applied = new Set(
       (
@@ -365,8 +390,11 @@ async function main() {
   console.log('Migrations complete.');
 }
 
-main().catch((err) => {
-  // eslint-disable-next-line no-console
-  console.error(err);
-  process.exit(1);
-});
+const launchedAsCli = /migrate\.(ts|js)$/.test(process.argv[1] ?? '');
+if (launchedAsCli) {
+  runMigrations().catch((err) => {
+    // eslint-disable-next-line no-console
+    console.error(err);
+    process.exit(1);
+  });
+}

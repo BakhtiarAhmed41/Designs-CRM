@@ -11,7 +11,6 @@ import { SkeletonRows } from '@/components/ui/Skeleton';
 import { getErrorMessage } from '@/lib/api';
 import { whenVisible } from '@/lib/queryRefresh';
 import {
-  chatTypeLabel,
   conversationInboxNumbers,
   customerChatTitle,
   sortConversationsNewestFirst,
@@ -63,7 +62,7 @@ export function PortalMessages() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState('');
-  const [showStarred, setShowStarred] = useState(false);
+  const [inboxFilter, setInboxFilter] = useState<'all' | 'unread' | 'starred' | 'archived'>('all');
   const [selected, setSelected] = useState<string[]>([]);
   const conversationId = searchParams.get('c');
 
@@ -85,13 +84,20 @@ export function PortalMessages() {
   const conversations = useMemo(() => {
     const term = q.trim().toLowerCase();
     return allConversations.filter((c) => {
-      if (showStarred && !isStarred(c, 'client')) return false;
+      const archived = Boolean(c.archived);
+      if (inboxFilter === 'archived') {
+        if (!archived) return false;
+      } else if (archived) {
+        return false;
+      }
+      if (inboxFilter === 'starred' && !isStarred(c, 'client')) return false;
+      if (inboxFilter === 'unread' && !(c.unreadClient > 0)) return false;
       if (!term) return true;
-      const title = customerChatTitle(c, inboxNumbers.get(c.id));
-      const hay = `${title} ${c.subject || ''} ${c.orderRef || ''} ${chatTypeLabel(c.chatType)} ${c.lastMessagePreview || ''}`.toLowerCase();
+      const ref = conversationContext(c) || '';
+      const hay = `${ref} ${c.orderRef || ''} ${c.lastMessagePreview || ''}`.toLowerCase();
       return hay.includes(term);
     });
-  }, [allConversations, inboxNumbers, q, showStarred]);
+  }, [allConversations, q, inboxFilter]);
 
   useEffect(() => {
     setSelected((ids) => {
@@ -309,7 +315,7 @@ export function PortalMessages() {
     <div>
       <PageHeader
         title="Messages"
-        subtitle="Chat with the team about a quote, order, or anything else."
+        subtitle="Chat with our team about your orders, quotes and revisions."
         actions={startActions}
       />
 
@@ -324,26 +330,22 @@ export function PortalMessages() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onFocus={() => maybeRequestBrowserNotifications()}
-          placeholder="Search conversations…"
+          placeholder="Search by reference number or message"
           aria-label="Search conversations"
         />
       </div>
 
       <div className="inbox-filters">
-        <button
-          type="button"
-          className={`chip-btn${showStarred ? '' : ' on'}`}
-          onClick={() => setShowStarred(false)}
-        >
-          Inbox
-        </button>
-        <button
-          type="button"
-          className={`chip-btn${showStarred ? ' on' : ''}`}
-          onClick={() => setShowStarred(true)}
-        >
-          Starred
-        </button>
+        {(['all', 'unread', 'starred', 'archived'] as const).map((id) => (
+          <button
+            key={id}
+            type="button"
+            className={`chip-btn${inboxFilter === id ? ' on' : ''}`}
+            onClick={() => setInboxFilter(id)}
+          >
+            {id === 'all' ? 'All' : id === 'unread' ? 'Unread' : id === 'starred' ? 'Starred' : 'Archived'}
+          </button>
+        ))}
       </div>
 
       <InboxBulkBar
@@ -386,7 +388,7 @@ export function PortalMessages() {
               key={c.id}
               role="button"
               tabIndex={0}
-              className={`orow inbox-row${selected.includes(c.id) ? ' is-selected' : ''}`}
+              className={`orow inbox-row msg-compact${selected.includes(c.id) ? ' is-selected' : ''}`}
               onClick={() => selectConvo(c)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
@@ -400,7 +402,7 @@ export function PortalMessages() {
                   type="checkbox"
                   checked={selected.includes(c.id)}
                   onChange={() => toggleSelected(c.id)}
-                  aria-label={`Select ${customerChatTitle(c, number)}`}
+                  aria-label={`Select ${context || 'conversation'}`}
                 />
               </label>
               <InboxStarButton
@@ -409,26 +411,26 @@ export function PortalMessages() {
                   starChat.mutate({ id: c.id, starred: !isStarred(c, 'client') })
                 }
               />
-              <div className="thumb inbox-index" aria-hidden>
-                {number}
+              <div className="oinfo msg-compact-main">
+                <span className="on">{context || 'New conversation'}</span>
+                <span className="om inbox-snippet">{c.lastMessagePreview || 'No messages yet'}</span>
+                <span className="msg-time">{inboxTime(c.lastMessageAt)}</span>
               </div>
-              <div className="oinfo">
-                <div className="on inbox-title-row">
-                  <span>{customerChatTitle(c, number)}</span>
-                  {isHelpRequest(c) && <HelpRequestBadge />}
-                </div>
-                {context && <div className="om">{context}</div>}
-                <div className="om inbox-snippet">
-                  {c.lastMessagePreview || 'No messages yet'}
-                </div>
-              </div>
-              <div className="inbox-meta">
-                <span>{inboxTime(c.lastMessageAt)}</span>
-                {c.unreadClient > 0 && (
-                  <span className="msg-badge">{c.unreadClient}</span>
-                )}
-              </div>
-              <i className="ti ti-chevron-right inbox-chevron" aria-hidden />
+              {c.unreadClient > 0 && <span className="msg-badge">{c.unreadClient}</span>}
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label={c.archived ? 'Unarchive' : 'Archive'}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void updateMyConversation(c.id, { archived: !c.archived }).then(() => {
+                    void qc.invalidateQueries({ queryKey: ['my-conversations'] });
+                  });
+                }}
+              >
+                <i className={`ti ${c.archived ? 'ti-inbox' : 'ti-archive'}`} />
+              </button>
+              <span className="sr-only">{number}</span>
             </div>
           );
         })}

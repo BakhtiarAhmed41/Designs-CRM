@@ -142,6 +142,9 @@ export function PortalQuoteDetail() {
   const statusChip = quoteLifecycleChip(order.status, 'customer', {
     partiallyAccepted: order.partiallyAccepted,
     adminRecounter,
+    needsCustomerInfo: order.needsCustomerInfo,
+    createdAt: order.createdAt,
+    type: order.type,
   });
 
   return (

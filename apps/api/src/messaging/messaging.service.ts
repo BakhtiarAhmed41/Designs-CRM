@@ -1154,7 +1154,7 @@ export class MessagingService {
   async updateMyConversation(
     user: AuthUser | undefined,
     conversationId: string,
-    input: { starred?: boolean; label?: MessageLabel | null },
+    input: { starred?: boolean; label?: MessageLabel | null; archived?: boolean },
   ) {
     assertAuthUser(user);
     if (user.role !== UserRole.CLIENT) throw new ForbiddenException();
@@ -1164,6 +1164,10 @@ export class MessagingService {
     if (input.starred !== undefined) {
       sets.push('starred_client = ?');
       params.push(input.starred ? 1 : 0);
+    }
+    if (input.archived !== undefined) {
+      sets.push('archived = ?');
+      params.push(input.archived ? 1 : 0);
     }
     if (input.label !== undefined) {
       sets.push('label = ?');

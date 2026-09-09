@@ -9,17 +9,27 @@ const distDir = path.join(apiRoot, 'dist');
 const publishDir = path.join(apiRoot, 'publish');
 const tscEntry = path.join(tscOut, 'main.js');
 
+function copyDir(src, dest) {
+  fs.mkdirSync(dest, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const from = path.join(src, entry.name);
+    const to = path.join(dest, entry.name);
+    if (entry.isDirectory()) copyDir(from, to);
+    else fs.copyFileSync(from, to);
+  }
+}
+
 function writeBundleDir(dir, bundledFile) {
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
   fs.copyFileSync(bundledFile, path.join(dir, 'main.js'));
   const assetsSrc = path.join(apiRoot, 'assets');
   if (fs.existsSync(assetsSrc)) {
-    const assetsDest = path.join(dir, 'assets');
-    fs.mkdirSync(assetsDest, { recursive: true });
-    for (const file of fs.readdirSync(assetsSrc)) {
-      fs.copyFileSync(path.join(assetsSrc, file), path.join(assetsDest, file));
-    }
+    copyDir(assetsSrc, path.join(dir, 'assets'));
+  }
+  const dbSrc = path.join(apiRoot, 'db');
+  if (fs.existsSync(dbSrc)) {
+    copyDir(dbSrc, path.join(dir, 'db'));
   }
   fs.writeFileSync(
     path.join(dir, 'package.json'),

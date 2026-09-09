@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
 import type { AuthUser } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -15,8 +15,15 @@ export class NotificationsController {
   constructor(private notifications: NotificationsService) {}
 
   @Get()
-  async list(@CurrentUser() user: AuthUser | undefined) {
-    const out = await this.notifications.list(user);
+  async list(
+    @CurrentUser() user: AuthUser | undefined,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    const out = await this.notifications.list(user, {
+      page: page ? Number(page) : undefined,
+      pageSize: pageSize ? Number(pageSize) : undefined,
+    });
     return out;
   }
 

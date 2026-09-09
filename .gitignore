@@ -41,6 +41,9 @@ apps/api/uploads
 # local fix notes (not tracked)
 /fixes.csv
 
+# client change requests (reference only, not tracked)
+/Changes
+
 # local QA runs (not production)
 /qa-*.mjs
 /qa-evidence/

@@ -1,11 +1,9 @@
 import { useEffect, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { QuoteBuilderModal } from '@/components/QuoteBuilderModal';
 import { listMyOrderSummary, listMyOrders, listQuoteDrafts } from '@/lib/orders';
 import { money, dateShort, quoteLifecycleChip } from '@/lib/format';
 import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
-import type { Order } from '@/lib/types';
 import { isAdminRecounter, studioQuotation } from '@/lib/quoteHelpers';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
@@ -27,28 +25,10 @@ const DRAFT_ICONS: Record<string, string> = {
   laser: 'ti-router',
 };
 
-function isQuoteOrder(o: Order) {
-  return (
-    o.type === 'QUOTE_REQUEST' ||
-    [
-      'CREATED',
-      'WAITING_FOR_QUOTATION',
-      'QUOTATION_PROVIDED',
-      'WAITING_FOR_ADMIN_QUOTATION_APPROVAL',
-      'CLIENT_REJECTED_QUOTATION',
-      'REJECTED',
-      'CANCELLED',
-    ].includes(o.status)
-  );
-}
-
 export function PortalQuotes() {
   const navigate = useNavigate();
   const location = useLocation();
-  const qc = useQueryClient();
-  const [quoteOpen, setQuoteOpen] = useState(false);
   const [draftsOpen, setDraftsOpen] = useState(false);
-  const [draftService, setDraftService] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -67,8 +47,8 @@ export function PortalQuotes() {
     queryKey: ['my-quotes', q, status, dateFrom, dateTo, page],
     queryFn: () =>
       listMyOrders({
-        type: 'QUOTE_REQUEST',
-        status: status || undefined,
+        quoteHistory: true,
+        quoteStatus: status || undefined,
         q: q.trim() || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
@@ -88,7 +68,7 @@ export function PortalQuotes() {
     ...freshOnOpen,
   });
 
-  const quotes = (data?.orders ?? []).filter((o) => isQuoteOrder(o));
+  const quotes = data?.orders ?? [];
   const drafts = draftsQ.data?.drafts ?? [];
   const totalPages = data?.totalPages ?? 1;
   const awaiting = summaryQ.data?.awaitingQuote ?? 0;
@@ -96,15 +76,14 @@ export function PortalQuotes() {
 
   function continueDraft(serviceKey: string) {
     setDraftsOpen(false);
-    setDraftService(serviceKey);
-    setQuoteOpen(true);
+    navigate(`/portal/quotes/new?service=${encodeURIComponent(serviceKey)}`);
   }
 
   return (
     <div>
       <PageHeader
         title="Quotes"
-        subtitle="See our price, then approve to start."
+        subtitle="Your quote is ready to review."
         actions={
           <>
             {drafts.length > 0 && (
@@ -112,7 +91,7 @@ export function PortalQuotes() {
                 <i className="ti ti-device-floppy" /> Open drafts
               </button>
             )}
-            <button type="button" className="btn btn-primary" onClick={() => setQuoteOpen(true)}>
+            <button type="button" className="btn btn-primary" onClick={() => navigate('/portal/quotes/new')}>
               <i className="ti ti-plus" /> Request a quote
             </button>
           </>
@@ -125,12 +104,12 @@ export function PortalQuotes() {
         <div className="metric" style={{ cursor: 'default' }}>
           <div className="ml">Awaiting your approval</div>
           <div className={`mv${awaiting ? ' alert' : ''}`}>{awaiting}</div>
-          <div className="md">Ready to review</div>
+          <div className="md">Review your quotes and approve when you’re ready to proceed.</div>
         </div>
         <div className="metric" style={{ cursor: 'default' }}>
-          <div className="ml">Being priced by us</div>
+          <div className="ml">Quotes in progress</div>
           <div className="mv">{pricing}</div>
-          <div className="md">We’ll get back within a few hours</div>
+          <div className="md">We’re preparing your price.</div>
         </div>
       </div>
 
@@ -148,10 +127,14 @@ export function PortalQuotes() {
         }}
         statusOptions={[
           { value: '', label: 'All statuses' },
-          { value: 'CREATED', label: 'Draft' },
-          { value: 'WAITING_FOR_QUOTATION', label: 'Being priced' },
-          { value: 'QUOTATION_PROVIDED', label: 'Quote ready' },
-          { value: 'WAITING_FOR_ADMIN_QUOTATION_APPROVAL', label: 'Counter pending' },
+          { value: 'draft', label: 'Draft' },
+          { value: 'in_progress', label: 'Quote in Progress' },
+          { value: 'info_needed', label: 'Info Needed' },
+          { value: 'ready', label: 'Ready for Approval' },
+          { value: 'approved', label: 'Approved' },
+          { value: 'declined', label: 'Declined' },
+          { value: 'expired', label: 'Expired' },
+          { value: 'cancelled', label: 'Cancelled' },
         ]}
         dateFrom={dateFrom}
         dateTo={dateTo}
@@ -176,7 +159,7 @@ export function PortalQuotes() {
             title="No quotes yet"
             description="Request a quote and we’ll price it. Approve to start production."
             action={
-              <button type="button" className="btn btn-primary btn-sm" onClick={() => setQuoteOpen(true)}>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => navigate('/portal/quotes/new')}>
                 Request a quote
               </button>
             }
@@ -186,6 +169,9 @@ export function PortalQuotes() {
           const chip = quoteLifecycleChip(o.status, 'customer', {
             partiallyAccepted: o.partiallyAccepted,
             adminRecounter: isAdminRecounter(o.quotations),
+            needsCustomerInfo: o.needsCustomerInfo,
+            createdAt: o.createdAt,
+            type: o.type,
           });
           const quote = studioQuotation(o.quotations);
           const lines = quote?.lines ?? [];
@@ -199,7 +185,9 @@ export function PortalQuotes() {
             <div key={o.id}>
               <div
                 className="orow"
-                onClick={() => navigate(`/portal/quotes/${o.id}`)}
+                onClick={() =>
+                  navigate(o.type === 'ORDER' ? `/portal/orders/${o.id}` : `/portal/quotes/${o.id}`)
+                }
                 style={{ cursor: 'pointer' }}
               >
                 <div className={`thumb${serviceThumbClass(o.serviceType) ? ' m' : ''}`}>
@@ -300,16 +288,6 @@ export function PortalQuotes() {
         </div>
       )}
 
-      <QuoteBuilderModal
-        open={quoteOpen}
-        initialService={draftService}
-        onClose={() => {
-          setQuoteOpen(false);
-          setDraftService(null);
-          void qc.invalidateQueries({ queryKey: ['my-quote-drafts'] });
-        }}
-        onSubmitted={(id) => navigate(`/portal/quotes/${id}`)}
-      />
     </div>
   );
 }

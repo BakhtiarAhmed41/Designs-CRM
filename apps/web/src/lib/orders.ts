@@ -23,6 +23,9 @@ export function listMyOrders(params?: {
   type?: string;
   status?: string;
   lifecycle?: 'active' | 'delivered';
+  customerStatus?: 'in_progress' | 'ready' | 'revision' | 'delivered' | 'cancelled';
+  quoteHistory?: boolean;
+  quoteStatus?: string;
   q?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -33,6 +36,9 @@ export function listMyOrders(params?: {
   if (params?.type) q.set('type', params.type);
   if (params?.status) q.set('status', params.status);
   if (params?.lifecycle) q.set('lifecycle', params.lifecycle);
+  if (params?.customerStatus) q.set('customerStatus', params.customerStatus);
+  if (params?.quoteHistory) q.set('quoteHistory', '1');
+  if (params?.quoteStatus) q.set('quoteStatus', params.quoteStatus);
   if (params?.q) q.set('q', params.q);
   if (params?.dateFrom) q.set('dateFrom', params.dateFrom);
   if (params?.dateTo) q.set('dateTo', params.dateTo);
@@ -249,6 +255,13 @@ export function adminRejectOrder(
   return apiFetch<{ order: Order }>(`/admin/orders/${orderId}/reject`, {
     method: 'PATCH',
     body: JSON.stringify(data),
+  });
+}
+
+export function setOrderInfoNeeded(orderId: string, needsCustomerInfo: boolean) {
+  return apiFetch<{ order: Order }>(`/admin/orders/${orderId}/info-needed`, {
+    method: 'PATCH',
+    body: JSON.stringify({ needsCustomerInfo }),
   });
 }
 

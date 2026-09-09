@@ -98,6 +98,7 @@ type OrderRow = {
   internal_notes: string | null;
   rejection_reason: string | null;
   completed_at: Date | null;
+  needs_customer_info?: number | boolean;
   created_at: Date;
   updated_at: Date;
 };
@@ -623,6 +624,7 @@ export class OrdersService {
       internalNotes: o.internal_notes,
       rejectionReason: o.rejection_reason,
       completedAt: o.completed_at,
+      needsCustomerInfo: Boolean(o.needs_customer_info),
       createdAt: o.created_at,
       updatedAt: o.updated_at,
       partiallyAccepted: extras?.partiallyAccepted ?? false,
@@ -923,12 +925,55 @@ export class OrdersService {
     };
   }
 
+  private applyQuoteStatusFilter(where: string[], params: unknown[], status: string) {
+    if (status === 'draft') {
+      where.push(`type = 'QUOTE_REQUEST' AND status = 'CREATED'`);
+      return;
+    }
+    if (status === 'in_progress') {
+      where.push(
+        `type = 'QUOTE_REQUEST' AND status IN ('WAITING_FOR_QUOTATION','WAITING_FOR_ADMIN_QUOTATION_APPROVAL')`,
+      );
+      return;
+    }
+    if (status === 'info_needed') {
+      where.push('needs_customer_info = 1');
+      return;
+    }
+    if (status === 'ready') {
+      where.push(
+        `type = 'QUOTE_REQUEST' AND status = 'QUOTATION_PROVIDED' AND needs_customer_info = 0 AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)`,
+      );
+      return;
+    }
+    if (status === 'approved') {
+      where.push(`type = 'ORDER'`);
+      return;
+    }
+    if (status === 'declined') {
+      where.push(`status IN ('CLIENT_REJECTED_QUOTATION','REJECTED')`);
+      return;
+    }
+    if (status === 'expired') {
+      where.push(
+        `type = 'QUOTE_REQUEST' AND status = 'QUOTATION_PROVIDED' AND created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)`,
+      );
+      return;
+    }
+    if (status === 'cancelled') {
+      where.push(`status = 'CANCELLED'`);
+    }
+  }
+
   async listMyOrders(
     user: AuthUser | undefined,
     filters?: {
       type?: OrderType;
       status?: OrderStatus;
       lifecycle?: 'active' | 'delivered';
+      customerStatus?: 'in_progress' | 'ready' | 'revision' | 'delivered' | 'cancelled';
+      quoteHistory?: boolean;
+      quoteStatus?: string;
       q?: string;
       dateFrom?: string | null;
       dateTo?: string | null;
@@ -939,11 +984,27 @@ export class OrdersService {
     assertAuthUser(user);
     const where = ['client_user_id = ?'];
     const params: unknown[] = [user.id];
-    if (filters?.type) {
+    if (filters?.quoteHistory) {
+      where.push(
+        `(type = 'QUOTE_REQUEST' OR EXISTS (SELECT 1 FROM quotations q WHERE q.order_id = orders.id))`,
+      );
+    } else if (filters?.type) {
       where.push('type = ?');
       params.push(filters.type);
     }
-    if (filters?.status) {
+    if (filters?.quoteStatus) {
+      this.applyQuoteStatusFilter(where, params, filters.quoteStatus);
+    } else if (filters?.customerStatus === 'in_progress') {
+      where.push(`status IN ('IN_PROGRESS','PENDING_PAYMENT')`);
+    } else if (filters?.customerStatus === 'ready') {
+      where.push(`status = 'READY_TO_SEND'`);
+    } else if (filters?.customerStatus === 'revision') {
+      where.push(`status = 'REVISION_REQUESTED'`);
+    } else if (filters?.customerStatus === 'delivered') {
+      where.push(`status IN ('COMPLETED','CLOSED')`);
+    } else if (filters?.customerStatus === 'cancelled') {
+      where.push(`status = 'CANCELLED'`);
+    } else if (filters?.status) {
       where.push('status = ?');
       params.push(filters.status);
     }
@@ -997,17 +1058,21 @@ export class OrdersService {
     );
     const ids = rows.map((r) => r.id);
     const extras = await this.listExtrasFor(ids);
+    const deliveries = await this.latestDeliveriesFor(ids);
     const items = [];
     for (const r of rows) {
       const quotations = extras.quotations.get(r.id) ?? [];
       const lineCount =
         (quotations[0] as { lines?: unknown[] } | undefined)?.lines?.length ?? 0;
+      const delivery = deliveries.get(r.id);
       items.push({
         ...this.orderDto(r, {
           partiallyAccepted: extras.partials.has(r.id),
           partiallyDelivered: extras.partialDeliveries.has(r.id),
         }),
         designCount: extras.designCounts.get(r.id) || lineCount,
+        deliveredVia: delivery?.via ?? null,
+        deliveryEmail: delivery?.email ?? null,
         attachments: extras.attachments.get(r.id) ?? [],
         quotations,
       });
@@ -1044,6 +1109,49 @@ export class OrdersService {
       }
     }
     return { awaitingQuote, beingPriced, activeOrders };
+  }
+
+  async setNeedsCustomerInfo(
+    user: AuthUser | undefined,
+    orderId: string,
+    needsCustomerInfo: boolean,
+  ) {
+    assertAuthUser(user);
+    if (!isAdminRole(user.role)) throw new ForbiddenException();
+    const order = await this.getOrderRow(orderId);
+    if (!order) throw new NotFoundException('Order not found');
+    await this.db.execute('UPDATE orders SET needs_customer_info = ? WHERE id = ?', [
+      needsCustomerInfo ? 1 : 0,
+      orderId,
+    ]);
+    return this.assembleOrder(orderId);
+  }
+
+  private async latestDeliveriesFor(orderIds: string[]) {
+    const map = new Map<string, { via: string; email: string | null }>();
+    if (orderIds.length === 0) return map;
+    const rows = await this.db.query<{
+      order_id: string;
+      delivered_via: string;
+      email: string | null;
+    }>(
+      `SELECT d.order_id, d.delivered_via, u.email
+         FROM deliveries d
+         JOIN orders o ON o.id = d.order_id
+         LEFT JOIN users u ON u.id = o.client_user_id
+         INNER JOIN (
+           SELECT order_id, MAX(version) AS v
+             FROM deliveries
+            WHERE released_at IS NOT NULL AND order_id IN (${this.sqlIn(orderIds)})
+            GROUP BY order_id
+         ) latest ON latest.order_id = d.order_id AND latest.v = d.version
+        WHERE d.released_at IS NOT NULL`,
+      orderIds,
+    );
+    for (const r of rows) {
+      map.set(r.order_id, { via: r.delivered_via, email: r.email });
+    }
+    return map;
   }
 
   async getMyOrder(user: AuthUser | undefined, orderId: string) {
@@ -2978,12 +3086,16 @@ export class OrdersService {
       order_id: string;
       order_name: string | null;
       human_ref: string | null;
+      delivered_via: string;
+      email: string | null;
     }>(
       `SELECT df.id AS file_id, df.original_name, df.format_label, df.created_at AS delivered_at,
-              o.id AS order_id, o.name AS order_name, o.human_ref
+              o.id AS order_id, o.name AS order_name, o.human_ref,
+              d.delivered_via, u.email
          FROM delivery_files df
          JOIN deliveries d ON d.id = df.delivery_id
          JOIN orders o ON o.id = d.order_id
+         LEFT JOIN users u ON u.id = o.client_user_id
         WHERE o.client_user_id = ? AND d.released_at IS NOT NULL
         ORDER BY df.created_at DESC`,
       [user.id],
@@ -2996,6 +3108,8 @@ export class OrdersService {
       originalName: r.original_name,
       formatLabel: r.format_label,
       deliveredAt: r.delivered_at,
+      deliveredVia: r.delivered_via,
+      deliveryEmail: r.email,
     }));
   }
 
