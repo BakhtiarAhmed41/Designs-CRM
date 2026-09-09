@@ -11,7 +11,7 @@ html,body{background:#fff;height:auto;overflow:visible;scrollbar-width:none;}htm
 body{font-family:system-ui,sans-serif;background:#fff;padding:4px 2px 8px;font-size:13px;color:#222222;}html.in-frame body{padding:2px 4px 6px;}
 .wrap{max-width:none;width:100%;margin:0;}
 .card{background:#fff;border:none;border-radius:0;overflow:visible;margin-bottom:0;}
-.ch{padding:8px 6px;border-bottom:0.5px solid rgba(0,0,0,.1);display:flex;align-items:center;gap:6px;}
+.ch{padding:8px 6px;display:flex;align-items:center;gap:6px;}
 .ch i{font-size:15px;color:#222222;}
 .ct{font-size:13px;font-weight:500;}
 .cb{padding:4px 0 6px;}html.in-frame .cb{padding:2px 2px 4px;}
@@ -59,7 +59,7 @@ body{font-family:system-ui,sans-serif;background:#fff;padding:4px 2px 8px;font-s
 .mini-trg{padding:4px 6px;text-align:center;cursor:pointer;font-size:10px;color:#666;display:flex;align-items:center;justify-content:center;gap:3px;}
 .mini-fl{padding:0 4px 2px;}
 .mini-fi{display:flex;align-items:center;justify-content:space-between;padding:2px 4px;background:#fff;border-radius:4px;margin-bottom:2px;font-size:10px;color:#666;}
-.mst{display:flex;align-items:center;gap:6px;margin-top:6px;padding-top:6px;border-top:0.5px solid rgba(0,0,0,.1);}
+.mst{display:flex;align-items:center;gap:6px;margin-top:6px;padding-top:6px;}
 .tgl{position:relative;width:32px;height:17px;flex-shrink:0;}
 .tgl input{opacity:0;width:0;height:0;}
 .tgl .sl2{position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:17px;transition:.2s;}
@@ -84,12 +84,12 @@ body{font-family:system-ui,sans-serif;background:#fff;padding:4px 2px 8px;font-s
 .adv-b{border:0.5px solid rgba(0,0,0,.1);border-radius:7px;padding:8px 10px;margin-top:4px;display:none;}
 .adv-b.open{display:block;}
 .cbg{display:grid;grid-template-columns:1fr 1fr;gap:0;}
-.cbr{display:flex;align-items:flex-start;gap:6px;padding:4px 0;border-bottom:0.5px solid rgba(0,0,0,.08);}
+.cbr{display:flex;align-items:flex-start;gap:6px;padding:4px 0;}
 .cbr:last-child{border-bottom:none;}
 .cbr input[type=checkbox]{margin-top:2px;flex-shrink:0;}
 .cbr label{font-size:11px;color:#222222;cursor:pointer;line-height:1.3;}
 .cbr .sub{font-size:10px;color:#aaa;display:block;margin-top:0;}
-.qdiv{border:none;border-top:0.5px dashed rgba(0,0,0,.15);margin:10px 0 8px;}
+.qdiv{border:none;margin:10px 0 8px;}
 .qtogrow{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;background:#fff;border-radius:7px;margin-bottom:6px;cursor:pointer;border:0.5px solid rgba(0,0,0,.1);}
 .qtogrow input[type=checkbox]{margin-top:2px;flex-shrink:0;width:15px;height:15px;cursor:pointer;}
 .ql{font-size:12px;font-weight:500;}
@@ -98,7 +98,7 @@ body{font-family:system-ui,sans-serif;background:#fff;padding:4px 2px 8px;font-s
 .qwrap.show{display:block;}
 .qbox{background:#fff;border:0.5px solid rgba(0,0,0,.15);border-radius:7px;padding:8px 10px;margin-bottom:4px;}
 .qbox textarea{width:100%;font-size:12px;border:none;background:transparent;resize:none;min-height:56px;outline:none;font-family:inherit;}
-.row-btns{display:flex;justify-content:flex-end;gap:6px;padding-top:8px;border-top:0.5px solid rgba(0,0,0,.1);margin-top:8px;}
+.row-btns{display:flex;justify-content:flex-end;gap:6px;padding-top:8px;border-top:none;margin-top:8px;}
 .btn-p{padding:6px 14px;background:#fff;color:#222222;border:0.5px solid #222222;border-radius:7px;font-size:12px;font-weight:500;cursor:pointer;}
 .btn-s{padding:6px 10px;border:0.5px solid rgba(0,0,0,.15);border-radius:7px;font-size:12px;color:#666;cursor:pointer;background:transparent;}
 .form-hint{margin:6px 0 0;font-size:11px;color:#6B6B6B;text-align:right;line-height:1.35;letter-spacing:.01em;}
@@ -135,7 +135,7 @@ body{font-family:system-ui,sans-serif;background:#fff;padding:4px 2px 8px;font-s
 .qbig textarea::placeholder{color:#bbb;}
 
 /* Remake: stronger section grouping so Detailed reads in chunks, not a wall */
-#mode-d .sl{font-size:11px;font-weight:700;color:#222222;letter-spacing:.05em;margin:5px 0 2px;padding-top:4px;border-top:1px solid rgba(34,34,34,.10);}
+#mode-d .sl{font-size:11px;font-weight:700;color:#222222;letter-spacing:.05em;margin:5px 0 2px;padding-top:0;border-top:none;}
 #mode-d .sl:first-of-type{border-top:none;padding-top:0;margin-top:4px;}
 </style>
 </head>
@@ -275,7 +275,7 @@ body{font-family:system-ui,sans-serif;background:#fff;padding:4px 2px 8px;font-s
               <div class="cbr"><input type="checkbox" id="a3" checked><label for="a3">Reduce detail if needed<span class="sub">Simplify elements too small</span></label></div>
               <div class="cbr"><input type="checkbox" id="a4"><label for="a4">Allow gradient stitching<span class="sub">Color fade effect (adds cost)</span></label></div>
             </div>
-            <div style="padding-left:11px;border-left:0.5px solid rgba(0,0,0,.1);">
+            <div style="padding-left:11px;">
               <div class="cbr"><input type="checkbox" id="a5" checked><label for="a5">Allow minor size tweaks<span class="sub">Scale-up if text too small</span></label></div>
               <div class="cbr"><input type="checkbox" id="a6" checked><label for="a6">Allow repositioning<span class="sub">Minor spacing adjustments</span></label></div>
               <div class="cbr"><input type="checkbox" id="a7"><label for="a7">Add knockdown stitches<span class="sub">For towel / terry fabric</span></label></div>

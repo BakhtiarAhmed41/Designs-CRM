@@ -5,14 +5,14 @@
     '.ff input,.ff select,.ff textarea,.upload-area,.mini-up,.qbig,.ref-area,.dcard,.drow,.qbox{background:#fff!important;}',
     '.mtab,.adv-tgl,.qtogrow,.ibox,.cond{background:transparent!important;}',
     '.mtab.sel,.topt.sel,.sopt.sel,.uopt.sel,.fmt-chip.sel,.var-chip.sel,.ropt.sel-s,.ropt.sel-w,.svc.sel{background:#fff!important;}',
-    '.sl{margin:14px 0 8px!important;padding-top:10px!important;}',
-    '#mode-d .sl{margin:16px 0 8px!important;padding-top:10px!important;}',
+    '.sl{margin:5px 0 2px!important;padding-top:0!important;border-top:none!important;}',
+    '#mode-d .sl{margin:5px 0 2px!important;padding-top:0!important;border-top:none!important;}',
     '.mode-tabs{margin-bottom:14px;}',
     '.mtab{padding:12px;}',
     '.qbig textarea{min-height:72px;}',
     '.dcard{padding:9px;margin-bottom:8px;}',
     '.form-hint{margin-top:6px;}',
-    '.row-btns{padding-top:10px;margin-top:10px;}',
+    '.row-btns{padding-top:6px;margin-top:6px;border-top:none!important;}',
     '.msg-cta{display:none;}',
     '.lvd-progress{display:none;align-items:center;gap:12px;padding:4px 0 10px;}',
     '.lvd-progress.show{display:flex;}',
@@ -20,12 +20,15 @@
     '.lvd-progress .pi span{width:26px;height:26px;border-radius:50%;background:#EDEBE6;display:grid;place-items:center;font-weight:700;font-size:12px;}',
     '.lvd-progress .pi.on{color:#222;}',
     '.lvd-progress .pi.on span{background:#222;color:#fff;}',
-    '.lvd-progress .line{flex:0 0 48px;height:1px;background:rgba(0,0,0,.12);}',
+    '.lvd-progress .line{display:none;}',
     '.lvd-progress small{margin-left:auto;color:#888;font-size:12px;}',
     '.lvd-step2{display:none;}',
     '.lvd-step2.show{display:block;}',
     '#mode-d.step2-on .lvd-step1{display:none;}',
-    '.lvd-continue{margin-top:8px;}',
+    '.lvd-continue{margin-top:6px;display:flex;align-items:center;gap:10px;justify-content:space-between;border-top:none;padding-top:0;}',
+    '.lvd-continue .add-d,.lvd-continue .add-btn{flex:1 1 70%;width:auto;margin:0;min-height:32px;}',
+    '.lvd-continue .btn-p{flex:0 0 auto;white-space:nowrap;}',
+    '@media(max-width:520px){.lvd-continue{flex-wrap:wrap;}.lvd-continue .add-d,.lvd-continue .add-btn{flex-basis:100%;}}',
   ].join('');
   document.head.appendChild(css);
 
@@ -81,6 +84,8 @@
     var cont = document.createElement('div');
     cont.className = 'row-btns lvd-continue';
     cont.innerHTML = '<button type="button" class="btn-p" id="lvd-next">Continue to Files &amp; Delivery →</button>';
+    var addBtn = step1.querySelector('.add-d, .add-btn');
+    if (addBtn) cont.insertBefore(addBtn, cont.firstChild);
     step1.appendChild(cont);
 
     var back = document.createElement('button');

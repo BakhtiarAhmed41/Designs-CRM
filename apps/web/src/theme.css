@@ -2091,7 +2091,7 @@ button.primary i,
   align-items: center;
   gap: 10px;
   padding-bottom: 8px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: none;
   margin-bottom: 8px;
 }
 .quote-page-h .service-icon {
