@@ -327,6 +327,9 @@ body {
   padding: 28px 32px 80px;
   background: var(--etsy-white);
 }
+.app-frame .main:has(.quote-page) {
+  padding: 14px 24px 16px;
+}
 .main.main-messaging {
   padding: 16px 16px 16px;
   background: var(--bg);
@@ -1971,9 +1974,58 @@ button.primary i,
 .msg-compact-main .on,
 .msg-compact-main .om { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .msg-time { color: var(--dash-muted); font-size: 12px; white-space: nowrap; }
-.inbox-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 12px; }
-.inbox-type { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--dash-muted); }
-.inbox-type select { font: inherit; }
+.inbox-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+}
+.inbox-toolbar .searchbar.inbox-search {
+  flex: 1 1 220px;
+  min-width: 180px;
+  max-width: 360px;
+  width: auto;
+  margin: 0;
+}
+.inbox-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  flex-wrap: nowrap;
+  margin: 0;
+}
+.inbox-type {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 12px 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 13px;
+  color: var(--dash-muted);
+  white-space: nowrap;
+}
+.inbox-type span { font-weight: 600; }
+.inbox-type select {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 0;
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23222222' d='M1.2 1.4 6 6.2l4.8-4.8'/%3E%3C/svg%3E") no-repeat right center;
+  padding: 0 18px 0 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+}
+.inbox-type select:focus { outline: none; }
+@media (max-width: 900px) {
+  .inbox-toolbar { flex-wrap: wrap; }
+  .inbox-toolbar .searchbar.inbox-search { max-width: none; flex-basis: 100%; }
+}
 .msg-unread-count {
   font-size: 11px;
   font-weight: 700;
@@ -2028,27 +2080,31 @@ button.primary i,
 .file-day { margin: 18px 0 8px; font-size: 14px; }
 .files-count { margin: 0 0 10px; color: var(--dash-muted); font-size: 13px; }
 .file-email-note { margin: 0; padding: 12px 16px 16px; color: var(--dash-muted); font-size: 13px; }
-.quote-page { max-width: 1450px; margin: 0 auto; }
+.quote-page { max-width: 1450px; margin: 0 auto; width: 100%; }
+.main:not(.main-messaging) > div.quote-page {
+  max-width: 1450px;
+  gap: 0;
+}
 .quote-page-h {
   display: grid;
   grid-template-columns: auto 1fr auto auto auto;
   align-items: center;
-  gap: 14px;
-  padding-bottom: 12px;
+  gap: 10px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--line);
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 .quote-page-h .service-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   background: var(--tint);
   display: grid;
   place-items: center;
-  font-size: 20px;
+  font-size: 16px;
 }
-.quote-page-h h1 { margin: 0; font-size: 24px; }
-.quote-page-h p { margin: 2px 0 0; color: var(--dash-muted); font-size: 14px; }
+.quote-page-h h1 { margin: 0; font-size: 18px; }
+.quote-page-h p { margin: 1px 0 0; color: var(--dash-muted); font-size: 12px; }
 .change-service {
   border: 0;
   background: none;
@@ -2066,8 +2122,8 @@ button.primary i,
   font-size: 22px;
   cursor: pointer;
 }
-.quote-layout { display: grid; grid-template-columns: minmax(0,1fr) 230px; gap: 18px; align-items: start; }
-.quote-frame { width: 100%; min-height: 520px; border: 0; }
+.quote-layout { display: grid; grid-template-columns: minmax(0,1fr) 210px; gap: 14px; align-items: start; }
+.quote-frame { width: 100%; min-height: 360px; border: 0; }
 .help-card {
   position: sticky;
   top: 72px;
@@ -2112,4 +2168,10 @@ button.primary i,
   .quote-layout { grid-template-columns: 1fr; }
   .quote-page-h { grid-template-columns: auto 1fr auto; }
   .msg-compact-main { grid-template-columns: 1fr; }
+}
+@media (max-height: 800px) {
+  .app-frame .main:has(.quote-page) { padding: 10px 20px 12px; }
+  .quote-page-h { padding-bottom: 6px; margin-bottom: 6px; }
+  .quote-page-h h1 { font-size: 16px; }
+  .quote-page-h p { display: none; }
 }

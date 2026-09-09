@@ -289,30 +289,31 @@ export function PortalMessages() {
         <ErrorBanner>{getErrorMessage(convosQuery.error)}</ErrorBanner>
       )}
 
-      <div className="searchbar inbox-search">
-        <i className="ti ti-search si" aria-hidden />
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onFocus={() => maybeRequestBrowserNotifications()}
-          placeholder="Search by reference number or message"
-          aria-label="Search conversations"
-        />
-      </div>
-
-      <div className="inbox-filters">
-        {(['all', 'unread', 'starred', 'archived'] as const).map((id) => (
-          <button
-            key={id}
-            type="button"
-            className={`chip-btn${inboxFilter === id ? ' on' : ''}`}
-            onClick={() => setInboxFilter(id)}
-          >
-            {id === 'all' ? 'All' : id === 'unread' ? 'Unread' : id === 'starred' ? 'Starred' : 'Archived'}
-          </button>
-        ))}
+      <div className="inbox-toolbar">
+        <div className="searchbar inbox-search">
+          <i className="ti ti-search si" aria-hidden />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onFocus={() => maybeRequestBrowserNotifications()}
+            placeholder="Search by reference number or message"
+            aria-label="Search conversations"
+          />
+        </div>
+        <div className="inbox-filters">
+          {(['all', 'unread', 'starred', 'archived'] as const).map((id) => (
+            <button
+              key={id}
+              type="button"
+              className={`chip-btn${inboxFilter === id ? ' on' : ''}`}
+              onClick={() => setInboxFilter(id)}
+            >
+              {id === 'all' ? 'All' : id === 'unread' ? 'Unread' : id === 'starred' ? 'Starred' : 'Archived'}
+            </button>
+          ))}
+        </div>
         <label className="inbox-type">
-          Type:
+          <span>Type</span>
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}

@@ -7,133 +7,133 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-html,body{background:transparent;height:auto;overflow:visible;scrollbar-width:none;}html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}html.in-frame .ch{display:none;}
-body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24px;font-size:14px;color:#222222;}html.in-frame body{padding:8px 8px 28px;}
+html,body{background:transparent;height:auto;overflow:visible;scrollbar-width:none;}html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}html.in-frame .ch{display:none;}html.in-frame .msg-cta{display:none;}
+body{font-family:system-ui,sans-serif;background:transparent;padding:4px 2px 8px;font-size:13px;color:#222222;}html.in-frame body{padding:2px 4px 6px;}
 .wrap{max-width:none;width:100%;margin:0;}
 .card{background:transparent;border:none;border-radius:0;overflow:visible;margin-bottom:0;}
-.ch{padding:12px 8px;border-bottom:0.5px solid rgba(0,0,0,.1);display:flex;align-items:center;gap:8px;}
-.ch i{font-size:17px;color:#222222;}
-.ct{font-size:14px;font-weight:500;}
-.cb{padding:8px 2px 12px;}html.in-frame .cb{padding:8px 6px 16px;}
-.sl{font-size:11px;font-weight:500;color:#888;letter-spacing:.05em;text-transform:uppercase;margin:22px 0 10px;}
+.ch{padding:8px 6px;border-bottom:0.5px solid rgba(0,0,0,.1);display:flex;align-items:center;gap:6px;}
+.ch i{font-size:15px;color:#222222;}
+.ct{font-size:13px;font-weight:500;}
+.cb{padding:4px 0 6px;}html.in-frame .cb{padding:2px 2px 4px;}
+.sl{font-size:10px;font-weight:600;color:#888;letter-spacing:.05em;text-transform:uppercase;margin:10px 0 5px;}
 .sl:first-child{margin-top:0;}
-.fg{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:11px;}
-.ff{display:flex;flex-direction:column;gap:4px;}
-.ff label{font-size:12px;font-weight:500;color:#555;}
-.ff input,.ff select{font-size:13px;padding:10px 12px;border:1px solid rgba(34,34,34,.12);border-radius:8px;background:#EDEBE6;color:#222222;outline:none;}
+.fg{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;}
+.ff{display:flex;flex-direction:column;gap:3px;}
+.ff label{font-size:11px;font-weight:500;color:#555;}
+.ff input,.ff select{font-size:12px;height:32px;padding:0 10px;border:1px solid rgba(34,34,34,.12);border-radius:7px;background:#EDEBE6;color:#222222;outline:none;}
 .ff input:focus,.ff select:focus{border-color:#222222;box-shadow:0 0 0 2px rgba(34,34,34,.12);}
-.ff textarea{font-size:13px;padding:12px 14px;border:1px solid rgba(34,34,34,.12);border-radius:8px;resize:vertical;min-height:88px;outline:none;font-family:inherit;background:#EDEBE6;color:#222222;}
+.ff textarea{font-size:12px;padding:8px 10px;border:1px solid rgba(34,34,34,.12);border-radius:7px;resize:vertical;min-height:56px;outline:none;font-family:inherit;background:#EDEBE6;color:#222222;}
 .lockable{transition:opacity .25s;}
 .lockable.locked{opacity:.25;pointer-events:none;user-select:none;}
-.type-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-.topt{border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:13px;cursor:pointer;text-align:center;display:flex;flex-direction:column;align-items:center;gap:5px;}
-.topt i{font-size:21px;color:#888;}
-.topt .ot{font-size:13px;font-weight:500;}
-.topt .os{font-size:11px;color:#aaa;}
+.type-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.topt{border:0.5px solid rgba(0,0,0,.15);border-radius:7px;padding:8px;cursor:pointer;text-align:center;display:flex;flex-direction:column;align-items:center;gap:3px;}
+.topt i{font-size:18px;color:#888;}
+.topt .ot{font-size:12px;font-weight:500;}
+.topt .os{font-size:10px;color:#aaa;}
 .topt.sel{border:1px solid #222222;background:#EDEBE6;}
 .topt.sel i,.topt.sel .ot{color:#222222;}
-.upload-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.upload-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 @media(max-width:520px){.upload-row{grid-template-columns:1fr;}}
-.upload-area{border:1.5px dashed rgba(0,0,0,.2);border-radius:8px;background:#EDEBE6;overflow:hidden;}
-.utrg{padding:14px;text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;}
-.utrg i{font-size:21px;color:#888;}
-.utrg p{font-size:13px;color:#555;}
-.utrg span{font-size:11px;color:#aaa;}
-.flist{padding:0 10px 8px;}
-.fitem{display:flex;align-items:center;justify-content:space-between;padding:5px 8px;background:#EDEBE6;border-radius:6px;margin-bottom:4px;font-size:12px;color:#555;border:0.5px solid rgba(0,0,0,.1);}
-.frem{background:none;border:none;cursor:pointer;color:#9A1E22;font-size:13px;}
-.other-inp{margin-top:5px;display:none;}
+.upload-area{border:1.5px dashed rgba(0,0,0,.2);border-radius:7px;background:#EDEBE6;overflow:hidden;}
+.utrg{padding:8px 10px;text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;}
+.utrg i{font-size:16px;color:#888;}
+.utrg p{font-size:12px;color:#555;}
+.utrg span{font-size:10px;color:#aaa;}
+.flist{padding:0 8px 6px;}
+.fitem{display:flex;align-items:center;justify-content:space-between;padding:3px 6px;background:#EDEBE6;border-radius:5px;margin-bottom:3px;font-size:11px;color:#555;border:0.5px solid rgba(0,0,0,.1);}
+.frem{background:none;border:none;cursor:pointer;color:#9A1E22;font-size:12px;}
+.other-inp{margin-top:4px;display:none;}
 .other-inp.show{display:block;}
-.size-r{display:grid;grid-template-columns:1fr 14px 1fr;align-items:center;gap:3px;}
-.sep{text-align:center;font-size:12px;color:#aaa;}
-.ibox{background:#F5F5F1;border-radius:8px;padding:8px 11px;font-size:12px;color:#666;display:flex;gap:6px;align-items:flex-start;margin-top:5px;}
-.ibox i{font-size:13px;flex-shrink:0;margin-top:1px;}
-.dcard{background:#EDEBE6;border:0.5px solid rgba(0,0,0,.1);border-radius:8px;padding:11px;margin-bottom:9px;}
-.dcard-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;}
-.dnum{font-size:12px;font-weight:500;color:#666;display:flex;align-items:center;gap:5px;}
-.dbtn{font-size:12px;color:#9A1E22;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:3px;}
-.dcols{display:grid;grid-template-columns:85px 1fr 1fr 1fr 90px 45px;gap:8px;align-items:start;}
-.dcols .ff label{font-size:11px;}
-.dcols .ff input,.dcols .ff select{font-size:12px;}
-.mini-up{border:1px dashed rgba(0,0,0,.2);border-radius:8px;background:#EDEBE6;overflow:hidden;}
-.mini-trg{padding:5px 7px;text-align:center;cursor:pointer;font-size:11px;color:#666;display:flex;align-items:center;justify-content:center;gap:4px;}
-.mini-fl{padding:0 5px 3px;}
-.mini-fi{display:flex;align-items:center;justify-content:space-between;padding:3px 5px;background:#F5F5F1;border-radius:4px;margin-bottom:2px;font-size:11px;color:#666;}
-.mst{display:flex;align-items:center;gap:8px;margin-top:9px;padding-top:9px;border-top:0.5px solid rgba(0,0,0,.1);}
+.size-r{display:grid;grid-template-columns:1fr 12px 1fr;align-items:center;gap:3px;}
+.sep{text-align:center;font-size:11px;color:#aaa;}
+.ibox{background:#F5F5F1;border-radius:7px;padding:6px 8px;font-size:11px;color:#666;display:flex;gap:5px;align-items:flex-start;margin-top:4px;line-height:1.35;}
+.ibox i{font-size:12px;flex-shrink:0;margin-top:1px;}
+.dcard{background:#EDEBE6;border:0.5px solid rgba(0,0,0,.1);border-radius:7px;padding:8px;margin-bottom:6px;}
+.dcard-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.dnum{font-size:11px;font-weight:500;color:#666;display:flex;align-items:center;gap:4px;}
+.dbtn{font-size:11px;color:#9A1E22;background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:3px;}
+.dcols{display:grid;grid-template-columns:72px 1fr 1fr 1fr 84px 44px;gap:6px;align-items:start;}
+.dcols .ff label{font-size:10px;}
+.dcols .ff input,.dcols .ff select{font-size:11px;height:30px;padding:0 8px;}
+.mini-up{border:1px dashed rgba(0,0,0,.2);border-radius:7px;background:#EDEBE6;overflow:hidden;}
+.mini-trg{padding:4px 6px;text-align:center;cursor:pointer;font-size:10px;color:#666;display:flex;align-items:center;justify-content:center;gap:3px;}
+.mini-fl{padding:0 4px 2px;}
+.mini-fi{display:flex;align-items:center;justify-content:space-between;padding:2px 4px;background:#F5F5F1;border-radius:4px;margin-bottom:2px;font-size:10px;color:#666;}
+.mst{display:flex;align-items:center;gap:6px;margin-top:6px;padding-top:6px;border-top:0.5px solid rgba(0,0,0,.1);}
 .tgl{position:relative;width:32px;height:17px;flex-shrink:0;}
 .tgl input{opacity:0;width:0;height:0;}
 .tgl .sl2{position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:17px;transition:.2s;}
 .tgl .sl2:before{position:absolute;content:"";height:11px;width:11px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.2s;}
 .tgl input:checked+.sl2{background:#222222;}
 .tgl input:checked+.sl2:before{transform:translateX(15px);}
-.szwrap{margin-top:9px;display:none;}
+.szwrap{margin-top:6px;display:none;}
 .szwrap.open{display:block;}
-.szrow{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:7px;}
-.szrow .ff label{font-size:11px;}
-.szrow .ff input{font-size:12px;}
-.add-r{width:100%;padding:7px;border:0.5px dashed rgba(0,0,0,.15);border-radius:8px;background:transparent;font-size:12px;color:#666;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;}
-.add-d{width:100%;padding:9px;border:0.5px dashed rgba(0,0,0,.15);border-radius:8px;background:transparent;font-size:13px;color:#666;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;margin-bottom:11px;}
+.szrow{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:6px;align-items:end;margin-bottom:5px;}
+.szrow .ff label{font-size:10px;}
+.szrow .ff input{font-size:11px;}
+.add-r{width:100%;padding:5px;border:0.5px dashed rgba(0,0,0,.15);border-radius:7px;background:transparent;font-size:11px;color:#666;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;}
+.add-d{width:100%;padding:6px;border:0.5px dashed rgba(0,0,0,.15);border-radius:7px;background:transparent;font-size:12px;color:#666;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;margin-bottom:6px;}
 .rush-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-.ropt{border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:9px 11px;cursor:pointer;font-size:12px;color:#555;}
+.ropt{border:0.5px solid rgba(0,0,0,.15);border-radius:7px;padding:6px 10px;cursor:pointer;font-size:12px;color:#555;}
 .ropt.sel-s{border-color:#222222;background:#EDEBE6;color:#222222;}
 .ropt.sel-w{border-color:#222222;background:#EDEBE6;color:#9A1E22;}
-.adv-tgl{width:100%;padding:10px 13px;background:#F5F5F1;border:0.5px solid rgba(0,0,0,.1);border-radius:8px;font-size:13px;color:#666;cursor:pointer;display:flex;align-items:center;justify-content:space-between;}
-.adv-b{border:0.5px solid rgba(0,0,0,.1);border-radius:8px;padding:13px;margin-top:5px;display:none;}
+.adv-tgl{width:100%;padding:7px 10px;background:#F5F5F1;border:0.5px solid rgba(0,0,0,.1);border-radius:7px;font-size:12px;color:#666;cursor:pointer;display:flex;align-items:center;justify-content:space-between;}
+.adv-b{border:0.5px solid rgba(0,0,0,.1);border-radius:7px;padding:8px 10px;margin-top:4px;display:none;}
 .adv-b.open{display:block;}
 .cbg{display:grid;grid-template-columns:1fr 1fr;gap:0;}
-.cbr{display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:0.5px solid rgba(0,0,0,.08);}
+.cbr{display:flex;align-items:flex-start;gap:6px;padding:4px 0;border-bottom:0.5px solid rgba(0,0,0,.08);}
 .cbr:last-child{border-bottom:none;}
 .cbr input[type=checkbox]{margin-top:2px;flex-shrink:0;}
-.cbr label{font-size:12px;color:#222222;cursor:pointer;line-height:1.4;}
-.cbr .sub{font-size:11px;color:#aaa;display:block;margin-top:1px;}
-.qdiv{border:none;border-top:0.5px dashed rgba(0,0,0,.15);margin:18px 0 14px;}
-.qtogrow{display:flex;align-items:flex-start;gap:10px;padding:12px 13px;background:#F5F5F1;border-radius:8px;margin-bottom:10px;cursor:pointer;border:0.5px solid rgba(0,0,0,.1);}
+.cbr label{font-size:11px;color:#222222;cursor:pointer;line-height:1.3;}
+.cbr .sub{font-size:10px;color:#aaa;display:block;margin-top:0;}
+.qdiv{border:none;border-top:0.5px dashed rgba(0,0,0,.15);margin:10px 0 8px;}
+.qtogrow{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;background:#F5F5F1;border-radius:7px;margin-bottom:6px;cursor:pointer;border:0.5px solid rgba(0,0,0,.1);}
 .qtogrow input[type=checkbox]{margin-top:2px;flex-shrink:0;width:15px;height:15px;cursor:pointer;}
-.ql{font-size:13px;font-weight:500;}
-.qs{font-size:12px;color:#888;margin-top:2px;line-height:1.5;}
+.ql{font-size:12px;font-weight:500;}
+.qs{font-size:11px;color:#888;margin-top:2px;line-height:1.35;}
 .qwrap{display:none;}
 .qwrap.show{display:block;}
-.qbox{background:#EDEBE6;border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:10px 12px;margin-bottom:6px;}
-.qbox textarea{width:100%;font-size:13px;border:none;background:transparent;resize:none;min-height:80px;outline:none;font-family:inherit;}
-.row-btns{display:flex;justify-content:flex-end;gap:8px;padding-top:13px;border-top:0.5px solid rgba(0,0,0,.1);margin-top:13px;}
-.btn-p{padding:9px 20px;background:#EDEBE6;color:#222222;border:0.5px solid #222222;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;}
-.btn-s{padding:9px 13px;border:0.5px solid rgba(0,0,0,.15);border-radius:8px;font-size:13px;color:#666;cursor:pointer;background:transparent;}
-.form-hint{margin:10px 0 0;font-size:12px;color:#6B6B6B;text-align:right;line-height:1.45;letter-spacing:.01em;}
+.qbox{background:#EDEBE6;border:0.5px solid rgba(0,0,0,.15);border-radius:7px;padding:8px 10px;margin-bottom:4px;}
+.qbox textarea{width:100%;font-size:12px;border:none;background:transparent;resize:none;min-height:56px;outline:none;font-family:inherit;}
+.row-btns{display:flex;justify-content:flex-end;gap:6px;padding-top:8px;border-top:0.5px solid rgba(0,0,0,.1);margin-top:8px;}
+.btn-p{padding:6px 14px;background:#EDEBE6;color:#222222;border:0.5px solid #222222;border-radius:7px;font-size:12px;font-weight:500;cursor:pointer;}
+.btn-s{padding:6px 10px;border:0.5px solid rgba(0,0,0,.15);border-radius:7px;font-size:12px;color:#666;cursor:pointer;background:transparent;}
+.form-hint{margin:6px 0 0;font-size:11px;color:#6B6B6B;text-align:right;line-height:1.35;letter-spacing:.01em;}
 .sec{display:none;}
 .sec.vis{display:block;}
-.badge-info{font-size:11px;background:#EDEBE6;color:#222222;padding:2px 8px;border-radius:10px;}
-.fmt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:7px;}
-.fmt-chip{border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:8px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;position:relative;}
-.fmt-chip i.icon{font-size:18px;color:#888;}
-.fmt-chip .fname{font-size:11px;font-weight:500;color:#555;}
-.fmt-chip .fext{font-size:10px;color:#aaa;}
-.fmt-chip .chk{display:none;position:absolute;top:4px;right:4px;width:14px;height:14px;border-radius:50%;background:#222222;color:#fff;font-size:9px;align-items:center;justify-content:center;}
+.badge-info{font-size:10px;background:#EDEBE6;color:#222222;padding:1px 6px;border-radius:10px;}
+.fmt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(72px,1fr));gap:5px;}
+.fmt-chip{border:0.5px solid rgba(0,0,0,.15);border-radius:7px;padding:5px 4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;position:relative;}
+.fmt-chip i.icon{font-size:14px;color:#888;}
+.fmt-chip .fname{font-size:10px;font-weight:500;color:#555;}
+.fmt-chip .fext{font-size:9px;color:#aaa;}
+.fmt-chip .chk{display:none;position:absolute;top:3px;right:3px;width:12px;height:12px;border-radius:50%;background:#222222;color:#fff;font-size:8px;align-items:center;justify-content:center;}
 .fmt-chip.sel{border:1px solid #222222;background:#EDEBE6;}
 .fmt-chip.sel .icon,.fmt-chip.sel .fname{color:#222222;}
 .fmt-chip.sel .chk{display:flex;}
-.msg-cta{display:flex;align-items:center;gap:11px;padding:12px 14px;background:#EDEBE6;border:0.5px solid rgba(34,34,34,.15);border-radius:8px;margin-top:16px;}
-.msg-cta>i{font-size:20px;color:#222222;flex-shrink:0;}
-.mc-t{font-size:13px;font-weight:500;color:#222222;}
-.mc-s{font-size:12px;color:#555;margin-top:2px;line-height:1.45;}
-.mc-btn{flex-shrink:0;padding:8px 14px;background:#222222;color:#fff;border-radius:8px;font-size:12px;font-weight:500;text-decoration:none;white-space:nowrap;}
+.msg-cta{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#EDEBE6;border:0.5px solid rgba(34,34,34,.15);border-radius:7px;margin-top:8px;}
+.msg-cta>i{font-size:16px;color:#222222;flex-shrink:0;}
+.mc-t{font-size:12px;font-weight:500;color:#222222;}
+.mc-s{font-size:11px;color:#555;margin-top:1px;line-height:1.3;}
+.mc-btn{flex-shrink:0;padding:6px 10px;background:#222222;color:#fff;border-radius:7px;font-size:11px;font-weight:500;text-decoration:none;white-space:nowrap;}
 @media(max-width:520px){.msg-cta{flex-wrap:wrap;}.mc-btn{width:100%;text-align:center;}}
 /* quick/detailed mode tabs */
-.mode-tabs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:22px;}
-.mtab{border:1px solid rgba(34,34,34,.12);border-radius:10px;padding:16px;cursor:pointer;display:flex;gap:12px;align-items:flex-start;background:#F5F5F1;}
-.mtab i{font-size:19px;color:#888;margin-top:1px;}
-.mtab .mt-t{font-size:13px;font-weight:500;}
-.mtab .mt-s{font-size:11px;color:#aaa;margin-top:2px;line-height:1.4;}
+.mode-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
+.mtab{border:1px solid rgba(34,34,34,.12);border-radius:8px;padding:8px 10px;cursor:pointer;display:flex;gap:8px;align-items:flex-start;background:#F5F5F1;}
+.mtab i{font-size:16px;color:#888;margin-top:1px;}
+.mtab .mt-t{font-size:12px;font-weight:500;}
+.mtab .mt-s{font-size:10px;color:#aaa;margin-top:1px;line-height:1.3;}
 .mtab.sel{border:1px solid #222222;background:#EDEBE6;}
 .mtab.sel i,.mtab.sel .mt-t{color:#222222;}
 .mode-body{display:none;}
 .mode-body.vis{display:block;}
-.qbig{background:#EDEBE6;border:1px solid rgba(34,34,34,.12);border-radius:8px;padding:14px 16px;}
-.qbig textarea{width:100%;font-size:13px;border:none;background:transparent;resize:none;min-height:95px;outline:none;font-family:inherit;}
+.qbig{background:#EDEBE6;border:1px solid rgba(34,34,34,.12);border-radius:7px;padding:8px 10px;}
+.qbig textarea{width:100%;font-size:12px;border:none;background:transparent;resize:none;min-height:56px;outline:none;font-family:inherit;}
 .qbig textarea::placeholder{color:#bbb;}
 
 /* Remake: stronger section grouping so Detailed reads in chunks, not a wall */
-#mode-d .sl{font-size:12px;font-weight:700;color:#222222;letter-spacing:.06em;margin:26px 0 10px;padding-top:18px;border-top:1px solid rgba(34,34,34,.10);}
-#mode-d .sl:first-of-type{border-top:none;padding-top:0;margin-top:18px;}
+#mode-d .sl{font-size:11px;font-weight:700;color:#222222;letter-spacing:.05em;margin:10px 0 5px;padding-top:8px;border-top:1px solid rgba(34,34,34,.10);}
+#mode-d .sl:first-of-type{border-top:none;padding-top:0;margin-top:8px;}
 </style>
 </head>
 <body>
@@ -160,7 +160,7 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
     <div class="sl">Upload files</div>
     <div class="upload-row">
       <div>
-        <div style="font-size:12px;font-weight:500;color:#555;margin-bottom:5px;display:flex;align-items:center;gap:5px;"><i class="ti ti-file" style="font-size:14px;"></i> Your artwork</div>
+        <div style="font-size:11px;font-weight:500;color:#555;margin-bottom:3px;display:flex;align-items:center;gap:4px;"><i class="ti ti-file" style="font-size:13px;"></i> Your artwork</div>
         <div class="upload-area">
           <div class="utrg" onclick="document.getElementById('fu-main').click()">
             <i class="ti ti-cloud-upload"></i>
@@ -172,7 +172,7 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
         </div>
       </div>
       <div>
-        <div style="font-size:12px;font-weight:500;color:#555;margin-bottom:5px;display:flex;align-items:center;gap:5px;"><i class="ti ti-photo" style="font-size:14px;"></i> Reference image <span style="font-size:11px;font-weight:400;color:#aaa;">(optional)</span></div>
+        <div style="font-size:11px;font-weight:500;color:#555;margin-bottom:3px;display:flex;align-items:center;gap:4px;"><i class="ti ti-photo" style="font-size:13px;"></i> Reference image <span style="font-size:10px;font-weight:400;color:#aaa;">(optional)</span></div>
         <div class="upload-area" style="border-color:rgba(34,34,34,.25);background:#EDEBE6;">
           <div class="utrg" onclick="document.getElementById('fu-ref').click()">
             <i class="ti ti-photo" style="color:#222222;"></i>
@@ -187,11 +187,11 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
 
     <!-- QUICK MODE -->
     <div class="mode-body vis" id="mode-q">
-      <div class="sl" style="margin-top:14px;">Tell us about your order</div>
+      <div class="sl" style="margin-top:8px;">Tell us about your order</div>
       <div class="qbig">
         <textarea placeholder="e.g. left chest 3.5&quot;, cap 2.5&quot;, need DST + PES"></textarea>
       </div>
-      <div class="fg" style="margin-top:11px;">
+      <div class="fg" style="margin-top:6px;">
         <div class="ff"><label>Sizing</label><select id="q-sizing" onchange="qSizeNote(this)"><option>Keep proportional (recommended)</option><option>Exact size : I'll mention it above</option><option>Multiple sizes : I'll describe above</option><option>Not sure : let team decide</option></select></div>
         <div class="ff"><label>Gradient / ombre effect</label><select><option>No : solid colors only</option><option>Yes : include gradient / ombre</option><option>Not sure : let team decide</option></select></div>
         
@@ -199,7 +199,7 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
 
       <div class="ibox" id="q-size-note" style="display:none;"><i class="ti ti-info-circle"></i> No problem : just list the sizes and placements in the box above (e.g. "logo 1: left chest 4" and hat 2.5""). Each size is digitized as a separate file.</div>
 
-      <div class="sl" style="margin-top:14px;">Turnaround</div>
+      <div class="sl" style="margin-top:8px;">Turnaround</div>
       <div class="rush-row">
         <div class="ropt sel-s" id="rq-std" onclick="selRushQ('std')"><i class="ti ti-clock" style="font-size:13px"></i> Standard (12-24 hrs) : included</div>
         <div class="ropt" id="rq-rush" onclick="selRushQ('rush')"><i class="ti ti-bolt" style="font-size:13px"></i> Urgent : contact us before placing an order</div>
@@ -211,7 +211,7 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
 
     <!-- DETAILED MODE -->
     <div class="mode-body" id="mode-d">
-      <div style="display:flex;gap:9px;align-items:flex-start;background:#EDEBE6;border-radius:10px;padding:11px 14px;margin-top:14px;font-size:12.5px;color:#222222;line-height:1.5;">
+      <div style="display:flex;gap:7px;align-items:flex-start;background:#EDEBE6;border-radius:8px;padding:7px 10px;margin-top:8px;font-size:11px;color:#222222;line-height:1.35;">
         <i class="ti ti-heart-handshake" style="font-size:16px;margin-top:1px;"></i>
         <span><b>Not sure about a field? Leave it blank.</b> We'll figure it out from your artwork : every field here is optional and just helps us quote faster.</span>
       </div>
@@ -229,8 +229,8 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
               <div class="ff"><label>Size (W×H in)</label><div class="size-r"><input type="number" placeholder="W" step="0.1" min="0"><span class="sep">×</span><input type="number" placeholder="H" step="0.1" min="0"></div></div>
               <div class="ff"><label>Colors</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6+</option><option>Not sure</option></select></div>
             </div>
-            <div class="ff" style="margin-top:8px;"><label>Notes for this design (optional)</label><input type="text" placeholder="e.g. bold outline, no gradient, match our old patch"></div>
-            <button class="add-r" onclick="toggleSizes('dsz-1',this)" style="margin-top:8px;"><i class="ti ti-plus"></i> Add another size of this design</button>
+            <div class="ff" style="margin-top:5px;"><label>Notes for this design (optional)</label><input type="text" placeholder="e.g. bold outline, no gradient, match our old patch"></div>
+            <button class="add-r" onclick="toggleSizes('dsz-1',this)" style="margin-top:5px;"><i class="ti ti-plus"></i> Add another size of this design</button>
             <div class="szwrap" id="dsz-1">
               <div class="ibox" style="margin:7px 0;"><i class="ti ti-info-circle"></i> Each size = separate file.</div>
               <div class="szrow"><div class="ff"><label>Label</label><input type="text" placeholder="Small"></div><div class="ff"><label>W (in)</label><input type="number" min="0" step="0.1"></div><div class="ff"><label>H (in)</label><input type="number" min="0" step="0.1"></div><div></div></div>
@@ -242,21 +242,21 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
         <button class="add-d" onclick="addDesign()"><i class="ti ti-plus"></i> Add another design</button>
       </div>
 
-      <div class="sl" style="margin-top:14px;">File formats <span style="font-size:11px;font-weight:400;color:#aaa;">  select all you need</span></div>
+      <div class="sl" style="margin-top:8px;">File formats <span style="font-size:10px;font-weight:400;color:#aaa;">  select all you need</span></div>
       <div class="fmt-grid">
         <div class="fmt-chip sel" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-needle-thread icon"></i><span class="fname">DST</span><span class="fext">Tajima</span></div><div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-needle-thread icon"></i><span class="fname">PES</span><span class="fext">Brother</span></div><div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-needle-thread icon"></i><span class="fname">EXP</span><span class="fext">Melco</span></div><div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-needle-thread icon"></i><span class="fname">XXX</span><span class="fext">Singer</span></div><div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-file-type-pdf icon"></i><span class="fname">PDF</span><span class="fext">Color chart / sheet</span></div><div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-photo icon"></i><span class="fname">PNG</span><span class="fext">Preview</span></div><div class="fmt-chip" id="fmt-other-chip" onclick="toggleFmtOther(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-pencil icon"></i><span class="fname">Other</span><span class="fext">Type it in</span></div>
       </div>
       <div id="fmt-other-inp" style="display:none;margin-top:8px;"><input type="text" style="width:100%;font-size:13px;padding:7px 10px;border:0.5px solid rgba(0,0,0,.2);border-radius:8px;outline:none;" placeholder="Type your format(s) : e.g. JEF, HUS, VP3, SEW, VIP, TAP, TBF, DSB, KSM..."></div>
       <div class="ibox" style="margin-top:8px;"><i class="ti ti-info-circle"></i> Not sure? DST works with most commercial machines : or tell us your machine model in the notes and we'll pick the right format.</div>
 
-      <div class="sl" style="margin-top:14px;">Turnaround</div>
+      <div class="sl" style="margin-top:8px;">Turnaround</div>
       <div class="rush-row">
         <div class="ropt sel-s" id="r-std" onclick="selRush('std')"><i class="ti ti-clock" style="font-size:13px"></i> Standard (12-24 hrs) : included</div>
         <div class="ropt" id="r-rush" onclick="selRush('rush')"><i class="ti ti-bolt" style="font-size:13px"></i> Urgent : contact us before placing an order</div>
       </div>
       <div class="ibox" id="rush-note" style="display:none;"><i class="ti ti-message-circle"></i> For urgent orders, please text or email us first so we can confirm the timeline before you place the order.</div>
 
-      <div style="margin-top:14px;">
+      <div style="margin-top:8px;">
         <button class="adv-tgl" onclick="toggleAdv(this)">
           <span style="display:flex;align-items:center;gap:7px;"><i class="ti ti-settings" style="font-size:14px"></i> Advanced digitizing options <span class="badge-info">pre-set to recommended defaults</span></span>
           <i class="ti ti-chevron-down" style="font-size:14px;transition:transform .2s" id="adv-chev"></i>
@@ -280,8 +280,8 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
         </div>
       </div>
     
-      <div class="sl" style="margin-top:14px;">Anything else we should know?</div>
-      <div class="qbig"><textarea style="min-height:64px;" placeholder="Deadlines, special requests, context : anything that didn&#39;t fit the fields above."></textarea></div>
+      <div class="sl" style="margin-top:8px;">Anything else we should know?</div>
+      <div class="qbig"><textarea style="min-height:48px;" placeholder="Deadlines, special requests, context : anything that didn&#39;t fit the fields above."></textarea></div>
 
     </div>
 
@@ -352,7 +352,7 @@ function addSzIn(btn){
 function addDesign(){
   drCnt++;var id='dr-'+drCnt;var szid='dsz-'+drCnt;var moid='mo-'+drCnt;var mfid='mfl-'+drCnt;
   var wrap=document.getElementById('mrows');var d=document.createElement('div');d.className='dcard';d.id=id;
-  d.innerHTML='<div class="dcard-h"><span class="dnum"><i class="ti ti-file"></i> Design '+drCnt+'</span><button class="dbtn" onclick="document.getElementById(\''+id+'\').remove()"><i class="ti ti-trash" style="font-size:13px"></i> Remove</button></div><div class="dcols"><div class="ff"><label>Files</label><div class="mini-up"><div class="mini-trg" onclick="this.nextElementSibling.nextElementSibling.click()"><i class="ti ti-upload" style="font-size:12px"></i> Add files</div><div class="mini-fl" id="'+mfid+'"></div><input type="file" multiple style="display:none" onchange="handleMiniFiles(\''+mfid+'\',this)"></div></div><div class="ff"><label>Design name</label><input type="text" placeholder="e.g. Sleeve logo"></div><div class="ff"><label>Placement</label><select onchange="toggleOther(\''+moid+'\',this)"><option>Hat / cap</option><option>Left chest</option><option>Right chest</option><option>Jacket back</option><option>Sleeve</option><option>Towel</option><option>Other : specify</option><option>Not sure</option></select><div class="other-inp" id="'+moid+'"><input type="text" placeholder="e.g. napkin, apron..."></div></div><div class="ff"><label>Fabric</label><select><option>Cap / hat</option><option>Polo / shirt</option><option>Fleece</option><option>Jacket</option><option>T-shirt</option><option>Towel</option><option>Not sure</option></select></div><div class="ff"><label>Size (W×H in)</label><div class="size-r"><input type="number" placeholder="W" step="0.1" min="0"><span class="sep">×</span><input type="number" placeholder="H" step="0.1" min="0"></div></div><div class="ff"><label>Colors</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6+</option><option>Not sure</option></select></div></div><div class="ff" style="margin-top:8px;"><label>Notes for this design (optional)</label><input type="text" placeholder="e.g. bold outline, no gradient"></div><button class="add-r" onclick="toggleSizes(\''+szid+'\',this)" style="margin-top:8px;"><i class="ti ti-plus"></i> Add another size of this design</button><div class="szwrap" id="'+szid+'"><div class="ibox" style="margin:7px 0;"><i class="ti ti-info-circle"></i> Each size = separate file.</div><div class="szrow"><div class="ff"><label>Label</label><input type="text" placeholder="Small"></div><div class="ff"><label>W (in)</label><input type="number" min="0" step="0.1"></div><div class="ff"><label>H (in)</label><input type="number" min="0" step="0.1"></div><div></div></div><button class="add-r" onclick="addSzIn(this)"><i class="ti ti-plus"></i> Add size</button></div>';
+  d.innerHTML='<div class="dcard-h"><span class="dnum"><i class="ti ti-file"></i> Design '+drCnt+'</span><button class="dbtn" onclick="document.getElementById(\''+id+'\').remove()"><i class="ti ti-trash" style="font-size:13px"></i> Remove</button></div><div class="dcols"><div class="ff"><label>Files</label><div class="mini-up"><div class="mini-trg" onclick="this.nextElementSibling.nextElementSibling.click()"><i class="ti ti-upload" style="font-size:12px"></i> Add files</div><div class="mini-fl" id="'+mfid+'"></div><input type="file" multiple style="display:none" onchange="handleMiniFiles(\''+mfid+'\',this)"></div></div><div class="ff"><label>Design name</label><input type="text" placeholder="e.g. Sleeve logo"></div><div class="ff"><label>Placement</label><select onchange="toggleOther(\''+moid+'\',this)"><option>Hat / cap</option><option>Left chest</option><option>Right chest</option><option>Jacket back</option><option>Sleeve</option><option>Towel</option><option>Other : specify</option><option>Not sure</option></select><div class="other-inp" id="'+moid+'"><input type="text" placeholder="e.g. napkin, apron..."></div></div><div class="ff"><label>Fabric</label><select><option>Cap / hat</option><option>Polo / shirt</option><option>Fleece</option><option>Jacket</option><option>T-shirt</option><option>Towel</option><option>Not sure</option></select></div><div class="ff"><label>Size (W×H in)</label><div class="size-r"><input type="number" placeholder="W" step="0.1" min="0"><span class="sep">×</span><input type="number" placeholder="H" step="0.1" min="0"></div></div><div class="ff"><label>Colors</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6+</option><option>Not sure</option></select></div></div><div class="ff" style="margin-top:5px;"><label>Notes for this design (optional)</label><input type="text" placeholder="e.g. bold outline, no gradient"></div><button class="add-r" onclick="toggleSizes(\''+szid+'\',this)" style="margin-top:5px;"><i class="ti ti-plus"></i> Add another size of this design</button><div class="szwrap" id="'+szid+'"><div class="ibox" style="margin:7px 0;"><i class="ti ti-info-circle"></i> Each size = separate file.</div><div class="szrow"><div class="ff"><label>Label</label><input type="text" placeholder="Small"></div><div class="ff"><label>W (in)</label><input type="number" min="0" step="0.1"></div><div class="ff"><label>H (in)</label><input type="number" min="0" step="0.1"></div><div></div></div><button class="add-r" onclick="addSzIn(this)"><i class="ti ti-plus"></i> Add size</button></div>';
   wrap.appendChild(d);
 }
 function selRush(v){
