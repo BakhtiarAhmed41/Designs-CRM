@@ -498,9 +498,7 @@ export function QuoteBuilderModal({
                     title={`${service.label} ${kindLabel} form`}
                     src={`/portal-forms/${service.key}.html`}
                     onLoad={() => {
-                      const frame = iframeRef.current;
-                      if (frame) frame.style.height = '520px';
-                      const win = frame?.contentWindow;
+                      const win = iframeRef.current?.contentWindow;
                       if (!win) return;
                       win.postMessage(
                         {
@@ -510,6 +508,7 @@ export function QuoteBuilderModal({
                         },
                         '*',
                       );
+                      win.postMessage({ type: 'lvd-request-height' }, '*');
                     }}
                   />
                   <div

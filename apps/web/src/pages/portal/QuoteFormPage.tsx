@@ -304,8 +304,8 @@ export function QuoteFormPage() {
               title={`${service.label} quote form`}
               src={`/portal-forms/${service.key}.html`}
               onLoad={() => {
-                const frame = iframeRef.current;
-                if (frame) frame.style.height = '360px';
+                const win = iframeRef.current?.contentWindow;
+                win?.postMessage({ type: 'lvd-request-height' }, '*');
               }}
             />
           )}

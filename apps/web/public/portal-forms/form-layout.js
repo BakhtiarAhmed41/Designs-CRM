@@ -106,6 +106,7 @@
       document.getElementById('lvd-step-count').textContent = 'Step ' + n + ' of 2';
       if (back) back.style.display = on2 ? '' : 'none';
       window.scrollTo(0, 0);
+      if (typeof window.LVD_REPORT_HEIGHT_SOON === 'function') window.LVD_REPORT_HEIGHT_SOON();
     }
 
     document.getElementById('lvd-next').addEventListener('click', function () {
@@ -123,10 +124,12 @@
       if (typeof origSetMode === 'function') origSetMode(m);
       bar.classList.toggle('show', m === 'd');
       if (m !== 'd') showStep(1);
+      if (typeof window.LVD_REPORT_HEIGHT_SOON === 'function') window.LVD_REPORT_HEIGHT_SOON();
     };
     if (document.getElementById('mode-d') && document.getElementById('mode-d').classList.contains('vis')) {
       bar.classList.add('show');
     }
+    if (typeof window.LVD_REPORT_HEIGHT_SOON === 'function') window.LVD_REPORT_HEIGHT_SOON();
   }
 
   document.addEventListener('input', function () {
