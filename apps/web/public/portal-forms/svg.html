@@ -7,69 +7,69 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-html,body{background:transparent;height:auto;overflow:visible;scrollbar-width:none;}html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}html.in-frame .ch{display:none;}
-body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24px;font-size:14px;color:#222222;}html.in-frame body{padding:8px 8px 28px;}
+html,body{background:#fff;height:auto;overflow:visible;scrollbar-width:none;}html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}html.in-frame .ch{display:none;}html.in-frame .msg-cta{display:none;}
+body{font-family:system-ui,sans-serif;background:#fff;padding:4px 2px 8px;font-size:13px;color:#222222;}html.in-frame body{padding:2px 4px 6px;}
 .wrap{max-width:none;width:100%;margin:0;}
-.card{background:transparent;border:none;border-radius:0;overflow:visible;margin-bottom:0;}
-.ch{padding:12px 8px;border-bottom:0.5px solid rgba(0,0,0,.1);display:flex;align-items:center;gap:8px;}
-.ch i{font-size:17px;color:#222222;}
-.ct{font-size:14px;font-weight:500;}
-.cb{padding:8px 2px 12px;}html.in-frame .cb{padding:8px 6px 16px;}
-.sl{font-size:11px;font-weight:500;color:#888;letter-spacing:.05em;text-transform:uppercase;margin:22px 0 10px;}
+.card{background:#fff;border:none;border-radius:0;overflow:visible;margin-bottom:0;}
+.ch{padding:8px 6px;display:flex;align-items:center;gap:6px;}
+.ch i{font-size:15px;color:#222222;}
+.ct{font-size:13px;font-weight:500;}
+.cb{padding:4px 0 6px;}html.in-frame .cb{padding:2px 2px 4px;}
+.sl{font-size:10px;font-weight:600;color:#888;letter-spacing:.05em;text-transform:uppercase;margin:8px 0 4px;}
 .sl:first-child{margin-top:0;}
-.fg{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:11px;}
+.fg{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;}
 .ff{display:flex;flex-direction:column;gap:4px;}
-.ff label{font-size:12px;font-weight:500;color:#555;}
-.ff input,.ff select{font-size:13px;padding:10px 12px;border:1px solid rgba(34,34,34,.12);border-radius:8px;background:#EDEBE6;color:#222222;outline:none;}
+.ff label{font-size:11px;font-weight:500;color:#555;}
+.ff input,.ff select{font-size:12px;height:32px;padding:0 10px;border:1px solid rgba(34,34,34,.12);border-radius:7px;background:#fff;color:#222222;outline:none;}
 .ff input:focus,.ff select:focus{border-color:#222222;box-shadow:0 0 0 2px rgba(34,34,34,.12);}
-.ff textarea{font-size:13px;padding:12px 14px;border:1px solid rgba(34,34,34,.12);border-radius:8px;resize:vertical;min-height:88px;outline:none;font-family:inherit;width:100%;background:#EDEBE6;color:#222222;}
+.ff textarea{font-size:12px;padding:8px 10px;border:1px solid rgba(34,34,34,.12);border-radius:7px;resize:vertical;min-height:56px;outline:none;font-family:inherit;width:100%;background:#fff;color:#222222;}
 .lockable{transition:opacity .25s;}
 .lockable.locked{opacity:.25;pointer-events:none;user-select:none;}
 /* service type selector */
 .svc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:4px;}
-.sopt{border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:11px 8px;cursor:pointer;text-align:center;display:flex;flex-direction:column;align-items:center;gap:5px;}
-.sopt i{font-size:20px;color:#888;}
+.sopt{border:0.5px solid rgba(0,0,0,.15);border-radius:7px;padding:8px;cursor:pointer;text-align:center;display:flex;flex-direction:column;align-items:center;gap:3px;}
+.sopt i{font-size:18px;color:#888;}
 .sopt .ot{font-size:12px;font-weight:500;color:#222222;}
 .sopt .os{font-size:11px;color:#aaa;line-height:1.3;}
-.sopt.sel{border:1px solid #222222;background:#EDEBE6;}
+.sopt.sel{border:1px solid #222222;background:#fff;}
 .sopt.sel i,.sopt.sel .ot{color:#222222;}
 .sopt.sel .os{color:#222222;}
 /* use selector */
 .use-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
-.uopt{border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;}
+.uopt{border:0.5px solid rgba(0,0,0,.15);border-radius:7px;padding:8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center;}
 .uopt i{font-size:18px;color:#888;}
 .uopt .ut{font-size:12px;font-weight:500;color:#222222;}
 .uopt .us{font-size:11px;color:#aaa;}
-.uopt.sel{border:1px solid #222222;background:#EDEBE6;}
+.uopt.sel{border:1px solid #222222;background:#fff;}
 .uopt.sel i,.uopt.sel .ut{color:#222222;}
 .uopt.sel .us{color:#222222;}
 /* upload areas */
-.upload-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:0;}
-.upload-area{border:1.5px dashed rgba(0,0,0,.2);border-radius:8px;background:#EDEBE6;overflow:hidden;}
-.utrg{padding:12px;text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;}
-.utrg i{font-size:20px;color:#888;}
+.upload-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:0;}
+.upload-area{border:1.5px dashed rgba(0,0,0,.2);border-radius:8px;background:#fff;overflow:hidden;}
+.utrg{padding:8px 10px;text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;}
+.utrg i{font-size:16px;color:#888;}
 .utrg p{font-size:12px;color:#555;font-weight:500;}
-.utrg span{font-size:11px;color:#aaa;}
+.utrg span{font-size:10px;color:#aaa;}
 .flist{padding:0 8px 6px;}
-.fitem{display:flex;align-items:center;justify-content:space-between;padding:4px 7px;background:#EDEBE6;border-radius:6px;margin-bottom:3px;font-size:12px;color:#555;border:0.5px solid rgba(0,0,0,.1);}
+.fitem{display:flex;align-items:center;justify-content:space-between;padding:4px 7px;background:#fff;border-radius:6px;margin-bottom:3px;font-size:12px;color:#555;border:0.5px solid rgba(0,0,0,.1);}
 .frem{background:none;border:none;cursor:pointer;color:#E24B4A;font-size:12px;}
-.ref-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:10px;background:#EDEBE6;color:#222222;margin-bottom:6px;}
+.ref-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:2px 8px;border-radius:10px;background:#fff;color:#222222;margin-bottom:6px;}
 /* style selector */
 .style-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
 .style-opt{border:0.5px solid rgba(0,0,0,.15);border-radius:8px;overflow:hidden;cursor:pointer;}
-.style-thumb{height:70px;background:#EDEBE6;display:flex;align-items:center;justify-content:center;position:relative;}
+.style-thumb{height:52px;background:#fff;display:flex;align-items:center;justify-content:center;position:relative;}
 .style-thumb svg{width:100%;height:100%;}
 .style-label{padding:6px 8px;font-size:11px;font-weight:500;text-align:center;color:#555;border-top:0.5px solid rgba(0,0,0,.08);}
 .style-opt.sel{border:1px solid #222222;}
-.style-opt.sel .style-label{background:#EDEBE6;color:#222222;}
+.style-opt.sel .style-label{background:#fff;color:#222222;}
 /* dynamic fields */
 .dyn-sec{display:none;}
 .dyn-sec.show{display:block;}
 /* info box */
-.ibox{background:#F5F5F1;border-radius:8px;padding:8px 11px;font-size:12px;color:#666;display:flex;gap:6px;align-items:flex-start;margin-top:5px;}
-.ibox i{font-size:13px;flex-shrink:0;margin-top:1px;}
-.ibox.warn{background:#EDEBE6;color:#222222;}
-.ibox.info{background:#EDEBE6;color:#222222;}
+.ibox{background:#fff;border-radius:7px;padding:6px 8px;font-size:11px;color:#666;display:flex;gap:5px;align-items:flex-start;margin-top:4px;line-height:1.35;}
+.ibox i{font-size:12px;flex-shrink:0;margin-top:1px;}
+.ibox.warn{background:#fff;color:#222222;}
+.ibox.info{background:#fff;color:#222222;}
 /* toggle row */
 .tog-row{display:flex;align-items:center;gap:8px;padding:9px 0;}
 .tgl{position:relative;width:32px;height:17px;flex-shrink:0;}
@@ -80,88 +80,88 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
 .tgl input:checked+.sl2:before{transform:translateX(15px);}
 /* rush */
 .rush-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-.ropt{border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:9px 11px;cursor:pointer;font-size:12px;color:#555;}
-.ropt.sel-s{border-color:#222222;background:#EDEBE6;color:#222222;}
-.ropt.sel-w{border-color:#222222;background:#EDEBE6;color:#222222;}
+.ropt{border:0.5px solid rgba(0,0,0,.15);border-radius:7px;padding:6px 10px;cursor:pointer;font-size:12px;color:#555;}
+.ropt.sel-s{border-color:#222222;background:#fff;color:#222222;}
+.ropt.sel-w{border-color:#222222;background:#fff;color:#222222;}
 /* adv */
-.adv-tgl{width:100%;padding:10px 13px;background:#F5F5F1;border:0.5px solid rgba(0,0,0,.1);border-radius:8px;font-size:13px;color:#666;cursor:pointer;display:flex;align-items:center;justify-content:space-between;}
-.adv-b{border:0.5px solid rgba(0,0,0,.1);border-radius:8px;padding:13px;margin-top:5px;display:none;}
+.adv-tgl{width:100%;padding:7px 10px;background:#fff;border:0.5px solid rgba(0,0,0,.1);border-radius:7px;font-size:12px;color:#666;cursor:pointer;display:flex;align-items:center;justify-content:space-between;}
+.adv-b{border:0.5px solid rgba(0,0,0,.1);border-radius:7px;padding:8px 10px;margin-top:4px;display:none;}
 .adv-b.open{display:block;}
 .cbg{display:grid;grid-template-columns:1fr 1fr;gap:0;}
-.cbr{display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:0.5px solid rgba(0,0,0,.08);}
+.cbr{display:flex;align-items:flex-start;gap:6px;padding:4px 0;}
 .cbr:last-child{border-bottom:none;}
 .cbr input[type=checkbox]{margin-top:2px;flex-shrink:0;}
 .cbr label{font-size:12px;color:#222222;cursor:pointer;line-height:1.4;}
 .cbr .sub{font-size:11px;color:#aaa;display:block;margin-top:1px;}
 /* quick describe */
-.qdiv{border:none;border-top:0.5px dashed rgba(0,0,0,.15);margin:18px 0 14px;}
-.qtogrow{display:flex;align-items:flex-start;gap:10px;padding:12px 13px;background:#F5F5F1;border-radius:8px;margin-bottom:10px;cursor:pointer;border:0.5px solid rgba(0,0,0,.1);}
+.qdiv{border:none;margin:10px 0 8px;}
+.qtogrow{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;background:#fff;border-radius:7px;margin-bottom:6px;cursor:pointer;border:0.5px solid rgba(0,0,0,.1);}
 .qtogrow input[type=checkbox]{margin-top:2px;flex-shrink:0;width:15px;height:15px;cursor:pointer;}
 .ql{font-size:13px;font-weight:500;}
 .qs{font-size:12px;color:#888;margin-top:2px;line-height:1.5;}
 .qwrap{display:none;}
 .qwrap.show{display:block;}
-.qbox{background:#EDEBE6;border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:10px 12px;margin-bottom:6px;}
-.qbox textarea{width:100%;font-size:13px;border:none;background:transparent;resize:none;min-height:78px;outline:none;font-family:inherit;}
+.qbox{background:#fff;border:0.5px solid rgba(0,0,0,.15);border-radius:7px;padding:8px 10px;margin-bottom:4px;}
+.qbox textarea{width:100%;font-size:12px;border:none;background:transparent;resize:none;min-height:56px;outline:none;font-family:inherit;}
 /* buttons */
-.row-btns{display:flex;justify-content:flex-end;gap:8px;padding-top:13px;border-top:0.5px solid rgba(0,0,0,.1);margin-top:13px;}
-.btn-p{padding:9px 20px;background:#EDEBE6;color:#222222;border:0.5px solid #222222;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;}
-.btn-s{padding:9px 13px;border:0.5px solid rgba(0,0,0,.15);border-radius:8px;font-size:13px;color:#666;cursor:pointer;background:transparent;}
-.form-hint{margin:10px 0 0;font-size:12px;color:#6B6B6B;text-align:right;line-height:1.45;letter-spacing:.01em;}
+.row-btns{display:flex;justify-content:flex-end;gap:6px;padding-top:8px;border-top:none;margin-top:8px;}
+.btn-p{padding:6px 14px;background:#fff;color:#222222;border:0.5px solid #222222;border-radius:7px;font-size:12px;font-weight:500;cursor:pointer;}
+.btn-s{padding:6px 10px;border:0.5px solid rgba(0,0,0,.15);border-radius:7px;font-size:12px;color:#666;cursor:pointer;background:transparent;}
+.form-hint{margin:6px 0 0;font-size:11px;color:#6B6B6B;text-align:right;line-height:1.35;letter-spacing:.01em;}
 .other-inp{margin-top:5px;display:none;}
 .other-inp.show{display:block;}
-.badge-info{font-size:11px;background:#EDEBE6;color:#222222;padding:2px 8px;border-radius:10px;}
+.badge-info{font-size:11px;background:#fff;color:#222222;padding:2px 8px;border-radius:10px;}
 .fmt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:7px;}
-.fmt-chip{border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:8px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;position:relative;}
-.fmt-chip i.icon{font-size:18px;color:#888;}
-.fmt-chip .fname{font-size:11px;font-weight:500;color:#555;}
+.fmt-chip{border:0.5px solid rgba(0,0,0,.15);border-radius:7px;padding:5px 4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;position:relative;}
+.fmt-chip i.icon{font-size:14px;color:#888;}
+.fmt-chip .fname{font-size:10px;font-weight:500;color:#555;}
 .fmt-chip .fext{font-size:10px;color:#aaa;}
 .fmt-chip .chk{display:none;position:absolute;top:4px;right:4px;width:14px;height:14px;border-radius:50%;background:#222222;color:#fff;font-size:9px;align-items:center;justify-content:center;}
-.fmt-chip.sel{border:1px solid #222222;background:#EDEBE6;}
+.fmt-chip.sel{border:1px solid #222222;background:#fff;}
 .fmt-chip.sel .icon,.fmt-chip.sel .fname{color:#222222;}
 .fmt-chip.sel .chk{display:flex;}
-.msg-cta{display:flex;align-items:center;gap:11px;padding:12px 14px;background:#EDEBE6;border:0.5px solid rgba(34,34,34,.15);border-radius:8px;margin-top:16px;}
+.msg-cta{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#fff;border:0.5px solid rgba(34,34,34,.15);border-radius:7px;margin-top:8px;}
 .msg-cta>i{font-size:20px;color:#222222;flex-shrink:0;}
 .mc-t{font-size:13px;font-weight:500;color:#222222;}
 .mc-s{font-size:12px;color:#555;margin-top:2px;line-height:1.45;}
 .mc-btn{flex-shrink:0;padding:8px 14px;background:#222222;color:#fff;border-radius:8px;font-size:12px;font-weight:500;text-decoration:none;white-space:nowrap;}
 @media(max-width:520px){.msg-cta{flex-wrap:wrap;}.mc-btn{width:100%;text-align:center;}}
-.divider{border:none;border-top:0.5px solid rgba(0,0,0,.08);margin:12px 0;}
+.divider{border:none;margin:8px 0;}
 /* quick/detailed mode tabs */
-.mode-tabs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:22px;}
-.mtab{border:1px solid rgba(34,34,34,.12);border-radius:10px;padding:16px;cursor:pointer;display:flex;gap:12px;align-items:flex-start;background:#F5F5F1;}
-.mtab i{font-size:19px;color:#888;margin-top:1px;}
-.mtab .mt-t{font-size:13px;font-weight:500;}
-.mtab .mt-s{font-size:11px;color:#aaa;margin-top:2px;line-height:1.4;}
-.mtab.sel{border:1px solid #222222;background:#EDEBE6;}
+.mode-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+.mtab{border:1px solid rgba(34,34,34,.12);border-radius:8px;padding:8px 10px;cursor:pointer;display:flex;gap:8px;align-items:flex-start;background:#fff;}
+.mtab i{font-size:16px;color:#888;margin-top:1px;}
+.mtab .mt-t{font-size:12px;font-weight:500;}
+.mtab .mt-s{font-size:10px;color:#aaa;margin-top:1px;line-height:1.3;}
+.mtab.sel{border:1px solid #222222;background:#fff;}
 .mtab.sel i,.mtab.sel .mt-t{color:#222222;}
 .mode-body{display:none;}
 .mode-body.vis{display:block;}
-.qbig{background:#EDEBE6;border:1px solid rgba(34,34,34,.12);border-radius:8px;padding:14px 16px;}
-.qbig textarea{width:100%;font-size:13px;border:none;background:transparent;resize:none;min-height:95px;outline:none;font-family:inherit;}
+.qbig{background:#fff;border:1px solid rgba(34,34,34,.12);border-radius:7px;padding:8px 10px;}
+.qbig textarea{width:100%;font-size:12px;border:none;background:transparent;resize:none;min-height:56px;outline:none;font-family:inherit;}
 .qbig textarea::placeholder{color:#bbb;}
 /* single vs multiple */
 .type-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-.topt{border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:13px;cursor:pointer;text-align:center;display:flex;flex-direction:column;align-items:center;gap:5px;}
-.topt i{font-size:21px;color:#888;}
-.topt .ot{font-size:13px;font-weight:500;color:#222222;}
-.topt .os{font-size:11px;color:#aaa;}
-.topt.sel{border:1px solid #222222;background:#EDEBE6;}
+.topt{border:0.5px solid rgba(0,0,0,.15);border-radius:7px;padding:8px;cursor:pointer;text-align:center;display:flex;flex-direction:column;align-items:center;gap:3px;}
+.topt i{font-size:18px;color:#888;}
+.topt .ot{font-size:12px;font-weight:500;color:#222222;}
+.topt .os{font-size:10px;color:#aaa;}
+.topt.sel{border:1px solid #222222;background:#fff;}
 .topt.sel i,.topt.sel .ot{color:#222222;}
 /* design rows for multiple */
-.drow{background:#EDEBE6;border:0.5px solid rgba(0,0,0,.1);border-radius:8px;padding:12px;margin-bottom:8px;}
-.drow-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.drow{background:#fff;border:0.5px solid rgba(0,0,0,.1);border-radius:7px;padding:10px;margin-bottom:8px;}
+.drow-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
 .drow-num{font-size:12px;font-weight:500;color:#666;display:flex;align-items:center;gap:5px;}
 .drow-del{background:none;border:none;cursor:pointer;color:#E24B4A;font-size:12px;display:flex;align-items:center;gap:3px;}
-.mini-up{border:1px dashed rgba(0,0,0,.2);border-radius:8px;background:#EDEBE6;overflow:hidden;}
+.mini-up{border:1px dashed rgba(0,0,0,.2);border-radius:8px;background:#fff;overflow:hidden;}
 .mini-trg{padding:6px 8px;text-align:center;cursor:pointer;font-size:11px;color:#666;display:flex;align-items:center;justify-content:center;gap:4px;}
 .mini-fl{padding:0 5px 3px;}
-.mini-fi{display:flex;align-items:center;justify-content:space-between;padding:3px 5px;background:#F5F5F1;border-radius:4px;margin-bottom:2px;font-size:11px;color:#666;}
-.add-btn{width:100%;padding:9px;border:0.5px dashed rgba(0,0,0,.15);border-radius:8px;background:transparent;font-size:13px;color:#666;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;margin-bottom:12px;}
+.mini-fi{display:flex;align-items:center;justify-content:space-between;padding:3px 5px;background:#fff;border-radius:4px;margin-bottom:2px;font-size:11px;color:#666;}
+.add-btn{width:100%;padding:6px;border:0.5px dashed rgba(0,0,0,.15);border-radius:7px;background:transparent;font-size:12px;color:#666;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;margin-bottom:6px;}
 
 /* Remake: stronger section grouping so Detailed reads in chunks, not a wall */
-#mode-d .sl{font-size:12px;font-weight:700;color:#222222;letter-spacing:.06em;margin:26px 0 10px;padding-top:18px;border-top:1px solid rgba(34,34,34,.10);}
-#mode-d .sl:first-of-type{border-top:none;padding-top:0;margin-top:18px;}
+#mode-d .sl{font-size:11px;font-weight:700;color:#222222;letter-spacing:.05em;margin:8px 0 4px;padding-top:0;border-top:none;}
+#mode-d .sl:first-of-type{border-top:none;padding-top:0;margin-top:6px;}
 </style>
 </head>
 <body>
@@ -202,7 +202,7 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
       </div>
       <div>
         <div style="font-size:12px;font-weight:500;color:#555;margin-bottom:5px;display:flex;align-items:center;gap:5px;"><i class="ti ti-photo" style="font-size:14px;"></i> Reference image <span style="font-size:11px;font-weight:400;color:#aaa;">(optional)</span></div>
-        <div class="upload-area" style="border-color:rgba(34,34,34,.25);background:#EDEBE6;">
+        <div class="upload-area" style="border-color:rgba(34,34,34,.25);background:#fff;">
           <div class="utrg" onclick="document.getElementById('fu-ref').click()">
             <i class="ti ti-photo" style="color:#222222;"></i>
             <p style="color:#222222;">Upload reference</p>
@@ -216,7 +216,7 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
 
     <!-- QUICK MODE -->
     <div class="mode-body vis" id="mode-q">
-      <div class="sl" style="margin-top:14px;">Tell us about your design</div>
+      <div class="sl" style="margin-top:8px;">Tell us about your design</div>
       <div class="qbig">
         <textarea placeholder="e.g. full color SVG for Cricut, no gradients, transparent background"></textarea>
       </div>
@@ -242,31 +242,30 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
       </div>
       <div class="ibox" id="q-color-note" style="display:none;"></div>
 
-      <div class="sl" style="margin-top:14px;">Turnaround</div>
+      <div class="sl" style="margin-top:8px;">Turnaround</div>
       <div class="rush-row">
         <div class="ropt sel-s" id="rq-std" onclick="selRushQ('std')"><i class="ti ti-clock" style="font-size:13px"></i> Standard (12-24 hrs) : included</div>
         <div class="ropt" id="rq-rush" onclick="selRushQ('rush')"><i class="ti ti-bolt" style="font-size:13px"></i> Urgent : contact us before placing an order</div>
       </div>
       <div class="ibox" id="rq-note" style="display:none;"><i class="ti ti-message-circle"></i> For urgent orders, please text or email us first so we can confirm the timeline before you place the order.</div>
 
-      <div class="ibox"><i class="ti ti-info-circle"></i> Don't worry about other technical details : layers, formats and cut settings can all be sorted after you submit. Switch to Detailed request if you already know your specs.</div>
     </div>
 
     <!-- DETAILED MODE -->
     <div class="mode-body" id="mode-d">
-      <div style="display:flex;gap:9px;align-items:flex-start;background:#EDEBE6;border-radius:10px;padding:11px 14px;margin-top:14px;font-size:12.5px;color:#222222;line-height:1.5;">
+      <div style="display:flex;gap:7px;align-items:flex-start;background:#fff;border-radius:8px;padding:7px 10px;margin-top:8px;font-size:11px;color:#222222;line-height:1.35;">
         <i class="ti ti-heart-handshake" style="font-size:16px;margin-top:1px;"></i>
         <span><b>Not sure about a field? Leave it blank.</b> We'll figure it out from your artwork : every field here is optional and just helps us quote faster.</span>
       </div>
 
-      <div class="sl" style="margin-top:14px;">How many designs?</div>
+      <div class="sl" style="margin-top:8px;">How many designs?</div>
       <div class="type-grid">
         <div class="topt sel" id="t-single" onclick="setType('single')"><i class="ti ti-file"></i><span class="ot">Single design</span><span class="os">One image, one output</span></div>
         <div class="topt" id="t-multi" onclick="setType('multi')"><i class="ti ti-files"></i><span class="ot">Multiple designs</span><span class="os">Different images or settings</span></div>
       </div>
 
       <!-- MULTIPLE DESIGNS -->
-      <div id="sec-multi" style="display:none;margin-top:14px;">
+      <div id="sec-multi" style="display:none;margin-top:8px;">
         <div class="ibox info" style="margin-bottom:10px;"><i class="ti ti-info-circle"></i> Add a row per design : each can have its own type and settings.</div>
         <div id="multi-rows">
           <div class="drow" id="mr-1">
@@ -286,7 +285,7 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
       <div class="single-wrap">
 
       <!-- service type -->
-      <div class="sl" style="margin-top:14px;">What type of SVG do you need?</div>
+      <div class="sl" style="margin-top:8px;">What type of SVG do you need?</div>
       <div class="svc-grid">
         <div class="sopt sel" id="sv-1color" onclick="setSvc('1color')">
           <i class="ti ti-circle-filled"></i>
@@ -311,14 +310,14 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
       </div>
 
       <!-- style selector : changes per service -->
-      <div class="sl" style="margin-top:14px;">Style preference <span style="font-size:11px;font-weight:400;color:#aaa;">  click the style closest to what you want</span></div>
+      <div class="sl" style="margin-top:8px;">Style preference <span style="font-size:11px;font-weight:400;color:#aaa;">  click the style closest to what you want</span></div>
       <div class="style-grid" id="style-grid">
         <!-- rendered by JS -->
       </div>
       <div class="ibox" style="margin-top:8px;"><i class="ti ti-info-circle"></i> Not sure? Upload a reference image above showing the style you like : that works even better.</div>
 
       <!-- intended use -->
-      <div class="sl" style="margin-top:14px;">What will you use this for?</div>
+      <div class="sl" style="margin-top:8px;">What will you use this for?</div>
       <div class="use-grid" id="use-grid">
         <div class="uopt sel" id="u-cut" onclick="setUse('cut')"><i class="ti ti-cut"></i><span class="ut">Cutting machine</span><span class="us">Cricut, Silhouette, vinyl</span></div>
         <div class="uopt" id="u-dtf" onclick="setUse('dtf')"><i class="ti ti-shirt"></i><span class="ut">DTF / screen print</span><span class="us">Heat transfer, printing</span></div>
@@ -330,7 +329,7 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
 
       <!-- dynamic fields per use -->
       <div id="dyn-cut" class="dyn-sec show">
-        <div class="sl" style="margin-top:14px;">Cutting machine details</div>
+        <div class="sl" style="margin-top:8px;">Cutting machine details</div>
         <div class="fg">
           <div class="ff"><label>Machine</label><select><option>Cricut (any model)</option><option>Silhouette Cameo</option><option>Silhouette Portrait</option><option>Brother ScanNcut</option><option>Other cutter</option><option>Not sure</option></select></div>
           <div class="ff"><label>Material to cut</label><select><option>Adhesive vinyl</option><option>HTV (heat transfer vinyl)</option><option>Glitter / specialty vinyl</option><option>Paper / cardstock</option><option>Fabric</option><option>Not sure : let team decide</option></select></div>
@@ -341,7 +340,7 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
       </div>
 
       <div id="dyn-dtf" class="dyn-sec">
-        <div class="sl" style="margin-top:14px;">DTF / screen print details</div>
+        <div class="sl" style="margin-top:8px;">DTF / screen print details</div>
         <div class="fg">
           <div class="ff"><label>Number of colors</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6+</option><option>Not sure : let team decide</option></select></div>
           <div class="ff"><label>Print size</label><div style="display:grid;grid-template-columns:1fr 14px 1fr;align-items:center;gap:3px;"><input type="number" placeholder="W" min="0" step="0.1"><span style="text-align:center;font-size:12px;color:#aaa;">×</span><input type="number" placeholder="H" min="0" step="0.1"></div></div>
@@ -351,7 +350,7 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
       </div>
 
       <div id="dyn-emb" class="dyn-sec">
-        <div class="ibox info" style="margin-top:14px;"><i class="ti ti-info-circle"></i> We'll create a clean vector SVG ready for digitizing. Once you receive it you can order our embroidery digitizing service to convert it to a stitch file.</div>
+        <div class="ibox info" style="margin-top:8px;"><i class="ti ti-info-circle"></i> We'll create a clean vector SVG ready for digitizing. Once you receive it you can order our embroidery digitizing service to convert it to a stitch file.</div>
         <div class="fg" style="margin-top:10px;">
           <div class="ff"><label>Number of colors</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6+</option><option>Not sure</option></select></div>
           <div class="ff"><label>Simplify for embroidery?</label><select><option>Yes : remove details too small to stitch</option><option>No : keep all details</option><option>Not sure : let team decide</option></select></div>
@@ -359,7 +358,7 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
       </div>
 
       <div id="dyn-web" class="dyn-sec">
-        <div class="sl" style="margin-top:14px;">Web / digital details</div>
+        <div class="sl" style="margin-top:8px;">Web / digital details</div>
         <div class="fg">
           <div class="ff"><label>Background</label><select><option>Transparent</option><option>White background</option><option>Custom color</option></select></div>
           <div class="ff"><label>Color mode</label><select><option>RGB (screen/web)</option><option>CMYK (print)</option><option>Not sure</option></select></div>
@@ -368,7 +367,7 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
       </div>
 
       <div id="dyn-print" class="dyn-sec">
-        <div class="sl" style="margin-top:14px;">Print details</div>
+        <div class="sl" style="margin-top:8px;">Print details</div>
         <div class="fg">
           <div class="ff"><label>Number of colors</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6+</option><option>Not sure</option></select></div>
           <div class="ff"><label>Background</label><select><option>Transparent</option><option>White</option><option>Custom color</option></select></div>
@@ -377,14 +376,14 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
       </div>
 
       <div id="dyn-other" class="dyn-sec">
-        <div class="sl" style="margin-top:14px;">Tell us more</div>
+        <div class="sl" style="margin-top:8px;">Tell us more</div>
         <div class="ff"><textarea placeholder="Describe how you plan to use this SVG file..."></textarea></div>
       </div>
 
       </div><!-- /single-wrap -->
 
       <!-- shared fields -->
-      <div class="sl" style="margin-top:14px;">Output formats <span style="font-size:11px;font-weight:400;color:#aaa;">  select all you need</span></div>
+      <div class="sl" style="margin-top:8px;">Output formats <span style="font-size:11px;font-weight:400;color:#aaa;">  select all you need</span></div>
       <div class="fmt-grid">
         <div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-vector-bezier icon"></i><span class="fname">AI</span><span class="fext">Illustrator</span></div><div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-file-type-pdf icon"></i><span class="fname">PDF</span><span class="fext">Print ready</span></div><div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-file-3d icon"></i><span class="fname">DXF</span><span class="fext">CNC / laser</span></div><div class="fmt-chip sel" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-file-type-svg icon"></i><span class="fname">SVG</span><span class="fext">Vector</span></div><div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-file-vector icon"></i><span class="fname">EPS</span><span class="fext">Vector</span></div><div class="fmt-chip sel" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-photo icon"></i><span class="fname">PNG</span><span class="fext">Transparent</span></div><div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-pentagon icon"></i><span class="fname">CDR</span><span class="fext">CorelDRAW</span></div>
       </div>
@@ -393,7 +392,7 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
       <div class="single-wrap">
       <!-- 1 color specific -->
       <div id="sec-1color" class="dyn-sec show">
-        <div class="sl" style="margin-top:14px;">One color options</div>
+        <div class="sl" style="margin-top:8px;">One color options</div>
         <div class="fg">
           <div class="ff"><label>Color preference</label><select><option>Keep original color</option><option>Black</option><option>White</option><option>I'll specify in notes</option></select></div>
           <div class="ff"><label>Background</label><select><option>Transparent</option><option>White</option><option>Colored : I'll specify</option></select></div>
@@ -401,7 +400,7 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
       </div>
 
       <div id="sec-full" class="dyn-sec">
-        <div class="sl" style="margin-top:14px;">Full color options</div>
+        <div class="sl" style="margin-top:8px;">Full color options</div>
         <div class="fg">
           <div class="ff"><label>Color matching</label><select><option>Match original exactly</option><option>Simplify / flatten colors</option><option>Stylize / recolor</option><option>Not sure : let team decide</option></select></div>
           <div class="ff"><label>Gradient</label><select><option>No gradient : flat colors only</option><option>Preserve gradients</option><option>Not sure</option></select></div>
@@ -410,7 +409,7 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
       </div>
 
       <div id="sec-line" class="dyn-sec">
-        <div class="sl" style="margin-top:14px;">Line art options</div>
+        <div class="sl" style="margin-top:8px;">Line art options</div>
         <div class="fg">
           <div class="ff"><label>Line weight</label><select><option>Thin / fine line</option><option>Medium</option><option>Bold / thick</option><option>Mixed : varies per element</option><option>Not sure</option></select></div>
           <div class="ff"><label>Color</label><select><option>Black only</option><option>Single color</option><option>Multi-color outlines</option><option>I'll specify in notes</option></select></div>
@@ -419,7 +418,7 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
       </div>
 
       <div id="sec-cricut" class="dyn-sec">
-        <div class="sl" style="margin-top:14px;">Cricut & Silhouette options</div>
+        <div class="sl" style="margin-top:8px;">Cricut & Silhouette options</div>
         <div class="fg">
           <div class="ff"><label>Machine</label><select><option>Cricut</option><option>Silhouette</option><option>Both</option><option>Not sure</option></select></div>
           <div class="ff"><label>Layers</label><select><option>Single layer</option><option>Multi layer (layered colors)</option><option>Not sure</option></select></div>
@@ -429,7 +428,7 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
       </div><!-- /single-wrap -->
 
       <!-- rush -->
-      <div class="sl" style="margin-top:14px;">Turnaround</div>
+      <div class="sl" style="margin-top:8px;">Turnaround</div>
       <div class="rush-row">
         <div class="ropt sel-s" id="r-std" onclick="selRush('std')"><i class="ti ti-clock" style="font-size:13px"></i> Standard (12-24 hrs) : included</div>
         <div class="ropt" id="r-rush" onclick="selRush('rush')"><i class="ti ti-bolt" style="font-size:13px"></i> Urgent : contact us before placing an order</div>
@@ -437,7 +436,7 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
       <div class="ibox" id="rush-note" style="display:none;"><i class="ti ti-message-circle"></i> For urgent orders, please text or email us first so we can confirm the timeline before you place the order.</div>
 
       <!-- advanced -->
-      <div style="margin-top:14px;">
+      <div style="margin-top:8px;">
         <button class="adv-tgl" onclick="toggleAdv()">
           <span style="display:flex;align-items:center;gap:7px;"><i class="ti ti-settings" style="font-size:14px;"></i> Advanced options <span class="badge-info">pre-set to recommended defaults</span></span>
           <i class="ti ti-chevron-down" style="font-size:14px;transition:transform .2s;" id="adv-chev"></i>
@@ -460,7 +459,7 @@ body{font-family:system-ui,sans-serif;background:transparent;padding:8px 4px 24p
       </div>
 
     
-      <div class="sl" style="margin-top:14px;">Anything else we should know?</div>
+      <div class="sl" style="margin-top:8px;">Anything else we should know?</div>
       <div class="qbig"><textarea style="min-height:64px;" placeholder="Deadlines, special requests, context : anything that didn&#39;t fit the fields above."></textarea></div>
 
     </div>
@@ -533,7 +532,7 @@ var styles={
   'cricut':[
     {label:'Single layer',svg:'<svg viewBox="0 0 80 70" xmlns="http://www.w3.org/2000/svg"><path d="M40 12 L62 55 L18 55 Z" fill="#E24B4A"/></svg>'},
     {label:'Multi layer',svg:'<svg viewBox="0 0 80 70" xmlns="http://www.w3.org/2000/svg"><path d="M40 12 L62 55 L18 55 Z" fill="#E24B4A"/><path d="M40 20 L56 52 L24 52 Z" fill="#378ADD"/><path d="M40 28 L50 48 L30 48 Z" fill="#fff"/></svg>'},
-    {label:'Print then cut',svg:'<svg viewBox="0 0 80 70" xmlns="http://www.w3.org/2000/svg"><rect x="18" y="15" width="44" height="40" rx="4" fill="#EDEBE6" stroke="#ccc" stroke-width="1"/><path d="M40 20 L54 48 L26 48 Z" fill="#378ADD"/><rect x="18" y="15" width="44" height="40" rx="4" fill="none" stroke="#E24B4A" stroke-width="2" stroke-dasharray="4,3"/></svg>'},
+    {label:'Print then cut',svg:'<svg viewBox="0 0 80 70" xmlns="http://www.w3.org/2000/svg"><rect x="18" y="15" width="44" height="40" rx="4" fill="#fff" stroke="#ccc" stroke-width="1"/><path d="M40 20 L54 48 L26 48 Z" fill="#378ADD"/><rect x="18" y="15" width="44" height="40" rx="4" fill="none" stroke="#E24B4A" stroke-width="2" stroke-dasharray="4,3"/></svg>'},
     {label:'Weld / union',svg:'<svg viewBox="0 0 80 70" xmlns="http://www.w3.org/2000/svg"><path d="M25 20 L55 20 L55 50 L25 50 Z M35 15 L45 15 L45 55 L35 55 Z" fill="#378ADD" fill-rule="nonzero"/></svg>'}
   ]
 };
