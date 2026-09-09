@@ -40,7 +40,7 @@ export function NotificationBell() {
   const isStaff = !!user && STAFF_ROLES.includes(user.role);
   const { data } = useQuery({
     queryKey: ['notifications'],
-    queryFn: listNotifications,
+    queryFn: () => listNotifications(),
     refetchInterval: whenVisible(30_000),
   });
 
