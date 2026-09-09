@@ -132,14 +132,25 @@ export function PortalDashboard() {
   const activities = activityData?.notifications ?? [];
   const activityPages = activityData?.totalPages ?? 1;
 
+  const orderCount = ordersData?.total ?? orders.length;
+  const quoteCount = quotesData?.total ?? quotes.length;
   const statTiles = useMemo(
     () => [
-      { label: 'Orders', value: String(ordersData?.total ?? orders.length), sub: 'placed in this range' },
-      { label: 'Quotes', value: String(quotesData?.total ?? quotes.length), sub: 'requests in this range' },
-      { label: 'Paid', value: money(paidCents), sub: 'Payments completed' },
-      { label: 'Balance due', value: money(unpaidTotal), sub: unpaidInvoices.length ? `${unpaidInvoices.length} open` : 'All paid', alert: unpaidTotal > 0 },
+      { label: 'Orders', value: String(orderCount), sub: 'Orders placed' },
+      {
+        label: 'Quotes',
+        value: String(quoteCount),
+        sub: quoteCount === 0 ? 'No quote requests' : 'Quote requests',
+      },
+      { label: 'Total paid', value: money(paidCents), sub: 'Payments completed' },
+      {
+        label: 'Balance due',
+        value: money(unpaidTotal),
+        sub: unpaidTotal > 0 ? 'Amount pending' : 'All paid',
+        alert: unpaidTotal > 0,
+      },
     ],
-    [orders.length, ordersData?.total, quotes.length, quotesData?.total, paidCents, unpaidInvoices.length, unpaidTotal],
+    [orderCount, quoteCount, paidCents, unpaidTotal],
   );
 
   const tabs: Array<{ id: WorkTab; label: string; count: number; to: string; viewAll: string }> = [
@@ -176,10 +187,7 @@ export function PortalDashboard() {
           </div>
         </div>
         {rangeReady ? (
-          <div
-            className="pulse-grid"
-            style={{ gridTemplateColumns: `repeat(${statTiles.length}, minmax(0, 1fr))` }}
-          >
+          <div className="pulse-grid">
             {statTiles.map((t) => (
               <div key={t.label} className="pulse-stat">
                 <div className="ps-l">{t.label}</div>

@@ -165,10 +165,7 @@ export function AdminDashboard() {
             </div>
           </div>
           {rangeReady ? (
-            <div
-              className="pulse-grid"
-              style={{ gridTemplateColumns: `repeat(${Math.max(statTiles.length, 1)}, minmax(0, 1fr))` }}
-            >
+            <div className="pulse-grid">
               {statTiles.map((t) => (
                 <div key={t.label} className="pulse-stat">
                   <div className="ps-l">{t.label}</div>
