@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { listMyFiles, type MyFile } from '@/lib/designs';
@@ -214,9 +214,10 @@ export function PortalFiles() {
       {!isLoading && paged.length > 0 && (
         <div className="card">
           <div className="table-wrap">
-            <table className="itable">
+            <table className="itable file-orders">
               <thead>
                 <tr>
+                  <th>Date</th>
                   <th>Project / Design</th>
                   <th>Order No.</th>
                   <th>Category</th>
@@ -225,31 +226,30 @@ export function PortalFiles() {
                   <th />
                 </tr>
               </thead>
-              <tbody>
-                {paged.map((g) => {
-                  const open = openKey === g.key;
-                  const emailed = g.deliveredVia === 'EMAIL';
-                  return (
-                    <Fragment key={g.key}>
-                      <tr
-                        className="click-row"
-                        onClick={() => setOpenKey(open ? null : g.key)}
-                      >
-                        <td>
-                          <div className="on">{g.orderName ?? 'Order'}</div>
-                          <div className="om">{dateShort(g.deliveredAt)}</div>
-                        </td>
-                        <td>{g.humanRef ?? g.orderId.slice(0, 6)}</td>
-                        <td className="muted">{serviceCategoryLabel(g.serviceType)}</td>
-                        <td>{g.files.length}</td>
-                        <td>{deliveryMethodLabel(g.deliveredVia)}</td>
-                        <td>
-                          <i className={`ti ${open ? 'ti-chevron-up' : 'ti-chevron-down'}`} />
-                        </td>
-                      </tr>
-                      {open && (
-                        <tr className="expand-row">
-                          <td colSpan={6}>
+              {paged.map((g) => {
+                const open = openKey === g.key;
+                const emailed = g.deliveredVia === 'EMAIL';
+                return (
+                  <tbody key={g.key} className={`file-order${open ? ' is-open' : ''}`}>
+                    <tr
+                      className="click-row"
+                      onClick={() => setOpenKey(open ? null : g.key)}
+                    >
+                      <td className="muted">{dateShort(g.deliveredAt)}</td>
+                      <td>
+                        <div className="on">{g.orderName ?? 'Order'}</div>
+                      </td>
+                      <td>{g.humanRef ?? g.orderId.slice(0, 6)}</td>
+                      <td className="muted">{serviceCategoryLabel(g.serviceType)}</td>
+                      <td>{g.files.length}</td>
+                      <td>{deliveryMethodLabel(g.deliveredVia)}</td>
+                      <td>
+                        <i className={`ti ${open ? 'ti-chevron-up' : 'ti-chevron-down'}`} />
+                      </td>
+                    </tr>
+                    {open && (
+                      <tr className="expand-row file-order-files">
+                        <td colSpan={7}>
                             {emailed ? (
                               <div className="file-email-note">
                                 <p>
@@ -298,11 +298,10 @@ export function PortalFiles() {
                             )}
                           </td>
                         </tr>
-                      )}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
+                    )}
+                  </tbody>
+                );
+              })}
             </table>
           </div>
         </div>
