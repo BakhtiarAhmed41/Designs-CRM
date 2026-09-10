@@ -1973,7 +1973,7 @@ button.primary i,
 }
 .activity-head,
 .activity-row {
-  grid-template-columns: 36px minmax(150px, 1.15fr) minmax(0, 1.8fr) 130px 130px;
+  grid-template-columns: 36px minmax(150px, 1.15fr) minmax(0, 1.8fr) 140px 160px;
 }
 .activity-row {
   display: grid;
@@ -2034,8 +2034,12 @@ button.primary i,
   display: grid;
   place-items: center;
 }
+.activity-head > :last-child,
 .activity-link {
-  justify-self: end;
+  justify-self: start;
+  text-align: left;
+}
+.activity-link {
   color: var(--brand, #9A1E22);
   font-size: 13px;
   font-weight: 700;
