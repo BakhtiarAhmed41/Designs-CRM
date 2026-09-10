@@ -149,7 +149,7 @@ export function PortalQuotes() {
         }}
       />
 
-      <div className="card">
+      <div className="card quote-list">
         <div className="card-h">
           <span className="ct">Your quotes</span>
         </div>
@@ -166,67 +166,67 @@ export function PortalQuotes() {
             }
           />
         )}
-        {quotes.map((o) => {
-          const chip = quoteLifecycleChip(o.status, 'customer', {
-            partiallyAccepted: o.partiallyAccepted,
-            adminRecounter: isAdminRecounter(o.quotations),
-            needsCustomerInfo: o.needsCustomerInfo,
-            createdAt: o.createdAt,
-            type: o.type,
-          });
-          const quote = studioQuotation(o.quotations);
-          const lines = quote?.lines ?? [];
-          const declined =
-            o.status === 'REJECTED' ||
-            o.status === 'CLIENT_REJECTED_QUOTATION' ||
-            o.status === 'CANCELLED';
-          const total = quote?.amountCents ?? null;
+        {quotes.length > 0 && (
+          <div className="quote-list-body">
+            {quotes.map((o) => {
+              const chip = quoteLifecycleChip(o.status, 'customer', {
+                partiallyAccepted: o.partiallyAccepted,
+                adminRecounter: isAdminRecounter(o.quotations),
+                needsCustomerInfo: o.needsCustomerInfo,
+                createdAt: o.createdAt,
+                type: o.type,
+              });
+              const quote = studioQuotation(o.quotations);
+              const designCount = o.designCount ?? quote?.lines?.length ?? 0;
+              const declined =
+                o.status === 'REJECTED' ||
+                o.status === 'CLIENT_REJECTED_QUOTATION' ||
+                o.status === 'CANCELLED';
+              const total = quote?.amountCents ?? null;
 
-          return (
-            <div key={o.id}>
-              <div
-                className="orow quote-orow"
-                onClick={() =>
-                  navigate(o.type === 'ORDER' ? `/portal/orders/${o.id}` : `/portal/quotes/${o.id}`)
-                }
-                style={{ cursor: 'pointer' }}
-              >
-                <div className={`thumb${serviceThumbClass(o.serviceType) ? ' m' : ''}`}>
-                  <i className={`ti ${serviceTi(o.serviceType)}`} />
-                </div>
-                <div className="oinfo">
-                  <div className="on">{o.name ?? o.serviceType ?? 'Quote request'}</div>
-                  <div className="om">
-                    <span>
-                      <i className="ti ti-hash" style={{ fontSize: 12 }} />
-                      {o.humanRef ?? o.id.slice(0, 6)}
-                    </span>
-                    {lines.length > 0 && (
+              return (
+                <div
+                  key={o.id}
+                  className="orow quote-orow"
+                  onClick={() =>
+                    navigate(o.type === 'ORDER' ? `/portal/orders/${o.id}` : `/portal/quotes/${o.id}`)
+                  }
+                >
+                  <div className={`thumb${serviceThumbClass(o.serviceType) ? ' m' : ''}`}>
+                    <i className={`ti ${serviceTi(o.serviceType)}`} />
+                  </div>
+                  <div className="oinfo">
+                    <div className="on">{o.name ?? o.serviceType ?? 'Quote request'}</div>
+                    <div className="om">
+                      <span>
+                        <i className="ti ti-hash" style={{ fontSize: 12 }} />
+                        {o.humanRef ?? o.id.slice(0, 6)}
+                      </span>
                       <span>
                         <i className="ti ti-files" style={{ fontSize: 12 }} />
-                        {lines.length} design{lines.length === 1 ? '' : 's'}
+                        {designCount} design{designCount === 1 ? '' : 's'}
                       </span>
-                    )}
-                    <span>Submitted {dateShort(o.createdAt)}</span>
+                      <span>Submitted {dateShort(o.createdAt)}</span>
+                    </div>
                   </div>
+                  <span className={chip.cls}>{chip.label}</span>
+                  <div className="oprice">
+                    {total != null ? (
+                      money(total, quote?.currency)
+                    ) : declined ? (
+                      <span style={{ color: 'var(--faint)', fontWeight: 500 }}>-</span>
+                    ) : (
+                      <span style={{ color: 'var(--faint)', fontWeight: 500 }}>Pending</span>
+                    )}
+                  </div>
+                  <span className="quote-open">
+                    Open quote <i className="ti ti-chevron-right" />
+                  </span>
                 </div>
-                <span className={chip.cls}>{chip.label}</span>
-                <div className="oprice">
-                  {total != null ? (
-                    <>
-                      {money(total, quote?.currency)}
-                      <div className="os">Open quote</div>
-                    </>
-                  ) : declined ? (
-                    <span style={{ color: 'var(--faint)', fontWeight: 500 }}>-</span>
-                  ) : (
-                    <span style={{ color: 'var(--faint)', fontWeight: 500 }}>Pending</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <PaginationBar

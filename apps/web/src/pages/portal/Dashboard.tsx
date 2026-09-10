@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { DateRangeSelect } from '@/components/ui/DateRangeSelect';
 import { listMyOrders } from '@/lib/orders';
 import { listMyInvoices } from '@/lib/billing';
 import { listMyAllEdits } from '@/lib/edits';
-import { listNotifications } from '@/lib/notifications';
+import { listNotifications, markNotificationRead } from '@/lib/notifications';
 import { datesForPortalPreset, inDateRange, type PortalRangePreset } from '@/lib/dateRange';
 import { useAuth } from '@/context/AuthContext';
 import { freshOnOpen } from '@/lib/queryRefresh';
@@ -68,6 +68,7 @@ function relativeTime(iso: string) {
 export function PortalDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [preset, setPreset] = useState<PortalRangePreset>('thisMonth');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
@@ -373,20 +374,34 @@ export function PortalDashboard() {
         )}
         {activities.map((n) => {
           const action = activityAction(n.title, n.link);
+          const unread = !n.readAt;
           return (
-            <div key={n.id} className="activity-row">
+            <div key={n.id} className={`activity-row${unread ? ' is-unread' : ''}`}>
               <div className="activity-icon">
-                <i className="ti ti-bell" />
+                <i className={`ti ${n.title.toLowerCase().includes('message') ? 'ti-message' : 'ti-bell'}`} />
               </div>
               <div className="oinfo">
-                <div className="on">{n.title}</div>
+                <div className="on">
+                  {n.title}
+                  {unread && <span className="activity-unread">Unread</span>}
+                </div>
                 <div className="om">
                   {n.body ? <span>{n.body}</span> : null}
-                  <span>{relativeTime(n.createdAt)}</span>
+                  <span className="activity-time">{relativeTime(n.createdAt)}</span>
                 </div>
               </div>
               {action && (
-                <Link to={action.to} className="activity-link">
+                <Link
+                  to={action.to}
+                  className="activity-link"
+                  onClick={() => {
+                    if (!unread) return;
+                    void markNotificationRead(n.id).then(() => {
+                      void qc.invalidateQueries({ queryKey: ['my-activity'] });
+                      void qc.invalidateQueries({ queryKey: ['notifications'] });
+                    });
+                  }}
+                >
                   {action.label} <i className="ti ti-chevron-right" />
                 </Link>
               )}
