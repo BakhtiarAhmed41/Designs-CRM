@@ -50,6 +50,11 @@ function activityAction(title: string, link: string | null) {
   return null;
 }
 
+function displayActivityTitle(title: string) {
+  if (title.toLowerCase().includes('new message')) return '(New Message)';
+  return title;
+}
+
 function relativeTime(iso: string) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
@@ -243,20 +248,26 @@ export function PortalDashboard() {
                 description="Approve a quote and it will show up here."
               />
             )}
+            {orders.length > 0 && (
+              <div className="dash-spread-head">
+                <span />
+                <span>Project</span>
+                <span>ID</span>
+                <span>Category</span>
+                <span>Status</span>
+                <span>Amount</span>
+              </div>
+            )}
             {orders.map((o) => {
               const chip = customerOrderChip(o);
               return (
-                <Link key={o.id} to={`/portal/orders/${o.id}`} className="orow">
+                <Link key={o.id} to={`/portal/orders/${o.id}`} className="orow dash-spread">
                   <div className="othumb">
                     <i className={`ti ${serviceTi(o.serviceType)}`} />
                   </div>
-                  <div className="oinfo">
-                    <div className="on">{o.name ?? o.serviceType ?? 'Order'}</div>
-                    <div className="om">
-                      <span>{o.humanRef ?? o.id.slice(0, 6)}</span>
-                      <span>{serviceCategoryLabel(o.serviceType)}</span>
-                    </div>
-                  </div>
+                  <div className="on">{o.name ?? o.serviceType ?? 'Order'}</div>
+                  <div className="om">{o.humanRef ?? o.id.slice(0, 6)}</div>
+                  <div className="om">{serviceCategoryLabel(o.serviceType)}</div>
                   <span className={chip.cls}>{chip.label}</span>
                   <div className="oprice">{money(o.priceCents)}</div>
                 </Link>
@@ -279,6 +290,16 @@ export function PortalDashboard() {
                 }
               />
             )}
+            {quotes.length > 0 && (
+              <div className="dash-spread-head">
+                <span />
+                <span>Project</span>
+                <span>ID</span>
+                <span>Category</span>
+                <span>Status</span>
+                <span>Amount</span>
+              </div>
+            )}
             {quotes.map((o) => {
               const chip = quoteLifecycleChip(o.status, 'customer', {
                 partiallyAccepted: o.partiallyAccepted,
@@ -287,17 +308,13 @@ export function PortalDashboard() {
                 type: o.type,
               });
               return (
-                <Link key={o.id} to={`/portal/quotes/${o.id}`} className="orow">
+                <Link key={o.id} to={`/portal/quotes/${o.id}`} className="orow dash-spread">
                   <div className="othumb">
                     <i className={`ti ${serviceTi(o.serviceType)}`} />
                   </div>
-                  <div className="oinfo">
-                    <div className="on">{o.name ?? 'Quote request'}</div>
-                    <div className="om">
-                      <span>{o.humanRef ?? o.id.slice(0, 6)}</span>
-                      <span>{serviceCategoryLabel(o.serviceType)}</span>
-                    </div>
-                  </div>
+                  <div className="on">{o.name ?? 'Quote request'}</div>
+                  <div className="om">{o.humanRef ?? o.id.slice(0, 6)}</div>
+                  <div className="om">{serviceCategoryLabel(o.serviceType)}</div>
                   <span className={chip.cls}>{chip.label}</span>
                   <div className="oprice">{money(o.priceCents)}</div>
                 </Link>
@@ -372,25 +389,31 @@ export function PortalDashboard() {
         {!activityLoading && activities.length === 0 && (
           <EmptyState icon="ti-bell" title="No recent activity" description="Updates will appear here as work moves along." />
         )}
+        {activities.length > 0 && (
+          <div className="activity-head">
+            <span />
+            <span>Activity</span>
+            <span>Details</span>
+            <span>Time</span>
+            <span>Action</span>
+          </div>
+        )}
         {activities.map((n) => {
           const action = activityAction(n.title, n.link);
           const unread = !n.readAt;
+          const title = displayActivityTitle(n.title);
           return (
             <div key={n.id} className={`activity-row${unread ? ' is-unread' : ''}`}>
               <div className="activity-icon">
                 <i className={`ti ${n.title.toLowerCase().includes('message') ? 'ti-message' : 'ti-bell'}`} />
               </div>
-              <div className="oinfo">
-                <div className="on">
-                  {n.title}
-                  {unread && <span className="activity-unread">Unread</span>}
-                </div>
-                <div className="om">
-                  {n.body ? <span>{n.body}</span> : null}
-                  <span className="activity-time">{relativeTime(n.createdAt)}</span>
-                </div>
+              <div className="activity-title">
+                <span className="on">{title}</span>
+                {unread && <span className="activity-unread">Unread</span>}
               </div>
-              {action && (
+              <div className="activity-detail">{n.body || '—'}</div>
+              <div className="activity-time">{relativeTime(n.createdAt)}</div>
+              {action ? (
                 <Link
                   to={action.to}
                   className="activity-link"
@@ -404,6 +427,8 @@ export function PortalDashboard() {
                 >
                   {action.label} <i className="ti ti-chevron-right" />
                 </Link>
+              ) : (
+                <span />
               )}
             </div>
           );

@@ -130,7 +130,7 @@ export function PortalMessages() {
     conversationId,
     onMessageNew: (payload) => {
       const p = payload as { message?: { body?: string } };
-      showBrowserNotification('New message from our team', p.message?.body);
+      showBrowserNotification('(New Message)', p.message?.body);
       if (conversationId) {
         void qc.invalidateQueries({ queryKey: ['my-conversation', conversationId] });
       }
