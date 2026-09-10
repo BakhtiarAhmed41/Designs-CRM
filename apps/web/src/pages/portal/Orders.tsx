@@ -8,7 +8,7 @@ import { getMyCustomer } from '@/lib/customers';
 import { RevisionRequestForm } from '@/components/RevisionRequestForm';
 import { getErrorMessage } from '@/lib/api';
 import { money, dateShort, customerOrderChip, deliveryMethodLabel } from '@/lib/format';
-import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
+import { serviceCategoryLabel, serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import { designStatusChipClass, designStatusLabel, type Design } from '@/lib/designs';
 import type { Order } from '@/lib/types';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
@@ -332,6 +332,7 @@ export function PortalOrders() {
     ...freshOnOpen,
   });
 
+  const isNetMonthly = meCustomer?.customer?.accountType === 'NET_MONTHLY';
   const pageItems = data?.orders ?? [];
   const totalPages = data?.totalPages ?? 1;
   const summary = {
@@ -459,6 +460,7 @@ export function PortalOrders() {
             <thead>
               <tr>
                 <th>Order</th>
+                <th>Category</th>
                 <th>Designs</th>
                 <th>Status</th>
                 <th>File delivery</th>
@@ -484,6 +486,7 @@ export function PortalOrders() {
                           </div>
                         </div>
                       </td>
+                      <td className="muted">{serviceCategoryLabel(o.serviceType)}</td>
                       <td>{o.designCount ? `${o.designCount} design${o.designCount === 1 ? '' : 's'}` : '—'}</td>
                       <td>
                         <span className={chip.cls}>{chip.label}</span>
@@ -492,7 +495,7 @@ export function PortalOrders() {
                       <td className="muted">{dateShort(o.createdAt)}</td>
                       <td className="num">
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
-                          {o.status === 'PENDING_PAYMENT' && (
+                          {o.status === 'PENDING_PAYMENT' && isNetMonthly && (
                             <button
                               type="button"
                               className="btn btn-primary btn-sm"
@@ -532,7 +535,7 @@ export function PortalOrders() {
                     </tr>
                     {open && (
                       <tr className="expand-row">
-                        <td colSpan={6}>
+                        <td colSpan={7}>
                           <OrderBatch orderId={o.id} open={open} />
                         </td>
                       </tr>

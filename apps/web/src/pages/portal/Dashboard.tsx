@@ -10,7 +10,7 @@ import { datesForPortalPreset, inDateRange, type PortalRangePreset } from '@/lib
 import { useAuth } from '@/context/AuthContext';
 import { freshOnOpen } from '@/lib/queryRefresh';
 import { money, quoteLifecycleChip, customerOrderChip } from '@/lib/format';
-import { serviceTi } from '@/lib/serviceIcon';
+import { serviceCategoryLabel, serviceTi } from '@/lib/serviceIcon';
 import type { Order } from '@/lib/types';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -201,6 +201,156 @@ export function PortalDashboard() {
         )}
       </section>
 
+      <div className="panel">
+        <div className="panel-head">
+          <div>
+            <h3>Active Requests</h3>
+            <p className="panel-sub">
+              Track your active orders, quotes, revisions and invoices here. View your complete history anytime.
+            </p>
+          </div>
+        </div>
+        <div className="dash-tabs" role="tablist">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.id}
+              className={tab === t.id ? 'on' : ''}
+              onClick={() => setTab(t.id)}
+            >
+              {t.label}
+              <span className="dash-tab-count">{t.count}</span>
+            </button>
+          ))}
+          {activeMeta && (
+            <Link to={activeMeta.to} className="btn btn-ghost btn-sm dash-tab-link">
+              {activeMeta.viewAll}
+            </Link>
+          )}
+        </div>
+
+        {isLoading && <SkeletonRows rows={4} />}
+
+        {!isLoading && tab === 'orders' && (
+          <>
+            {orders.length === 0 && (
+              <EmptyState
+                icon="ti-package"
+                title="No active orders"
+                description="Approve a quote and it will show up here."
+              />
+            )}
+            {orders.map((o) => {
+              const chip = customerOrderChip(o);
+              return (
+                <Link key={o.id} to={`/portal/orders/${o.id}`} className="orow">
+                  <div className="othumb">
+                    <i className={`ti ${serviceTi(o.serviceType)}`} />
+                  </div>
+                  <div className="oinfo">
+                    <div className="on">{o.name ?? o.serviceType ?? 'Order'}</div>
+                    <div className="om">
+                      <span>{o.humanRef ?? o.id.slice(0, 6)}</span>
+                      <span>{serviceCategoryLabel(o.serviceType)}</span>
+                    </div>
+                  </div>
+                  <span className={chip.cls}>{chip.label}</span>
+                  <div className="oprice">{money(o.priceCents)}</div>
+                </Link>
+              );
+            })}
+          </>
+        )}
+
+        {!isLoading && tab === 'quotes' && (
+          <>
+            {quotes.length === 0 && (
+              <EmptyState
+                icon="ti-file-invoice"
+                title="No open quotes"
+                description="Start a new quote when you are ready."
+                action={
+                  <button type="button" className="btn btn-primary btn-sm" onClick={() => navigate('/portal/quotes/new')}>
+                    Request a quote
+                  </button>
+                }
+              />
+            )}
+            {quotes.map((o) => {
+              const chip = quoteLifecycleChip(o.status, 'customer', {
+                partiallyAccepted: o.partiallyAccepted,
+                needsCustomerInfo: o.needsCustomerInfo,
+                createdAt: o.createdAt,
+                type: o.type,
+              });
+              return (
+                <Link key={o.id} to={`/portal/quotes/${o.id}`} className="orow">
+                  <div className="othumb">
+                    <i className={`ti ${serviceTi(o.serviceType)}`} />
+                  </div>
+                  <div className="oinfo">
+                    <div className="on">{o.name ?? 'Quote request'}</div>
+                    <div className="om">
+                      <span>{o.humanRef ?? o.id.slice(0, 6)}</span>
+                      <span>{serviceCategoryLabel(o.serviceType)}</span>
+                    </div>
+                  </div>
+                  <span className={chip.cls}>{chip.label}</span>
+                  <div className="oprice">{money(o.priceCents)}</div>
+                </Link>
+              );
+            })}
+          </>
+        )}
+
+        {!isLoading && tab === 'revisions' && (
+          <>
+            {revisions.length === 0 && (
+              <EmptyState icon="ti-refresh" title="No open revisions" description="Requested changes will show up here." />
+            )}
+            {revisions.map((e) => (
+              <Link key={e.id} to={`/portal/orders/${e.orderId}`} className="orow">
+                <div className="othumb">
+                  <i className="ti ti-refresh" />
+                </div>
+                <div className="oinfo">
+                  <div className="on">{e.orderName ?? 'Revision'}</div>
+                  <div className="om">
+                    <span>{e.orderRef ?? e.orderId.slice(0, 6)}</span>
+                  </div>
+                </div>
+                <span className="portal-chip c-revision">In progress</span>
+              </Link>
+            ))}
+          </>
+        )}
+
+        {!isLoading && tab === 'invoices' && (
+          <>
+            {unpaidInvoices.length === 0 && (
+              <EmptyState icon="ti-receipt" title="No unpaid invoices" description="Open invoices will show up here." />
+            )}
+            {unpaidInvoices.map((inv) => (
+              <Link key={inv.id} to="/portal/invoices" className="orow">
+                <div className="othumb">
+                  <i className="ti ti-receipt" />
+                </div>
+                <div className="oinfo">
+                  <div className="on">{inv.coversText ?? 'Invoice'}</div>
+                  <div className="om">
+                    <span>{inv.status === 'PARTIAL' ? 'Partial' : 'Unpaid'}</span>
+                  </div>
+                </div>
+                <span className="chip c-review">{inv.status === 'PARTIAL' ? 'Partial' : 'Unpaid'}</span>
+                <div className="oprice">{money(inv.remainingCents ?? inv.amountCents)}</div>
+              </Link>
+            ))}
+          </>
+        )}
+      </div>
+
       <section className="panel">
         <div className="panel-head">
           <div>
@@ -267,154 +417,6 @@ export function PortalDashboard() {
           </div>
         )}
       </section>
-
-      <div className="panel">
-        <div className="panel-head">
-          <div>
-            <h3>Active Requests</h3>
-            <p className="panel-sub">
-              Track your active orders, quotes, revisions and invoices here. View your complete history anytime.
-            </p>
-          </div>
-        </div>
-        <div className="dash-tabs" role="tablist">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={tab === t.id}
-              className={tab === t.id ? 'on' : ''}
-              onClick={() => setTab(t.id)}
-            >
-              {t.label}
-              <span className="dash-tab-count">{t.count}</span>
-            </button>
-          ))}
-          {activeMeta && (
-            <Link to={activeMeta.to} className="btn btn-ghost btn-sm dash-tab-link">
-              {activeMeta.viewAll}
-            </Link>
-          )}
-        </div>
-
-        {isLoading && <SkeletonRows rows={4} />}
-
-        {!isLoading && tab === 'orders' && (
-          <>
-            {orders.length === 0 && (
-              <EmptyState
-                icon="ti-package"
-                title="No active orders"
-                description="Approve a quote and it will show up here."
-              />
-            )}
-            {orders.map((o) => {
-              const chip = customerOrderChip(o);
-              return (
-                <Link key={o.id} to={`/portal/orders/${o.id}`} className="orow">
-                  <div className="othumb">
-                    <i className={`ti ${serviceTi(o.serviceType)}`} />
-                  </div>
-                  <div className="oinfo">
-                    <div className="on">{o.name ?? o.serviceType ?? 'Order'}</div>
-                    <div className="om">
-                      <span>{o.humanRef ?? o.id.slice(0, 6)}</span>
-                    </div>
-                  </div>
-                  <span className={chip.cls}>{chip.label}</span>
-                  <div className="oprice">{money(o.priceCents)}</div>
-                </Link>
-              );
-            })}
-          </>
-        )}
-
-        {!isLoading && tab === 'quotes' && (
-          <>
-            {quotes.length === 0 && (
-              <EmptyState
-                icon="ti-file-invoice"
-                title="No open quotes"
-                description="Start a new quote when you are ready."
-                action={
-                  <button type="button" className="btn btn-primary btn-sm" onClick={() => navigate('/portal/quotes/new')}>
-                    Request a quote
-                  </button>
-                }
-              />
-            )}
-            {quotes.map((o) => {
-              const chip = quoteLifecycleChip(o.status, 'customer', {
-                partiallyAccepted: o.partiallyAccepted,
-                needsCustomerInfo: o.needsCustomerInfo,
-                createdAt: o.createdAt,
-                type: o.type,
-              });
-              return (
-                <Link key={o.id} to={`/portal/quotes/${o.id}`} className="orow">
-                  <div className="othumb">
-                    <i className={`ti ${serviceTi(o.serviceType)}`} />
-                  </div>
-                  <div className="oinfo">
-                    <div className="on">{o.name ?? 'Quote request'}</div>
-                    <div className="om">
-                      <span>{o.humanRef ?? o.id.slice(0, 6)}</span>
-                    </div>
-                  </div>
-                  <span className={chip.cls}>{chip.label}</span>
-                  <div className="oprice">{money(o.priceCents)}</div>
-                </Link>
-              );
-            })}
-          </>
-        )}
-
-        {!isLoading && tab === 'revisions' && (
-          <>
-            {revisions.length === 0 && (
-              <EmptyState icon="ti-refresh" title="No open revisions" description="Requested changes will show up here." />
-            )}
-            {revisions.map((e) => (
-              <Link key={e.id} to={`/portal/orders/${e.orderId}`} className="orow">
-                <div className="othumb">
-                  <i className="ti ti-refresh" />
-                </div>
-                <div className="oinfo">
-                  <div className="on">{e.orderName ?? 'Revision'}</div>
-                  <div className="om">
-                    <span>{e.orderRef ?? e.orderId.slice(0, 6)}</span>
-                  </div>
-                </div>
-                <span className="portal-chip c-revision">In progress</span>
-              </Link>
-            ))}
-          </>
-        )}
-
-        {!isLoading && tab === 'invoices' && (
-          <>
-            {unpaidInvoices.length === 0 && (
-              <EmptyState icon="ti-receipt" title="No unpaid invoices" description="Open invoices will show up here." />
-            )}
-            {unpaidInvoices.map((inv) => (
-              <Link key={inv.id} to="/portal/invoices" className="orow">
-                <div className="othumb">
-                  <i className="ti ti-receipt" />
-                </div>
-                <div className="oinfo">
-                  <div className="on">{inv.coversText ?? 'Invoice'}</div>
-                  <div className="om">
-                    <span>{inv.status === 'PARTIAL' ? 'Partial' : 'Unpaid'}</span>
-                  </div>
-                </div>
-                <span className="chip c-review">{inv.status === 'PARTIAL' ? 'Partial' : 'Unpaid'}</span>
-                <div className="oprice">{money(inv.remainingCents ?? inv.amountCents)}</div>
-              </Link>
-            ))}
-          </>
-        )}
-      </div>
     </div>
   );
 }

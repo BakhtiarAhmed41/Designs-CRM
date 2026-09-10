@@ -1,12 +1,12 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { listMyFiles, type MyFile } from '@/lib/designs';
 import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
-import { myDeliveryFileUrl, requestFormat } from '@/lib/orders';
-import { downloadSignedFile, getErrorMessage } from '@/lib/api';
+import { myDeliveryFileUrl } from '@/lib/orders';
+import { downloadSignedFile } from '@/lib/api';
 import { dateShort, deliveryMethodLabel } from '@/lib/format';
-import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
+import { serviceCategoryLabel } from '@/lib/serviceIcon';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { SkeletonRows } from '@/components/ui/Skeleton';
@@ -17,6 +17,7 @@ type Group = {
   orderId: string;
   orderName: string | null;
   humanRef: string | null;
+  serviceType: string | null;
   deliveredAt: string;
   deliveredVia: string | null;
   deliveryEmail: string | null;
@@ -48,22 +49,11 @@ function monthHeading(key: string) {
   return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 }
 
-function dayHeading(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return 'Delivered';
-  return `Delivered ${d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}`;
-}
-
-function deliveredWhen(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return dateShort(iso);
-  return d.toLocaleString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+function fileSizeLabel(bytes?: number | null) {
+  if (bytes == null || bytes <= 0) return '—';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export function PortalFiles() {
@@ -74,30 +64,11 @@ export function PortalFiles() {
   const [method, setMethod] = useState('all');
   const [page, setPage] = useState(1);
   const [openKey, setOpenKey] = useState<string | null>(null);
-  const [formatFor, setFormatFor] = useState<MyFile | null>(null);
-  const [formatValue, setFormatValue] = useState('');
-  const [formatNote, setFormatNote] = useState('');
-  const [formatMsg, setFormatMsg] = useState<string | null>(null);
-  const qc = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ['my-files'],
     queryFn: listMyFiles,
     ...freshOnOpen,
     refetchInterval: whenVisible(30_000),
-  });
-  const requestMut = useMutation({
-    mutationFn: () =>
-      requestFormat(formatFor!.orderId, {
-        format: formatValue.trim(),
-        deliveryFileId: formatFor!.fileId,
-        note: formatNote.trim() || null,
-      }),
-    onSuccess: () => {
-      setFormatMsg('Request sent. We’ll add the export to this library when it’s ready.');
-      setFormatFor(null);
-      void qc.invalidateQueries({ queryKey: ['my-files'] });
-    },
-    onError: (e) => setFormatMsg(getErrorMessage(e)),
   });
 
   const groups = useMemo<Group[]>(() => {
@@ -112,6 +83,7 @@ export function PortalFiles() {
           orderId: f.orderId,
           orderName: f.orderName,
           humanRef: f.humanRef,
+          serviceType: f.serviceType ?? null,
           deliveredAt: f.deliveredAt,
           deliveredVia: f.deliveredVia ?? null,
           deliveryEmail: f.deliveryEmail ?? null,
@@ -142,6 +114,7 @@ export function PortalFiles() {
       return (
         (g.orderName ?? '').toLowerCase().includes(term) ||
         (g.humanRef ?? '').toLowerCase().includes(term) ||
+        serviceCategoryLabel(g.serviceType).toLowerCase().includes(term) ||
         g.files.some((f) => f.originalName.toLowerCase().includes(term))
       );
     });
@@ -150,23 +123,6 @@ export function PortalFiles() {
   const pageSize = 10;
   const totalPages = Math.max(1, Math.ceil(visible.length / pageSize));
   const paged = visible.slice((page - 1) * pageSize, page * pageSize);
-
-  const sections = useMemo(() => {
-    const monthsOut: Array<{ month: string | null; days: Array<{ heading: string; items: Group[] }> }> = [];
-    for (const g of paged) {
-      const monthLabel = month === 'all' ? monthHeading(monthKey(g.deliveredAt)) : null;
-      const heading = dayHeading(g.deliveredAt);
-      let monthBlock = monthsOut[monthsOut.length - 1];
-      if (!monthBlock || monthBlock.month !== monthLabel) {
-        monthBlock = { month: monthLabel, days: [] };
-        monthsOut.push(monthBlock);
-      }
-      const lastDay = monthBlock.days[monthBlock.days.length - 1];
-      if (lastDay && lastDay.heading === heading) lastDay.items.push(g);
-      else monthBlock.days.push({ heading, items: [g] });
-    }
-    return monthsOut;
-  }, [paged, month]);
 
   return (
     <div>
@@ -255,102 +211,102 @@ export function PortalFiles() {
         />
       )}
 
-      <div className="file-lib">
-        {sections.map((monthBlock) => (
-          <div key={monthBlock.month ?? 'selected-month'}>
-            {monthBlock.month && <h2 className="file-month">{monthBlock.month}</h2>}
-            {monthBlock.days.map((section) => (
-              <div key={`${monthBlock.month ?? ''}-${section.heading}`}>
-                <h3 className="file-day">{section.heading}</h3>
-                {section.items.map((g) => {
-                  const emailed = g.deliveredVia === 'EMAIL';
+      {!isLoading && paged.length > 0 && (
+        <div className="card">
+          <div className="table-wrap">
+            <table className="itable">
+              <thead>
+                <tr>
+                  <th>Project / Design</th>
+                  <th>Order No.</th>
+                  <th>Category</th>
+                  <th>Files</th>
+                  <th>Delivery Method</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {paged.map((g) => {
                   const open = openKey === g.key;
+                  const emailed = g.deliveredVia === 'EMAIL';
                   return (
-                    <div key={g.key} className="file-group">
-                      <button
-                        type="button"
-                        className="file-group-h file-group-toggle"
+                    <Fragment key={g.key}>
+                      <tr
+                        className="click-row"
                         onClick={() => setOpenKey(open ? null : g.key)}
                       >
-                        <span>
-                          <strong>
-                            {g.orderName ?? 'Order'} · #{g.humanRef ?? g.orderId.slice(0, 6)}
-                          </strong>
-                          <span className="om">
-                            {g.files.length} file{g.files.length === 1 ? '' : 's'}
-                          </span>
-                        </span>
-                        <span className="file-group-meta">
-                          <span className="chip c-paid">{deliveryMethodLabel(g.deliveredVia)}</span>
+                        <td>
+                          <div className="on">{g.orderName ?? 'Order'}</div>
+                          <div className="om">{dateShort(g.deliveredAt)}</div>
+                        </td>
+                        <td>{g.humanRef ?? g.orderId.slice(0, 6)}</td>
+                        <td className="muted">{serviceCategoryLabel(g.serviceType)}</td>
+                        <td>{g.files.length}</td>
+                        <td>{deliveryMethodLabel(g.deliveredVia)}</td>
+                        <td>
                           <i className={`ti ${open ? 'ti-chevron-up' : 'ti-chevron-down'}`} />
-                        </span>
-                      </button>
-                      {open && emailed && (
-                        <div className="file-email-note">
-                          <p>
-                            <i className="ti ti-mail" /> Final files sent by email
-                          </p>
-                          <p>
-                            {g.files.length} file{g.files.length === 1 ? '' : 's'} were sent to{' '}
-                            {maskEmail(g.deliveryEmail)} on {deliveredWhen(g.deliveredAt)}.
-                          </p>
-                          <div className="order-expand-actions">
-                            <Link to={`/portal/orders/${g.orderId}`} className="btn btn-ghost btn-sm">
-                              View order
-                            </Link>
-                            <Link to="/portal/messages" className="btn btn-ghost btn-sm">
-                              Need help
-                            </Link>
-                          </div>
-                        </div>
-                      )}
-                      {open && !emailed && (
-                        <div className="fgrid">
-                          {g.files.map((f) => (
-                            <div key={f.fileId} className="fcard">
-                              <div className={`fic${serviceThumbClass(f.formatLabel) ? ' m' : ''}`}>
-                                <i className={`ti ${serviceTi(f.formatLabel ?? 'file')}`} />
+                        </td>
+                      </tr>
+                      {open && (
+                        <tr className="expand-row">
+                          <td colSpan={6}>
+                            {emailed ? (
+                              <div className="file-email-note">
+                                <p>
+                                  <i className="ti ti-mail" /> Final files sent by email
+                                </p>
+                                <p>
+                                  {g.files.length} file{g.files.length === 1 ? '' : 's'} were sent to{' '}
+                                  {maskEmail(g.deliveryEmail)}.
+                                </p>
+                                <Link to={`/portal/orders/${g.orderId}`} className="btn btn-ghost btn-sm">
+                                  View order
+                                </Link>
                               </div>
-                              <div className="fn">{f.originalName}</div>
-                              <div className="fd">Delivered {dateShort(f.deliveredAt)}</div>
-                              <div className="ftags">
-                                {f.formatLabel && <span className="ftag">{f.formatLabel}</span>}
-                              </div>
-                              <button
-                                type="button"
-                                className="fbtn"
-                                onClick={() =>
-                                  downloadSignedFile(
-                                    myDeliveryFileUrl(f.orderId, f.fileId),
-                                    f.originalName,
-                                  )
-                                }
-                              >
-                                <i className="ti ti-download" /> Download
-                              </button>
-                              <button
-                                type="button"
-                                className="fbtn"
-                                onClick={() => {
-                                  setFormatFor(f);
-                                  setFormatValue('');
-                                  setFormatNote('');
-                                }}
-                              >
-                                Add a format
-                              </button>
-                            </div>
-                          ))}
-                        </div>
+                            ) : (
+                              <table className="itable file-inner">
+                                <thead>
+                                  <tr>
+                                    <th>File Name</th>
+                                    <th>Size</th>
+                                    <th>Action</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {g.files.map((f) => (
+                                    <tr key={f.fileId}>
+                                      <td>{f.originalName}</td>
+                                      <td className="muted">{fileSizeLabel(f.byteSize)}</td>
+                                      <td>
+                                        <button
+                                          type="button"
+                                          className="btn btn-ghost btn-sm"
+                                          onClick={() =>
+                                            downloadSignedFile(
+                                              myDeliveryFileUrl(f.orderId, f.fileId),
+                                              f.originalName,
+                                            )
+                                          }
+                                        >
+                                          <i className="ti ti-download" /> Download
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            )}
+                          </td>
+                        </tr>
                       )}
-                    </div>
+                    </Fragment>
                   );
                 })}
-              </div>
-            ))}
+              </tbody>
+            </table>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
 
       <PaginationBar
         page={page}
@@ -358,49 +314,6 @@ export function PortalFiles() {
         total={visible.length}
         onPage={setPage}
       />
-
-      {formatMsg && <div className="note">{formatMsg}</div>}
-      {formatFor && (
-        <div className="overlay open" onClick={() => setFormatFor(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-h">
-              <span>Request another format</span>
-              <button type="button" className="modal-x" onClick={() => setFormatFor(null)}>
-                &times;
-              </button>
-            </div>
-            <div className="modal-b">
-              <p className="muted" style={{ marginTop: 0 }}>
-                {formatFor.originalName} · Order #{formatFor.humanRef ?? formatFor.orderId.slice(0, 6)}
-              </p>
-              <div className="ff">
-                <label>Format</label>
-                <input
-                  value={formatValue}
-                  onChange={(e) => setFormatValue(e.target.value)}
-                  placeholder="DST, PES, SVG…"
-                />
-              </div>
-              <div className="ff">
-                <label>Note</label>
-                <input
-                  value={formatNote}
-                  onChange={(e) => setFormatNote(e.target.value)}
-                  placeholder="Optional"
-                />
-              </div>
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={!formatValue.trim() || requestMut.isPending}
-                onClick={() => requestMut.mutate()}
-              >
-                Send request
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

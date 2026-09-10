@@ -144,7 +144,11 @@ export function PortalProfile() {
     setPrefMsg(null);
     setPrefError(null);
     setPrefBusy(true);
-    const payload: Prefs = { ...prefs, placement };
+    const existing =
+      meCustomer?.customer?.preferences && typeof meCustomer.customer.preferences === 'object'
+        ? (meCustomer.customer.preferences as Record<string, unknown>)
+        : {};
+    const payload = { ...existing, ...prefs, placement };
     try {
       await updateMyCustomer({ preferences: payload });
       setPrefMsg('Preferences saved. Applied to new quote requests.');

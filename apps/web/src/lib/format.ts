@@ -212,31 +212,31 @@ export function quoteLifecycleChip(
 ): StatusChip {
   if (audience === 'customer') {
     if (opts?.type === 'ORDER') {
-      return { cls: 'chip c-done', label: 'Approved' };
+      return { cls: 'portal-chip c-delivered', label: 'Approved' };
     }
     if (opts?.needsCustomerInfo) {
-      return { cls: 'chip c-wait', label: 'Info Needed' };
+      return { cls: 'portal-chip c-review', label: 'Info Needed' };
     }
     if (status === 'QUOTATION_PROVIDED' && isQuoteExpired(opts?.createdAt)) {
-      return { cls: 'chip c-wait', label: 'Expired' };
+      return { cls: 'portal-chip c-cancelled', label: 'Expired' };
     }
-    if (status === 'CREATED') return { cls: 'chip c-new', label: 'Draft' };
+    if (status === 'CREATED') return { cls: 'portal-chip c-progress', label: 'Draft' };
     if (status === 'WAITING_FOR_QUOTATION') {
-      return { cls: 'chip c-quote', label: 'Submitted' };
+      return { cls: 'portal-chip c-progress', label: 'Submitted' };
     }
     if (status === 'WAITING_FOR_ADMIN_QUOTATION_APPROVAL') {
-      return { cls: 'chip c-quote', label: 'Quote in Progress' };
+      return { cls: 'portal-chip c-progress', label: 'Quote in Progress' };
     }
     if (status === 'QUOTATION_PROVIDED') {
       return {
-        cls: 'chip c-prog',
+        cls: 'portal-chip c-review',
         label: opts?.adminRecounter ? 'Updated quote' : 'Ready for Approval',
       };
     }
     if (status === 'CLIENT_REJECTED_QUOTATION' || status === 'REJECTED') {
-      return { cls: 'chip c-wait', label: 'Declined' };
+      return { cls: 'portal-chip c-cancelled', label: 'Declined' };
     }
-    if (status === 'CANCELLED') return { cls: 'chip c-wait', label: 'Cancelled' };
+    if (status === 'CANCELLED') return { cls: 'portal-chip c-cancelled', label: 'Cancelled' };
   }
   if (status === 'QUOTATION_PROVIDED' && opts?.adminRecounter) {
     return {

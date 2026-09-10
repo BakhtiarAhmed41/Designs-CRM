@@ -102,6 +102,22 @@ export function deleteCustomer(id: string) {
   return apiFetch<{ ok: boolean }>(`/admin/customers/${id}`, { method: 'DELETE' });
 }
 
+export type PortalLook = {
+  headingColor?: string;
+  backgroundColor?: string;
+};
+
+export function portalLookFromPrefs(prefs: unknown): PortalLook {
+  if (!prefs || typeof prefs !== 'object') return {};
+  const look = (prefs as { portalLook?: unknown }).portalLook;
+  if (!look || typeof look !== 'object') return {};
+  const rec = look as Record<string, unknown>;
+  return {
+    headingColor: typeof rec.headingColor === 'string' ? rec.headingColor : undefined,
+    backgroundColor: typeof rec.backgroundColor === 'string' ? rec.backgroundColor : undefined,
+  };
+}
+
 export function getMyCustomer() {
   return apiFetch<{ customer: Customer | null }>('/me/customer');
 }

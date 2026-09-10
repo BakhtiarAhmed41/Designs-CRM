@@ -23,6 +23,7 @@ import {
   type QuotationLine,
 } from '@/lib/designs';
 import type { Order, Quotation } from '@/lib/types';
+import { getMyCustomer } from '@/lib/customers';
 import { studioQuotation } from '@/lib/quoteHelpers';
 import { QuoteHistory } from '@/components/QuoteHistory';
 import { applyOrderChange, invalidateWorkCaches } from '@/lib/queryCache';
@@ -43,6 +44,7 @@ export function PortalOrderDetail() {
   const qc = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const paidReturn = searchParams.get('paid') === '1';
+  const [paidSuccess, setPaidSuccess] = useState(false);
   const [keepLineIds, setKeepLineIds] = useState<string[] | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -66,6 +68,12 @@ export function PortalOrderDetail() {
       return 1500;
     },
   });
+
+  const { data: meCustomer } = useQuery({
+    queryKey: ['portal-customer-me'],
+    queryFn: getMyCustomer,
+  });
+  const showOrderPay = meCustomer?.customer?.accountType === 'NET_MONTHLY';
 
   const editsQ = useQuery({
     queryKey: ['my-order-edits', id],
@@ -145,6 +153,7 @@ export function PortalOrderDetail() {
     const o = data?.order;
     if (!o) return;
     if (o.paymentStatus === 'PAID') {
+      setPaidSuccess(true);
       searchParams.delete('paid');
       setSearchParams(searchParams, { replace: true });
     }
@@ -247,7 +256,7 @@ export function PortalOrderDetail() {
         ]}
         actions={
           <>
-          {order.status === 'PENDING_PAYMENT' && (
+          {order.status === 'PENDING_PAYMENT' && showOrderPay && (
             <button
               type="button"
               className="btn btn-primary btn-sm"
@@ -293,6 +302,11 @@ export function PortalOrderDetail() {
       />
 
       {actionError && <ErrorBanner>{actionError}</ErrorBanner>}
+      {paidSuccess && (
+        <div className="note" style={{ marginBottom: 14 }}>
+          <i className="ti ti-circle-check" /> Payment successful. Your order has been created.
+        </div>
+      )}
       {paidReturn && order.paymentStatus !== 'PAID' && (
         <div className="note" style={{ marginBottom: 14 }}>
           <i className="ti ti-loader" /> Confirming payment with Stripe…
@@ -567,7 +581,7 @@ export function PortalOrderDetail() {
                 <span className={payChip.cls}>{payChip.label}</span>
               </span>
             </div>
-            {order.status === 'PENDING_PAYMENT' && (
+            {order.status === 'PENDING_PAYMENT' && showOrderPay && (
               <div style={{ padding: '0 16px 14px' }}>
                 <button
                   type="button"

@@ -185,7 +185,7 @@ export function PortalQuotes() {
           return (
             <div key={o.id}>
               <div
-                className="orow"
+                className="orow quote-orow"
                 onClick={() =>
                   navigate(o.type === 'ORDER' ? `/portal/orders/${o.id}` : `/portal/quotes/${o.id}`)
                 }

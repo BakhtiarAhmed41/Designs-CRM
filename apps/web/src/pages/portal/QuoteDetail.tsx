@@ -7,6 +7,7 @@ import {
   myAttachmentUrl,
   rejectQuotation,
 } from '@/lib/orders';
+import { startMyOrderCheckout } from '@/lib/billing';
 import { openLinkedChat } from '@/lib/messaging';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import { dateShort, money, quoteLifecycleChip } from '@/lib/format';
@@ -25,6 +26,7 @@ export function PortalQuoteDetail() {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [kept, setKept] = useState<string[] | null>(null);
+  const [payBusy, setPayBusy] = useState(false);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['my-order', id],
@@ -54,10 +56,32 @@ export function PortalQuoteDetail() {
     .filter((l) => selected.includes(l.id))
     .reduce((sum, l) => sum + lineTotal(l), 0);
 
+  async function goToPayment(orderId: string) {
+    setPayBusy(true);
+    setError(null);
+    try {
+      const res = await startMyOrderCheckout(orderId);
+      if (res?.alreadyPaid) {
+        setToast('Payment successful. Your order has been created.');
+        window.setTimeout(() => navigate(`/portal/orders/${orderId}`), 700);
+      }
+    } catch (e) {
+      setError(getErrorMessage(e));
+    } finally {
+      setPayBusy(false);
+    }
+  }
+
   const acceptMut = useMutation({
     mutationFn: () => acceptQuotation(id, selected),
     onSuccess: (res) => {
       void applyOrderChange(qc, res.order);
+      const next = res.order;
+      if (next.status === 'PENDING_PAYMENT') {
+        setToast('Quote accepted. Continue to payment…');
+        void goToPayment(next.id);
+        return;
+      }
       setToast(
         selected.length < lines.length && lines.length > 0
           ? 'Partially accepted. Opening your order…'
@@ -115,6 +139,34 @@ export function PortalQuoteDetail() {
         description="It may have been removed or the link is outdated."
         action={<Link to="/portal/quotes" className="btn btn-ghost btn-sm">Back to quotes</Link>}
       />
+    );
+  }
+
+  if (order.type === 'ORDER' && order.status === 'PENDING_PAYMENT') {
+    return (
+      <div>
+        {error && <ErrorBanner>{error}</ErrorBanner>}
+        <EmptyState
+          icon="ti-credit-card"
+          title="Complete payment"
+          description="Your quote is accepted. Pay to create the order."
+          action={
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={payBusy}
+                onClick={() => void goToPayment(order.id)}
+              >
+                <i className="ti ti-credit-card" /> {payBusy ? 'Opening checkout…' : 'Accept & Pay'}
+              </button>
+              <Link to="/portal/quotes" className="btn btn-ghost">
+                Back to quotes
+              </Link>
+            </div>
+          }
+        />
+      </div>
     );
   }
 
@@ -345,7 +397,7 @@ export function PortalQuoteDetail() {
                     disabled={acceptMut.isPending || (canPickLines && selected.length === 0)}
                     onClick={() => acceptMut.mutate()}
                   >
-                    Accept &amp; convert to order
+                    {acceptMut.isPending || payBusy ? 'Please wait…' : 'Accept & Pay'}
                   </button>
                 </div>
               )}

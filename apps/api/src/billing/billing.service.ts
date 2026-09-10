@@ -181,12 +181,20 @@ export class BillingService {
 
   // --- mappers -------------------------------------------------------------
 
-  private invoiceDto(i: InvoiceRow & { customer_name?: string | null }) {
+  private invoiceDto(
+    i: InvoiceRow & {
+      customer_name?: string | null;
+      order_ref?: string | null;
+      service_type?: string | null;
+    },
+  ) {
     return {
       id: i.id,
       customerId: i.customer_id,
       customerName: i.customer_name ?? null,
       orderId: i.order_id,
+      orderRef: i.order_ref ?? null,
+      serviceType: i.service_type ?? null,
       kind: i.kind,
       amountCents: i.amount_cents,
       amountPaidCents: i.amount_paid_cents ?? 0,
@@ -2012,10 +2020,17 @@ export class BillingService {
   async listMyInvoices(user: AuthUser | undefined) {
     const customer = await this.resolveMyCustomer(user);
     await this.collapseOrderInvoiceDupes(customer.id);
-    const rows = await this.db.query<InvoiceRow & { customer_name: string | null }>(
-      `SELECT i.*, c.name AS customer_name
+    const rows = await this.db.query<
+      InvoiceRow & {
+        customer_name: string | null;
+        order_ref: string | null;
+        service_type: string | null;
+      }
+    >(
+      `SELECT i.*, c.name AS customer_name, o.human_ref AS order_ref, o.service_type
          FROM invoices i
          LEFT JOIN customers c ON c.id = i.customer_id
+         LEFT JOIN orders o ON o.id = i.order_id
         WHERE i.customer_id = ? AND i.status <> ?
         ORDER BY i.issued_at DESC`,
       [customer.id, InvoiceStatus.CANCELLED],

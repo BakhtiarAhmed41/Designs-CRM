@@ -12,6 +12,8 @@ export type Invoice = {
   customerId: string;
   customerName: string | null;
   orderId: string | null;
+  orderRef?: string | null;
+  serviceType?: string | null;
   kind: InvoiceKind;
   amountCents: number;
   amountPaidCents?: number;

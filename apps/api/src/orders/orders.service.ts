@@ -853,7 +853,7 @@ export class OrdersService {
     }
 
     const id = randomUUID();
-    const humanRef = `LVD-${Date.now().toString(36).toUpperCase()}`;
+    const humanRef = `LVD-${Date.now()}`;
     const name =
       data.name?.trim() ||
       data.subCategory ||
@@ -1807,7 +1807,7 @@ export class OrdersService {
     }
 
     const id = randomUUID();
-    const humanRef = `LVD-${Date.now().toString(36).toUpperCase()}`;
+    const humanRef = `LVD-${Date.now()}`;
     const serviceType = toServiceType(data.serviceType);
     const name =
       data.name?.trim() ||
@@ -3088,15 +3088,17 @@ export class OrdersService {
       file_id: string;
       original_name: string;
       format_label: string | null;
+      byte_size: number | null;
       delivered_at: Date;
       order_id: string;
       order_name: string | null;
       human_ref: string | null;
+      service_type: string | null;
       delivered_via: string;
       email: string | null;
     }>(
-      `SELECT df.id AS file_id, df.original_name, df.format_label, df.created_at AS delivered_at,
-              o.id AS order_id, o.name AS order_name, o.human_ref,
+      `SELECT df.id AS file_id, df.original_name, df.format_label, df.byte_size, df.created_at AS delivered_at,
+              o.id AS order_id, o.name AS order_name, o.human_ref, o.service_type,
               d.delivered_via, u.email
          FROM delivery_files df
          JOIN deliveries d ON d.id = df.delivery_id
@@ -3110,9 +3112,11 @@ export class OrdersService {
       orderId: r.order_id,
       orderName: r.order_name,
       humanRef: r.human_ref,
+      serviceType: r.service_type,
       fileId: r.file_id,
       originalName: r.original_name,
       formatLabel: r.format_label,
+      byteSize: r.byte_size,
       deliveredAt: r.delivered_at,
       deliveredVia: r.delivered_via,
       deliveryEmail: r.email,

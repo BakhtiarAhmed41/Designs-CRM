@@ -39,7 +39,10 @@ export function QuoteHistory({
         >
           <div style={{ minWidth: 0 }}>
             <div style={{ fontWeight: 600, fontSize: 13.5 }}>
-              v{q.version} · {quoteHistoryLabel(q, list)}
+              {quoteHistoryLabel(q, list)}
+            </div>
+            <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+              {dateShort(q.createdAt)}
             </div>
             {q.comment && (
               <div
@@ -50,7 +53,7 @@ export function QuoteHistory({
               </div>
             )}
             <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-              {dateShort(q.createdAt)} · {STATUS_LABEL[q.status] ?? q.status}
+              {STATUS_LABEL[q.status] ?? q.status}
             </div>
           </div>
           <div style={{ fontWeight: 700, color: 'var(--navy)', flexShrink: 0 }}>

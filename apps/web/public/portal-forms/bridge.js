@@ -466,6 +466,7 @@
     });
 
     document.querySelectorAll('.btn-p').forEach(function (btn) {
+      if (btn.id === 'lvd-next') return;
       var original = rememberDefault(btn, 'data-default-label');
       btn.textContent = isAdmin ? 'Continue to pricing →' : original;
     });
@@ -543,6 +544,7 @@
     });
 
     document.querySelectorAll('.btn-p').forEach(function (btn) {
+      if (btn.id === 'lvd-next') return;
       btn.addEventListener('click', function (e) {
         e.preventDefault();
         if (inIframe()) {

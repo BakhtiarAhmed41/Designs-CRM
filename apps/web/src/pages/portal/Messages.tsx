@@ -408,7 +408,7 @@ export function PortalMessages() {
               key={c.id}
               role="button"
               tabIndex={0}
-              className="orow inbox-row msg-compact"
+              className={`orow inbox-row msg-compact${c.unreadClient > 0 ? ' is-unread' : ''}`}
               onClick={() => selectConvo(c)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {

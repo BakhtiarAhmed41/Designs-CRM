@@ -2,25 +2,26 @@
   var css = document.createElement('style');
   css.textContent = [
     'html,body,.wrap,.card{background:transparent!important;}',
-    'html.in-frame body{padding:2px 4px 6px!important;}',
-    '.cb,html.in-frame .cb{padding:2px 2px 4px!important;}',
+    '.wrap{max-width:960px!important;margin:0 auto!important;width:100%!important;}',
+    'html.in-frame body{padding:10px 16px 20px!important;}',
+    '.cb,html.in-frame .cb{padding:8px 4px 12px!important;}',
     '.ch{border-bottom:none!important;padding:8px 6px!important;}',
     '.ff input,.ff select,.ff textarea,.upload-area,.mini-up,.qbig,.ref-area,.dcard,.drow,.qbox,.fitem,.mini-fi,.style-thumb,.redirect{background:#fff!important;}',
     '.mtab,.adv-tgl,.qtogrow,.ibox,.cond,.style-opt.sel .style-label{background:#fff!important;}',
     '.mtab.sel,.topt.sel,.sopt.sel,.uopt.sel,.fmt-chip.sel,.var-chip.sel,.ropt.sel-s,.ropt.sel-w,.svc.sel{background:#fff!important;}',
-    '.ff label{font-size:11px;}',
-    '.ff input,.ff select{height:32px!important;padding:0 10px!important;font-size:12px!important;border-radius:7px!important;}',
-    '.ff textarea{padding:8px 10px!important;min-height:56px!important;font-size:12px!important;border-radius:7px!important;}',
-    '.sl{margin:8px 0 4px!important;padding-top:0!important;border-top:none!important;font-size:10px!important;}',
-    '#mode-d .sl{margin:8px 0 4px!important;padding-top:0!important;border-top:none!important;font-size:11px!important;}',
+    '.ff label{font-size:12.5px!important;font-weight:700!important;color:#222!important;}',
+    '.ff input,.ff select{height:40px!important;padding:0 12px!important;font-size:13px!important;border-radius:8px!important;}',
+    '.ff textarea{padding:12px!important;min-height:88px!important;font-size:13px!important;border-radius:8px!important;}',
+    '.sl{margin:16px 0 8px!important;padding-top:0!important;border-top:none!important;font-size:13px!important;font-weight:700!important;color:#222!important;letter-spacing:.02em!important;}',
+    '#mode-d .sl{margin:16px 0 8px!important;padding-top:0!important;border-top:none!important;font-size:13px!important;font-weight:700!important;}',
     '.mode-tabs{gap:8px!important;margin-bottom:8px!important;}',
     '.mtab{padding:8px 10px!important;border-radius:8px!important;}',
     '.mtab i{font-size:16px!important;}',
     '.mtab .mt-t{font-size:12px!important;}',
     '.mtab .mt-s{font-size:10px!important;line-height:1.3;}',
     '.qbig{padding:8px 10px!important;}',
-    '.qbig textarea{min-height:56px!important;font-size:12px!important;}',
-    '.utrg{padding:8px 10px!important;}',
+    '.qbig textarea{min-height:88px!important;font-size:13px!important;}',
+    '.utrg{padding:22px 12px!important;}',
     '.utrg i{font-size:16px!important;}',
     '.utrg p{font-size:12px!important;}',
     '.utrg span{font-size:10px!important;}',
@@ -120,7 +121,7 @@
 
     var cont = document.createElement('div');
     cont.className = 'row-btns lvd-continue';
-    cont.innerHTML = '<button type="button" class="btn-p" id="lvd-next">Continue to Files &amp; Delivery →</button>';
+    cont.innerHTML = '<button type="button" class="btn-p btn-next" id="lvd-next">Continue to Files &amp; Delivery →</button>';
     var addBtn = step1.querySelector('.add-d, .add-btn');
     if (addBtn) cont.insertBefore(addBtn, cont.firstChild);
     step1.appendChild(cont);

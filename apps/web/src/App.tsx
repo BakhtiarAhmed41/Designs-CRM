@@ -43,6 +43,12 @@ const PortalMessages = lazy(() =>
 const PortalRevisions = lazy(() =>
   import('@/pages/portal/Revisions').then((m) => ({ default: m.PortalRevisions })),
 );
+const PortalSettings = lazy(() =>
+  import('@/pages/portal/Settings').then((m) => ({ default: m.PortalSettings })),
+);
+const PortalPolicies = lazy(() =>
+  import('@/pages/portal/Policies').then((m) => ({ default: m.PortalPolicies })),
+);
 
 const AdminDashboard = lazy(() =>
   import('@/pages/admin/Dashboard').then((m) => ({ default: m.AdminDashboard })),
@@ -153,6 +159,8 @@ export function App() {
           <Route path="invoices" element={<PortalInvoices />} />
           <Route path="messages" element={<PortalMessages />} />
           <Route path="profile" element={<PortalProfile />} />
+          <Route path="settings" element={<PortalSettings />} />
+          <Route path="policies" element={<PortalPolicies />} />
         </Route>
 
         <Route

@@ -43,6 +43,7 @@ apps/api/uploads
 
 # client change requests (reference only, not tracked)
 /Changes
+/Edit-2 09-09.xlsx
 
 # local QA runs (not production)
 /qa-*.mjs

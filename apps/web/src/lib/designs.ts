@@ -65,9 +65,11 @@ export type MyFile = {
   orderId: string;
   orderName: string | null;
   humanRef: string | null;
+  serviceType?: string | null;
   fileId: string;
   originalName: string;
   formatLabel: string | null;
+  byteSize?: number | null;
   deliveredAt: string;
   deliveredVia?: string | null;
   deliveryEmail?: string | null;

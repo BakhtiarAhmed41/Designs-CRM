@@ -17,6 +17,7 @@ import { getErrorMessage } from '@/lib/api';
 import { invalidateWorkCaches } from '@/lib/queryCache';
 import { freshOnOpen } from '@/lib/queryRefresh';
 import { money, dateShort } from '@/lib/format';
+import { serviceCategoryLabel } from '@/lib/serviceIcon';
 import { useDialog } from '@/components/ui/AppDialog';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -253,6 +254,8 @@ export function PortalInvoices() {
               <tr>
                 <th>Invoice</th>
                 <th>{isNet ? 'Statement' : 'Order'}</th>
+                <th>Order No.</th>
+                <th>Category</th>
                 <th>Items</th>
                 <th>Amount</th>
                 <th>Due</th>
@@ -274,6 +277,10 @@ export function PortalInvoices() {
                   <tr key={inv.id}>
                     <td className="inv-id">{invId}</td>
                     <td>{inv.coversText ?? (inv.kind === 'MONTHLY' ? 'Monthly statement' : 'Invoice')}</td>
+                    <td className="muted">{inv.orderRef ?? '—'}</td>
+                    <td className="muted">
+                      {inv.serviceType ? serviceCategoryLabel(inv.serviceType) : '—'}
+                    </td>
                     <td style={{ color: 'var(--muted)' }}>
                       {inv.kind === 'MONTHLY'
                         ? 'Statement'
