@@ -249,30 +249,56 @@ export function PortalDashboard() {
               />
             )}
             {orders.length > 0 && (
-              <div className="dash-spread-head">
-                <span />
-                <span>Project</span>
-                <span>ID</span>
-                <span>Category</span>
-                <span>Status</span>
-                <span>Amount</span>
+              <div className="dash-table-wrap">
+                <table className="dash-table">
+                  <colgroup>
+                    <col className="dash-col-icon" />
+                    <col className="dash-col-project" />
+                    <col className="dash-col-id" />
+                    <col className="dash-col-cat" />
+                    <col className="dash-col-status" />
+                    <col className="dash-col-amount" />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th aria-hidden="true" />
+                      <th>Project</th>
+                      <th>ID</th>
+                      <th>Category</th>
+                      <th>Status</th>
+                      <th>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orders.map((o) => {
+                      const chip = customerOrderChip(o);
+                      return (
+                        <tr
+                          key={o.id}
+                          className="click-row"
+                          onClick={() => navigate(`/portal/orders/${o.id}`)}
+                        >
+                          <td>
+                            <div className="othumb">
+                              <i className={`ti ${serviceTi(o.serviceType)}`} />
+                            </div>
+                          </td>
+                          <td>
+                            <div className="on">{o.name ?? o.serviceType ?? 'Order'}</div>
+                          </td>
+                          <td className="muted">{o.humanRef ?? o.id.slice(0, 6)}</td>
+                          <td className="muted">{serviceCategoryLabel(o.serviceType)}</td>
+                          <td>
+                            <span className={chip.cls}>{chip.label}</span>
+                          </td>
+                          <td>{money(o.priceCents)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
-            {orders.map((o) => {
-              const chip = customerOrderChip(o);
-              return (
-                <Link key={o.id} to={`/portal/orders/${o.id}`} className="orow dash-spread">
-                  <div className="othumb">
-                    <i className={`ti ${serviceTi(o.serviceType)}`} />
-                  </div>
-                  <div className="on">{o.name ?? o.serviceType ?? 'Order'}</div>
-                  <div className="om">{o.humanRef ?? o.id.slice(0, 6)}</div>
-                  <div className="om">{serviceCategoryLabel(o.serviceType)}</div>
-                  <span className={chip.cls}>{chip.label}</span>
-                  <div className="oprice">{money(o.priceCents)}</div>
-                </Link>
-              );
-            })}
           </>
         )}
 
@@ -291,35 +317,61 @@ export function PortalDashboard() {
               />
             )}
             {quotes.length > 0 && (
-              <div className="dash-spread-head">
-                <span />
-                <span>Project</span>
-                <span>ID</span>
-                <span>Category</span>
-                <span>Status</span>
-                <span>Amount</span>
+              <div className="dash-table-wrap">
+                <table className="dash-table">
+                  <colgroup>
+                    <col className="dash-col-icon" />
+                    <col className="dash-col-project" />
+                    <col className="dash-col-id" />
+                    <col className="dash-col-cat" />
+                    <col className="dash-col-status" />
+                    <col className="dash-col-amount" />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th aria-hidden="true" />
+                      <th>Project</th>
+                      <th>ID</th>
+                      <th>Category</th>
+                      <th>Status</th>
+                      <th>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {quotes.map((o) => {
+                      const chip = quoteLifecycleChip(o.status, 'customer', {
+                        partiallyAccepted: o.partiallyAccepted,
+                        needsCustomerInfo: o.needsCustomerInfo,
+                        createdAt: o.createdAt,
+                        type: o.type,
+                      });
+                      return (
+                        <tr
+                          key={o.id}
+                          className="click-row"
+                          onClick={() => navigate(`/portal/quotes/${o.id}`)}
+                        >
+                          <td>
+                            <div className="othumb">
+                              <i className={`ti ${serviceTi(o.serviceType)}`} />
+                            </div>
+                          </td>
+                          <td>
+                            <div className="on">{o.name ?? 'Quote request'}</div>
+                          </td>
+                          <td className="muted">{o.humanRef ?? o.id.slice(0, 6)}</td>
+                          <td className="muted">{serviceCategoryLabel(o.serviceType)}</td>
+                          <td>
+                            <span className={chip.cls}>{chip.label}</span>
+                          </td>
+                          <td>{o.priceCents ? money(o.priceCents) : '—'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
-            {quotes.map((o) => {
-              const chip = quoteLifecycleChip(o.status, 'customer', {
-                partiallyAccepted: o.partiallyAccepted,
-                needsCustomerInfo: o.needsCustomerInfo,
-                createdAt: o.createdAt,
-                type: o.type,
-              });
-              return (
-                <Link key={o.id} to={`/portal/quotes/${o.id}`} className="orow dash-spread">
-                  <div className="othumb">
-                    <i className={`ti ${serviceTi(o.serviceType)}`} />
-                  </div>
-                  <div className="on">{o.name ?? 'Quote request'}</div>
-                  <div className="om">{o.humanRef ?? o.id.slice(0, 6)}</div>
-                  <div className="om">{serviceCategoryLabel(o.serviceType)}</div>
-                  <span className={chip.cls}>{chip.label}</span>
-                  <div className="oprice">{money(o.priceCents)}</div>
-                </Link>
-              );
-            })}
           </>
         )}
 
@@ -390,49 +442,68 @@ export function PortalDashboard() {
           <EmptyState icon="ti-bell" title="No recent activity" description="Updates will appear here as work moves along." />
         )}
         {activities.length > 0 && (
-          <div className="activity-head">
-            <span />
-            <span>Activity</span>
-            <span>Details</span>
-            <span>Time</span>
-            <span>Action</span>
+          <div className="dash-table-wrap">
+            <table className="dash-table activity-table">
+              <colgroup>
+                <col className="dash-col-icon" />
+                <col className="dash-col-activity" />
+                <col className="dash-col-detail" />
+                <col className="dash-col-time" />
+                <col className="dash-col-action" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th aria-hidden="true" />
+                  <th>Activity</th>
+                  <th>Details</th>
+                  <th>Time</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activities.map((n) => {
+                  const action = activityAction(n.title, n.link);
+                  const unread = !n.readAt;
+                  const title = displayActivityTitle(n.title);
+                  return (
+                    <tr key={n.id} className={`click-row${unread ? ' is-unread' : ''}`}>
+                      <td>
+                        <div className="activity-icon">
+                          <i className={`ti ${n.title.toLowerCase().includes('message') ? 'ti-message' : 'ti-bell'}`} />
+                        </div>
+                      </td>
+                      <td>
+                        <div className="activity-title">
+                          <span className="on">{title}</span>
+                          {unread && <span className="activity-unread">Unread</span>}
+                        </div>
+                      </td>
+                      <td className="activity-detail">{n.body || '—'}</td>
+                      <td className="activity-time">{relativeTime(n.createdAt)}</td>
+                      <td>
+                        {action ? (
+                          <Link
+                            to={action.to}
+                            className="activity-link"
+                            onClick={() => {
+                              if (!unread) return;
+                              void markNotificationRead(n.id).then(() => {
+                                void qc.invalidateQueries({ queryKey: ['my-activity'] });
+                                void qc.invalidateQueries({ queryKey: ['notifications'] });
+                              });
+                            }}
+                          >
+                            {action.label} <i className="ti ti-chevron-right" />
+                          </Link>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
-        {activities.map((n) => {
-          const action = activityAction(n.title, n.link);
-          const unread = !n.readAt;
-          const title = displayActivityTitle(n.title);
-          return (
-            <div key={n.id} className={`activity-row${unread ? ' is-unread' : ''}`}>
-              <div className="activity-icon">
-                <i className={`ti ${n.title.toLowerCase().includes('message') ? 'ti-message' : 'ti-bell'}`} />
-              </div>
-              <div className="activity-title">
-                <span className="on">{title}</span>
-                {unread && <span className="activity-unread">Unread</span>}
-              </div>
-              <div className="activity-detail">{n.body || '—'}</div>
-              <div className="activity-time">{relativeTime(n.createdAt)}</div>
-              {action ? (
-                <Link
-                  to={action.to}
-                  className="activity-link"
-                  onClick={() => {
-                    if (!unread) return;
-                    void markNotificationRead(n.id).then(() => {
-                      void qc.invalidateQueries({ queryKey: ['my-activity'] });
-                      void qc.invalidateQueries({ queryKey: ['notifications'] });
-                    });
-                  }}
-                >
-                  {action.label} <i className="ti ti-chevron-right" />
-                </Link>
-              ) : (
-                <span />
-              )}
-            </div>
-          );
-        })}
         {activityPages > 1 && (
           <div className="activity-pager">
             <button
