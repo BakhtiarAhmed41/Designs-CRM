@@ -1996,6 +1996,13 @@ button.primary i,
 .app-frame .side.portal-side {
   overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.app-frame .side.portal-side::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 .app-frame .side.portal-side .nav,
 .app-frame .side.portal-side .service-nav {
