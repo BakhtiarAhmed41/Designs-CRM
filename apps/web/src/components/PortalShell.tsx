@@ -114,7 +114,7 @@ export function PortalShell() {
   const account: NavEntry[] = [
     { to: '/portal/profile', label: 'Profile', icon: 'ti-user' },
     { to: '/portal/settings', label: 'Settings', icon: 'ti-settings' },
-    { to: '/portal/policies', label: 'Policies', icon: 'ti-shield' },
+    { to: '/portal/policies', label: 'Policies', icon: 'ti-file-text' },
   ];
 
   const sidebar = (
