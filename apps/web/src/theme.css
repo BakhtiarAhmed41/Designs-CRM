@@ -1993,6 +1993,16 @@ button.primary i,
 .portal-look h3 {
   color: var(--portal-heading, inherit);
 }
+.app-frame .side.portal-side {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.app-frame .side.portal-side .nav,
+.app-frame .side.portal-side .service-nav {
+  flex: 0 0 auto;
+  min-height: unset;
+  overflow: visible;
+}
 .portal-side .nav a .cnt {
   background: #fde8d8;
   color: #9a3412;
