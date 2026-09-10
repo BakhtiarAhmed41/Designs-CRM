@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { listMyOrderSummary, listMyOrders, listQuoteDrafts } from '@/lib/orders';
 import { money, dateShort, quoteLifecycleChip } from '@/lib/format';
-import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
+import { serviceCategoryLabel } from '@/lib/serviceIcon';
 import { isAdminRecounter, studioQuotation } from '@/lib/quoteHelpers';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
@@ -24,6 +24,13 @@ const DRAFT_ICONS: Record<string, string> = {
   vector: 'ti-vector-bezier',
   laser: 'ti-router',
 };
+
+function quoteRowAction(statusLabel: string) {
+  const t = statusLabel.toLowerCase();
+  if (t.includes('ready') || t.includes('updated')) return 'Review Quote';
+  if (t.includes('approved')) return 'View Quote';
+  return 'View Details';
+}
 
 export function PortalQuotes() {
   const navigate = useNavigate();
@@ -167,65 +174,53 @@ export function PortalQuotes() {
           />
         )}
         {quotes.length > 0 && (
-          <div className="quote-list-body">
-            {quotes.map((o) => {
-              const chip = quoteLifecycleChip(o.status, 'customer', {
-                partiallyAccepted: o.partiallyAccepted,
-                adminRecounter: isAdminRecounter(o.quotations),
-                needsCustomerInfo: o.needsCustomerInfo,
-                createdAt: o.createdAt,
-                type: o.type,
-              });
-              const quote = studioQuotation(o.quotations);
-              const designCount = o.designCount ?? quote?.lines?.length ?? 0;
-              const declined =
-                o.status === 'REJECTED' ||
-                o.status === 'CLIENT_REJECTED_QUOTATION' ||
-                o.status === 'CANCELLED';
-              const total = quote?.amountCents ?? null;
+          <table className="qtable quote-table">
+            <thead>
+              <tr>
+                <th>Project</th>
+                <th>Category</th>
+                <th>Designs</th>
+                <th>Requested</th>
+                <th>Status</th>
+                <th>Price</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {quotes.map((o) => {
+                const chip = quoteLifecycleChip(o.status, 'customer', {
+                  partiallyAccepted: o.partiallyAccepted,
+                  adminRecounter: isAdminRecounter(o.quotations),
+                  needsCustomerInfo: o.needsCustomerInfo,
+                  createdAt: o.createdAt,
+                  type: o.type,
+                });
+                const quote = studioQuotation(o.quotations);
+                const designCount = o.designCount ?? quote?.lines?.length ?? 0;
+                const total = quote?.amountCents ?? null;
+                const href = o.type === 'ORDER' ? `/portal/orders/${o.id}` : `/portal/quotes/${o.id}`;
 
-              return (
-                <div
-                  key={o.id}
-                  className="orow quote-orow"
-                  onClick={() =>
-                    navigate(o.type === 'ORDER' ? `/portal/orders/${o.id}` : `/portal/quotes/${o.id}`)
-                  }
-                >
-                  <div className={`thumb${serviceThumbClass(o.serviceType) ? ' m' : ''}`}>
-                    <i className={`ti ${serviceTi(o.serviceType)}`} />
-                  </div>
-                  <div className="oinfo">
-                    <div className="on">{o.name ?? o.serviceType ?? 'Quote request'}</div>
-                    <div className="om">
-                      <span>
-                        <i className="ti ti-hash" style={{ fontSize: 12 }} />
-                        {o.humanRef ?? o.id.slice(0, 6)}
-                      </span>
-                      <span>
-                        <i className="ti ti-files" style={{ fontSize: 12 }} />
-                        {designCount} design{designCount === 1 ? '' : 's'}
-                      </span>
-                      <span>Submitted {dateShort(o.createdAt)}</span>
-                    </div>
-                  </div>
-                  <span className={chip.cls}>{chip.label}</span>
-                  <div className="oprice">
-                    {total != null ? (
-                      money(total, quote?.currency)
-                    ) : declined ? (
-                      <span style={{ color: 'var(--faint)', fontWeight: 500 }}>-</span>
-                    ) : (
-                      <span style={{ color: 'var(--faint)', fontWeight: 500 }}>Pending</span>
-                    )}
-                  </div>
-                  <span className="quote-open">
-                    Open quote <i className="ti ti-chevron-right" />
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+                return (
+                  <tr key={o.id} className="click-row" onClick={() => navigate(href)}>
+                    <td>
+                      <div className="on">{o.name ?? o.serviceType ?? 'Quote request'}</div>
+                      <div className="om">{o.humanRef ?? o.id.slice(0, 6)}</div>
+                    </td>
+                    <td className="muted">{serviceCategoryLabel(o.serviceType)}</td>
+                    <td>{designCount || '—'}</td>
+                    <td className="muted">{dateShort(o.createdAt)}</td>
+                    <td>
+                      <span className={chip.cls}>{chip.label}</span>
+                    </td>
+                    <td>{total != null ? money(total, quote?.currency) : '—'}</td>
+                    <td>
+                      <span className="quote-open">{quoteRowAction(chip.label)}</span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         )}
       </div>
 
