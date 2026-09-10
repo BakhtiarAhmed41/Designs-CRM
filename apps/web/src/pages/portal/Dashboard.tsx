@@ -51,7 +51,7 @@ function activityAction(title: string, link: string | null) {
 }
 
 function displayActivityTitle(title: string) {
-  if (title.toLowerCase().includes('new message')) return '(New Message)';
+  if (title.toLowerCase().includes('new message')) return 'New Message';
   return title;
 }
 

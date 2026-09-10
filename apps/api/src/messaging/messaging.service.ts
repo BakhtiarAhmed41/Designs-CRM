@@ -874,7 +874,7 @@ export class MessagingService {
       );
       if (cust?.user_id) {
         await this.notifications.createFor(cust.user_id, {
-          title: '(New Message)',
+          title: 'New Message',
           body: (text || 'Sent an attachment').slice(0, 140),
           link: `/portal/messages?c=${conversationId}`,
         });
