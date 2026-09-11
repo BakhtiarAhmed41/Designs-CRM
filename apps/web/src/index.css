@@ -819,18 +819,18 @@ button { font-family: inherit; }
 .login-field input {
   width: 100%;
   box-sizing: border-box;
-  border: 0.5px solid var(--line);
+  border: 0.5px solid var(--form-border, var(--line));
   border-radius: 9px;
   padding: 10px 12px;
   font-size: 14px;
   font-family: inherit;
   outline: none;
-  background: #fff;
-  color: var(--ink);
+  background: var(--form-bg, #fff);
+  color: var(--form-text, var(--ink));
 }
 .login-field input:focus {
-  border-color: var(--navy);
-  box-shadow: 0 0 0 2px rgba(20, 63, 101, 0.1);
+  border-color: var(--form-focus, var(--navy));
+  box-shadow: var(--focus);
 }
 .login-password-wrap {
   position: relative;

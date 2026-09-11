@@ -24,7 +24,7 @@ export class ThemeService {
     }
   }
 
-  async save(input: ThemeColors): Promise<ThemeColors> {
+  async save(input: unknown): Promise<ThemeColors> {
     const colors = normalizeTheme(themeColorsSchema.parse(input));
     const json = JSON.stringify(colors);
     await this.db.execute(

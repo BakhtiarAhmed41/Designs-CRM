@@ -1,0 +1,137 @@
+:root {
+  --form-bg: #ffffff;
+  --form-text: #222222;
+  --form-border: #e5e7eb;
+  --form-focus: #222222;
+  --form-muted: #4a4a4a;
+  --form-label: #222222;
+  --ink: #222222;
+  --muted: #4a4a4a;
+  --navy: #222222;
+  --button-bg: #222222;
+  --button-text: #ffffff;
+  --maroon: #9a1e22;
+  --card: #ffffff;
+  --bg: #ffffff;
+  --hover-bg: #f4f5f7;
+  --success: #1f6b4a;
+  --warning: #a67c00;
+}
+
+html, body {
+  background: var(--bg);
+  color: var(--form-text);
+}
+
+.ff label,
+.sl,
+.drow-num,
+.utrg p,
+.fitem,
+.mini-fi {
+  color: var(--form-label);
+}
+
+.ff input,
+.ff select,
+.ff textarea,
+.qbig textarea,
+.qbox textarea {
+  background: var(--form-bg);
+  color: var(--form-text);
+  border-color: var(--form-border);
+}
+
+.ff input:focus,
+.ff select:focus,
+.ff textarea:focus,
+.qbig textarea:focus,
+.qbox textarea:focus {
+  border-color: var(--form-focus);
+}
+
+.upload-area,
+.mini-up,
+.qbig,
+.ref-area,
+.dcard,
+.drow,
+.qbox,
+.fitem,
+.mini-fi,
+.style-thumb,
+.redirect,
+.mtab,
+.adv-tgl,
+.qtogrow,
+.ibox,
+.cond {
+  background: var(--form-bg);
+  color: var(--form-text);
+}
+
+.topt,
+.sopt,
+.uopt,
+.svc,
+.fmt-chip,
+.var-chip,
+.ropt {
+  background: var(--form-bg);
+  color: var(--form-text);
+  border-color: var(--form-border);
+}
+
+.topt.sel,
+.sopt.sel,
+.uopt.sel,
+.fmt-chip.sel,
+.var-chip.sel,
+.mtab.sel,
+.svc.sel,
+.ropt.sel-s,
+.ropt.sel-w {
+  border-color: var(--form-focus);
+  background: var(--form-bg);
+  color: var(--form-text);
+}
+
+.topt.sel i,
+.topt.sel .ot,
+.fmt-chip.sel .icon,
+.fmt-chip.sel .fname,
+.mtab.sel {
+  color: var(--form-focus);
+}
+
+.fmt-chip .chk {
+  background: var(--button-bg);
+  color: var(--button-text);
+}
+
+.btn-p,
+.btn-p.btn-next {
+  background: var(--button-bg) !important;
+  color: var(--button-text) !important;
+  border-color: var(--button-bg) !important;
+}
+
+.btn-s {
+  color: var(--form-muted);
+  border-color: var(--form-border);
+  background: var(--form-bg);
+}
+
+.frem,
+.drow-del {
+  color: var(--maroon);
+}
+
+.lvd-progress .pi.on {
+  color: var(--form-text);
+}
+
+.lvd-progress .pi.on span {
+  background: var(--button-bg);
+  color: var(--button-text);
+}

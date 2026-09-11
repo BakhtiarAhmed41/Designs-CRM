@@ -45,6 +45,15 @@
   --sidebar-active-bg: #FFFFFF;
   --sidebar-active-text: #222222;
   --topbar-bg: #FFFFFF;
+  --brand: #9A1E22;
+  --brand-d: #7d181b;
+  --form-bg: #FFFFFF;
+  --form-text: #222222;
+  --form-border: #E5E7EB;
+  --form-focus: #222222;
+  --form-muted: #4A4A4A;
+  --form-label: #222222;
+  --hover-bg: #F4F5F7;
 }
 
 html { color-scheme: light; }
@@ -221,7 +230,7 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   color: inherit;
 }
 .orow:last-child, .crow:last-child { border-bottom: none; }
-.orow:hover, .crow:hover { background: #f7f8fa; }
+.orow:hover, .crow:hover { background: var(--hover-bg, var(--tint-hover)); }
 .thumb, .othumb {
   width: 40px;
   height: 40px;
@@ -299,7 +308,7 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
 
 .filters { display: flex; gap: 6px; flex-wrap: wrap; }
 .filters button {
-  background: #f4f5f7;
+  background: var(--hover-bg, #f4f5f7);
   border: 1px solid transparent;
   color: var(--muted);
   font-size: 12.5px;
@@ -311,8 +320,8 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   font-weight: 500;
   transition: background var(--ease), color var(--ease);
 }
-.filters button.on { background: var(--navy); color: #fff; }
-.filters button:hover:not(.on) { background: #eceef1; color: var(--ink); }
+.filters button.on { background: var(--button-bg, var(--navy)); color: var(--button-text, #fff); }
+.filters button:hover:not(.on) { background: var(--tint-hover, #eceef1); color: var(--ink); }
 
 .range {
   display: inline-flex;
@@ -445,7 +454,7 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   font-weight: 600;
   padding: 10px 16px;
   border-bottom: 1px solid var(--line);
-  background: #fafbfc;
+  background: var(--hover-bg, #fafbfc);
   position: sticky;
   top: 0;
   z-index: 1;
@@ -457,7 +466,7 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   vertical-align: middle;
 }
 .qtable tr:last-child td, .itable tr:last-child td { border-bottom: none; }
-.qtable tbody tr:hover td, .itable tbody tr:hover td { background: #f7f8fa; }
+.qtable tbody tr:hover td, .itable tbody tr:hover td { background: var(--hover-bg, #f7f8fa); }
 .itable .inv-id { font-weight: 600; color: var(--navy); }
 .itable .amt { font-weight: 600; }
 
@@ -471,20 +480,20 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
 .ff label, .pf label, .login-field span {
   font-size: 12px;
   font-weight: 600;
-  color: var(--muted);
+  color: var(--form-label, var(--muted));
 }
 .ff input, .ff select, .ff textarea,
 .pf input, .pf select, .pf textarea,
 .login-field input,
 .notes-box, .stat-select, .msg-search, .msg-composer-row textarea {
-  border: 1px solid var(--line);
+  border: 1px solid var(--form-border, var(--line));
   border-radius: var(--radius-sm);
   padding: 9px 11px;
   font-size: 13.5px;
   font-family: inherit;
   outline: none;
-  background: var(--tint);
-  color: var(--ink);
+  background: var(--form-bg, var(--tint));
+  color: var(--form-text, var(--ink));
   width: 100%;
   box-sizing: border-box;
   transition: border-color var(--ease), box-shadow var(--ease);
@@ -493,7 +502,7 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
 .pf input:focus, .pf select:focus,
 .login-field input:focus,
 .notes-box:focus, .msg-search:focus, .msg-composer-row textarea:focus {
-  border-color: var(--navy);
+  border-color: var(--form-focus, var(--navy));
   box-shadow: var(--focus);
 }
 .pform { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -505,7 +514,7 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
 }
 .app-frame .side {
   background: var(--sidebar-bg, var(--etsy-white));
-  border-right: 1px solid #e8eaed;
+  border-right: 1px solid var(--line);
   padding: 18px 12px 12px;
   display: flex;
   flex-direction: column;
@@ -522,7 +531,7 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   font-size: 13px;
   font-weight: 650;
   font-weight: 600;
-  color: var(--navy);
+  color: var(--sidebar-text, var(--navy));
   line-height: 1.2;
   letter-spacing: -0.02em;
 }
@@ -845,7 +854,7 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   align-items: center;
 }
 .modal-x {
-  background: #f2f4f6;
+  background: var(--hover-bg, #f2f4f6);
   border: none;
   width: 32px;
   height: 32px;
@@ -857,7 +866,7 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   align-items: center;
   justify-content: center;
 }
-.modal-x:hover { background: #e8eaed; color: var(--ink); }
+.modal-x:hover { background: var(--tint-hover, #e8eaed); color: var(--ink); }
 .modal-b, .omod-b { padding: 18px; }
 .modal-b.form-section { padding: 18px 22px 22px; }
 
@@ -1089,22 +1098,33 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   color: var(--navy);
   line-height: 1.2;
 }
+.pay-page {
+  align-items: center;
+  padding: 32px 20px;
+}
 .pay-card {
-  width: 440px;
+  width: 420px;
   max-width: 100%;
-  background: var(--etsy-white);
+  background: var(--card);
   border: 1px solid var(--line);
-  border-radius: 14px;
-  box-shadow: var(--shadow-md);
+  border-radius: 10px;
+  box-shadow: var(--shadow-sec);
   overflow: hidden;
 }
+.pay-card::before {
+  content: '';
+  display: block;
+  height: 3px;
+  background: var(--maroon);
+}
 .pay-brand {
-  padding: 18px 22px;
+  padding: 22px 24px 16px;
   border-bottom: 1px solid var(--line);
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
 }
 .pay-brand img {
   height: 40px;
@@ -1112,20 +1132,113 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   max-width: 100%;
   object-fit: contain;
 }
+.pay-body {
+  padding: 22px 24px 24px;
+}
+.pay-hero {
+  text-align: center;
+  padding: 2px 0 18px;
+}
+.pay-kicker {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
 .pay-amount {
-  font-size: 36px;
+  font-size: 34px;
   font-weight: 700;
-  color: var(--navy);
-  letter-spacing: -0.03em;
+  color: var(--ink);
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+  margin-top: 6px;
+}
+.pay-rows {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--card);
+}
+.pay-rows li {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 11px 14px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+.pay-rows li:first-child {
+  border-top: none;
+}
+.pay-rows span {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.pay-rows strong {
+  color: var(--ink);
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.pay-submit {
+  width: 100%;
+  justify-content: center;
+  min-height: 42px;
 }
 .pay-secure {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  margin-top: 14px;
+  margin: 14px 0 0;
   font-size: 12px;
   color: var(--faint);
+}
+.pay-secure i {
+  font-size: 14px;
+}
+.pay-status {
+  text-align: center;
+  padding: 18px 4px 8px;
+}
+.pay-status .spinner {
+  margin: 0 auto 12px;
+}
+.pay-status h1 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.pay-status p {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.pay-status-ok .pay-amount {
+  margin: 10px 0 8px;
+}
+.pay-status-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--tint);
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pay-status-icon i {
+  font-size: 22px;
 }
 
 /* ---------- Messaging polish ---------- */

@@ -83,14 +83,18 @@ export function AdminAppearance() {
     }
   }
 
-  const appFields = THEME_FIELDS.filter((f) => f.group === 'app');
-  const sidebarFields = THEME_FIELDS.filter((f) => f.group === 'sidebar');
+  const groups: Array<{ id: (typeof THEME_FIELDS)[number]['group']; title: string }> = [
+    { id: 'app', title: 'App' },
+    { id: 'sidebar', title: 'Sidebar & top bar' },
+    { id: 'form', title: 'Forms' },
+    { id: 'status', title: 'Status labels' },
+  ];
 
   return (
     <div>
       <PageHeader
         title="Colors"
-        subtitle="Try colors on this page. Click Save to keep them. Reset puts the default look back right away."
+        subtitle="Try colors here. Save applies them for everyone — admin, customer portal, login, pay pages, and quote forms."
         actions={
           <>
             <button type="button" className="btn btn-ghost" onClick={() => void onReset()} disabled={busy}>
@@ -115,73 +119,86 @@ export function AdminAppearance() {
         </div>
       )}
 
-      <div className="card card-pad theme-card">
-        <div className="theme-card-title">App</div>
-        <div className="theme-fields">
-          {appFields.map((field) => (
-            <ColorField
-              key={field.key}
-              label={field.label}
-              hint={field.hint}
-              hex={hexDraft[field.key]}
-              onChange={(value) => setColor(field.key, value)}
-            />
-          ))}
+      {groups.map((group) => (
+        <div key={group.id} className="card card-pad theme-card">
+          <div className="theme-card-title">{group.title}</div>
+          <div className="theme-fields">
+            {THEME_FIELDS.filter((field) => field.group === group.id).map((field) => (
+              <ColorField
+                key={field.key}
+                label={field.label}
+                hint={field.hint}
+                hex={hexDraft[field.key]}
+                onChange={(value) => setColor(field.key, value)}
+              />
+            ))}
+          </div>
+          {group.id === 'app' && (
+            <div className="theme-preview">
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{ background: draft.buttonBg, color: draft.buttonText, border: 'none' }}
+              >
+                Primary
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{
+                  background: draft.cardBg,
+                  color: draft.mainText,
+                  border: `1px solid ${draft.formBorder}`,
+                }}
+              >
+                Secondary
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{
+                  background: draft.cardBg,
+                  color: draft.accent,
+                  border: `1px solid ${draft.formBorder}`,
+                }}
+              >
+                Danger
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm"
+                style={{ background: draft.accent, color: '#fff', border: 'none' }}
+              >
+                Delete
+              </button>
+            </div>
+          )}
+          {group.id === 'form' && (
+            <div className="theme-preview">
+              <input
+                className="theme-preview-input"
+                defaultValue="Sample field"
+                readOnly
+                style={{
+                  background: draft.formBg,
+                  color: draft.formText,
+                  border: `1px solid ${draft.formFocus}`,
+                }}
+              />
+            </div>
+          )}
+          {group.id === 'status' && (
+            <div className="theme-preview">
+              <span className="theme-preview-chip" style={{ background: `${draft.success}22`, color: draft.success }}>
+                Success
+              </span>
+              <span className="theme-preview-chip" style={{ background: `${draft.warning}22`, color: draft.warning }}>
+                Warning
+              </span>
+            </div>
+          )}
         </div>
-        <div className="theme-preview">
-          <button
-            type="button"
-            className="btn btn-sm"
-            style={{ background: draft.buttonBg, color: draft.buttonText, border: 'none' }}
-          >
-            Primary
-          </button>
-          <button
-            type="button"
-            className="btn btn-sm"
-            style={{
-              background: draft.pageBg,
-              color: draft.mainText,
-              border: `1px solid ${draft.mainText}1a`,
-            }}
-          >
-            Secondary
-          </button>
-          <button
-            type="button"
-            className="btn btn-sm"
-            style={{
-              background: draft.pageBg,
-              color: draft.accent,
-              border: `1px solid ${draft.mainText}1a`,
-            }}
-          >
-            Danger
-          </button>
-          <button
-            type="button"
-            className="btn btn-sm"
-            style={{ background: draft.accent, color: '#fff', border: 'none' }}
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-
-      <div className="card card-pad theme-card">
-        <div className="theme-card-title">Sidebar &amp; top bar</div>
-        <div className="theme-fields">
-          {sidebarFields.map((field) => (
-            <ColorField
-              key={field.key}
-              label={field.label}
-              hint={field.hint}
-              hex={hexDraft[field.key]}
-              onChange={(value) => setColor(field.key, value)}
-            />
-          ))}
-        </div>
-      </div>
+      ))}
     </div>
   );
 }

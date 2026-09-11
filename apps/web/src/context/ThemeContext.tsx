@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   DEFAULT_THEME_COLORS,
   applyTheme,
@@ -24,6 +24,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   );
   const [loaded, setLoaded] = useState(false);
 
+  useLayoutEffect(() => {
+    applyTheme(colors);
+  }, [colors]);
+
   useEffect(() => {
     let cancelled = false;
     void getTheme()
@@ -34,7 +38,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         applyTheme(next);
       })
       .catch(() => {
-        /* keep defaults / stored theme */
+        applyTheme(colors);
       })
       .finally(() => {
         if (!cancelled) setLoaded(true);

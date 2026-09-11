@@ -1,11 +1,14 @@
 import { apiFetch } from './api';
 
 export const THEME_STORAGE_KEY = 'lvd-theme-colors';
+export const THEME_IFRAME_TYPE = 'lvd-apply-theme';
 
 export const THEME_COLOR_KEYS = [
   'pageBg',
+  'cardBg',
   'mainText',
   'secondaryText',
+  'hoverBg',
   'buttonBg',
   'buttonText',
   'accent',
@@ -14,6 +17,12 @@ export const THEME_COLOR_KEYS = [
   'sidebarActiveBg',
   'sidebarActiveText',
   'topbarBg',
+  'formBg',
+  'formText',
+  'formBorder',
+  'formFocus',
+  'success',
+  'warning',
 ] as const;
 
 export type ThemeColorKey = (typeof THEME_COLOR_KEYS)[number];
@@ -21,8 +30,10 @@ export type ThemeColors = Record<ThemeColorKey, string>;
 
 export const DEFAULT_THEME_COLORS: ThemeColors = {
   pageBg: '#FFFFFF',
+  cardBg: '#FFFFFF',
   mainText: '#222222',
   secondaryText: '#4A4A4A',
+  hoverBg: '#F4F5F7',
   buttonBg: '#222222',
   buttonText: '#FFFFFF',
   accent: '#9A1E22',
@@ -31,25 +42,39 @@ export const DEFAULT_THEME_COLORS: ThemeColors = {
   sidebarActiveBg: '#FFFFFF',
   sidebarActiveText: '#222222',
   topbarBg: '#FFFFFF',
+  formBg: '#FFFFFF',
+  formText: '#222222',
+  formBorder: '#E5E7EB',
+  formFocus: '#222222',
+  success: '#1F6B4A',
+  warning: '#A67C00',
 };
 
 export const THEME_FIELDS: Array<{
   key: ThemeColorKey;
   label: string;
   hint: string;
-  group: 'app' | 'sidebar';
+  group: 'app' | 'sidebar' | 'form' | 'status';
 }> = [
-  { key: 'pageBg', label: 'Page background', hint: 'Screen, cards, and popups', group: 'app' },
+  { key: 'pageBg', label: 'Page background', hint: 'Screen behind cards', group: 'app' },
+  { key: 'cardBg', label: 'Card background', hint: 'Cards and popups', group: 'app' },
   { key: 'mainText', label: 'Main text', hint: 'Titles and body text', group: 'app' },
   { key: 'secondaryText', label: 'Secondary text', hint: 'Labels and hints', group: 'app' },
+  { key: 'hoverBg', label: 'Hover background', hint: 'Rows and menus on hover', group: 'app' },
   { key: 'buttonBg', label: 'Button color', hint: 'Main buttons', group: 'app' },
   { key: 'buttonText', label: 'Button text', hint: 'Words on main buttons', group: 'app' },
-  { key: 'accent', label: 'Accent color', hint: 'Errors, delete, and alerts', group: 'app' },
+  { key: 'accent', label: 'Accent color', hint: 'Links, errors, and alerts', group: 'app' },
   { key: 'sidebarBg', label: 'Sidebar background', hint: 'Left menu background', group: 'sidebar' },
   { key: 'sidebarText', label: 'Menu text', hint: 'Sidebar links', group: 'sidebar' },
   { key: 'sidebarActiveBg', label: 'Active menu background', hint: 'The page you are on', group: 'sidebar' },
   { key: 'sidebarActiveText', label: 'Active menu text', hint: 'Selected page text', group: 'sidebar' },
   { key: 'topbarBg', label: 'Top bar background', hint: 'Bar across the top', group: 'sidebar' },
+  { key: 'formBg', label: 'Field background', hint: 'Inputs and quote forms', group: 'form' },
+  { key: 'formText', label: 'Field text', hint: 'Typed text in boxes', group: 'form' },
+  { key: 'formBorder', label: 'Field border', hint: 'Input outlines', group: 'form' },
+  { key: 'formFocus', label: 'Field focus', hint: 'Border when a box is selected', group: 'form' },
+  { key: 'success', label: 'Success', hint: 'Done and paid labels', group: 'status' },
+  { key: 'warning', label: 'Warning', hint: 'Waiting and caution labels', group: 'status' },
 ];
 
 const HEX = /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/;
@@ -108,17 +133,13 @@ function rgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-export function applyTheme(colors: ThemeColors) {
-  if (typeof document === 'undefined') return;
+export function themeCssVars(colors: ThemeColors): Record<string, string> {
   const c = normalizeTheme(colors);
-  const tint = c.pageBg;
-  const tintHover = mix(c.pageBg, c.mainText, 0.08);
   const faint = mix(c.secondaryText, c.pageBg, 0.22);
-  const root = document.documentElement;
-  const vars: Record<string, string> = {
+  return {
     '--bg': c.pageBg,
-    '--card': c.pageBg,
-    '--etsy-white': c.pageBg,
+    '--card': c.cardBg,
+    '--etsy-white': c.cardBg,
     '--ink': c.mainText,
     '--navy': c.buttonBg,
     '--navy-d': darken(c.buttonBg, 0.45),
@@ -126,19 +147,21 @@ export function applyTheme(colors: ThemeColors) {
     '--faint': faint,
     '--maroon': c.accent,
     '--maroon-d': darken(c.accent, 0.18),
+    '--brand': c.accent,
+    '--brand-d': darken(c.accent, 0.18),
     '--line': rgba(c.mainText, 0.1),
     '--line-s': rgba(c.mainText, 0.06),
-    '--tint': tint,
-    '--tint-m': tint,
-    '--tint-hover': tintHover,
-    '--green': c.buttonBg,
-    '--green-bg': c.pageBg,
-    '--amber': c.mainText,
-    '--amber-bg': c.pageBg,
-    '--purple': c.mainText,
-    '--purple-bg': c.pageBg,
-    '--focus': `0 0 0 3px ${rgba(c.buttonBg, 0.16)}`,
-    '--dash-white': c.pageBg,
+    '--tint': mix(c.pageBg, c.mainText, 0.04),
+    '--tint-m': mix(c.pageBg, c.accent, 0.12),
+    '--tint-hover': c.hoverBg,
+    '--green': c.success,
+    '--green-bg': mix(c.pageBg, c.success, 0.14),
+    '--amber': c.warning,
+    '--amber-bg': mix(c.pageBg, c.warning, 0.14),
+    '--purple': c.buttonBg,
+    '--purple-bg': mix(c.pageBg, c.buttonBg, 0.1),
+    '--focus': `0 0 0 3px ${rgba(c.formFocus, 0.16)}`,
+    '--dash-white': c.cardBg,
     '--dash-ink': c.mainText,
     '--dash-muted': c.secondaryText,
     '--dash-faint': faint,
@@ -150,10 +173,26 @@ export function applyTheme(colors: ThemeColors) {
     '--sidebar-active-bg': c.sidebarActiveBg,
     '--sidebar-active-text': c.sidebarActiveText,
     '--topbar-bg': c.topbarBg,
+    '--form-bg': c.formBg,
+    '--form-text': c.formText,
+    '--form-border': c.formBorder,
+    '--form-focus': c.formFocus,
+    '--form-muted': c.secondaryText,
+    '--form-label': c.mainText,
+    '--hover-bg': c.hoverBg,
   };
-  for (const [key, value] of Object.entries(vars)) {
+}
+
+export function applyTheme(colors: ThemeColors, root: HTMLElement | null = typeof document === 'undefined' ? null : document.documentElement) {
+  if (!root) return;
+  for (const [key, value] of Object.entries(themeCssVars(colors))) {
     root.style.setProperty(key, value);
   }
+}
+
+export function postThemeToWindow(win: Window | null | undefined, colors: ThemeColors) {
+  if (!win) return;
+  win.postMessage({ type: THEME_IFRAME_TYPE, colors: normalizeTheme(colors) }, '*');
 }
 
 export function readStoredTheme(): ThemeColors | null {
@@ -187,3 +226,4 @@ export function saveTheme(colors: ThemeColors) {
 
 const stored = readStoredTheme();
 if (stored) applyTheme(stored);
+else if (typeof document !== 'undefined') applyTheme(DEFAULT_THEME_COLORS);

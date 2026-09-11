@@ -13,6 +13,8 @@ import { getErrorMessage } from '@/lib/api';
 import { getCustomer, getMyCustomer } from '@/lib/customers';
 import { money } from '@/lib/format';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
+import { postThemeToWindow } from '@/lib/theme';
 import { invalidateWorkCaches } from '@/lib/queryCache';
 
 type PriceLine = { name: string; note: string; price: string };
@@ -117,6 +119,7 @@ export function QuoteBuilderModal({
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { user } = useAuth();
+  const { colors: themeColors } = useTheme();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [service, setService] = useState<(typeof SERVICES)[number] | null>(null);
   const isAdmin = Boolean(adminFor);
@@ -156,6 +159,11 @@ export function QuoteBuilderModal({
     setPriceLines([emptyPriceLine()]);
     if (iframeRef.current) iframeRef.current.src = 'about:blank';
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    postThemeToWindow(iframeRef.current?.contentWindow, themeColors);
+  }, [open, themeColors, service]);
 
   useEffect(() => {
     if (!open) {
@@ -346,6 +354,7 @@ export function QuoteBuilderModal({
       if (data.type === 'lvd-form-ready') {
         const win = iframeRef.current?.contentWindow;
         if (win) {
+          postThemeToWindow(win, themeColors);
           win.postMessage(
             {
               type: 'lvd-set-context',
@@ -389,7 +398,7 @@ export function QuoteBuilderModal({
     }
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
-  }, [open, submitFromIframe, onClose, navigate, customerPrefs, service, isAdmin, isDirectOrder]);
+  }, [open, submitFromIframe, onClose, navigate, customerPrefs, service, isAdmin, isDirectOrder, themeColors]);
 
   if (!open) return null;
 
@@ -500,6 +509,7 @@ export function QuoteBuilderModal({
                     onLoad={() => {
                       const win = iframeRef.current?.contentWindow;
                       if (!win) return;
+                      postThemeToWindow(win, themeColors);
                       win.postMessage(
                         {
                           type: 'lvd-set-context',

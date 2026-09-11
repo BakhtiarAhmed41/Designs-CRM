@@ -7,6 +7,8 @@ import { getMyCustomer } from '@/lib/customers';
 import { invalidateWorkCaches } from '@/lib/queryCache';
 import { useDialog } from '@/components/ui/AppDialog';
 import { useTopbarLead } from '@/components/Shell';
+import { useTheme } from '@/context/ThemeContext';
+import { postThemeToWindow } from '@/lib/theme';
 
 type ServiceKey = 'embroidery' | 'svg' | 'vector' | 'laser';
 
@@ -81,11 +83,16 @@ export function QuoteFormPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const { colors: themeColors } = useTheme();
 
   useEffect(() => {
     const match = SERVICES.find((s) => s.key === initial);
     setService(match ?? null);
   }, [initial]);
+
+  useEffect(() => {
+    postThemeToWindow(iframeRef.current?.contentWindow, themeColors);
+  }, [themeColors, service]);
 
   useEffect(() => {
     void getMyCustomer()
@@ -199,6 +206,7 @@ export function QuoteFormPage() {
       if (data.type === 'lvd-form-ready') {
         const win = iframeRef.current?.contentWindow;
         if (win) {
+          postThemeToWindow(win, themeColors);
           win.postMessage({ type: 'lvd-set-context', role: 'customer', kind: 'quote' }, '*');
         }
         if (win && customerPrefs) {
@@ -232,7 +240,7 @@ export function QuoteFormPage() {
     }
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
-  }, [submitFromIframe, navigate, customerPrefs, service, qc]);
+  }, [submitFromIframe, navigate, customerPrefs, service, qc, themeColors]);
 
   const topbarLead = useMemo(
     () => (
@@ -305,6 +313,7 @@ export function QuoteFormPage() {
               src={`/portal-forms/${service.key}.html`}
               onLoad={() => {
                 const win = iframeRef.current?.contentWindow;
+                postThemeToWindow(win, themeColors);
                 win?.postMessage({ type: 'lvd-request-height' }, '*');
               }}
             />

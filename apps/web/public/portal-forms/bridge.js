@@ -595,5 +595,8 @@
     if (data.type === 'lvd-request-height') {
       reportHeightSoon();
     }
+    if (data.type === 'lvd-apply-theme' && typeof window.LVD_APPLY_THEME === 'function') {
+      window.LVD_APPLY_THEME(data.colors);
+    }
   });
 })();

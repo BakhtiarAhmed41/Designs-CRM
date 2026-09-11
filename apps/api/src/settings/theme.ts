@@ -4,8 +4,10 @@ export const THEME_SETTING_KEY = 'theme.colors';
 
 export const THEME_COLOR_KEYS = [
   'pageBg',
+  'cardBg',
   'mainText',
   'secondaryText',
+  'hoverBg',
   'buttonBg',
   'buttonText',
   'accent',
@@ -14,20 +16,26 @@ export const THEME_COLOR_KEYS = [
   'sidebarActiveBg',
   'sidebarActiveText',
   'topbarBg',
+  'formBg',
+  'formText',
+  'formBorder',
+  'formFocus',
+  'success',
+  'warning',
 ] as const;
 
 export type ThemeColorKey = (typeof THEME_COLOR_KEYS)[number];
 export type ThemeColors = Record<ThemeColorKey, string>;
 
 const HEX = /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/;
-const hexField = z
-  .string()
-  .regex(HEX, 'Enter a color like #222222');
+const hexField = z.string().regex(HEX, 'Enter a color like #222222');
 
 export const DEFAULT_THEME_COLORS: ThemeColors = {
   pageBg: '#FFFFFF',
+  cardBg: '#FFFFFF',
   mainText: '#222222',
   secondaryText: '#4A4A4A',
+  hoverBg: '#F4F5F7',
   buttonBg: '#222222',
   buttonText: '#FFFFFF',
   accent: '#9A1E22',
@@ -36,6 +44,12 @@ export const DEFAULT_THEME_COLORS: ThemeColors = {
   sidebarActiveBg: '#FFFFFF',
   sidebarActiveText: '#222222',
   topbarBg: '#FFFFFF',
+  formBg: '#FFFFFF',
+  formText: '#222222',
+  formBorder: '#E5E7EB',
+  formFocus: '#222222',
+  success: '#1F6B4A',
+  warning: '#A67C00',
 };
 
 export const themeColorsSchema = z.object({
@@ -50,6 +64,14 @@ export const themeColorsSchema = z.object({
   sidebarActiveBg: hexField,
   sidebarActiveText: hexField,
   topbarBg: hexField,
+  cardBg: hexField.optional(),
+  hoverBg: hexField.optional(),
+  formBg: hexField.optional(),
+  formText: hexField.optional(),
+  formBorder: hexField.optional(),
+  formFocus: hexField.optional(),
+  success: hexField.optional(),
+  warning: hexField.optional(),
 });
 
 export function normalizeHex(value: string): string | null {

@@ -34,9 +34,18 @@
   --maroon-d: #7d181b;
   --sidebar-bg: #FFFFFF;
   --sidebar-text: #222222;
-  --sidebar-active-bg: #FFFFFF;
   --sidebar-active-text: #222222;
+  --sidebar-active-bg: #FFFFFF;
   --topbar-bg: #FFFFFF;
+  --brand: #9A1E22;
+  --brand-d: #7d181b;
+  --form-bg: #FFFFFF;
+  --form-text: #222222;
+  --form-border: #E5E7EB;
+  --form-focus: #222222;
+  --form-muted: #4A4A4A;
+  --form-label: #222222;
+  --hover-bg: #F4F5F7;
 }
 
 body {
@@ -1018,6 +1027,30 @@ button.ghost i { color: var(--ink); }
   background: var(--tint) !important;
   color: var(--ink) !important;
 }
+.c-done,
+.c-paid,
+.pay-paid {
+  background: var(--green-bg) !important;
+  color: var(--green) !important;
+}
+.c-wait,
+.c-review,
+.nic.warn {
+  background: var(--amber-bg) !important;
+  color: var(--amber) !important;
+}
+.c-unpaid,
+.pay-unpaid {
+  background: var(--tint-m) !important;
+  color: var(--maroon) !important;
+}
+.c-prog,
+.c-quote,
+.c-new,
+.c-assigned {
+  background: var(--purple-bg) !important;
+  color: var(--navy) !important;
+}
 .role-pill { border-radius: 6px; padding: 3px 8px; }
 
 .card { padding: 0; }
@@ -1026,7 +1059,8 @@ button.ghost i { color: var(--ink); }
 .card-b { padding: 18px 12px; }
 .card-pad { padding: 20px 12px; }
 .card .qtable, .card .itable { margin: 0; }
-.pay-card .card-b { padding: 22px; }
+.pay-card .card-b,
+.pay-body { padding: 22px 24px 24px; }
 
 .ph { margin-bottom: 0; align-items: flex-start; padding-bottom: 2px; }
 .ph-actions { gap: 8px; }
@@ -1531,6 +1565,9 @@ body,
 .login-card,
 .pay-card,
 .pay-brand,
+.pay-body,
+.pay-rows,
+.pay-status-icon,
 .modal,
 .omod,
 .app-dialog,
@@ -1622,6 +1659,8 @@ body,
 h1, h2, h3, h4,
 .ph h1,
 .login-title,
+.pay-amount,
+.pay-status h1,
 .stat .sv,
 .stat .sv.maroon,
 .metric .mv,
@@ -1847,6 +1886,22 @@ button.primary i,
   padding-top: 14px;
   border-top: 1px solid var(--line);
 }
+.theme-preview-input {
+  min-width: 220px;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font: inherit;
+}
+.theme-preview-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 650;
+}
 @media (max-width: 640px) {
   .theme-field {
     flex-direction: column;
@@ -2018,8 +2073,8 @@ button.primary i,
   align-items: center;
   padding: 1px 7px;
   border-radius: 999px;
-  background: #fde8d8;
-  color: #9a3412;
+  background: var(--tint-m);
+  color: var(--maroon);
   font-size: 10px;
   font-weight: 800;
   letter-spacing: .04em;
@@ -2066,11 +2121,11 @@ button.primary i,
   border-radius: 50%;
   background: currentColor;
 }
-.portal-chip.c-progress { background: #e8f1fb !important; color: #1d4ed8 !important; }
-.portal-chip.c-review { background: #fef6d8 !important; color: #a16207 !important; }
-.portal-chip.c-revision { background: #ffedd5 !important; color: #c2410c !important; }
-.portal-chip.c-delivered { background: #dcfce7 !important; color: #15803d !important; }
-.portal-chip.c-cancelled { background: #fee2e2 !important; color: #b91c1c !important; }
+.portal-chip.c-progress { background: var(--purple-bg) !important; color: var(--navy) !important; }
+.portal-chip.c-review { background: var(--amber-bg) !important; color: var(--amber) !important; }
+.portal-chip.c-revision { background: var(--tint-m) !important; color: var(--maroon) !important; }
+.portal-chip.c-delivered { background: var(--green-bg) !important; color: var(--green) !important; }
+.portal-chip.c-cancelled { background: var(--tint-m) !important; color: var(--maroon) !important; }
 .quote-table th {
   background: transparent;
   color: var(--muted);
@@ -2128,12 +2183,12 @@ button.primary i,
   overflow: visible;
 }
 .portal-side .nav a .cnt {
-  background: #fde8d8;
-  color: #9a3412;
+  background: var(--tint-m);
+  color: var(--maroon);
 }
 .portal-side .nav a.on .cnt {
-  background: #fde8d8;
-  color: #9a3412;
+  background: var(--tint-m);
+  color: var(--maroon);
 }
 .orow.inbox-row.msg-compact {
   grid-template-columns: 22px minmax(0, 1fr) 10px 28px;
@@ -2384,4 +2439,80 @@ button.primary i,
   .quote-page-h { padding-bottom: 6px; margin-bottom: 6px; }
   .quote-page-h h1 { font-size: 16px; }
   .quote-page-h p { display: none; }
+}
+
+/* Saved admin colors win over leftover hardcoded styles */
+.nav a,
+.nav a i,
+.logout-link,
+.logout-link i {
+  color: var(--sidebar-text);
+}
+.nav a:hover,
+.logout-link:hover {
+  background: var(--sidebar-active-bg);
+}
+.nav a.on,
+.nav a.on i {
+  color: var(--sidebar-active-text);
+}
+.btn-primary,
+button.primary,
+.btn.primary {
+  background: var(--button-bg);
+  color: var(--button-text);
+}
+.btn-primary:hover:not(:disabled),
+button.primary:hover:not(:disabled),
+.btn.primary:hover:not(:disabled) {
+  background: var(--button-bg-hover);
+  color: var(--button-text);
+}
+.searchbar input,
+.ff input,
+.ff select,
+.ff textarea,
+.pf input,
+.pf select,
+.login-field input,
+.stat-select,
+.inbox-start-input,
+.notes-box,
+.msg-search,
+.msg-composer-row textarea {
+  background: var(--form-bg);
+  color: var(--form-text);
+  border-color: var(--form-border);
+}
+.searchbar input:focus,
+.ff input:focus,
+.ff select:focus,
+.ff textarea:focus,
+.pf input:focus,
+.pf select:focus,
+.login-field input:focus,
+.inbox-start-input:focus,
+.notes-box:focus,
+.msg-search:focus,
+.msg-composer-row textarea:focus {
+  border-color: var(--form-focus);
+}
+.orow:hover,
+.crow:hover,
+.mrow:hover,
+.nitem:hover,
+.sd-item:hover,
+.folder:hover {
+  background: var(--hover-bg);
+}
+.card,
+.stat,
+.task,
+.help-card,
+.pay-card,
+.login-card,
+.search-drop,
+.notif-drop,
+.acct-drop {
+  background: var(--card);
 }
