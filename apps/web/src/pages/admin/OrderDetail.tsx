@@ -1006,7 +1006,7 @@ export function AdminOrderDetail() {
                           setPublishSaved(false);
                         }}
                       >
-                        Publish
+                        Attach file and publish
                       </button>
                       <span style={{ color: 'var(--ink)', fontWeight: 600 }}>
                         {d.name}
