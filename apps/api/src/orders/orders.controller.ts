@@ -19,7 +19,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import type { AuthUser } from '../auth/auth.types';
 import { EditsService } from '../edits/edits.service';
 import { OrdersService } from './orders.service';
-import { OrderStatus, OrderType } from '../common/enums';
+import { OrderStatus, OrderType, PreviewStatus } from '../common/enums';
 
 const createOrderSchema = z.object({
   type: z.enum(['ORDER', 'QUOTE_REQUEST', 'QUOTATION_REQUEST']).optional(),
@@ -56,6 +56,11 @@ const counterQuotationSchema = z.object({
   amountCents: z.number().int().positive().optional().nullable(),
   currency: z.string().min(1).optional().nullable(),
   comment: z.string().optional().nullable(),
+});
+
+const previewDecisionSchema = z.object({
+  decision: z.enum(['APPROVED', 'CHANGES_REQUESTED']),
+  note: z.string().max(2000).optional().nullable(),
 });
 
 @Controller('orders')
@@ -219,6 +224,30 @@ export class OrdersController {
     @Param('deliveryFileId') deliveryFileId: string,
   ) {
     return this.orders.getMyDeliveryFileSignedUrl(user, orderId, deliveryFileId);
+  }
+
+  @Get(':id/delivery-files/:deliveryFileId/preview-url')
+  async getDeliveryFilePreviewUrl(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('id') orderId: string,
+    @Param('deliveryFileId') deliveryFileId: string,
+  ) {
+    return this.orders.getMyDeliveryFilePreviewUrl(user, orderId, deliveryFileId);
+  }
+
+  @Post(':id/previews/:deliveryId/decision')
+  async decidePreview(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('id') orderId: string,
+    @Param('deliveryId') deliveryId: string,
+    @Body() body: unknown,
+  ) {
+    const data = previewDecisionSchema.parse(body ?? {});
+    const order = await this.orders.decidePreview(user, orderId, deliveryId, {
+      decision: data.decision as PreviewStatus,
+      note: data.note,
+    });
+    return { order };
   }
 
   @Patch(':id/quotations/accept')

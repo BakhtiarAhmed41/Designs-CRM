@@ -21,6 +21,12 @@ function getSocket() {
   return shared;
 }
 
+export function emitConversationTyping(conversationId: string, typing: boolean) {
+  const socket = getSocket();
+  if (!socket.connected) socket.connect();
+  socket.emit(typing ? 'typing:start' : 'typing:stop', { conversationId });
+}
+
 export function useMessagingSocket(handlers: {
   onMessageNew?: Handler;
   onConversationUpdated?: Handler;
@@ -28,6 +34,7 @@ export function useMessagingSocket(handlers: {
   onTeamMessage?: Handler;
   onPresenceUpdate?: Handler;
   onNotificationNew?: Handler;
+  onTyping?: Handler;
   conversationId?: string | null;
   peerId?: string | null;
 }) {
@@ -75,6 +82,9 @@ export function useMessagingSocket(handlers: {
       void qc.invalidateQueries({ queryKey: ['notifications'] });
       void invalidateWorkCaches(qc);
     };
+    const onTyping = (payload: unknown) => {
+      handlersRef.current.onTyping?.(payload);
+    };
     const onPresenceUpdate = (payload: unknown) => {
       handlersRef.current.onPresenceUpdate?.(payload);
       const p = payload as { userId?: string; presence?: string };
@@ -99,6 +109,7 @@ export function useMessagingSocket(handlers: {
     socket.on('unread:changed', onUnreadChanged);
     socket.on('team:message', onTeamMessage);
     socket.on('notification:new', onNotificationNew);
+    socket.on('typing', onTyping);
     socket.on('presence:update', onPresenceUpdate);
 
     const onVisibility = () => {
@@ -117,6 +128,7 @@ export function useMessagingSocket(handlers: {
       socket.off('unread:changed', onUnreadChanged);
       socket.off('team:message', onTeamMessage);
       socket.off('notification:new', onNotificationNew);
+      socket.off('typing', onTyping);
       socket.off('presence:update', onPresenceUpdate);
       document.removeEventListener('visibilitychange', onVisibility);
     };

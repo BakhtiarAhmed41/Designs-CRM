@@ -131,11 +131,8 @@ export function PortalShell() {
         <NavLink to="/portal/quotes/new?service=vector">
           <i className="ti ti-vector-bezier" /> Vector &amp; Print
         </NavLink>
-        <NavLink to="/portal/quotes/new?service=svg">
-          <i className="ti ti-vector-triangle" /> SVG &amp; Cricut Files
-        </NavLink>
         <NavLink to="/portal/quotes/new?service=laser">
-          <i className="ti ti-router" /> CNC &amp; Laser Files
+          <i className="ti ti-router" /> Cut, Print &amp; Engraving
         </NavLink>
       </nav>
       <NavGroup label="Account" items={account} />

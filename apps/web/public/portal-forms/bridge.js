@@ -19,6 +19,13 @@
           /* still collect advanced via dedicated helper */
         }
       }
+      if (
+        node.classList.contains('lvd-step1') ||
+        node.classList.contains('lvd-step2')
+      ) {
+        node = node.parentElement;
+        continue;
+      }
       var st = window.getComputedStyle(node);
       if (st.display === 'none' || st.visibility === 'hidden') return false;
       node = node.parentElement;
@@ -38,11 +45,12 @@
   }
 
   function getMode() {
-    var q = document.getElementById('mode-q');
-    return q && q.classList.contains('vis') ? 'q' : 'd';
+    return 'd';
   }
 
   function getDesignName() {
+    var proj = document.getElementById('proj-name');
+    if (proj && proj.value && proj.value.trim()) return proj.value.trim();
     var sls = document.querySelectorAll('.cb > .sl');
     for (var i = 0; i < sls.length; i++) {
       var t = sls[i].textContent.trim().toLowerCase();

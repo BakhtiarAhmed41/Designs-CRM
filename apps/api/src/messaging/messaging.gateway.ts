@@ -217,7 +217,46 @@ export class MessagingGateway
     @MessageBody() body: { conversationId?: string },
   ) {
     if (!body?.conversationId) return { ok: false };
+    const user = client.data.user as SocketUser | undefined;
+    if (user) {
+      client.to(`conversation:${body.conversationId}`).emit('typing', {
+        conversationId: body.conversationId,
+        userId: user.id,
+        typing: false,
+      });
+    }
     await client.leave(`conversation:${body.conversationId}`);
+    return { ok: true };
+  }
+
+  @SubscribeMessage('typing:start')
+  onTypingStart(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { conversationId?: string },
+  ) {
+    return this.emitTyping(client, body?.conversationId, true);
+  }
+
+  @SubscribeMessage('typing:stop')
+  onTypingStop(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { conversationId?: string },
+  ) {
+    return this.emitTyping(client, body?.conversationId, false);
+  }
+
+  private emitTyping(
+    client: Socket,
+    conversationId: string | undefined,
+    typing: boolean,
+  ) {
+    const user = client.data.user as SocketUser | undefined;
+    if (!user || !conversationId) return { ok: false };
+    client.to(`conversation:${conversationId}`).emit('typing', {
+      conversationId,
+      userId: user.id,
+      typing,
+    });
     return { ok: true };
   }
 

@@ -91,6 +91,9 @@ export type Attachment = {
   originalName: string;
 };
 
+export type DeliveryKind = 'FINAL' | 'PREVIEW';
+export type PreviewStatus = 'PENDING' | 'APPROVED' | 'CHANGES_REQUESTED';
+
 export type DeliveryFile = {
   id: string;
   designId?: string | null;
@@ -106,6 +109,8 @@ export type Delivery = {
   deliveredVia: string;
   createdAt: string;
   releasedAt?: string | null;
+  kind?: DeliveryKind;
+  previewStatus?: PreviewStatus | null;
   files: DeliveryFile[];
 };
 

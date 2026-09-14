@@ -5,11 +5,13 @@ import { confirmMyOrder, startMyOrderCheckout } from '@/lib/billing';
 import {
   acceptQuotation,
   getMyOrder,
+  decidePreview,
   myAttachmentUrl,
   myDeliveryFileUrl,
   rejectQuotation,
   uploadAttachments,
 } from '@/lib/orders';
+import { DeliveryPreview } from '@/components/FilePreview';
 import { listMyEdits, requestEdit } from '@/lib/edits';
 import { RevisionRequestForm } from '@/components/RevisionRequestForm';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
@@ -193,6 +195,21 @@ export function PortalOrderDetail() {
     },
     onError: (e) => setActionError(getErrorMessage(e)),
   });
+  const previewDecision = useMutation({
+    mutationFn: (input: {
+      deliveryId: string;
+      decision: 'APPROVED' | 'CHANGES_REQUESTED';
+      note?: string;
+    }) => decidePreview(id, input.deliveryId, input),
+    onSuccess: (res) => {
+      setActionError(null);
+      applyOrderChange(qc, res.order);
+      void qc.invalidateQueries({ queryKey: ['my-order', id] });
+      void qc.invalidateQueries({ queryKey: ['my-files'] });
+    },
+    onError: (e) => setActionError(getErrorMessage(e)),
+  });
+
   const reject = useMutation({
     mutationFn: () => rejectQuotation(id),
     onSuccess: (res) => {
@@ -499,25 +516,108 @@ export function PortalOrderDetail() {
               </span>
             </div>
             {order.deliveries && order.deliveries.length > 0 ? (
-              <div className="od-files">
-                {order.deliveries.flatMap((d) =>
-                  d.files.map((f) => (
-                    <div key={f.id} className="odf">
-                      <i className={`ti ${serviceTi(f.formatLabel)}`} />
-                      <span>{f.originalName}</span>
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-sm"
-                        onClick={() =>
-                          downloadSignedFile(myDeliveryFileUrl(order.id, f.id), f.originalName)
-                        }
-                      >
-                        <i className="ti ti-download" /> Download
-                      </button>
-                    </div>
-                  )),
+              <>
+                {order.deliveries.some((d) => d.kind === 'PREVIEW') && (
+                  <div className="od-files-block">
+                    <div className="od-files-label">Preview for approval</div>
+                    <p className="muted od-files-hint">
+                      Look at the design here. You cannot download a preview.
+                    </p>
+                    {order.deliveries
+                      .filter((d) => d.kind === 'PREVIEW')
+                      .map((d) => (
+                        <div key={d.id} className="od-preview-batch">
+                          <div className="od-files">
+                            {d.files.map((f) => (
+                              <DeliveryPreview
+                                key={f.id}
+                                orderId={order.id}
+                                fileId={f.id}
+                                name={f.originalName}
+                                mimeType={f.mimeType}
+                              />
+                            ))}
+                          </div>
+                          {d.previewStatus === 'PENDING' && (
+                            <div className="od-preview-actions">
+                              <button
+                                type="button"
+                                className="btn btn-primary btn-sm"
+                                disabled={previewDecision.isPending}
+                                onClick={() =>
+                                  previewDecision.mutate({
+                                    deliveryId: d.id,
+                                    decision: 'APPROVED',
+                                  })
+                                }
+                              >
+                                Approve preview
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-ghost btn-sm"
+                                disabled={previewDecision.isPending}
+                                onClick={() =>
+                                  previewDecision.mutate({
+                                    deliveryId: d.id,
+                                    decision: 'CHANGES_REQUESTED',
+                                  })
+                                }
+                              >
+                                Request changes
+                              </button>
+                            </div>
+                          )}
+                          {d.previewStatus === 'APPROVED' && (
+                            <p className="muted od-files-hint">You approved this preview.</p>
+                          )}
+                          {d.previewStatus === 'CHANGES_REQUESTED' && (
+                            <p className="muted od-files-hint">You asked for changes on this preview.</p>
+                          )}
+                        </div>
+                      ))}
+                  </div>
                 )}
-              </div>
+                {order.deliveries.some((d) => d.kind !== 'PREVIEW') ? (
+                  <div className="od-files-block">
+                    <div className="od-files-label">Final files</div>
+                    <div className="od-files">
+                      {order.deliveries
+                        .filter((d) => d.kind !== 'PREVIEW')
+                        .flatMap((d) =>
+                          d.files.map((f) => (
+                            <div key={f.id} className="odf odf-final">
+                              <DeliveryPreview
+                                orderId={order.id}
+                                fileId={f.id}
+                                name={f.originalName}
+                                mimeType={f.mimeType}
+                              />
+                              <button
+                                type="button"
+                                className="btn btn-ghost btn-sm"
+                                onClick={() =>
+                                  downloadSignedFile(
+                                    myDeliveryFileUrl(order.id, f.id),
+                                    f.originalName,
+                                  )
+                                }
+                              >
+                                <i className="ti ti-download" /> Download
+                              </button>
+                            </div>
+                          )),
+                        )}
+                    </div>
+                  </div>
+                ) : (
+                  !order.deliveries.some((d) => d.kind === 'PREVIEW') && (
+                    <div className="muted" style={{ padding: '14px 16px 16px', fontSize: 13.5 }}>
+                      Files show up here after our team releases them. You can also find them under Files.
+                    </div>
+                  )
+                )}
+              </>
             ) : (
               <div className="muted" style={{ padding: '14px 16px 16px', fontSize: 13.5 }}>
                 Files show up here after our team releases them. You can also find them under Files.

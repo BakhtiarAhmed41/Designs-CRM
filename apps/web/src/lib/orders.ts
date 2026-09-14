@@ -288,6 +288,7 @@ export function deliverOrder(
     notifySms?: boolean;
     complete?: boolean;
     release?: boolean;
+    kind?: 'FINAL' | 'PREVIEW';
   },
 ) {
   const form = new FormData();
@@ -301,6 +302,7 @@ export function deliverOrder(
   if (options?.complete !== undefined)
     form.append('complete', String(options.complete));
   if (options?.release !== undefined) form.append('release', String(options.release));
+  if (options?.kind) form.append('kind', options.kind);
   return apiFetchForm<{ order: Order; partial?: boolean }>(
     `/admin/orders/${orderId}/deliveries`,
     form,
@@ -312,6 +314,20 @@ export function myAttachmentUrl(orderId: string, attachmentId: string) {
 }
 export function myDeliveryFileUrl(orderId: string, fileId: string) {
   return `/orders/${orderId}/delivery-files/${fileId}/signed-url`;
+}
+export function myDeliveryFilePreviewUrl(orderId: string, fileId: string) {
+  return `/orders/${orderId}/delivery-files/${fileId}/preview-url`;
+}
+
+export function decidePreview(
+  orderId: string,
+  deliveryId: string,
+  data: { decision: 'APPROVED' | 'CHANGES_REQUESTED'; note?: string | null },
+) {
+  return apiFetch<{ order: Order }>(`/orders/${orderId}/previews/${deliveryId}/decision`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
 }
 
 export function deleteAdminOrder(orderId: string) {

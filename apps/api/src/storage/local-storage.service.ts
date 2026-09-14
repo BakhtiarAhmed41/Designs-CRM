@@ -71,15 +71,15 @@ export class LocalStorageService {
     await writeFile(full, opts.body);
   }
 
-  private sign(key: string, exp: number): string {
+  private sign(key: string, exp: number, inline = false): string {
     return createHmac('sha256', signSecret())
-      .update(`${key}\n${exp}`)
+      .update(inline ? `${key}\n${exp}\ninline` : `${key}\n${exp}`)
       .digest('hex');
   }
 
-  verify(key: string, exp: number, sig: string): boolean {
+  verify(key: string, exp: number, sig: string, inline = false): boolean {
     if (!Number.isFinite(exp) || Date.now() > exp) return false;
-    const expected = this.sign(key, exp);
+    const expected = this.sign(key, exp, inline);
     return expected === sig;
   }
 
@@ -91,16 +91,19 @@ export class LocalStorageService {
     key: string;
     expiresInSeconds?: number;
     downloadAs?: string;
+    inline?: boolean;
   }): Promise<string> {
     const env = getEnv();
     const ttl = opts.expiresInSeconds ?? env.STORAGE_SIGNED_URL_TTL_SECONDS;
     const exp = Date.now() + ttl * 1000;
-    const sig = this.sign(opts.key, exp);
+    const inline = Boolean(opts.inline);
+    const sig = this.sign(opts.key, exp, inline);
     const params = new URLSearchParams({
       key: opts.key,
       exp: String(exp),
       sig,
     });
+    if (inline) params.set('inline', '1');
     if (opts.downloadAs) params.set('name', sanitizeFilename(opts.downloadAs));
     return `/api/files/download?${params.toString()}`;
   }

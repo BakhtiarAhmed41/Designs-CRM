@@ -1,10 +1,11 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useDialog } from '@/components/ui/AppDialog';
 
 type Props = {
   disabled?: boolean;
   placeholder?: string;
   onSend: (body: string, files: File[]) => Promise<void> | void;
+  onTyping?: (typing: boolean) => void;
   templates?: Array<{ id: string; title: string; body: string }>;
   onCreateTemplate?: (title: string, body: string) => Promise<void> | void;
   onDeleteTemplate?: (id: string) => Promise<void> | void;
@@ -14,6 +15,7 @@ export function MessageComposer({
   disabled,
   placeholder = 'Type a message…',
   onSend,
+  onTyping,
   templates,
   onCreateTemplate,
   onDeleteTemplate,
@@ -23,11 +25,41 @@ export function MessageComposer({
   const [files, setFiles] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const typingOn = useRef(false);
+  const stopTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onTypingRef = useRef(onTyping);
+  onTypingRef.current = onTyping;
+
+  function setTyping(next: boolean) {
+    if (!onTypingRef.current) return;
+    if (typingOn.current === next) return;
+    typingOn.current = next;
+    onTypingRef.current(next);
+  }
+
+  function bumpTyping(hasText: boolean) {
+    if (!onTypingRef.current) return;
+    if (stopTimer.current) clearTimeout(stopTimer.current);
+    if (!hasText) {
+      setTyping(false);
+      return;
+    }
+    setTyping(true);
+    stopTimer.current = setTimeout(() => setTyping(false), 1600);
+  }
+
+  useEffect(() => {
+    return () => {
+      if (stopTimer.current) clearTimeout(stopTimer.current);
+      if (typingOn.current) onTypingRef.current?.(false);
+    };
+  }, []);
 
   async function submit() {
     if (disabled || sending) return;
     if (!draft.trim() && files.length === 0) return;
     setSending(true);
+    setTyping(false);
     try {
       await onSend(draft, files);
       setDraft('');
@@ -141,7 +173,10 @@ export function MessageComposer({
           disabled={disabled || sending}
           placeholder={placeholder}
           rows={2}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            bumpTyping(e.target.value.trim().length > 0);
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();

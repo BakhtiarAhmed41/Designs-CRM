@@ -366,6 +366,22 @@ export async function runMigrations() {
     );
   }
 
+  if (!(await columnExists('deliveries', 'kind'))) {
+    // eslint-disable-next-line no-console
+    console.log('Adding deliveries.kind column ...');
+    await conn.query(
+      "ALTER TABLE deliveries ADD COLUMN kind ENUM('FINAL','PREVIEW') NOT NULL DEFAULT 'FINAL'",
+    );
+  }
+  if (!(await columnExists('deliveries', 'preview_status'))) {
+    // eslint-disable-next-line no-console
+    console.log('Adding deliveries.preview_status column ...');
+    await conn.query(
+      `ALTER TABLE deliveries ADD COLUMN preview_status
+         ENUM('PENDING','APPROVED','CHANGES_REQUESTED') NULL`,
+    );
+  }
+
   if (existsSync(migrationsDir)) {
     const applied = new Set(
       (

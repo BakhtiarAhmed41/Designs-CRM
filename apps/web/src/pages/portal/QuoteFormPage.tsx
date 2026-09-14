@@ -10,7 +10,7 @@ import { useTopbarLead } from '@/components/Shell';
 import { useTheme } from '@/context/ThemeContext';
 import { postThemeToWindow } from '@/lib/theme';
 
-type ServiceKey = 'embroidery' | 'svg' | 'vector' | 'laser';
+type ServiceKey = 'embroidery' | 'vector' | 'laser';
 
 type Collected = {
   mode: string;
@@ -35,29 +35,22 @@ const SERVICES: Array<{
   {
     key: 'embroidery',
     serviceType: 'EMBROIDERY',
-    label: 'Embroidery digitizing',
+    label: 'Embroidery Digitizing',
     desc: 'Turn your logo into a stitch file. DST, PES and more.',
     icon: 'ti-needle-thread',
   },
   {
-    key: 'svg',
-    serviceType: 'SVG',
-    label: 'SVG & cut files',
-    desc: 'Vinyl, Cricut, engraving and layered cut files.',
-    icon: 'ti-vector-triangle',
-  },
-  {
     key: 'vector',
     serviceType: 'VECTOR',
-    label: 'Vector & print files',
+    label: 'Vector & Print',
     desc: 'Logo redraws and print-ready color separations.',
     icon: 'ti-vector-bezier',
   },
   {
     key: 'laser',
     serviceType: 'CNC_LASER',
-    label: 'CNC & laser cut files',
-    desc: 'Cutting, engraving, stencils and plasma files.',
+    label: 'Cut, Print & Engraving',
+    desc: 'Cutting, engraving, print files and plasma files.',
     icon: 'ti-router',
   },
 ];
@@ -76,7 +69,8 @@ export function QuoteFormPage() {
   const [params] = useSearchParams();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const dirtyRef = useRef(false);
-  const initial = params.get('service');
+  const requested = params.get('service');
+  const initial = requested === 'svg' ? 'laser' : requested;
   const found = SERVICES.find((s) => s.key === initial);
   const [service, setService] = useState<(typeof SERVICES)[number] | null>(found ?? null);
   const [customerPrefs, setCustomerPrefs] = useState<Record<string, unknown> | null>(null);
@@ -86,9 +80,13 @@ export function QuoteFormPage() {
   const { colors: themeColors } = useTheme();
 
   useEffect(() => {
+    if (requested === 'svg') {
+      navigate('/portal/quotes/new?service=laser', { replace: true });
+      return;
+    }
     const match = SERVICES.find((s) => s.key === initial);
     setService(match ?? null);
-  }, [initial]);
+  }, [initial, requested, navigate]);
 
   useEffect(() => {
     postThemeToWindow(iframeRef.current?.contentWindow, themeColors);
@@ -152,7 +150,7 @@ export function QuoteFormPage() {
       const collected: Collected =
         win?.LVD_COLLECT?.() ??
         ({
-          mode: 'q',
+          mode: 'd',
           designName: 'New design request',
           instructions: '',
           size: null,

@@ -148,6 +148,8 @@ function SavedPublishFile({
   orderId,
   file,
   waiting,
+  preview,
+  previewStatus,
   canDelete,
   deleting,
   onDelete,
@@ -155,6 +157,8 @@ function SavedPublishFile({
   orderId: string;
   file: { id: string; originalName: string; mimeType?: string | null };
   waiting?: boolean;
+  preview?: boolean;
+  previewStatus?: string | null;
   canDelete: boolean;
   deleting?: boolean;
   onDelete: () => void;
@@ -171,7 +175,7 @@ function SavedPublishFile({
   });
 
   return (
-    <div className={`pub-file${waiting ? ' wait' : ''}`}>
+    <div className={`pub-file${waiting ? ' wait' : ''}${preview ? ' is-preview' : ''}`}>
       <button
         type="button"
         className="pub-file-open"
@@ -185,6 +189,15 @@ function SavedPublishFile({
           </div>
         )}
         <span title={file.originalName}>{file.originalName}</span>
+        {preview && (
+          <em className="pub-file-tag">
+            {previewStatus === 'APPROVED'
+              ? 'Preview approved'
+              : previewStatus === 'CHANGES_REQUESTED'
+                ? 'Changes requested'
+                : 'Preview'}
+          </em>
+        )}
       </button>
       {canDelete && (
         <button
@@ -328,6 +341,7 @@ export function AdminOrderDetail() {
       release: boolean;
       designIds?: string[];
       upload?: File[];
+      kind?: 'FINAL' | 'PREVIEW';
     }) =>
       deliverOrder(id, opts.upload ?? [], {
         deliveredVia: 'PORTAL',
@@ -336,6 +350,7 @@ export function AdminOrderDetail() {
         notifySms: opts.release && notifyPortal,
         complete: false,
         release: opts.release,
+        kind: opts.kind,
       }),
     onSuccess: (res, opts) => {
       setPublishFiles([]);
@@ -344,7 +359,9 @@ export function AdminOrderDetail() {
       if (opts.designIds?.[0]) {
         setEditingIds((prev) => prev.filter((x) => x !== opts.designIds![0]));
       }
-      if (!opts.release) {
+      if (opts.kind === 'PREVIEW') {
+        setToast('Preview sent. The customer can view it but cannot download it.');
+      } else if (!opts.release) {
         setToast('Sent to admin for approval. The customer cannot see these files yet.');
       } else if (res.partial) {
         setToast('This design was sent to the customer. Other designs are still in progress.');
@@ -677,14 +694,22 @@ export function AdminOrderDetail() {
     batch.files.map((f) => ({
       ...f,
       releasedAt: batch.releasedAt ?? null,
+      kind: batch.kind ?? 'FINAL',
+      previewStatus: batch.previewStatus ?? null,
     })),
   );
   const filesForDesign = (designId: string) =>
     deliveryFiles.filter((f) => f.designId === designId);
-  const hasSubmitted = (designId: string) => filesForDesign(designId).length > 0;
+  const finalFilesForDesign = (designId: string) =>
+    filesForDesign(designId).filter((f) => f.kind !== 'PREVIEW');
+  const previewForDesign = (designId: string) =>
+    filesForDesign(designId).find((f) => f.kind === 'PREVIEW');
+  const hasSubmitted = (designId: string) => finalFilesForDesign(designId).length > 0;
   const hasPendingRelease = (designId: string) =>
-    filesForDesign(designId).some((f) => !f.releasedAt);
-  const pendingBatches = (order.deliveries ?? []).filter((d) => !d.releasedAt);
+    finalFilesForDesign(designId).some((f) => !f.releasedAt);
+  const pendingBatches = (order.deliveries ?? []).filter(
+    (d) => !d.releasedAt && d.kind !== 'PREVIEW',
+  );
   const hasPaidInvoice = (invoicesQ.data?.invoices ?? []).some(
     (inv) => inv.orderId === id && inv.status === 'PAID',
   );
@@ -959,7 +984,8 @@ export function AdminOrderDetail() {
             {designs.map((d) => {
               const submitted = hasSubmitted(d.id);
               const pending = hasPendingRelease(d.id);
-              const hasReleased = filesForDesign(d.id).some((f) => f.releasedAt);
+              const preview = previewForDesign(d.id);
+              const hasReleased = finalFilesForDesign(d.id).some((f) => f.releasedAt);
               const published = d.status === 'DELIVERED' || hasReleased;
               const inRevision = designInRevision(d.id);
               const editing = editingIds.includes(d.id) || inRevision;
@@ -1022,7 +1048,13 @@ export function AdminOrderDetail() {
                       <span style={{ fontSize: 12, color: 'var(--muted)' }}>
                         {filesForDesign(d.id).length} file
                         {filesForDesign(d.id).length === 1 ? '' : 's'}
-                        {pending ? ' · waiting for approval' : ' · delivered'}
+                        {pending
+                          ? ' · waiting for approval'
+                          : hasReleased
+                            ? ' · delivered'
+                            : preview
+                              ? ' · preview sent'
+                              : ''}
                       </span>
                     )}
                   </span>
@@ -1032,6 +1064,15 @@ export function AdminOrderDetail() {
                         {pending ? 'Waiting for approval' : designStatusLabel(d.status)}
                       </span>
                       {inRevision && <span className="chip c-review">Revision requested</span>}
+                      {preview?.previewStatus === 'PENDING' && (
+                        <span className="chip c-review">Preview waiting</span>
+                      )}
+                      {preview?.previewStatus === 'APPROVED' && (
+                        <span className="chip c-done">Preview approved</span>
+                      )}
+                      {preview?.previewStatus === 'CHANGES_REQUESTED' && (
+                        <span className="chip c-review">Preview changes requested</span>
+                      )}
                     </span>
                     {canApprove && pending && (
                       <button
@@ -1228,6 +1269,8 @@ export function AdminOrderDetail() {
                       orderId={order.id}
                       file={f}
                       waiting={!d.releasedAt}
+                      preview={d.kind === 'PREVIEW'}
+                      previewStatus={d.previewStatus}
                       canDelete={canDeliver}
                       deleting={removeDeliveryFile.isPending}
                       onDelete={() => removeDeliveryFile.mutate(f.id)}
@@ -1627,7 +1670,7 @@ export function AdminOrderDetail() {
                   ? 'Attach up to 10 files, click Save, then publish to the customer or send to admin for approval.'
                   : showSendForApproval
                     ? 'Attach up to 10 files, click Save, then send them to admin for approval.'
-                    : 'Attach up to 10 files, click Save, then publish them to the customer.'}
+                    : 'Attach up to 10 files, click Save, then send a view-only preview or publish the final files.'}
               </p>
               <label className="odf up" style={{ marginBottom: 12, display: 'inline-flex' }}>
                 <i className="ti ti-cloud-upload" /> Choose files
@@ -1709,20 +1752,37 @@ export function AdminOrderDetail() {
                   </button>
                 )}
                 {canPublishToCustomer && (
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    disabled={deliver.isPending || !publishSaved || publishFiles.length === 0}
-                    onClick={() =>
-                      deliver.mutate({
-                        release: true,
-                        designIds: [publishFor.id],
-                        upload: publishFiles,
-                      })
-                    }
-                  >
-                    {deliver.isPending ? 'Publishing…' : 'Publish to customer'}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      disabled={deliver.isPending || !publishSaved || publishFiles.length === 0}
+                      onClick={() =>
+                        deliver.mutate({
+                          release: true,
+                          designIds: [publishFor.id],
+                          upload: publishFiles,
+                          kind: 'PREVIEW',
+                        })
+                      }
+                    >
+                      {deliver.isPending ? 'Sending…' : 'Send preview for approval'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      disabled={deliver.isPending || !publishSaved || publishFiles.length === 0}
+                      onClick={() =>
+                        deliver.mutate({
+                          release: true,
+                          designIds: [publishFor.id],
+                          upload: publishFiles,
+                        })
+                      }
+                    >
+                      {deliver.isPending ? 'Publishing…' : 'Publish final files'}
+                    </button>
+                  </>
                 )}
               </div>
             </div>

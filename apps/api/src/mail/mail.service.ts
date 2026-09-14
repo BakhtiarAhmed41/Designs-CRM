@@ -187,6 +187,21 @@ export class MailService {
     });
   }
 
+  async sendPreviewReady(to: string, orderName: string, orderId: string) {
+    const link = `${webBase()}/portal/orders/${orderId}`;
+    return this.sendMail({
+      to,
+      subject: `Design preview ready: ${orderName}`,
+      text: `A design preview for ${orderName} is ready for your approval. You can view it in your portal, but you cannot download it yet.\n\n${link}`,
+      html: wrapHtml(
+        'Design preview ready',
+        `<p>A design preview for <strong>${orderName}</strong> is ready for your approval.</p>
+         <p>You can view it in your portal. Final files will be sent after you approve.</p>
+         <p><a href="${link}">Review preview</a></p>`,
+      ),
+    });
+  }
+
   async sendFilesReady(
     to: string,
     orderName: string,

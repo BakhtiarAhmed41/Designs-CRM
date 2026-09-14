@@ -127,6 +127,19 @@ export const DeliveredVia = {
 } as const;
 export type DeliveredVia = (typeof DeliveredVia)[keyof typeof DeliveredVia];
 
+export const DeliveryKind = {
+  FINAL: 'FINAL',
+  PREVIEW: 'PREVIEW',
+} as const;
+export type DeliveryKind = (typeof DeliveryKind)[keyof typeof DeliveryKind];
+
+export const PreviewStatus = {
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  CHANGES_REQUESTED: 'CHANGES_REQUESTED',
+} as const;
+export type PreviewStatus = (typeof PreviewStatus)[keyof typeof PreviewStatus];
+
 export const AccountType = {
   PAY_PER_ORDER: 'PAY_PER_ORDER',
   NET_MONTHLY: 'NET_MONTHLY',

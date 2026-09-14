@@ -18,6 +18,7 @@ import type { AuthUser } from '../auth/auth.types';
 import {
   CustomerSource,
   DeliveredVia,
+  DeliveryKind,
   DesignStatus,
   OrderStatus,
   OrderType,
@@ -441,6 +442,9 @@ export class AdminOrdersController {
       notifySms: parseBool(body?.notifySms, true),
       complete: parseBool(body?.complete, true),
       release: parseBool(body?.release, true),
+      kind: body?.kind === DeliveryKind.PREVIEW
+        ? DeliveryKind.PREVIEW
+        : DeliveryKind.FINAL,
     });
   }
 

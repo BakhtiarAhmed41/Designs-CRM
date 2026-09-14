@@ -23,6 +23,7 @@ import {
   type Conversation,
 } from '@/lib/messaging';
 import {
+  emitConversationTyping,
   maybeRequestBrowserNotifications,
   showBrowserNotification,
   useMessagingSocket,
@@ -78,6 +79,7 @@ export function PortalMessages() {
   const [typeOpen, setTypeOpen] = useState(false);
   const typeRef = useRef<HTMLDivElement>(null);
   const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [peerTyping, setPeerTyping] = useState(false);
   const conversationId = searchParams.get('c');
 
   const convosQuery = useQuery({
@@ -130,13 +132,24 @@ export function PortalMessages() {
     conversationId,
     onMessageNew: (payload) => {
       const p = payload as { message?: { body?: string } };
+      setPeerTyping(false);
       showBrowserNotification('New Message', p.message?.body);
       if (conversationId) {
         void qc.invalidateQueries({ queryKey: ['my-conversation', conversationId] });
       }
       void qc.invalidateQueries({ queryKey: ['my-conversations'] });
     },
+    onTyping: (payload) => {
+      const p = payload as { conversationId?: string; typing?: boolean };
+      if (p.conversationId && p.conversationId === conversationId) {
+        setPeerTyping(Boolean(p.typing));
+      }
+    },
   });
+
+  useEffect(() => {
+    setPeerTyping(false);
+  }, [conversationId]);
 
   const active = threadQuery.data?.conversation;
 
@@ -288,8 +301,10 @@ export function PortalMessages() {
               <ConversationThread
                 messages={active.messages ?? []}
                 mineDirection="INBOUND"
+                typing={peerTyping}
               />
               <MessageComposer
+                onTyping={(on) => emitConversationTyping(active.id, on)}
                 onSend={async (body, files) => {
                   await sendMutation.mutateAsync({ body, files });
                 }}

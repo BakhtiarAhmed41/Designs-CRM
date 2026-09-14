@@ -34,6 +34,7 @@ import { canFeature } from '@/lib/permissions';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 import {
+  emitConversationTyping,
   maybeRequestBrowserNotifications,
   showBrowserNotification,
   useMessagingSocket,
@@ -120,6 +121,7 @@ export function AdminCustomerMessages() {
   const [notesDraft, setNotesDraft] = useState('');
   const [startMenuOpen, setStartMenuOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
+  const [peerTyping, setPeerTyping] = useState(false);
   const startMenuRef = useRef<HTMLDivElement>(null);
 
   const listFilters = useMemo(() => {
@@ -194,6 +196,7 @@ export function AdminCustomerMessages() {
     conversationId: activeConversationId,
     onMessageNew: (payload) => {
       const p = payload as { conversation?: { customerName?: string }; message?: { body?: string } };
+      setPeerTyping(false);
       showBrowserNotification(
         'New customer message',
         p.message?.body ||
@@ -205,7 +208,17 @@ export function AdminCustomerMessages() {
       }
       void qc.invalidateQueries({ queryKey: ['admin-conversations'] });
     },
+    onTyping: (payload) => {
+      const p = payload as { conversationId?: string; typing?: boolean };
+      if (p.conversationId && p.conversationId === activeConversationId) {
+        setPeerTyping(Boolean(p.typing));
+      }
+    },
   });
+
+  useEffect(() => {
+    setPeerTyping(false);
+  }, [activeConversationId]);
 
   const sendMutation = useMutation({
     mutationFn: ({ body, files }: { body: string; files: File[] }) =>
@@ -496,6 +509,7 @@ export function AdminCustomerMessages() {
               <ConversationThread
                 messages={active.messages ?? []}
                 mineDirection="OUTBOUND"
+                typing={peerTyping}
               />
               {!canReply && active.status === 'OPEN' && (
                 <div className="muted" style={{ margin: '0 12px 8px', fontSize: 12.5 }}>
@@ -520,6 +534,7 @@ export function AdminCustomerMessages() {
                   await deleteMessageTemplate(templateId);
                   void qc.invalidateQueries({ queryKey: ['message-templates'] });
                 }}
+                onTyping={(on) => emitConversationTyping(active.id, on)}
                 onSend={async (body, files) => {
                   await sendMutation.mutateAsync({ body, files });
                 }}

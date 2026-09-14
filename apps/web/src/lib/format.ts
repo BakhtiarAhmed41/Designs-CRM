@@ -36,6 +36,12 @@ export function friendlyFileName(name: string | null | undefined): string {
   return trimmed;
 }
 
+export function isImageFile(name?: string | null, mime?: string | null) {
+  if (mime?.startsWith('image/')) return true;
+  const ext = name?.split('.').pop()?.toLowerCase();
+  return !!ext && IMAGE_EXTS.has(ext);
+}
+
 export function money(cents: number | null | undefined, currency = 'USD'): string {
   if (cents == null) return '-';
   const amount = cents / 100;

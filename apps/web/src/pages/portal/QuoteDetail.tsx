@@ -5,7 +5,6 @@ import {
   acceptQuotation,
   getMyOrder,
   myAttachmentUrl,
-  rejectQuotation,
 } from '@/lib/orders';
 import { startMyOrderCheckout } from '@/lib/billing';
 import { openLinkedChat } from '@/lib/messaging';
@@ -88,15 +87,6 @@ export function PortalQuoteDetail() {
           : 'Quote accepted. Opening your order…',
       );
       window.setTimeout(() => navigate(`/portal/orders/${id}`), 700);
-    },
-    onError: (e) => setError(getErrorMessage(e)),
-  });
-
-  const rejectMut = useMutation({
-    mutationFn: () => rejectQuotation(id),
-    onSuccess: (res) => {
-      void applyOrderChange(qc, res.order);
-      setToast('Quote declined.');
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -386,10 +376,11 @@ export function PortalQuoteDetail() {
                   <button
                     type="button"
                     className="btn btn-ghost"
-                    disabled={rejectMut.isPending}
-                    onClick={() => rejectMut.mutate()}
+                    disabled={startChat.isPending}
+                    onClick={() => startChat.mutate()}
                   >
-                    Decline
+                    <i className="ti ti-message" />{' '}
+                    {startChat.isPending ? 'Opening…' : 'Contact us'}
                   </button>
                   <button
                     type="button"

@@ -68,11 +68,16 @@ export type MyFile = {
   serviceType?: string | null;
   fileId: string;
   originalName: string;
+  mimeType?: string | null;
   formatLabel: string | null;
   byteSize?: number | null;
   deliveredAt: string;
   deliveredVia?: string | null;
   deliveryEmail?: string | null;
+  kind?: 'FINAL' | 'PREVIEW';
+  previewStatus?: 'PENDING' | 'APPROVED' | 'CHANGES_REQUESTED' | null;
+  previewUrl?: string | null;
+  canDownload?: boolean;
 };
 
 export type QuoteBuilderLineInput = {

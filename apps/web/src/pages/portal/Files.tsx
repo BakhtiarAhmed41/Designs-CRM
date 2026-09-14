@@ -7,6 +7,7 @@ import { myDeliveryFileUrl } from '@/lib/orders';
 import { downloadSignedFile } from '@/lib/api';
 import { dateShort, deliveryMethodLabel } from '@/lib/format';
 import { serviceCategoryLabel } from '@/lib/serviceIcon';
+import { DeliveryPreview } from '@/components/FilePreview';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { SkeletonRows } from '@/components/ui/Skeleton';
@@ -264,37 +265,79 @@ export function PortalFiles() {
                                 </Link>
                               </div>
                             ) : (
-                              <table className="itable file-inner">
-                                <thead>
-                                  <tr>
-                                    <th>File Name</th>
-                                    <th>Size</th>
-                                    <th>Action</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {g.files.map((f) => (
-                                    <tr key={f.fileId}>
-                                      <td>{f.originalName}</td>
-                                      <td className="muted">{fileSizeLabel(f.byteSize)}</td>
-                                      <td>
-                                        <button
-                                          type="button"
-                                          className="btn btn-ghost btn-sm"
-                                          onClick={() =>
-                                            downloadSignedFile(
-                                              myDeliveryFileUrl(f.orderId, f.fileId),
-                                              f.originalName,
-                                            )
-                                          }
-                                        >
-                                          <i className="ti ti-download" /> Download
-                                        </button>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+                              <div className="file-split">
+                                {g.files.some((f) => f.kind === 'PREVIEW') && (
+                                  <div className="file-split-block">
+                                    <div className="od-files-label">Order preview</div>
+                                    <p className="muted od-files-hint">
+                                      View only. These cannot be downloaded.
+                                    </p>
+                                    <div className="od-files">
+                                      {g.files
+                                        .filter((f) => f.kind === 'PREVIEW')
+                                        .map((f) => (
+                                          <DeliveryPreview
+                                            key={f.fileId}
+                                            orderId={f.orderId}
+                                            fileId={f.fileId}
+                                            name={f.originalName}
+                                            mimeType={f.mimeType}
+                                            previewUrl={f.previewUrl}
+                                          />
+                                        ))}
+                                    </div>
+                                  </div>
+                                )}
+                                {g.files.some((f) => f.kind !== 'PREVIEW') && (
+                                  <table className="itable file-inner">
+                                    <thead>
+                                      <tr>
+                                        <th>Preview</th>
+                                        <th>File Name</th>
+                                        <th>Size</th>
+                                        <th>Action</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {g.files
+                                        .filter((f) => f.kind !== 'PREVIEW')
+                                        .map((f) => (
+                                          <tr key={f.fileId}>
+                                            <td>
+                                              <DeliveryPreview
+                                                orderId={f.orderId}
+                                                fileId={f.fileId}
+                                                name={f.originalName}
+                                                mimeType={f.mimeType}
+                                                previewUrl={f.previewUrl}
+                                              />
+                                            </td>
+                                            <td>{f.originalName}</td>
+                                            <td className="muted">{fileSizeLabel(f.byteSize)}</td>
+                                            <td>
+                                              {f.canDownload === false ? (
+                                                <span className="muted">View only</span>
+                                              ) : (
+                                                <button
+                                                  type="button"
+                                                  className="btn btn-ghost btn-sm"
+                                                  onClick={() =>
+                                                    downloadSignedFile(
+                                                      myDeliveryFileUrl(f.orderId, f.fileId),
+                                                      f.originalName,
+                                                    )
+                                                  }
+                                                >
+                                                  <i className="ti ti-download" /> Download
+                                                </button>
+                                              )}
+                                            </td>
+                                          </tr>
+                                        ))}
+                                    </tbody>
+                                  </table>
+                                )}
+                              </div>
                             )}
                           </td>
                         </tr>

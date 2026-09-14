@@ -12,15 +12,15 @@ import { freshOnOpen } from '@/lib/queryRefresh';
 import { PageHeader } from '@/components/ui/PageHeader';
 
 const DRAFT_LABELS: Record<string, string> = {
-  embroidery: 'Embroidery digitizing',
-  svg: 'SVG & cut files',
-  vector: 'Vector & print files',
-  laser: 'CNC & laser cut files',
+  embroidery: 'Embroidery Digitizing',
+  svg: 'Cut, Print & Engraving',
+  vector: 'Vector & Print',
+  laser: 'Cut, Print & Engraving',
 };
 
 const DRAFT_ICONS: Record<string, string> = {
   embroidery: 'ti-needle-thread',
-  svg: 'ti-vector-triangle',
+  svg: 'ti-router',
   vector: 'ti-vector-bezier',
   laser: 'ti-router',
 };
@@ -83,7 +83,8 @@ export function PortalQuotes() {
 
   function continueDraft(serviceKey: string) {
     setDraftsOpen(false);
-    navigate(`/portal/quotes/new?service=${encodeURIComponent(serviceKey)}`);
+    const key = serviceKey === 'svg' ? 'laser' : serviceKey;
+    navigate(`/portal/quotes/new?service=${encodeURIComponent(key)}`);
   }
 
   return (

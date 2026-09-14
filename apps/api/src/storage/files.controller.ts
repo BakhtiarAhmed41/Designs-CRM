@@ -8,6 +8,16 @@ import {
 import type { Response } from 'express';
 import { LocalStorageService } from './local-storage.service';
 
+function guessContentType(name: string): string | null {
+  const lower = name.toLowerCase();
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+  if (lower.endsWith('.gif')) return 'image/gif';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  if (lower.endsWith('.bmp')) return 'image/bmp';
+  return null;
+}
+
 /**
  * Public download endpoint. Access is authorized by the HMAC-signed token
  * embedded in the URL (created by LocalStorageService.createSignedUrl), so it
@@ -23,18 +33,23 @@ export class FilesController {
     @Query('exp') exp: string,
     @Query('sig') sig: string,
     @Query('name') name: string | undefined,
+    @Query('inline') inlineFlag: string | undefined,
     @Res() res: Response,
   ) {
     if (!key || !exp || !sig) throw new BadRequestException('Missing token');
     const expNum = Number(exp);
-    if (!this.storage.verify(key, expNum, sig)) {
+    const inline = inlineFlag === '1';
+    if (!this.storage.verify(key, expNum, sig, inline)) {
       throw new BadRequestException('Invalid or expired link');
     }
     const filename = name || key.split('/').pop() || 'download';
+    const safeName = filename.replace(/"/g, '');
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="${filename.replace(/"/g, '')}"`,
+      `${inline ? 'inline' : 'attachment'}; filename="${safeName}"`,
     );
+    const type = guessContentType(safeName);
+    if (type) res.setHeader('Content-Type', type);
     const stream = this.storage.createStream(key);
     stream.on('error', () => {
       if (!res.headersSent) res.status(404).end();

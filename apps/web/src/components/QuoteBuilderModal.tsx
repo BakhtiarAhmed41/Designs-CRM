@@ -41,7 +41,7 @@ export type AdminFormContext = {
   type: 'ORDER' | 'QUOTE_REQUEST';
 };
 
-type ServiceKey = 'embroidery' | 'svg' | 'vector' | 'laser';
+type ServiceKey = 'embroidery' | 'vector' | 'laser';
 
 type Collected = {
   mode: string;
@@ -67,30 +67,22 @@ const SERVICES: Array<{
   {
     key: 'embroidery',
     serviceType: 'EMBROIDERY',
-    label: 'Embroidery digitizing',
+    label: 'Embroidery Digitizing',
     desc: 'Turn your logo into a stitch file. DST, PES and more.',
     icon: 'ti-needle-thread',
   },
   {
-    key: 'svg',
-    serviceType: 'SVG',
-    label: 'SVG & cut files',
-    desc: 'Vinyl, Cricut, engraving and layered cut files.',
-    icon: 'ti-vector-triangle',
-    mar: true,
-  },
-  {
     key: 'vector',
     serviceType: 'VECTOR',
-    label: 'Vector & print files',
+    label: 'Vector & Print',
     desc: 'Logo redraws and print-ready color separations.',
     icon: 'ti-vector-bezier',
   },
   {
     key: 'laser',
     serviceType: 'CNC_LASER',
-    label: 'CNC & laser cut files',
-    desc: 'Cutting, engraving, stencils and plasma files.',
+    label: 'Cut, Print & Engraving',
+    desc: 'Cutting, engraving, print files and plasma files.',
     icon: 'ti-router',
     mar: true,
   },
@@ -172,7 +164,8 @@ export function QuoteBuilderModal({
     }
     setAccountName(fallbackName);
     if (initialService) {
-      const found = SERVICES.find((s) => s.key === initialService);
+      const key = initialService === 'svg' ? 'laser' : initialService;
+      const found = SERVICES.find((s) => s.key === key);
       if (found) setService(found);
     }
     const loadPrefs = adminFor
@@ -211,7 +204,7 @@ export function QuoteBuilderModal({
       const collected: Collected =
         win?.LVD_COLLECT?.() ??
         ({
-          mode: 'q',
+          mode: 'd',
           designName: 'New design request',
           instructions: '',
           size: null,

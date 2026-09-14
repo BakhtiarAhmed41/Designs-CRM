@@ -1648,6 +1648,8 @@ textarea,
   background-color: var(--tint);
 }
 
+.msg-sender { color: var(--navy); }
+.msg-typing { color: #c2410c; }
 .msg-bubble.theirs .msg-bubble-body,
 .tmsg.them,
 .msg.them {

@@ -11,7 +11,9 @@ import {
   AccountType,
   CustomerSource,
   DeliveredVia,
+  DeliveryKind,
   DesignStatus,
+  PreviewStatus,
   EditStatus,
   OrderPaymentStatus,
   OrderStatus,
@@ -42,6 +44,11 @@ function isAdminRole(role: UserRole): boolean {
     role === UserRole.SUPPORT ||
     role === UserRole.DESIGNER
   );
+}
+
+function isImageFile(name?: string | null, mime?: string | null) {
+  if (mime?.startsWith('image/')) return true;
+  return /\.(png|jpe?g|gif|webp|bmp)$/i.test(name ?? '');
 }
 
 function toServiceType(value?: string | null): ServiceType | null {
@@ -561,17 +568,24 @@ export class OrdersService {
     );
   }
 
-  private async clearDesignDeliveryFiles(orderId: string, designIds: string[]) {
+  private async clearDesignDeliveryFiles(
+    orderId: string,
+    designIds: string[],
+    kind?: DeliveryKind,
+  ) {
     if (designIds.length === 0) return;
+    const kindFilter = kind ? ' AND d.kind = ?' : '';
     const files = await this.db.query<{ id: string; delivery_id: string }>(
-      `SELECT id, delivery_id FROM delivery_files
-        WHERE design_id IN (${this.sqlIn(designIds)})`,
-      designIds,
+      `SELECT df.id, df.delivery_id
+         FROM delivery_files df
+         JOIN deliveries d ON d.id = df.delivery_id
+        WHERE df.design_id IN (${this.sqlIn(designIds)})${kindFilter}`,
+      kind ? [...designIds, kind] : designIds,
     );
     if (files.length === 0) return;
     await this.db.execute(
-      `DELETE FROM delivery_files WHERE design_id IN (${this.sqlIn(designIds)})`,
-      designIds,
+      `DELETE FROM delivery_files WHERE id IN (${this.sqlIn(files.map((f) => f.id))})`,
+      files.map((f) => f.id),
     );
     const deliveryIds = [...new Set(files.map((f) => f.delivery_id))];
     for (const deliveryId of deliveryIds) {
@@ -716,8 +730,10 @@ export class OrdersService {
       delivered_via: string;
       created_at: Date;
       released_at: Date | null;
+      kind: string | null;
+      preview_status: string | null;
     }>(
-      `SELECT id, order_id, version, delivered_via, created_at, released_at
+      `SELECT id, order_id, version, delivered_via, created_at, released_at, kind, preview_status
          FROM deliveries WHERE order_id = ? ORDER BY version DESC`,
       [orderId],
     );
@@ -772,6 +788,10 @@ export class OrdersService {
       deliveredVia: d.delivered_via,
       createdAt: d.created_at,
       releasedAt: d.released_at,
+      kind: (d.kind === DeliveryKind.PREVIEW
+        ? DeliveryKind.PREVIEW
+        : DeliveryKind.FINAL) as DeliveryKind,
+      previewStatus: (d.preview_status ?? null) as PreviewStatus | null,
       files: filesByDelivery.get(d.id) ?? [],
     }));
   }
@@ -1273,21 +1293,33 @@ export class OrdersService {
     return { url };
   }
 
-  private async signDeliveryFile(orderId: string, deliveryFileId: string) {
+  private async signDeliveryFile(
+    orderId: string,
+    deliveryFileId: string,
+    opts?: { inline?: boolean; allowPreviewDownload?: boolean },
+  ) {
     const file = await this.db.queryOne<{
       storage_key: string;
       original_name: string;
+      mime_type: string | null;
+      kind: string | null;
+      released_at: Date | null;
     }>(
-      `SELECT df.storage_key, df.original_name
+      `SELECT df.storage_key, df.original_name, df.mime_type, d.kind, d.released_at
          FROM delivery_files df
          JOIN deliveries d ON d.id = df.delivery_id
         WHERE df.id = ? AND d.order_id = ? LIMIT 1`,
       [deliveryFileId, orderId],
     );
     if (!file) throw new NotFoundException('Delivery file not found');
+    const isPreview = file.kind === DeliveryKind.PREVIEW;
+    if (isPreview && !opts?.inline && !opts?.allowPreviewDownload) {
+      throw new ForbiddenException('Preview files cannot be downloaded');
+    }
     const url = await this.storage.createSignedUrl({
       key: file.storage_key,
-      downloadAs: file.original_name || 'delivery',
+      downloadAs: opts?.inline ? undefined : file.original_name || 'delivery',
+      inline: Boolean(opts?.inline),
     });
     return { url };
   }
@@ -1313,7 +1345,100 @@ export class OrdersService {
     const order = await this.getOrderRow(orderId);
     if (!order || order.client_user_id !== user.id)
       throw new NotFoundException('Order not found');
+    await this.assertCustomerCanSeeDeliveryFile(orderId, deliveryFileId);
     return this.signDeliveryFile(orderId, deliveryFileId);
+  }
+
+  async getMyDeliveryFilePreviewUrl(
+    user: AuthUser | undefined,
+    orderId: string,
+    deliveryFileId: string,
+  ) {
+    assertAuthUser(user);
+    const order = await this.getOrderRow(orderId);
+    if (!order || order.client_user_id !== user.id)
+      throw new NotFoundException('Order not found');
+    const file = await this.assertCustomerCanSeeDeliveryFile(
+      orderId,
+      deliveryFileId,
+    );
+    if (!isImageFile(file.original_name, file.mime_type)) {
+      throw new ForbiddenException('Only image previews can be viewed');
+    }
+    return this.signDeliveryFile(orderId, deliveryFileId, { inline: true });
+  }
+
+  async decidePreview(
+    user: AuthUser | undefined,
+    orderId: string,
+    deliveryId: string,
+    input: { decision: PreviewStatus; note?: string | null },
+  ) {
+    assertAuthUser(user);
+    if (user.role !== UserRole.CLIENT) throw new ForbiddenException();
+    const order = await this.getOrderRow(orderId);
+    if (!order || order.client_user_id !== user.id)
+      throw new NotFoundException('Order not found');
+    const delivery = await this.db.queryOne<{
+      id: string;
+      kind: string | null;
+      preview_status: string | null;
+      released_at: Date | null;
+    }>(
+      'SELECT id, kind, preview_status, released_at FROM deliveries WHERE id = ? AND order_id = ? LIMIT 1',
+      [deliveryId, orderId],
+    );
+    if (!delivery || delivery.kind !== DeliveryKind.PREVIEW) {
+      throw new NotFoundException('Preview not found');
+    }
+    if (!delivery.released_at) throw new NotFoundException('Preview not found');
+    if (delivery.preview_status && delivery.preview_status !== PreviewStatus.PENDING) {
+      throw new BadRequestException('You already replied to this preview');
+    }
+    const decision =
+      input.decision === PreviewStatus.CHANGES_REQUESTED
+        ? PreviewStatus.CHANGES_REQUESTED
+        : PreviewStatus.APPROVED;
+    await this.db.execute(
+      'UPDATE deliveries SET preview_status = ? WHERE id = ?',
+      [decision, deliveryId],
+    );
+    const note = input.note?.trim() || '';
+    await this.notifyAdmins({
+      title:
+        decision === PreviewStatus.APPROVED
+          ? 'Preview approved'
+          : 'Preview changes requested',
+      body:
+        decision === PreviewStatus.APPROVED
+          ? `${order.name ?? 'A customer'} approved the design preview. You can send the final files.`
+          : `${order.name ?? 'A customer'} asked for changes on the design preview.${
+              note ? ` ${note}` : ''
+            }`,
+      link: `/admin/orders/${orderId}`,
+    });
+    return this.getMyOrder(user, orderId);
+  }
+
+  private async assertCustomerCanSeeDeliveryFile(
+    orderId: string,
+    deliveryFileId: string,
+  ) {
+    const file = await this.db.queryOne<{
+      original_name: string;
+      mime_type: string | null;
+      released_at: Date | null;
+    }>(
+      `SELECT df.original_name, df.mime_type, d.released_at
+         FROM delivery_files df
+         JOIN deliveries d ON d.id = df.delivery_id
+        WHERE df.id = ? AND d.order_id = ? LIMIT 1`,
+      [deliveryFileId, orderId],
+    );
+    if (!file || !file.released_at) {
+      throw new NotFoundException('Delivery file not found');
+    }
+    return file;
   }
 
   async clientAcceptQuotation(
@@ -2424,10 +2549,12 @@ export class OrdersService {
       notifySms?: boolean;
       complete?: boolean;
       release?: boolean;
+      kind?: DeliveryKind;
     },
   ) {
     this.assertAdmin(user);
-    const release = options?.release !== false;
+    const isPreview = options?.kind === DeliveryKind.PREVIEW;
+    const release = isPreview ? true : options?.release !== false;
     if (
       release &&
       user.role === UserRole.DESIGNER &&
@@ -2464,6 +2591,17 @@ export class OrdersService {
     if (incoming.length > 10) {
       throw new BadRequestException('Upload at most 10 files at a time');
     }
+    if (isPreview && incoming.length === 0) {
+      throw new BadRequestException('Upload a preview image first');
+    }
+    if (
+      isPreview &&
+      incoming.some((f) => !isImageFile(f.originalname, f.mimetype))
+    ) {
+      throw new BadRequestException(
+        'Preview files must be images (PNG, JPG, or WebP)',
+      );
+    }
     if (incoming.length === 0 && existing.length === 0) {
       throw new BadRequestException('Upload finished files first');
     }
@@ -2477,10 +2615,14 @@ export class OrdersService {
     const notifySms = options?.notifySms !== false;
 
     if (incoming.length > 0 && designIds.length > 0) {
-      await this.clearDesignDeliveryFiles(orderId, designIds);
+      await this.clearDesignDeliveryFiles(
+        orderId,
+        designIds,
+        isPreview ? DeliveryKind.PREVIEW : DeliveryKind.FINAL,
+      );
     }
 
-    if (release) {
+    if (release && !isPreview) {
       const idsToMark =
         designIds.length > 0
           ? designIds
@@ -2516,8 +2658,8 @@ export class OrdersService {
       deliveryId = randomUUID();
       await this.db.execute(
         `INSERT INTO deliveries
-           (id, order_id, version, delivered_via, created_by_admin_id, released_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+           (id, order_id, version, delivered_via, created_by_admin_id, released_at, kind, preview_status)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           deliveryId,
           orderId,
@@ -2525,6 +2667,8 @@ export class OrdersService {
           deliveredVia,
           user.id,
           release ? new Date() : null,
+          isPreview ? DeliveryKind.PREVIEW : DeliveryKind.FINAL,
+          isPreview ? PreviewStatus.PENDING : null,
         ],
       );
 
@@ -2559,7 +2703,7 @@ export class OrdersService {
       }
     }
 
-    if (release) {
+    if (release && !isPreview) {
       if (designIds.length > 0) {
         await this.db.execute(
           `UPDATE deliveries
@@ -2587,7 +2731,9 @@ export class OrdersService {
       designs.every((d) => d.status === DesignStatus.DELIVERED);
     const partial = release && !allDelivered && designs.length > 0;
 
-    const alreadyReleased = existing.some((d) => Boolean(d.releasedAt));
+    const alreadyReleased = existing.some(
+      (d) => Boolean(d.releasedAt) && d.kind !== DeliveryKind.PREVIEW,
+    );
     const isNewUpload = incoming.length > 0;
     const submittedIds = new Set(
       (await this.getDeliveries(orderId)).flatMap((d) =>
@@ -2597,9 +2743,9 @@ export class OrdersService {
     const allDesignsHaveFiles =
       designs.length === 0 || designs.every((d) => submittedIds.has(d.id));
 
-    if (release && designIds.length > 0) {
+    if (release && !isPreview && designIds.length > 0) {
       await this.closeRevisionDesigns(orderId, designIds);
-    } else if (release && allDelivered) {
+    } else if (release && !isPreview && allDelivered) {
       await this.closeRevisionDesigns(
         orderId,
         designs.map((d) => d.id),
@@ -2624,6 +2770,13 @@ export class OrdersService {
           link: `/admin/orders/${orderId}`,
         });
       }
+    } else if (isPreview) {
+      await this.db.execute('UPDATE orders SET status = ? WHERE id = ?', [
+        revisionOpen
+          ? OrderStatus.REVISION_REQUESTED
+          : OrderStatus.IN_PROGRESS,
+        orderId,
+      ]);
     } else if (revisionOpen) {
       await this.db.execute('UPDATE orders SET status = ? WHERE id = ?', [
         OrderStatus.REVISION_REQUESTED,
@@ -2645,10 +2798,12 @@ export class OrdersService {
       release && (notifyEmail || notifySms) && (isNewUpload || !alreadyReleased);
     if (shouldNotify && order.client_user_id) {
       await this.notifications.createFor(order.client_user_id, {
-        title: 'Your files are ready',
-        body: partial
-          ? `Some files for ${order.name ?? 'your order'} are ready to download.`
-          : `Your files for ${order.name ?? 'your order'} are ready to download.`,
+        title: isPreview ? 'Design preview ready' : 'Your files are ready',
+        body: isPreview
+          ? `A preview for ${order.name ?? 'your order'} is ready for your approval.`
+          : partial
+            ? `Some files for ${order.name ?? 'your order'} are ready to download.`
+            : `Your files for ${order.name ?? 'your order'} are ready to download.`,
         link: `/portal/orders/${orderId}`,
       });
     }
@@ -2658,12 +2813,20 @@ export class OrdersService {
         d.files.map((f) => f.originalName),
       );
       if (email) {
-        await this.mail.sendFilesReady(
-          email,
-          order.name ?? 'your order',
-          orderId,
-          fileNames,
-        );
+        if (isPreview) {
+          await this.mail.sendPreviewReady(
+            email,
+            order.name ?? 'your order',
+            orderId,
+          );
+        } else {
+          await this.mail.sendFilesReady(
+            email,
+            order.name ?? 'your order',
+            orderId,
+            fileNames,
+          );
+        }
       }
     }
 
@@ -2694,7 +2857,9 @@ export class OrdersService {
     deliveryFileId: string,
   ) {
     this.assertAdmin(user);
-    return this.signDeliveryFile(orderId, deliveryFileId);
+    return this.signDeliveryFile(orderId, deliveryFileId, {
+      allowPreviewDownload: true,
+    });
   }
 
   async deleteAdminDeliveryFile(
@@ -3087,6 +3252,7 @@ export class OrdersService {
     const rows = await this.db.query<{
       file_id: string;
       original_name: string;
+      mime_type: string | null;
       format_label: string | null;
       byte_size: number | null;
       delivered_at: Date;
@@ -3096,10 +3262,14 @@ export class OrdersService {
       service_type: string | null;
       delivered_via: string;
       email: string | null;
+      kind: string | null;
+      preview_status: string | null;
+      storage_key: string;
     }>(
-      `SELECT df.id AS file_id, df.original_name, df.format_label, df.byte_size, df.created_at AS delivered_at,
+      `SELECT df.id AS file_id, df.original_name, df.mime_type, df.format_label, df.byte_size,
+              df.created_at AS delivered_at, df.storage_key,
               o.id AS order_id, o.name AS order_name, o.human_ref, o.service_type,
-              d.delivered_via, u.email
+              d.delivered_via, d.kind, d.preview_status, u.email
          FROM delivery_files df
          JOIN deliveries d ON d.id = df.delivery_id
          JOIN orders o ON o.id = d.order_id
@@ -3108,19 +3278,36 @@ export class OrdersService {
         ORDER BY df.created_at DESC`,
       [user.id],
     );
-    return rows.map((r) => ({
-      orderId: r.order_id,
-      orderName: r.order_name,
-      humanRef: r.human_ref,
-      serviceType: r.service_type,
-      fileId: r.file_id,
-      originalName: r.original_name,
-      formatLabel: r.format_label,
-      byteSize: r.byte_size,
-      deliveredAt: r.delivered_at,
-      deliveredVia: r.delivered_via,
-      deliveryEmail: r.email,
-    }));
+    return Promise.all(
+      rows.map(async (r) => {
+        const isPreview = r.kind === DeliveryKind.PREVIEW;
+        const canPreview = isImageFile(r.original_name, r.mime_type);
+        const previewUrl = canPreview
+          ? await this.storage.createSignedUrl({
+              key: r.storage_key,
+              inline: true,
+            })
+          : null;
+        return {
+          orderId: r.order_id,
+          orderName: r.order_name,
+          humanRef: r.human_ref,
+          serviceType: r.service_type,
+          fileId: r.file_id,
+          originalName: r.original_name,
+          mimeType: r.mime_type,
+          formatLabel: r.format_label,
+          byteSize: r.byte_size,
+          deliveredAt: r.delivered_at,
+          deliveredVia: r.delivered_via,
+          deliveryEmail: r.email,
+          kind: isPreview ? DeliveryKind.PREVIEW : DeliveryKind.FINAL,
+          previewStatus: r.preview_status,
+          previewUrl,
+          canDownload: !isPreview,
+        };
+      }),
+    );
   }
 
   async saveQuoteDraft(
