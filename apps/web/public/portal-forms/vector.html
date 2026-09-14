@@ -7,549 +7,162 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-html,body{background:#fff;height:auto;overflow:visible;scrollbar-width:none;}html::-webkit-scrollbar,body::-webkit-scrollbar{width:0;height:0;display:none;}html.in-frame .ch{display:none;}html.in-frame .msg-cta{display:none;}
-body{font-family:system-ui,sans-serif;background:#fff;padding:4px 2px 8px;font-size:13px;color:#222222;}html.in-frame body{padding:2px 4px 6px;}
-.wrap{max-width:none;width:100%;margin:0;}
-.card{background:#fff;border:none;border-radius:0;overflow:visible;margin-bottom:0;}
+html,body{background:#fff;height:auto;overflow:visible;}
+body{font-family:system-ui,sans-serif;padding:4px 2px 8px;font-size:14px;color:#222;}
+.wrap{width:100%;margin:0;}
 .ch{padding:8px 6px;display:flex;align-items:center;gap:6px;}
-.ch i{font-size:15px;color:#222222;}
 .ct{font-size:13px;font-weight:500;}
-.cb{padding:4px 0 6px;}html.in-frame .cb{padding:2px 2px 4px;}
-.sl{font-size:10px;font-weight:600;color:#888;letter-spacing:.05em;text-transform:uppercase;margin:8px 0 4px;}
-.sl:first-child{margin-top:0;}
-.fg{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;}
-.ff{display:flex;flex-direction:column;gap:4px;}
-.ff label{font-size:11px;font-weight:500;color:#555;}
-.ff input,.ff select{font-size:12px;height:32px;padding:0 10px;border:1px solid rgba(34,34,34,.12);border-radius:7px;background:#fff;color:#222222;outline:none;}
-.ff input:focus,.ff select:focus{border-color:#222222;}
-.ff textarea{font-size:12px;padding:8px 10px;border:1px solid rgba(34,34,34,.12);border-radius:7px;resize:vertical;min-height:56px;outline:none;font-family:inherit;width:100%;background:#fff;color:#222222;}
-.lockable{transition:opacity .25s;}
-.lockable.locked{opacity:.25;pointer-events:none;user-select:none;}
-/* redirect */
-.redirect{background:#fff;border:0.5px solid rgba(34,34,34,.15);border-radius:7px;padding:8px 10px;font-size:12px;color:#222222;display:flex;align-items:center;gap:8px;margin-bottom:8px;}
-.redirect i{font-size:15px;flex-shrink:0;}
-/* single/multi selector */
-.type-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-.topt{border:0.5px solid rgba(0,0,0,.15);border-radius:7px;padding:8px;cursor:pointer;text-align:center;display:flex;flex-direction:column;align-items:center;gap:3px;}
-.topt i{font-size:18px;color:#888;}
-.topt .ot{font-size:12px;font-weight:500;color:#222222;}
-.topt .os{font-size:10px;color:#aaa;}
-.topt.sel{border:1px solid #222222;background:#fff;}
-.topt.sel i,.topt.sel .ot{color:#222222;}
-.topt.sel .os{color:#222222;}
-/* upload */
-.upload-area{border:1.5px dashed rgba(0,0,0,.2);border-radius:8px;background:#fff;overflow:hidden;}
-.utrg{padding:8px 10px;text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;}
-.utrg i{font-size:16px;color:#888;}
-.utrg p{font-size:12px;color:#555;}
-.utrg span{font-size:10px;color:#aaa;}
+.cb{padding:4px 0 6px;}
+.sl{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin:16px 0 8px;}
+.ff{display:flex;flex-direction:column;gap:6px;}
+.ff label{font-size:13px;font-weight:600;color:#444;}
+.ff input,.ff select,.ff textarea{font-size:14px;height:42px;padding:0 12px;border:1px solid rgba(34,34,34,.12);border-radius:8px;background:#fff;color:#222;outline:none;font-family:inherit;}
+.ff textarea{height:auto;min-height:88px;padding:10px 12px;resize:vertical;}
+.upload-area{border:1.5px dashed rgba(0,0,0,.2);border-radius:10px;background:#fff;overflow:hidden;}
+.utrg{padding:16px 10px;text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;}
+.utrg i{font-size:22px;color:#888;}
+.utrg p{font-size:14px;font-weight:600;color:#333;}
+.utrg span{font-size:12px;color:#888;}
 .flist{padding:0 10px 8px;}
-.fitem{display:flex;align-items:center;justify-content:space-between;padding:5px 8px;background:#fff;border-radius:6px;margin-bottom:4px;font-size:12px;color:#555;border:0.5px solid rgba(0,0,0,.1);}
-.frem{background:none;border:none;cursor:pointer;color:#E24B4A;font-size:12px;}
-/* ref upload */
-.ref-area{border:1.5px dashed #EF9F27;border-radius:8px;background:#fff;overflow:hidden;}
-.ref-trg{padding:10px 12px;text-align:center;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;}
-/* service type fields */
-.svc-fields{display:none;}
-.svc-fields.show{display:block;}
-/* design rows for multiple */
-.drow{background:#fff;border:0.5px solid rgba(0,0,0,.1);border-radius:7px;padding:10px;margin-bottom:8px;}
-.drow-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
-.drow-num{font-size:12px;font-weight:500;color:#666;display:flex;align-items:center;gap:5px;}
-.drow-del{background:none;border:none;cursor:pointer;color:#E24B4A;font-size:12px;display:flex;align-items:center;gap:3px;}
-.mini-up{border:1px dashed rgba(0,0,0,.2);border-radius:8px;background:#fff;overflow:hidden;}
-.mini-trg{padding:6px 8px;text-align:center;cursor:pointer;font-size:11px;color:#666;display:flex;align-items:center;justify-content:center;gap:4px;}
-.mini-fl{padding:0 5px 3px;}
-.mini-fi{display:flex;align-items:center;justify-content:space-between;padding:3px 5px;background:#fff;border-radius:4px;margin-bottom:2px;font-size:11px;color:#666;}
-.add-btn{width:100%;padding:6px;border:0.5px dashed rgba(0,0,0,.15);border-radius:7px;background:transparent;font-size:12px;color:#666;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;margin-bottom:6px;}
-/* format chips */
-.fmt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:7px;}
-.fmt-chip{border:0.5px solid rgba(0,0,0,.15);border-radius:7px;padding:5px 4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;text-align:center;position:relative;}
-.fmt-chip i.icon{font-size:14px;color:#888;}
-.fmt-chip .fname{font-size:10px;font-weight:500;color:#555;}
-.fmt-chip .fext{font-size:10px;color:#aaa;}
-.fmt-chip .chk{display:none;position:absolute;top:4px;right:4px;width:14px;height:14px;border-radius:50%;background:#222222;color:#fff;font-size:9px;align-items:center;justify-content:center;}
-.fmt-chip.sel{border:1px solid #222222;background:#fff;}
-.fmt-chip.sel .icon{color:#222222;}
-.fmt-chip.sel .fname{color:#222222;}
-.fmt-chip.sel .fext{color:#222222;}
-.fmt-chip.sel .chk{display:flex;}
-/* var chips */
-.var-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;}
-.var-chip{border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:8px 10px;cursor:pointer;font-size:12px;color:#555;display:flex;align-items:center;gap:6px;position:relative;}
-.var-chip i{font-size:14px;}
-.var-chip.sel{border:1px solid #222222;background:#fff;color:#222222;}
-.var-chip.sel::after{content:"✓";position:absolute;top:4px;right:6px;font-size:10px;color:#222222;}
-/* info boxes */
-.ibox{background:#fff;border-radius:7px;padding:6px 8px;font-size:11px;color:#666;display:flex;gap:5px;align-items:flex-start;margin-top:4px;line-height:1.35;}
-.ibox i{font-size:12px;flex-shrink:0;margin-top:1px;}
-.ibox.warn{background:#fff;color:#222222;}
-.ibox.info{background:#fff;color:#222222;}
-/* size row */
-.size-r{display:grid;grid-template-columns:1fr 14px 1fr;align-items:center;gap:3px;}
-.sep-x{text-align:center;font-size:12px;color:#aaa;}
-/* toggle */
-.tgl{position:relative;width:32px;height:17px;flex-shrink:0;}
-.tgl input{opacity:0;width:0;height:0;}
-.tgl .sl2{position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:17px;transition:.2s;}
-.tgl .sl2:before{position:absolute;content:"";height:11px;width:11px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.2s;}
-.tgl input:checked+.sl2{background:#222222;}
-.tgl input:checked+.sl2:before{transform:translateX(15px);}
-.mst{display:flex;align-items:center;gap:6px;margin-top:6px;padding-top:6px;}
-.szwrap{margin-top:9px;display:none;}
-.szwrap.open{display:block;}
-/* rush */
-.rush-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-.ropt{border:0.5px solid rgba(0,0,0,.15);border-radius:7px;padding:6px 10px;cursor:pointer;font-size:12px;color:#555;}
-.ropt.sel-s{border-color:#222222;background:#fff;color:#222222;}
-.ropt.sel-w{border-color:#222222;background:#fff;color:#222222;}
-/* advanced */
-.adv-tgl{width:100%;padding:7px 10px;background:#fff;border:0.5px solid rgba(0,0,0,.1);border-radius:7px;font-size:12px;color:#666;cursor:pointer;display:flex;align-items:center;justify-content:space-between;}
-.adv-b{border:0.5px solid rgba(0,0,0,.1);border-radius:7px;padding:8px 10px;margin-top:4px;display:none;}
-.adv-b.open{display:block;}
-.cbg{display:grid;grid-template-columns:1fr 1fr;gap:0;}
-.cbr{display:flex;align-items:flex-start;gap:6px;padding:4px 0;}
-.cbr:last-child{border-bottom:none;}
-.cbr input[type=checkbox]{margin-top:2px;flex-shrink:0;}
-.cbr label{font-size:12px;color:#222222;cursor:pointer;line-height:1.4;}
-.cbr .sub{font-size:11px;color:#aaa;display:block;margin-top:1px;}
-.adv-sl{font-size:11px;font-weight:500;color:#aaa;letter-spacing:.05em;text-transform:uppercase;margin:8px 0 4px;padding-top:0;}
-.adv-sl:first-child{border-top:none;padding-top:0;margin-top:0;}
-/* quick describe */
-.qdiv{border:none;margin:10px 0 8px;}
-.qtogrow{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;background:#fff;border-radius:7px;margin-bottom:6px;cursor:pointer;border:0.5px solid rgba(0,0,0,.1);}
-.qtogrow input[type=checkbox]{margin-top:2px;flex-shrink:0;width:15px;height:15px;cursor:pointer;}
-.ql{font-size:13px;font-weight:500;}
-.qs{font-size:12px;color:#888;margin-top:2px;line-height:1.5;}
-.qwrap{display:none;}
-.qwrap.show{display:block;}
-.qbox{background:#fff;border:0.5px solid rgba(0,0,0,.15);border-radius:7px;padding:8px 10px;margin-bottom:4px;}
-.qbox textarea{width:100%;font-size:12px;border:none;background:transparent;resize:none;min-height:56px;outline:none;font-family:inherit;color:#222222;}
-.qbox textarea::placeholder{color:#bbb;}
-.row-btns{display:flex;justify-content:flex-end;gap:6px;padding-top:8px;border-top:none;margin-top:8px;}
-.btn-p{padding:6px 14px;background:#fff;color:#222222;border:0.5px solid #222222;border-radius:7px;font-size:12px;font-weight:500;cursor:pointer;}
-.btn-s{padding:6px 10px;border:0.5px solid rgba(0,0,0,.15);border-radius:7px;font-size:12px;color:#666;cursor:pointer;background:transparent;}
-.form-hint{margin:6px 0 0;font-size:11px;color:#6B6B6B;text-align:right;line-height:1.35;letter-spacing:.01em;}
-.badge-info{font-size:11px;background:#fff;color:#222222;padding:2px 8px;border-radius:10px;}
-.msg-cta{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#fff;border:0.5px solid rgba(34,34,34,.15);border-radius:7px;margin-top:8px;}
-.msg-cta>i{font-size:20px;color:#222222;flex-shrink:0;}
-.mc-t{font-size:13px;font-weight:500;color:#222222;}
-.mc-s{font-size:12px;color:#555;margin-top:2px;line-height:1.45;}
-.mc-btn{flex-shrink:0;padding:8px 14px;background:#222222;color:#fff;border-radius:8px;font-size:12px;font-weight:500;text-decoration:none;white-space:nowrap;}
-@media(max-width:520px){.msg-cta{flex-wrap:wrap;}.mc-btn{width:100%;text-align:center;}}
-.sec{display:none;}
-.sec.vis{display:block;}
-/* quick/detailed mode tabs */
-.mode-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
-.mtab{border:1px solid rgba(34,34,34,.12);border-radius:8px;padding:8px 10px;cursor:pointer;display:flex;gap:8px;align-items:flex-start;background:#fff;}
-.mtab i{font-size:16px;color:#888;margin-top:1px;}
-.mtab .mt-t{font-size:12px;font-weight:500;}
-.mtab .mt-s{font-size:10px;color:#aaa;margin-top:1px;line-height:1.3;}
-.mtab.sel{border:1px solid #222222;background:#fff;}
-.mtab.sel i,.mtab.sel .mt-t{color:#222222;}
+.fitem{display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:6px;margin-bottom:4px;font-size:13px;border:0.5px solid rgba(0,0,0,.1);}
+.frem{background:none;border:none;cursor:pointer;color:#E24B4A;}
+.fmt-chip{border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:8px 10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;min-width:70px;}
+.fmt-chip .fname{font-size:13px;font-weight:700;}
+.fmt-chip.sel{border:1px solid #222;}
+.rush-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.ropt{border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:12px;cursor:pointer;font-size:14px;}
+.ropt.sel-s,.ropt.sel-w{border-color:#222;background:#fff8f8;}
+.row-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;}
+.btn-p{padding:10px 16px;background:#222;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;}
+.btn-s{padding:10px 14px;border:1px solid rgba(0,0,0,.15);border-radius:8px;font-size:14px;background:#fff;cursor:pointer;}
+.form-hint{margin:6px 0 0;font-size:12px;color:#6B6B6B;text-align:right;}
 .mode-body{display:none;}
 .mode-body.vis{display:block;}
-.qbig{background:#fff;border:1px solid rgba(34,34,34,.12);border-radius:7px;padding:8px 10px;}
-.qbig textarea{width:100%;font-size:12px;border:none;background:transparent;resize:none;min-height:56px;outline:none;font-family:inherit;}
-.qbig textarea::placeholder{color:#bbb;}
-
-/* Remake: stronger section grouping so Detailed reads in chunks, not a wall */
-#mode-d .sl{font-size:11px;font-weight:700;color:#222222;letter-spacing:.05em;margin:8px 0 4px;padding-top:0;border-top:none;}
-#mode-d .sl:first-of-type{border-top:none;padding-top:0;margin-top:6px;}
-@media(max-width:640px){.up2col{grid-template-columns:1fr!important;}}
+html.in-frame .ch{display:none;}
 </style>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="new-quote.css">
 </head>
 <body>
 <div class="wrap">
 <div class="card">
-  <div class="ch"><i class="ti ti-vector-triangle"></i><span class="ct">Vector &amp; Print File Quote</span></div>
+  <div class="ch"><i class="ti ti-vector-bezier"></i><span class="ct">Vector &amp; Print File Quote</span></div>
   <div class="cb">
-
-    <!-- MODE TABS -->
-    <div class="mode-tabs">
-      <div class="mtab sel" id="mtab-q" onclick="setMode('q')">
-        <i class="ti ti-message-2"></i>
-        <div><div class="mt-t">Quick request</div><div class="mt-s">Just describe what you need in a few words. We'll handle the rest.</div></div>
-      </div>
-      <div class="mtab" id="mtab-d" onclick="setMode('d')">
-        <i class="ti ti-list-details"></i>
-        <div><div class="mt-t">Detailed request</div><div class="mt-s">Choose services, formats, colors and variations for an exact quote.</div></div>
-      </div>
-    </div>
-
-    <div class="sl">Project name</div>
-    <div class="ff" style="margin-bottom:8px;"><input type="text" id="proj-name" placeholder="e.g. Tractor logo for shirt, CAFSU military design..."></div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;" class="up2col">
-      <div>
-        <div class="sl">Artwork upload</div>
-        <div class="upload-area">
-          <div class="utrg" onclick="document.getElementById('fu-main').click()">
-            <i class="ti ti-cloud-upload"></i>
-            <p>Click to upload : multiple files allowed</p>
-            <span>PNG, JPG, PDF, AI, EPS, SVG : max 20MB each</span>
-            <input type="file" id="fu-main" multiple style="display:none" onchange="handleFiles('fl-main',this)">
-          </div>
-          <div class="flist" id="fl-main"></div>
-        </div>
-      </div>
-      <div>
-        <div class="sl">Reference image <span style="font-size:11px;font-weight:400;color:#aaa;">(optional : won't be redrawn)</span></div>
-        <div class="upload-area">
-          <div class="utrg" onclick="document.getElementById('fu-ref').click()">
-            <i class="ti ti-photo" style="color:#222222;"></i>
-            <p>"I want something like this"</p>
-            <span>Style examples, links, screenshots</span>
-            <input type="file" id="fu-ref" multiple style="display:none" onchange="handleFiles('fl-ref',this)">
-          </div>
-          <div class="flist" id="fl-ref"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- QUICK MODE -->
-    <div class="mode-body vis" id="mode-q">
-      <div class="sl" style="margin-top:0;">Tell us about your project</div>
-      <div class="qbig">
-        <textarea placeholder="e.g. vector logo, black &amp; white plus color, screen-print ready"></textarea>
-      </div>
-      <div class="fg" style="margin-top:11px;">
-        
-      </div>
-
-      <div class="sl" style="margin-top:8px;">Turnaround</div>
-      <div class="rush-row">
-        <div class="ropt sel-s" id="rq-std" onclick="selRushQ('std')"><i class="ti ti-clock" style="font-size:13px"></i> Standard (12-24 hrs) : included</div>
-        <div class="ropt" id="rq-rush" onclick="selRushQ('rush')"><i class="ti ti-bolt" style="font-size:13px"></i> Urgent : contact us before placing an order</div>
-      </div>
-      <div class="ibox" id="rq-note" style="display:none;"><i class="ti ti-message-circle"></i> For urgent orders, please text or email us first so we can confirm the timeline before you place the order.</div>
-
-    </div>
-
-    <!-- DETAILED MODE -->
-    <div class="mode-body" id="mode-d">
-      <div style="display:flex;gap:7px;align-items:flex-start;background:#fff;border-radius:8px;padding:7px 10px;margin-top:8px;font-size:11px;color:#222222;line-height:1.35;">
-        <i class="ti ti-heart-handshake" style="font-size:16px;margin-top:1px;"></i>
-        <span><b>Not sure about a field? Leave it blank.</b> We'll figure it out from your artwork : every field here is optional and just helps us quote faster.</span>
-      </div>
-
-      <div class="sl">How many designs?</div>
-      <div class="type-grid" style="margin-bottom:8px;">
-        <div class="topt sel" id="t-single" onclick="setType('single')">
-          <i class="ti ti-file"></i>
-          <span class="ot">Single design</span>
-          <span class="os">One image, one output</span>
-        </div>
-        <div class="topt" id="t-multi" onclick="setType('multi')">
-          <i class="ti ti-files"></i>
-          <span class="ot">Multiple designs</span>
-          <span class="os">Different images or settings</span>
-        </div>
-      </div>
-
-      <!-- SINGLE -->
-      <div id="sec-single" class="sec vis">
-
-        <div class="sl" style="margin-top:0;">What do you need?</div>
-        <div class="ff" style="margin-bottom:12px;">
-          <select id="svc-sel" onchange="setSvc(this.value)">
-            <option value="vector">Image to vector : redraw as clean vector art</option>
-            <option value="dtf">DTF print file : print ready PNG / SVG</option>
-            <option value="screen">Screen print / color separation</option>
-            <option value="complex">Complex artwork : portrait, pet, vehicle, illustration</option>
-            <option value="pattern">Seamless pattern : repeat pattern for fabric / print</option>
-            <option value="other">Something else : I'll describe below</option>
+    <div class="mode-body vis" id="mode-d">
+      <p class="nq-lead">Tell us what you need. If you’re unsure, we’ll help.</p>
+      <div class="nq-top">
+        <div class="ff">
+          <label>How many designs?</label>
+          <select id="how-many" onchange="setHowMany(this.value)">
+            <option value="1">1 design</option>
+            <option value="2">2 designs</option>
+            <option value="3">3 designs</option>
+            <option value="4">4 designs</option>
+            <option value="5">5 designs</option>
+            <option value="6">6 designs</option>
+            <option value="7">7 designs</option>
+            <option value="8">8 designs</option>
+            <option value="9">9 designs</option>
+            <option value="10">10 designs</option>
           </select>
         </div>
-
-        <!-- vector fields -->
-        <div id="sf-vector" class="svc-fields show">
-          <div class="fg">
-            <div class="ff"><label>Style</label><select><option>Clean flat colors</option><option>Detailed / realistic</option><option>Bold outline</option><option>Vintage / retro</option><option>Match reference image</option><option>Not sure</option></select></div>
-            <div class="ff"><label>Number of colors</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>Full color</option><option>Not sure</option></select></div>
-            <div class="ff"><label>Background</label><select><option>Transparent</option><option>White</option><option>Black</option><option>Custom color</option></select></div>
-            <div class="ff"><label>Intended use</label><select><option>Print on apparel</option><option>Logo / branding</option><option>General print (stickers, banners)</option><option>Embroidery later</option><option>Web / digital</option><option>Edit / modify myself</option><option>Not sure</option></select></div>
-            <div class="ff"><label>Size needed <span style="font-weight:400;color:#aaa;">(optional : vector scales, but tell us if exact)</span></label><div style="display:grid;grid-template-columns:1fr 14px 1fr 74px;align-items:center;gap:4px;"><input type="number" placeholder="W" min="0" step="0.1"><span style="text-align:center;font-size:12px;color:#aaa;">×</span><input type="number" placeholder="H" min="0" step="0.1"><select><option>inches</option><option>cm</option><option>px</option></select></div></div>
-          </div>
-        </div>
-
-        <!-- dtf fields -->
-        <div id="sf-dtf" class="svc-fields">
-          <div class="fg">
-            <div class="ff"><label>Print size (W × H inches)</label><div class="size-r"><input type="number" placeholder="W" min="0" step="0.1"><span class="sep-x">×</span><input type="number" placeholder="H" min="0" step="0.1"></div></div>
-            <div class="ff"><label>Number of colors</label><select><option>Full color</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>Not sure</option></select></div>
-            <div class="ff"><label>Background</label><select><option>Transparent</option><option>White</option><option>Black</option></select></div>
-            <div class="ff"><label>Gang sheet?</label><select><option>No : single design</option><option>Yes : arrange on gang sheet</option><option>Not sure</option></select></div>
-          </div>
-          <div class="ibox info" style="margin-top:8px;"><i class="ti ti-info-circle"></i> DTF files delivered as high resolution PNG with white underbase layer included as standard.</div>
-        </div>
-
-        <!-- screen fields -->
-        <div id="sf-screen" class="svc-fields">
-          <div class="fg">
-            <div class="ff"><label>Number of colors / screens</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6+</option><option>Not sure</option></select></div>
-            <div class="ff"><label>Separation type</label><select><option>Spot color</option><option>CMYK</option><option>Simulated process</option><option>Not sure : let team decide</option></select></div>
-            <div class="ff"><label>Underbase</label><select><option>Yes : white underbase</option><option>No underbase</option><option>Not sure</option></select></div>
-            <div class="ff"><label>Halftone</label><select><option>No : solid colors only</option><option>Yes : halftone separations</option><option>Not sure</option></select></div>
-          </div>
-        </div>
-
-        <!-- complex fields -->
-        <div id="sf-complex" class="svc-fields">
-          <div class="fg">
-            <div class="ff"><label>Subject type</label><select><option>Pet / animal</option><option>Human portrait</option><option>Vehicle (car, truck, tractor etc)</option><option>Building / architecture</option><option>Character / mascot</option><option>Other complex illustration</option></select></div>
-            <div class="ff"><label>Style</label><select><option>Realistic / detailed</option><option>Flat illustration</option><option>Bold / graphic</option><option>Vintage / retro</option><option>Match reference image</option></select></div>
-            <div class="ff"><label>Number of colors</label><select><option>Full color</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5+</option><option>Not sure</option></select></div>
-            <div class="ff"><label>Intended use</label><select><option>Print on apparel</option><option>Logo / branding</option><option>Wall art / poster</option><option>Gift / keepsake</option><option>DTF / screen print</option><option>Not sure</option></select></div>
-          </div>
-          <div class="ibox info" style="margin-top:8px;"><i class="ti ti-info-circle"></i> Complex artwork is priced after reviewing your image : we'll quote within 2 hours.</div>
-        </div>
-
-        <!-- pattern fields -->
-        <div id="sf-pattern" class="svc-fields">
-          <div class="fg">
-            <div class="ff"><label>Repeat type</label><select><option>Square repeat</option><option>Half-drop repeat</option><option>Brick repeat</option><option>Not sure : let team decide</option></select></div>
-            <div class="ff"><label>Intended use</label><select><option>Fabric / textile printing</option><option>Sublimation</option><option>Wallpaper / background</option><option>Branding / packaging</option><option>Web / digital</option></select></div>
-            <div class="ff"><label>Tile size (W × H inches)</label><div class="size-r"><input type="number" placeholder="W" min="0" step="0.1"><span class="sep-x">×</span><input type="number" placeholder="H" min="0" step="0.1"></div></div>
-            <div class="ff"><label>Number of colors</label><select><option>2</option><option>3</option><option>4</option><option>5</option><option>Full color</option><option>Not sure</option></select></div>
-          </div>
-        </div>
-
-        <!-- other fields -->
-        <div id="sf-other" class="svc-fields">
-          <div class="ff"><label>Describe what you need</label><textarea placeholder="Tell us what you need and how you plan to use it..."></textarea></div>
-        </div>
-
-      </div>
-
-      <!-- MULTIPLE -->
-      <div id="sec-multi" class="sec">
-        <div class="ibox info" style="margin-bottom:10px;"><i class="ti ti-info-circle"></i> Add a row per design : each can have its own service type and settings.</div>
-        <div id="multi-rows">
-          <div class="drow" id="mr-1">
-            <div class="drow-head"><span class="drow-num"><i class="ti ti-file" style="font-size:13px;"></i> Design 1</span></div>
-            <div style="display:grid;grid-template-columns:80px 1fr 1fr 1fr;gap:8px;align-items:start;">
-              <div class="ff"><label>File</label>
-                <div class="mini-up"><div class="mini-trg" onclick="this.nextElementSibling.nextElementSibling.click()"><i class="ti ti-upload" style="font-size:13px;"></i> Upload</div><div class="mini-fl" id="mfl-1"></div><input type="file" multiple style="display:none" onchange="handleMini('mfl-1',this)"></div>
-              </div>
-              <div class="ff"><label>Design name</label><input type="text" placeholder="e.g. Eagle logo"></div>
-              <div class="ff"><label>Service needed</label>
-                <select onchange="toggleRowFields(this)">
-                  <option value="vector">Image to vector</option>
-                  <option value="dtf">DTF print file</option>
-                  <option value="screen">Screen print / color sep</option>
-                  <option value="complex">Complex artwork</option>
-                  <option value="pattern">Seamless pattern</option>
-                  <option value="other">Other : describe below</option>
-                </select>
-              </div>
-              <div class="ff"><label>Colors</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>Full color</option><option>Not sure</option></select></div>
-            </div>
-            <div class="ff" style="margin-top:8px;"><label>Notes for this design</label><input type="text" placeholder="Any specific instructions for this design..."></div>
-          </div>
-        </div>
-        <button class="add-btn" onclick="addRow()"><i class="ti ti-plus"></i> Add another design</button>
-        <div class="fg">
-          <div class="ff"><label>Shared output format</label><select><option>Same for all designs</option><option>Different per design : I'll specify in notes</option></select></div>
-          <div class="ff"><label>Shared turnaround</label><select><option>Standard (12-24 hrs)</option><option>Urgent : I'll contact you first before ordering</option></select></div>
+        <div class="ff">
+          <label>Select a service</label>
+          <select id="svc-sel">
+            <option value="Image to vector">Image to vector</option>
+            <option value="DTF print">DTF print</option>
+            <option value="Screen print">Screen print</option>
+            <option value="Seamless pattern">Seamless pattern</option>
+            <option value="Halftone">Halftone</option>
+            <option value="Other">Other</option>
+          </select>
         </div>
       </div>
 
+      <div id="design-list"></div>
+      <button type="button" class="add-d nq-add" onclick="addDesign()"><i class="ti ti-plus"></i> Add another design</button>
 
-      <!-- output formats -->
-      <div class="sl" style="margin-top:8px;">Output formats <span style="font-size:11px;font-weight:400;color:#aaa;">  select all you need</span></div>
-      <div class="fmt-grid">
-        <div class="fmt-chip sel" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-photo icon"></i><span class="fname">PNG</span><span class="fext">300 DPI</span></div>
-        <div class="fmt-chip sel" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-file-type-svg icon"></i><span class="fname">SVG</span><span class="fext">Vector</span></div>
-        <div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-file-type-pdf icon"></i><span class="fname">PDF</span><span class="fext">Print ready</span></div>
-        <div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-vector-bezier icon"></i><span class="fname">AI</span><span class="fext">Illustrator</span></div>
-        <div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-file-vector icon"></i><span class="fname">EPS</span><span class="fext">Vector</span></div>
-        <div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-layers icon"></i><span class="fname">PSD</span><span class="fext">Layered</span></div>
-        <div class="fmt-chip" onclick="toggleFmt(this)"><span class="chk"><i class="ti ti-check" style="font-size:9px;"></i></span><i class="ti ti-pentagon icon"></i><span class="fname">CDR</span><span class="fext">CorelDRAW</span></div>
+      <div class="sl">Output files</div>
+      <p class="nq-hint">PNG and PDF are always included. We’ll also provide the best editable file for your selected service.</p>
+      <div class="nq-fmts">
+        <div class="fmt-chip sel" data-included="1"><span class="fname">PNG</span><span class="fincl">Included</span></div>
+        <div class="fmt-chip sel" data-included="1"><span class="fname">PDF</span><span class="fincl">Included</span></div>
+        <div class="fmt-chip" onclick="toggleFmt(this)"><span class="fname">SVG</span></div>
+        <div class="fmt-chip" onclick="toggleFmt(this)"><span class="fname">AI</span></div>
+        <div class="fmt-chip" onclick="toggleFmt(this)"><span class="fname">EPS</span></div>
+        <div class="fmt-chip" onclick="toggleFmt(this)"><span class="fname">CDR</span></div>
+        <div class="fmt-chip" id="fmt-other-chip" onclick="toggleFmt(this)"><span class="fname">Other</span></div>
+        <div id="fmt-other-inp" class="fmt-other" style="display:none;"><input type="text" placeholder="Enter format"></div>
       </div>
-      <div class="ibox" style="margin-top:8px;"><i class="ti ti-info-circle"></i> Not sure? PNG + SVG covers most uses. We can always export to other formats on request.</div>
+      <p class="nq-hint">You don’t need to select formats already saved in your profile.</p>
 
-      <!-- color mode -->
-      <div class="fg" style="margin-top:12px;">
-        <div class="ff"><label>Color mode</label><select><option>RGB (screen / DTF / web)</option><option>CMYK (screen print / offset)</option><option>Not sure : let team decide</option></select></div>
-      </div>
-
-      <!-- variations -->
-      <div class="sl" style="margin-top:8px;">Variations needed? <span style="font-size:11px;font-weight:400;color:#aaa;">select all that apply</span></div>
-      <div class="var-row">
-        <div class="var-chip" onclick="toggleVar(this)"><i class="ti ti-circle-filled" style="color:#222222;"></i> Black version</div>
-        <div class="var-chip" onclick="toggleVar(this)"><i class="ti ti-circle"></i> White version</div>
-        <div class="var-chip" onclick="toggleVar(this)"><i class="ti ti-text-size"></i> Different text</div>
-        <div class="var-chip" onclick="toggleVar(this)"><i class="ti ti-resize"></i> Multiple sizes</div>
-        <div class="var-chip" onclick="toggleVar(this)"><i class="ti ti-palette"></i> Different colors</div>
-        <div class="var-chip" onclick="toggleVar(this)"><i class="ti ti-mirror"></i> Mirrored version</div>
-      </div>
-      <div style="margin-top:8px;">
-        <input type="text" style="font-size:13px;padding:7px 10px;border:0.5px solid rgba(0,0,0,.2);border-radius:8px;width:100%;background:#fff;outline:none;" placeholder="Any other variation? e.g. San Diego version, add name, remove text...">
-      </div>
-
-      <!-- rush (single only) -->
-      <div id="rush-single">
-        <div class="sl" style="margin-top:8px;">Turnaround</div>
+      <div class="sl">Turnaround</div>
       <div class="rush-row">
-        <div class="ropt sel-s" id="r-std" onclick="selRush('std')"><i class="ti ti-clock" style="font-size:13px"></i> Standard (12-24 hrs) : included</div>
-        <div class="ropt" id="r-rush" onclick="selRush('rush')"><i class="ti ti-bolt" style="font-size:13px"></i> Urgent : contact us before placing an order</div>
+        <div class="ropt sel-s" id="r-std" onclick="selRush('std')">Usually ready in 12–24 hours</div>
+        <div class="ropt" id="r-rush" onclick="selRush('rush')">Urgent — contact us first</div>
       </div>
-      <div class="ibox" id="rush-note" style="display:none;"><i class="ti ti-message-circle"></i> For urgent orders, please text or email us first so we can confirm the timeline before you place the order.</div>
-      </div>
-
-      <!-- advanced -->
-      <div style="margin-top:8px;">
-        <button class="adv-tgl" onclick="toggleAdv()">
-          <span style="display:flex;align-items:center;gap:7px;"><i class="ti ti-settings" style="font-size:14px;"></i> Advanced technical options <span class="badge-info">pre-set to recommended defaults</span></span>
-          <i class="ti ti-chevron-down" style="font-size:14px;transition:transform .2s;" id="adv-chev"></i>
-        </button>
-        <div class="adv-b" id="adv-b">
-          <div style="font-size:12px;color:#aaa;margin-bottom:10px;">Only change if you have specific technical requirements.</div>
-          <div class="adv-sl">General</div>
-          <div class="cbg">
-            <div style="padding-right:11px;">
-              <div class="cbr"><input type="checkbox" checked><label>Remove background<span class="sub">Clean transparent background</span></label></div>
-              <div class="cbr"><input type="checkbox" checked><label>Smooth all paths<span class="sub">Clean up rough edges</span></label></div>
-              <div class="cbr"><input type="checkbox" checked><label>Reduce node count<span class="sub">Cleaner, smaller file</span></label></div>
-            </div>
-            <div style="padding-left:11px;border-left:0.5px solid rgba(0,0,0,.08);">
-              <div class="cbr"><input type="checkbox"><label>Expand strokes to fills<span class="sub">Outlines become solid shapes</span></label></div>
-              <div class="cbr"><input type="checkbox"><label>Preserve colors exactly<span class="sub">No color adjustments</span></label></div>
-              <div class="cbr"><input type="checkbox"><label>Contact me before changes<span class="sub">We'll ask before modifying</span></label></div>
-            </div>
-          </div>
-          <div class="adv-sl">Color</div>
-          <div class="fg">
-            <div class="ff"><label>Pantone / color codes</label><input type="text" placeholder="e.g. PMS 286 C, #1a1a18"></div>
-            <div class="ff"><label>Color matching</label><select><option>Match as close as possible</option><option>Exact Pantone match</option><option>Simplify / flatten colors</option></select></div>
-          </div>
-          <div class="adv-sl">DTF specific</div>
-          <div class="cbg">
-            <div style="padding-right:11px;">
-              <div class="cbr"><input type="checkbox" checked><label>Include white underbase layer<span class="sub">Standard for dark fabric</span></label></div>
-              <div class="cbr"><input type="checkbox"><label>Mirror / flip for HTV<span class="sub">Required for heat transfer</span></label></div>
-            </div>
-            <div style="padding-left:11px;border-left:0.5px solid rgba(0,0,0,.08);">
-              <div class="cbr"><input type="checkbox"><label>Gang sheet layout<span class="sub">Multiple designs on one sheet</span></label></div>
-              <div class="cbr"><input type="checkbox" checked><label>300 DPI minimum<span class="sub">Print quality standard</span></label></div>
-            </div>
-          </div>
-          <div class="adv-sl">Screen print specific</div>
-          <div class="cbg">
-            <div style="padding-right:11px;">
-              <div class="cbr"><input type="checkbox"><label>Halftone separations<span class="sub">For gradient / shaded areas</span></label></div>
-              <div class="cbr"><input type="checkbox" checked><label>Separate layer per color<span class="sub">Each color on its own layer</span></label></div>
-            </div>
-            <div style="padding-left:11px;border-left:0.5px solid rgba(0,0,0,.08);">
-              <div class="cbr"><input type="checkbox"><label>Film positive ready<span class="sub">Black on transparent</span></label></div>
-              <div class="cbr"><input type="checkbox"><label>Pantone matching per layer<span class="sub">Exact Pantone ref per screen</span></label></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-    
-      <div class="sl" style="margin-top:8px;">Anything else we should know?</div>
-      <div class="qbig"><textarea style="min-height:64px;" placeholder="Deadlines, special requests, context : anything that didn&#39;t fit the fields above."></textarea></div>
-
-    </div>
-
-    <div class="msg-cta">
-      <i class="ti ti-messages"></i>
-      <div style="flex:1;">
-        <div class="mc-t">Prefer to message us directly?</div>
-        <div class="mc-s">Skip the form : chat with our team from your account, attach your image and send your details. We'll set up the order for you.</div>
-      </div>
-      <a class="mc-btn" href="#">Message our team</a>
+      <div class="nq-warn" id="rush-note" style="display:none;"><i class="ti ti-alert-circle"></i> For urgent work, please text or email us first so we can confirm the timeline.</div>
+      <div class="nq-warn"><i class="ti ti-info-circle"></i> Complex designs may take up to 3 business days. We’ll confirm the turnaround before starting.</div>
     </div>
 
     <div class="row-btns">
-      <button class="btn-s">Save as draft</button>
-      <button class="btn-p">Submit quote request →</button>
+      <button type="button" class="btn-s">Save as draft</button>
+      <button type="button" class="btn-p">Submit quote request →</button>
     </div>
     <p class="form-hint">This sends your request to our team.</p>
-
   </div>
 </div>
 </div>
 <script>
-var rowCnt=1;
-
-function setType(t){
-  document.getElementById('t-single').className='topt'+(t==='single'?' sel':'');
-  document.getElementById('t-multi').className='topt'+(t==='multi'?' sel':'');
-  document.getElementById('sec-single').className='sec'+(t==='single'?' vis':'');
-  document.getElementById('sec-multi').className='sec'+(t==='multi'?' vis':'');
-  document.getElementById('rush-single').style.display=t==='single'?'block':'none';
-}
-
-function setSvc(v){
-  ['vector','dtf','screen','complex','pattern','other'].forEach(function(x){
-    document.getElementById('sf-'+x).className='svc-fields'+(x===v?' show':'');
-  });
-}
-
-function addRow(){
-  rowCnt++;
-  var id='mr-'+rowCnt;
-  var mflid='mfl-'+rowCnt;
-  var wrap=document.getElementById('multi-rows');
-  var d=document.createElement('div');
-  d.className='drow';d.id=id;
-  d.innerHTML='<div class="drow-head"><span class="drow-num"><i class="ti ti-file" style="font-size:13px;"></i> Design '+rowCnt+'</span><button class="drow-del" onclick="document.getElementById(\''+id+'\').remove()"><i class="ti ti-trash" style="font-size:13px;"></i> Remove</button></div><div style="display:grid;grid-template-columns:80px 1fr 1fr 1fr;gap:8px;align-items:start;"><div class="ff"><label>File</label><div class="mini-up"><div class="mini-trg" onclick="this.nextElementSibling.nextElementSibling.click()"><i class="ti ti-upload" style="font-size:13px;"></i> Upload</div><div class="mini-fl" id="'+mflid+'"></div><input type="file" multiple style="display:none" onchange="handleMini(\''+mflid+'\',this)"></div></div><div class="ff"><label>Design name</label><input type="text" placeholder="e.g. Back print"></div><div class="ff"><label>Service needed</label><select><option value="vector">Image to vector</option><option value="dtf">DTF print file</option><option value="screen">Screen print / color sep</option><option value="complex">Complex artwork</option><option value="pattern">Seamless pattern</option><option value="other">Other</option></select></div><div class="ff"><label>Colors</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>Full color</option><option>Not sure</option></select></div></div><div class="ff" style="margin-top:8px;"><label>Notes for this design</label><input type="text" placeholder="Any specific instructions..."></div>';
-  wrap.appendChild(d);
-}
-
-function handleMini(lid,inp){
-  var list=document.getElementById(lid);
-  if(!inp.files) return;
-  Array.from(inp.files).forEach(function(f){
-    var d=document.createElement('div');d.className='mini-fi';
-    d.innerHTML='<span>'+f.name+'</span><button style="background:none;border:none;cursor:pointer;color:#E24B4A;" onclick="this.parentNode.remove()"><i class="ti ti-x" style="font-size:11px;"></i></button>';
-    list.appendChild(d);
-  });
-}
-
-function handleFiles(lid,inp){
-  var list=document.getElementById(lid);
-  if(!inp.files) return;
-  Array.from(inp.files).forEach(function(f){
-    var d=document.createElement('div');d.className='fitem';
-    d.innerHTML='<span style="display:flex;align-items:center;gap:5px;"><i class="ti ti-file"></i>'+f.name+'</span><button class="frem" onclick="this.parentNode.remove()"><i class="ti ti-x"></i></button>';
-    list.appendChild(d);
-  });
-}
-
-function toggleFmt(el){el.classList.toggle('sel');}
-function toggleVar(el){el.classList.toggle('sel');}
-
-function selRush(v){
-  document.getElementById('r-std').className='ropt'+(v==='std'?' sel-s':'');
-  document.getElementById('r-rush').className='ropt'+(v==='rush'?' sel-w':'');
-  var n=document.getElementById('rush-note');if(n)n.style.display=(v==='rush'?'flex':'none');
-}
-
-function toggleAdv(){
-  var b=document.getElementById('adv-b');var c=document.getElementById('adv-chev');
-  var o=b.classList.toggle('open');c.style.transform=o?'rotate(180deg)':'';
-}
-
-function selRushQ(v){
-  document.getElementById('rq-std').className='ropt'+(v==='std'?' sel-s':'');
-  document.getElementById('rq-rush').className='ropt'+(v==='rush'?' sel-w':'');
-  document.getElementById('rq-note').style.display=(v==='rush'?'flex':'none');
-}
-function setMode(m){
-  document.getElementById('mtab-q').className='mtab'+(m==='q'?' sel':'');
-  document.getElementById('mtab-d').className='mtab'+(m==='d'?' sel':'');
-  document.getElementById('mode-q').className='mode-body'+(m==='q'?' vis':'');
-  document.getElementById('mode-d').className='mode-body'+(m==='d'?' vis':'');
-}
-
+window.LVD_DESIGN_HTML = function (n) {
+  return (
+    '<div class="dcard nq-card" id="dr-' + n + '">' +
+      '<div class="nq-card-h"><strong data-card-title>Design ' + n + '</strong>' +
+      '<button type="button" class="drow-del" onclick="removeDesign(this)"><i class="ti ti-trash"></i> Remove</button></div>' +
+      '<div class="ff"><label>Project name (optional)</label>' +
+      '<input class="d-name" data-design-name type="text" placeholder="e.g. Tractor logo, military design, or seamless pattern"></div>' +
+      '<div class="nq-up">' +
+        '<div class="ff"><label>Upload your artwork</label>' +
+        '<div class="upload-area"><div class="utrg" onclick="document.getElementById(\'fu-' + n + '\').click()">' +
+        '<i class="ti ti-cloud-upload"></i><p>Upload your artwork</p>' +
+        '<span>PNG, JPG, PDF, AI, EPS or SVG</span></div>' +
+        '<input type="file" id="fu-' + n + '" multiple style="display:none" onchange="handleFiles(\'flist-' + n + '\',this)">' +
+        '<div class="flist" id="flist-' + n + '"></div></div></div>' +
+        '<div class="ff"><label>Add a reference (optional)</label>' +
+        '<div class="upload-area"><div class="utrg" onclick="document.getElementById(\'fr-' + n + '\').click()">' +
+        '<i class="ti ti-photo"></i><p>Add a reference</p>' +
+        '<span>Upload an example of the style or result you want</span></div>' +
+        '<input type="file" id="fr-' + n + '" multiple style="display:none" onchange="handleFiles(\'rlist-' + n + '\',this)">' +
+        '<div class="flist" id="rlist-' + n + '"></div></div></div>' +
+      '</div>' +
+      '<div class="nq-prefs">' +
+        '<div class="nq-pref"><h3>Background</h3>' +
+          '<label class="nq-radio"><input type="radio" name="bg-' + n + '" value="Transparent" checked> Transparent</label>' +
+          '<label class="nq-radio"><input type="radio" name="bg-' + n + '" value="Keep original"> Keep original</label>' +
+          '<label class="nq-radio"><input type="radio" name="bg-' + n + '" value="Not sure"> Not sure</label>' +
+        '</div>' +
+        '<div class="nq-pref"><h3>Color mode</h3>' +
+          '<label class="nq-radio"><input type="radio" name="cm-' + n + '" value="RGB"> RGB</label>' +
+          '<label class="nq-radio"><input type="radio" name="cm-' + n + '" value="CMYK"> CMYK</label>' +
+          '<label class="nq-radio"><input type="radio" name="cm-' + n + '" value="Choose for me" checked> Choose for me</label>' +
+        '</div>' +
+        '<label class="nq-check" style="padding-top:22px;"><input type="checkbox" data-dpi checked> Prepare at 300 DPI</label>' +
+      '</div>' +
+      '<p class="nq-hint">Not sure? Leave the default options selected and our team will prepare the correct settings.</p>' +
+      '<div class="ff nq-note"><label>Tell us about your project</label>' +
+      '<textarea placeholder="Example: Recreate this as clean vector artwork, keep the original colors, and make the background transparent."></textarea>' +
+      '<p class="nq-hint">Mention any text, colors, printing requirements, or other details.</p></div>' +
+    '</div>'
+  );
+};
 </script>
-<link rel="stylesheet" href="theme.css">
 <script src="theme.js"></script>
+<script src="new-quote.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  if (!document.querySelector('#design-list .dcard')) addDesign();
+});
+</script>
 <script src="form-layout.js"></script>
 <script src="bridge.js"></script>
 </body>

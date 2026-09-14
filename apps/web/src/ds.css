@@ -952,6 +952,7 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   display: flex;
   gap: 12px;
   align-items: flex-start;
+  text-align: left;
   background: var(--etsy-white);
   transition: border-color var(--ease), background var(--ease), box-shadow var(--ease);
 }
@@ -973,8 +974,9 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   flex-shrink: 0;
 }
 .pick.mar .pic { background: var(--tint-m); color: var(--maroon); }
-.pick .pt { font-size: 14px; font-weight: 600; }
-.pick .pd { font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+.pick-copy { flex: 1; min-width: 0; text-align: left; }
+.pick .pt { font-size: 14px; font-weight: 600; text-align: left; }
+.pick .pd { font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.4; text-align: left; }
 .steps {
   display: flex;
   gap: 8px;

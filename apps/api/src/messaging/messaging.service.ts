@@ -425,12 +425,22 @@ export class MessagingService {
     return out;
   }
 
+  private conversationWithPreview(row: ConversationRow, preview: string, stripPrivate = false) {
+    return {
+      ...this.conversationDto(row, stripPrivate),
+      lastMessagePreview: preview,
+    };
+  }
+
   private emitConversation(event: string, payload: Record<string, unknown>) {
     this.gateway?.emitToConversation(
       String(payload.conversationId ?? ''),
       event,
       payload,
     );
+    if (event === 'message:new') {
+      this.gateway?.emitToStaff(event, payload);
+    }
     this.gateway?.server?.emit('unread:changed', { scope: 'customer' });
   }
 
@@ -886,6 +896,7 @@ export class MessagingService {
         this.gateway?.emitToUser(cust.user_id, 'message:new', {
           conversationId,
           direction: MessageDirection.OUTBOUND,
+          message: { body: text || '(attachment)' },
         });
       }
     }
@@ -895,8 +906,9 @@ export class MessagingService {
       'SELECT * FROM messages WHERE id = ? LIMIT 1',
       [messageId],
     );
+    const preview = text || '(attachment)';
     const dto = {
-      conversation: this.conversationDto(row!),
+      conversation: this.conversationWithPreview(row!, preview),
       message: this.messageDto(message!, attachments),
     };
     this.emitConversation('message:new', {
@@ -1422,8 +1434,9 @@ export class MessagingService {
       'SELECT * FROM messages WHERE id = ? LIMIT 1',
       [messageId],
     );
+    const preview = text || '(attachment)';
     const dto = {
-      conversation: this.conversationDto(row!, true),
+      conversation: this.conversationWithPreview(row!, preview, true),
       message: this.messageDto(message!, attachments),
     };
     this.emitConversation('message:new', {

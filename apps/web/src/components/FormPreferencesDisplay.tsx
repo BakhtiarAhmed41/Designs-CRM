@@ -5,6 +5,9 @@ type FormDesign = {
   size?: string;
   colors?: string;
   notes?: string;
+  background?: string;
+  keepProportional?: boolean;
+  dpi300?: boolean;
   sizes?: Array<{ label?: string; w?: string; h?: string }>;
 };
 
@@ -46,7 +49,7 @@ export function FormPreferencesDisplay({ preferences }: { preferences: unknown }
 
       {(p.mode || p.turnaround || hasFormats) && (
         <div style={{ padding: '0 16px 12px' }}>
-          {p.mode && (
+          {p.mode && p.mode !== 'd' && (
             <div className="od-line">
               <span className="l">Form mode</span>
               <span className="v">{p.mode === 'd' ? 'Detailed request' : 'Quick request'}</span>
@@ -128,12 +131,7 @@ export function FormPreferencesDisplay({ preferences }: { preferences: unknown }
               </div>
               {d.placement && (
                 <div>
-                  <b>Placement:</b> {d.placement}
-                </div>
-              )}
-              {d.fabric && (
-                <div>
-                  <b>Fabric:</b> {d.fabric}
+                  <b>Item / placement:</b> {d.placement}
                 </div>
               )}
               {d.size && (
@@ -143,7 +141,22 @@ export function FormPreferencesDisplay({ preferences }: { preferences: unknown }
               )}
               {d.colors && (
                 <div>
-                  <b>Colors:</b> {d.colors}
+                  <b>Color mode:</b> {d.colors}
+                </div>
+              )}
+              {d.background && (
+                <div>
+                  <b>Background:</b> {d.background}
+                </div>
+              )}
+              {d.dpi300 && (
+                <div>
+                  <b>300 DPI:</b> Yes
+                </div>
+              )}
+              {d.keepProportional && (
+                <div>
+                  <b>Keep proportional:</b> Yes
                 </div>
               )}
               {d.notes && (

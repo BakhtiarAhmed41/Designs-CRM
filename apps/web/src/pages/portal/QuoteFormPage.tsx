@@ -294,7 +294,7 @@ export function QuoteFormPage() {
                   <div className="pic">
                     <i className={`ti ${s.icon}`} />
                   </div>
-                  <div>
+                  <div className="pick-copy">
                     <div className="pt">{s.label}</div>
                     <div className="pd">{s.desc}</div>
                   </div>

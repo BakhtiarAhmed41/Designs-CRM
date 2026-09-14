@@ -49,8 +49,8 @@
   }
 
   function getDesignName() {
-    var proj = document.getElementById('proj-name');
-    if (proj && proj.value && proj.value.trim()) return proj.value.trim();
+    var named = document.querySelector('[data-design-name], .d-name, #proj-name');
+    if (named && named.value && named.value.trim()) return named.value.trim();
     var sls = document.querySelectorAll('.cb > .sl');
     for (var i = 0; i < sls.length; i++) {
       var t = sls[i].textContent.trim().toLowerCase();
@@ -68,17 +68,18 @@
 
   function collectSize(mode, body) {
     if (!body) return null;
-    if (mode === 'q') {
-      var sel = body.querySelector('#q-sizing');
-      return sel ? sel.value : null;
-    }
     var card = body.querySelector('.dcard');
     if (!card) return null;
-    var w = card.querySelector('.size-r input');
-    var h = card.querySelector('.size-r input:last-of-type');
+    var w = card.querySelector('[data-size="w"]') || card.querySelector('.size-r input');
+    var h = card.querySelector('[data-size="h"]') || card.querySelector('.size-r input:last-of-type');
+    var unit = card.querySelector('[data-size-unit]');
+    var unitSel = document.getElementById('unit-sel');
+    var suffix = (unit && unit.value) || (unitSel && unitSel.value) || '"';
     var ws = w ? w.value.trim() : '';
     var hs = h ? h.value.trim() : '';
-    if (ws || hs) return ws + '×' + hs + '"';
+    if (ws || hs) return ws + '×' + hs + (suffix ? ' ' + suffix : '');
+    var unsure = card.querySelector('[data-size-unsure]');
+    if (unsure && unsure.checked) return 'Not sure';
     return null;
   }
 
@@ -105,41 +106,46 @@
     return formats;
   }
 
+  function radioValue(card, prefix) {
+    var el = card.querySelector('input[type="radio"][name^="' + prefix + '"]:checked');
+    return el ? el.value : '';
+  }
+
   function collectDesigns() {
-    if (getMode() !== 'd') return [];
     var designs = [];
     document.querySelectorAll('#mode-d .dcard').forEach(function (card) {
-      if (!isVisible(card)) return;
-      var textInputs = card.querySelectorAll('input[type="text"]');
-      var nameInp = card.querySelector('.dcols .ff:nth-child(2) input') || textInputs[0];
-      var placementSel = card.querySelector('.dcols select');
-      var fabricSel = card.querySelectorAll('.dcols select')[1];
-      var colorSel = card.querySelectorAll('.dcols select')[2];
-      var noteInp = card.querySelector('.ff input[type="text"]:last-of-type');
-      var wInp = card.querySelector('.size-r input');
-      var hInp = card.querySelector('.size-r input:last-of-type');
+      var nameInp = card.querySelector('[data-design-name], .d-name');
+      var itemSel = card.querySelector('[data-item]');
+      var noteInp = card.querySelector('textarea');
+      var wInp = card.querySelector('[data-size="w"]') || card.querySelector('.size-r input');
+      var hInp = card.querySelector('[data-size="h"]') || card.querySelector('.size-r input:last-of-type');
+      var unit = card.querySelector('[data-size-unit]');
+      var unitSel = document.getElementById('unit-sel');
+      var suffix = (unit && unit.value) || (unitSel && unitSel.value) || '';
       var ws = wInp ? wInp.value.trim() : '';
       var hs = hInp ? hInp.value.trim() : '';
+      var size = ws || hs ? ws + '×' + hs + (suffix ? ' ' + suffix : '') : '';
+      var unsure = card.querySelector('[data-size-unsure]');
+      if (unsure && unsure.checked) size = size ? size + ' (not sure)' : 'Not sure';
       var sizes = [];
-      var szwrap = card.querySelector('.szwrap.open');
-      if (szwrap) {
-        szwrap.querySelectorAll('.szrow').forEach(function (row) {
-          if (!isVisible(row)) return;
-          var label = row.querySelector('input[type="text"]');
-          var nums = row.querySelectorAll('input[type="number"]');
-          var lbl = label ? label.value.trim() : '';
-          var w = nums[0] ? nums[0].value.trim() : '';
-          var h = nums[1] ? nums[1].value.trim() : '';
-          if (lbl || w || h) sizes.push({ label: lbl, w: w, h: h });
-        });
-      }
+      card.querySelectorAll('[data-extra-size]').forEach(function (row) {
+        var nums = row.querySelectorAll('input[type="number"]');
+        var w = nums[0] ? nums[0].value.trim() : '';
+        var h = nums[1] ? nums[1].value.trim() : '';
+        if (w || h) sizes.push({ w: w, h: h });
+      });
+      var keep = card.querySelector('[data-keep-prop]');
+      var dpi = card.querySelector('[data-dpi]');
       designs.push({
         name: nameInp ? nameInp.value.trim() : '',
-        placement: placementSel ? placementSel.value : '',
-        fabric: fabricSel ? fabricSel.value : '',
-        size: ws || hs ? ws + '×' + hs + '"' : '',
-        colors: colorSel ? colorSel.value : '',
+        placement: itemSel ? itemSel.value : '',
+        fabric: itemSel ? itemSel.value : '',
+        size: size,
+        colors: radioValue(card, 'cm-'),
         notes: noteInp ? noteInp.value.trim() : '',
+        background: radioValue(card, 'bg-'),
+        keepProportional: keep ? keep.checked : false,
+        dpi300: dpi ? dpi.checked : false,
         sizes: sizes,
       });
     });
@@ -150,6 +156,7 @@
     if (!body) return [];
     var fields = [];
     body.querySelectorAll('.ff').forEach(function (ff) {
+      if (ff.closest('.dcard')) return;
       if (!isVisible(ff)) return;
       var labelEl = ff.querySelector('label');
       var label = labelEl ? labelEl.textContent.trim() : '';
@@ -168,9 +175,11 @@
     if (!body) return '';
     var parts = [];
     body.querySelectorAll('textarea').forEach(function (ta) {
+      if (ta.closest('.dcard')) return;
       if (isVisible(ta) && ta.value.trim()) parts.push(ta.value.trim());
     });
     body.querySelectorAll('select').forEach(function (sel) {
+      if (sel.closest('.dcard')) return;
       if (!isVisible(sel)) return;
       var lbl =
         (sel.closest('.ff') && sel.closest('.ff').querySelector('label')
@@ -202,6 +211,7 @@
       wanted[String(f).toUpperCase()] = true;
     });
     document.querySelectorAll('.fmt-chip').forEach(function (chip) {
+      if (chip.getAttribute('data-included') === '1') return;
       var nameEl = chip.querySelector('.fname');
       if (!nameEl) return;
       var name = nameEl.textContent.trim().toUpperCase();
@@ -262,17 +272,33 @@
   window.LVD_COLLECT = function () {
     var mode = getMode();
     var body = activeModeBody();
+    var designs = collectDesigns();
+    var instructions = collectInstructions(body);
+    var designNotes = designs
+      .map(function (d, i) {
+        var bits = [];
+        if (d.name) bits.push(d.name);
+        if (d.placement) bits.push(d.placement);
+        if (d.size) bits.push(d.size);
+        if (d.notes) bits.push(d.notes);
+        return bits.length ? 'Design ' + (i + 1) + ': ' + bits.join(' — ') : '';
+      })
+      .filter(Boolean)
+      .join('\n\n');
+    if (designNotes) {
+      instructions = instructions ? instructions + '\n\n' + designNotes : designNotes;
+    }
     return {
       mode: mode,
-      designName: getDesignName(),
-      instructions: collectInstructions(body),
+      designName: getDesignName() || 'Quote request',
+      instructions: instructions,
       size: collectSize(mode, body),
       turnaround: collectTurnaround(mode),
       formats: collectFormats(),
-      designs: collectDesigns(),
+      designs: designs,
       fields: collectFields(body),
       advanced: collectAdvanced(),
-      formVersion: 1,
+      formVersion: 2,
     };
   };
 
@@ -302,8 +328,10 @@
   function applyDraft(draft) {
     if (!draft || typeof draft !== 'object') return false;
     if (draft.designName) {
-      var nameInputs = document.querySelectorAll('.cb > .ff input[type="text"]');
-      if (nameInputs[0] && !nameInputs[0].value) nameInputs[0].value = draft.designName;
+      var nameInp =
+        document.querySelector('[data-design-name]') ||
+        document.querySelector('.cb > .ff input[type="text"]');
+      if (nameInp && !nameInp.value) nameInp.value = draft.designName;
     }
     if (draft.formats && draft.formats.length) applyFormats(draft.formats);
     if (draft.instructions) {
@@ -470,6 +498,7 @@
       el.style.display = isAdmin ? 'none' : '';
     });
     document.querySelectorAll('.btn-s').forEach(function (el) {
+      if (el.id === 'lvd-back') return;
       el.style.display = isAdmin ? 'none' : '';
     });
 
@@ -564,6 +593,7 @@
     });
 
     document.querySelectorAll('.btn-s').forEach(function (btn) {
+      if (btn.id === 'lvd-back') return;
       btn.addEventListener('click', function (e) {
         e.preventDefault();
         if (inIframe()) {

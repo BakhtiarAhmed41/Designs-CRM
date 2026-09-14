@@ -191,6 +191,75 @@ function conversationTime(iso?: string | null) {
   return Number.isNaN(t) ? 0 : t;
 }
 
+type ConversationListCache = { conversations: Conversation[] };
+
+function isConversationListCache(value: unknown): value is ConversationListCache {
+  return (
+    !!value &&
+    typeof value === 'object' &&
+    Array.isArray((value as ConversationListCache).conversations)
+  );
+}
+
+/** Put the newest message text on inbox rows as soon as the socket event arrives. */
+export function applyIncomingMessageToLists(
+  qc: { cancelQueries: (opts: { queryKey: unknown[] }) => Promise<unknown>; setQueriesData: (opts: { queryKey: unknown[] }, updater: (prev: unknown) => unknown) => void },
+  payload: unknown,
+) {
+  const p = payload as {
+    conversationId?: string;
+    conversation?: Partial<Conversation> & { id?: string };
+    message?: { body?: string; createdAt?: string };
+  };
+  const conversationId = p.conversationId || p.conversation?.id;
+  const preview = (
+    p.conversation?.lastMessagePreview ||
+    p.message?.body ||
+    ''
+  ).trim();
+  if (!conversationId || !preview) return;
+
+  const lastMessageAt =
+    p.message?.createdAt || p.conversation?.lastMessageAt || new Date().toISOString();
+  const incoming = p.conversation ?? {};
+  const keys = [
+    ['admin-conversations'],
+    ['admin-conversations-preview'],
+    ['admin-conversations-order'],
+    ['admin-conversations-quote'],
+    ['my-conversations'],
+  ];
+
+  for (const queryKey of keys) {
+    void qc.cancelQueries({ queryKey });
+    qc.setQueriesData({ queryKey }, (prev: unknown) => {
+      if (!isConversationListCache(prev)) return prev;
+      const next = prev.conversations.map((c) =>
+        c.id === conversationId
+          ? {
+              ...c,
+              ...incoming,
+              id: c.id,
+              customerName: incoming.customerName ?? c.customerName,
+              customerEmail: incoming.customerEmail ?? c.customerEmail,
+              lastMessagePreview: preview,
+              lastMessageAt,
+            }
+          : c,
+      );
+      if (!next.some((c) => c.id === conversationId) && incoming.id) {
+        next.unshift({
+          ...(incoming as Conversation),
+          id: conversationId,
+          lastMessagePreview: preview,
+          lastMessageAt,
+        });
+      }
+      return { ...prev, conversations: sortConversationsNewestFirst(next) };
+    });
+  }
+}
+
 /** Newest activity first. New chats with no messages still sit at the top. */
 export function sortConversationsNewestFirst<
   T extends { lastMessageAt?: string | null; createdAt?: string | null },

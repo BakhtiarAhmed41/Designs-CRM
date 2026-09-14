@@ -2,8 +2,22 @@ import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { io, type Socket } from 'socket.io-client';
 import { apiOrigin } from '@/lib/api';
+import { applyIncomingMessageToLists } from '@/lib/messaging';
 import { invalidateWorkCaches } from '@/lib/queryCache';
 import { getAccessToken } from '@/lib/session';
+
+const seenMessageEvents = new Set<string>();
+
+function takeMessageEvent(id: string | undefined) {
+  if (!id) return true;
+  if (seenMessageEvents.has(id)) return false;
+  seenMessageEvents.add(id);
+  if (seenMessageEvents.size > 200) {
+    const first = seenMessageEvents.values().next().value;
+    if (first) seenMessageEvents.delete(first);
+  }
+  return true;
+}
 
 type Handler = (payload: unknown) => void;
 
@@ -47,6 +61,9 @@ export function useMessagingSocket(handlers: {
     if (!socket.connected) socket.connect();
 
     const onMessageNew = (payload: unknown) => {
+      const p = payload as { message?: { id?: string } };
+      if (!takeMessageEvent(p.message?.id)) return;
+      applyIncomingMessageToLists(qc, payload);
       handlersRef.current.onMessageNew?.(payload);
       void qc.invalidateQueries({ queryKey: ['admin-conversations'] });
       void qc.invalidateQueries({ queryKey: ['admin-conversations-preview'] });

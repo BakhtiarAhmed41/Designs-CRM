@@ -285,6 +285,10 @@ export class MessagingGateway
     this.server?.to(`conversation:${conversationId}`).emit(event, payload);
   }
 
+  emitToStaff(event: string, payload: unknown) {
+    this.server?.to('team:group').emit(event, payload);
+  }
+
   emitTeamDm(a: string, b: string, event: string, payload: unknown) {
     this.server?.to(this.dmRoom(a, b)).emit(event, payload);
     this.emitToUser(a, event, payload);

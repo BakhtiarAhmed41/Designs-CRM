@@ -1,0 +1,33 @@
+.nq-lead{margin:0 0 16px;font-size:15px;color:#555;line-height:1.45;}
+.nq-top{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:8px;}
+.nq-hint{margin:6px 0 0;font-size:13px;color:#777;line-height:1.4;}
+.nq-card{border:1px solid rgba(34,34,34,.12);border-radius:14px;padding:18px;margin:14px 0;background:#fff;}
+.nq-card-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.nq-card-h strong{font-size:16px;}
+.nq-up{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0;}
+.nq-up .upload-area{min-height:132px;display:flex;flex-direction:column;}
+.nq-up .utrg{flex:1;padding:22px 12px;justify-content:center;}
+.nq-prefs{display:grid;grid-template-columns:1fr 1fr auto;gap:16px;align-items:start;margin:14px 0 8px;}
+.nq-pref h3,.nq-size h3{margin:0 0 8px;font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#666;}
+.nq-radio{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:14px;cursor:pointer;}
+.nq-check{display:inline-flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;white-space:nowrap;}
+.nq-size{margin:14px 0;}
+.nq-size-row{display:flex;flex-wrap:wrap;align-items:end;gap:10px;}
+.nq-size-row .ff{min-width:110px;}
+.nq-x{color:#aaa;padding-bottom:12px;}
+.nq-extra{margin-top:10px;display:grid;gap:8px;}
+.nq-extra-row{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end;}
+.nq-note{margin-top:12px;}
+.nq-add{width:auto;margin:8px 0 18px;padding:0;border:none;background:none;color:#9A1E22;font-size:15px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+.nq-add:hover{text-decoration:underline;}
+.nq-fmts{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0;}
+.fmt-chip{min-width:72px;}
+.fmt-chip .fincl{font-size:11px;color:#888;margin-top:2px;}
+.fmt-other{display:flex;align-items:center;gap:8px;}
+.fmt-other input{height:40px;padding:0 10px;border:1px solid rgba(34,34,34,.15);border-radius:8px;font-size:14px;min-width:140px;}
+.nq-warn{margin:10px 0 0;padding:10px 12px;border-radius:8px;background:#FFF8E6;color:#7A5B00;font-size:13px;line-height:1.4;display:flex;gap:8px;align-items:flex-start;}
+.drow-del{background:none;border:none;color:#E24B4A;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;gap:4px;}
+@media(max-width:720px){
+  .nq-top,.nq-up,.nq-prefs{grid-template-columns:1fr;}
+  .nq-size-row{display:grid;grid-template-columns:1fr 1fr;}
+}

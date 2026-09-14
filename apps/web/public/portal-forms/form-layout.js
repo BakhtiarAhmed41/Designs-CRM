@@ -89,6 +89,7 @@
     var t = textOf(el);
     return (
       t.indexOf('file format') >= 0 ||
+      t.indexOf('output file') >= 0 ||
       t.indexOf('output format') >= 0 ||
       t.indexOf('turnaround') >= 0 ||
       t.indexOf('files') === 0
@@ -143,8 +144,41 @@
     cont.className = 'row-btns lvd-continue';
     cont.innerHTML = '<button type="button" class="btn-p btn-next" id="lvd-next">Continue to Files &amp; Delivery →</button>';
     var addBtn = step1.querySelector('.add-d, .add-btn');
-    if (addBtn) cont.insertBefore(addBtn, cont.firstChild);
+    if (addBtn) {
+      addBtn.setAttribute('type', 'button');
+      cont.insertBefore(addBtn, cont.firstChild);
+    }
     step1.appendChild(cont);
+
+    function showMultipleDesigns() {
+      if (typeof window.setType === 'function') {
+        try {
+          window.setType('multi');
+        } catch (err) {
+          /* ignore */
+        }
+      }
+      var multi = document.getElementById('sec-multi');
+      if (multi) {
+        multi.style.display = 'block';
+        multi.classList.add('vis');
+      }
+    }
+
+    ['addRow', 'addDesign'].forEach(function (name) {
+      var orig = window[name];
+      if (typeof orig !== 'function' || orig.__lvdWrapped) return;
+      var wrapped = function () {
+        showMultipleDesigns();
+        var result = orig.apply(this, arguments);
+        if (typeof window.LVD_REPORT_HEIGHT_SOON === 'function') {
+          window.LVD_REPORT_HEIGHT_SOON();
+        }
+        return result;
+      };
+      wrapped.__lvdWrapped = true;
+      window[name] = wrapped;
+    });
 
     var back = document.createElement('button');
     back.type = 'button';
