@@ -84,6 +84,8 @@
   }
 
   function collectTurnaround(mode) {
+    var picked = document.querySelector('input[name="turnaround"]:checked');
+    if (picked) return picked.value === 'urgent' ? 'urgent' : 'standard';
     var rushId = mode === 'q' ? 'rq-rush' : 'r-rush';
     var stdId = mode === 'q' ? 'rq-std' : 'r-std';
     var rush = document.getElementById(rushId);
@@ -95,14 +97,21 @@
 
   function collectFormats() {
     var formats = [];
-    document.querySelectorAll('.fmt-chip.sel .fname').forEach(function (el) {
-      var t = el.textContent.trim();
-      if (t) formats.push(t);
-    });
-    var otherInp = document.querySelector('#fmt-other-inp input');
-    if (otherInp && isVisible(otherInp.parentElement) && otherInp.value.trim()) {
-      formats.push(otherInp.value.trim());
+    var seen = {};
+    function addFmt(t) {
+      t = (t || '').trim();
+      if (!t || t.toLowerCase() === 'other' || seen[t.toUpperCase()]) return;
+      seen[t.toUpperCase()] = true;
+      formats.push(t);
     }
+    document.querySelectorAll('[data-fmt]:checked').forEach(function (el) {
+      addFmt(el.getAttribute('data-fmt'));
+    });
+    document.querySelectorAll('.fmt-chip.sel .fname').forEach(function (el) {
+      addFmt(el.textContent);
+    });
+    var otherInp = document.querySelector('#fmt-other-inp input, #fmt-other-text');
+    if (otherInp && otherInp.value.trim()) addFmt(otherInp.value);
     return formats;
   }
 
@@ -168,6 +177,14 @@
       var value = inputValue(control);
       if (value) fields.push({ label: label, value: value });
     });
+    var svc = document.getElementById('svc-sel');
+    if (svc && svc.value && !fields.some(function (f) { return f.value === svc.value; })) {
+      var svcLabel = svc.closest('.ff') && svc.closest('.ff').querySelector('label');
+      fields.push({
+        label: svcLabel ? svcLabel.textContent.trim() : 'Service',
+        value: svc.value,
+      });
+    }
     return fields;
   }
 
@@ -447,8 +464,10 @@
     function setLabel(id, label, suffix) {
       var el = document.getElementById(id);
       if (!el || !label) return;
+      var radio = el.querySelector('input[type="radio"]');
       var icon = el.querySelector('i');
       el.textContent = '';
+      if (radio) el.appendChild(radio);
       if (icon) el.appendChild(icon);
       el.appendChild(document.createTextNode(' ' + label + (suffix || '')));
     }

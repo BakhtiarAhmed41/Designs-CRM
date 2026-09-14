@@ -277,7 +277,7 @@ export function QuoteFormPage() {
 
       {error && <div className="alert-error">{error}</div>}
 
-      <div className="quote-layout">
+      <div className={`quote-layout${service ? ' quote-layout-form' : ''}`}>
         <div>
           {!service && (
             <div className="pick-grid">
@@ -317,16 +317,18 @@ export function QuoteFormPage() {
             />
           )}
         </div>
-        <aside className="help-card">
-          <span className="help-icon">
-            <i className="ti ti-messages" />
-          </span>
-          <h2>Need help?</h2>
-          <p>Not sure what to select? Our team can help with artwork, sizing and file requirements.</p>
-          <Link className="help-button" to="/portal/messages">
-            Chat with our team
-          </Link>
-        </aside>
+        {!service && (
+          <aside className="help-card">
+            <span className="help-icon">
+              <i className="ti ti-messages" />
+            </span>
+            <h2>Need help?</h2>
+            <p>Not sure what to select? Our team can help with artwork, sizing and file requirements.</p>
+            <Link className="help-button" to="/portal/messages">
+              Chat with our team
+            </Link>
+          </aside>
+        )}
       </div>
       {busy && <p className="muted">Submitting…</p>}
       {toast && <div className="toast show">{toast}</div>}

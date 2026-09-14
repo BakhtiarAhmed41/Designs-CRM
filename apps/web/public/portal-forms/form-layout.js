@@ -109,6 +109,7 @@
       }
     }
     if (!modeD || modeD.dataset.stepsReady) return;
+    if (modeD.getAttribute('data-single-page') === '1') return;
     var kids = Array.prototype.slice.call(modeD.childNodes);
     var split = null;
     for (var i = 0; i < modeD.children.length; i++) {

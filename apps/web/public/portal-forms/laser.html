@@ -13,26 +13,18 @@ body{font-family:system-ui,sans-serif;padding:4px 2px 8px;font-size:14px;color:#
 .ch{padding:8px 6px;display:flex;align-items:center;gap:6px;}
 .ct{font-size:13px;font-weight:500;}
 .cb{padding:4px 0 6px;}
-.sl{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin:16px 0 8px;}
+.sl{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin:18px 0 8px;}
 .ff{display:flex;flex-direction:column;gap:6px;}
 .ff label{font-size:13px;font-weight:600;color:#444;}
 .ff input,.ff select,.ff textarea{font-size:14px;height:42px;padding:0 12px;border:1px solid rgba(34,34,34,.12);border-radius:8px;background:#fff;color:#222;outline:none;font-family:inherit;}
 .ff textarea{height:auto;min-height:88px;padding:10px 12px;resize:vertical;}
 .upload-area{border:1.5px dashed rgba(0,0,0,.2);border-radius:10px;background:#fff;overflow:hidden;}
 .utrg{padding:16px 10px;text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;}
-.utrg i{font-size:22px;color:#888;}
-.utrg p{font-size:14px;font-weight:600;color:#333;}
+.utrg p{font-size:14px;font-weight:600;}
 .utrg span{font-size:12px;color:#888;}
 .flist{padding:0 10px 8px;}
 .fitem{display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:6px;margin-bottom:4px;font-size:13px;border:0.5px solid rgba(0,0,0,.1);}
 .frem{background:none;border:none;cursor:pointer;color:#E24B4A;}
-.fmt-chip{border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:8px 10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;min-width:70px;}
-.fmt-chip .fname{font-size:13px;font-weight:700;}
-.fmt-chip.sel{border:1px solid #222;}
-.rush-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-.ropt{border:0.5px solid rgba(0,0,0,.15);border-radius:8px;padding:12px;cursor:pointer;font-size:14px;}
-.ropt.sel-s,.ropt.sel-w{border-color:#222;background:#fff8f8;}
-.row-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;}
 .btn-p{padding:10px 16px;background:#222;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;}
 .btn-s{padding:10px 14px;border:1px solid rgba(0,0,0,.15);border-radius:8px;font-size:14px;background:#fff;cursor:pointer;}
 .form-hint{margin:6px 0 0;font-size:12px;color:#6B6B6B;text-align:right;}
@@ -48,7 +40,7 @@ html.in-frame .ch{display:none;}
 <div class="card">
   <div class="ch"><i class="ti ti-router"></i><span class="ct">Cut, Print &amp; Engraving File Quote</span></div>
   <div class="cb">
-    <div class="mode-body vis" id="mode-d">
+    <div class="mode-body vis" id="mode-d" data-single-page="1">
       <p class="nq-lead">Tell us what you need. If you’re unsure, we’ll help.</p>
       <div class="nq-top">
         <div class="ff">
@@ -68,46 +60,56 @@ html.in-frame .ch{display:none;}
         </div>
         <div class="ff">
           <label>What service do you need?</label>
-          <select id="svc-sel">
-            <option value="">Select a service</option>
-            <option>SVG cut file</option>
-            <option>Print design (SVG / DTF)</option>
-            <option>Laser engraving</option>
-            <option>Laser cut &amp; engrave</option>
-            <option>CNC cut file</option>
-            <option>Vinyl cut file</option>
-            <option>Plasma cut file</option>
-            <option>V-carve / CNC engraving</option>
-            <option>Not sure</option>
-          </select>
+          <input type="hidden" id="svc-sel" value="">
+          <div class="nq-dd" id="svc-dd">
+            <button type="button" class="nq-dd-btn">Select a service</button>
+            <div class="nq-dd-list">
+              <button type="button" data-value="SVG Cut File"><strong>SVG Cut File</strong><span>Solid-color Cricut or Silhouette file</span></button>
+              <button type="button" data-value="Print Design (SVG/DTF)"><strong>Print Design (SVG/DTF)</strong><span>Full color, gradients and print-ready artwork</span></button>
+              <button type="button" data-value="Laser Engraving"><strong>Laser Engraving</strong><span>Engraving only</span></button>
+              <button type="button" data-value="Laser Cut &amp; Engrave"><strong>Laser Cut &amp; Engrave</strong><span>Cutting and engraving combined</span></button>
+              <button type="button" data-value="CNC Cut File"><strong>CNC Cut File</strong><span>CNC or router cutting</span></button>
+              <button type="button" data-value="Vinyl Cut File"><strong>Vinyl Cut File</strong><span>Decals and heat-transfer vinyl</span></button>
+              <button type="button" data-value="Plasma Cut File"><strong>Plasma Cut File</strong><span>Metal cutting</span></button>
+              <button type="button" data-value="V-carve / CNC Engraving"><strong>V-carve / CNC Engraving</strong><span>For V-carve, Easel and routers</span></button>
+              <button type="button" data-value="Not sure"><strong>Not sure</strong><span>We’ll help you choose</span></button>
+            </div>
+          </div>
         </div>
       </div>
 
       <div id="design-list"></div>
       <button type="button" class="add-d nq-add" onclick="addDesign()"><i class="ti ti-plus"></i> Add another design</button>
 
-      <div class="sl">Output files</div>
-      <p class="nq-hint">We’ll provide the appropriate file for your selected service.</p>
-      <div class="nq-fmts">
-        <div class="fmt-chip sel" onclick="toggleFmt(this)"><span class="fname">SVG</span></div>
-        <div class="fmt-chip sel" onclick="toggleFmt(this)"><span class="fname">PNG</span></div>
-        <div class="fmt-chip sel" onclick="toggleFmt(this)"><span class="fname">PDF</span></div>
-        <div class="fmt-chip" onclick="toggleFmt(this)"><span class="fname">DXF</span></div>
-        <div class="fmt-chip" onclick="toggleFmt(this)"><span class="fname">EPS</span></div>
-        <div class="fmt-chip" onclick="toggleFmt(this)"><span class="fname">AI</span></div>
-        <div class="fmt-chip" onclick="toggleFmt(this)"><span class="fname">CDR</span></div>
-        <div class="fmt-chip" id="fmt-other-chip" onclick="toggleFmt(this)"><span class="fname">Other</span></div>
-        <div id="fmt-other-inp" class="fmt-other" style="display:none;"><input type="text" placeholder="Enter format"></div>
+      <div class="nq-sec">
+        <div class="sl">Output files</div>
+        <p class="nq-hint">We’ll provide the appropriate file for your selected service.</p>
+        <div class="nq-fmts">
+          <div class="fmt-chip fmt-tile sel" onclick="toggleFmt(this)"><i class="ti ti-file"></i><span class="fname">SVG</span><span class="dot"></span></div>
+          <div class="fmt-chip fmt-tile sel" onclick="toggleFmt(this)"><i class="ti ti-file"></i><span class="fname">PNG</span><span class="dot"></span></div>
+          <div class="fmt-chip fmt-tile sel" onclick="toggleFmt(this)"><i class="ti ti-file"></i><span class="fname">PDF</span><span class="dot"></span></div>
+          <div class="fmt-chip fmt-tile" onclick="toggleFmt(this)"><i class="ti ti-file"></i><span class="fname">DXF</span><span class="dot"></span></div>
+          <div class="fmt-chip fmt-tile" onclick="toggleFmt(this)"><i class="ti ti-file"></i><span class="fname">EPS</span><span class="dot"></span></div>
+          <div class="fmt-chip fmt-tile" onclick="toggleFmt(this)"><i class="ti ti-file"></i><span class="fname">AI</span><span class="dot"></span></div>
+          <div class="fmt-chip fmt-tile" onclick="toggleFmt(this)"><i class="ti ti-file"></i><span class="fname">CDR</span><span class="dot"></span></div>
+          <div class="fmt-chip fmt-tile" id="fmt-other-chip" onclick="toggleFmt(this)"><i class="ti ti-file"></i><span class="fname">Other</span><span class="dot"></span></div>
+          <div id="fmt-other-inp" class="fmt-other"><input id="fmt-other-text" type="text" placeholder="Enter format"></div>
+        </div>
+        <p class="nq-hint">You don’t need to select formats already saved in your profile.</p>
       </div>
-      <p class="nq-hint">You don’t need to select formats already saved in your profile.</p>
 
-      <div class="sl">Turnaround</div>
-      <div class="rush-row">
-        <div class="ropt sel-s" id="r-std" onclick="selRush('std')">Usually ready in 12–24 hours</div>
-        <div class="ropt" id="r-rush" onclick="selRush('rush')">Urgent — contact us first</div>
+      <div class="nq-sec">
+        <div class="sl">Turnaround</div>
+        <div class="rush-row">
+          <label class="ropt sel-s" id="r-std" onclick="selRush('std')">
+            <input type="radio" name="turnaround" value="standard" checked> Usually ready in 12–24 hours
+          </label>
+          <label class="ropt" id="r-rush" onclick="selRush('rush')">
+            <input type="radio" name="turnaround" value="urgent"> Urgent — contact us first
+          </label>
+        </div>
+        <div class="nq-warn"><i class="ti ti-alert-triangle"></i> Complex files may take up to 3 business days. We’ll confirm the turnaround before starting.</div>
       </div>
-      <div class="nq-warn" id="rush-note" style="display:none;"><i class="ti ti-alert-circle"></i> For urgent work, please text or email us first so we can confirm the timeline.</div>
-      <div class="nq-warn"><i class="ti ti-info-circle"></i> Complex files may take up to 3 business days. We’ll confirm the turnaround before starting.</div>
     </div>
 
     <div class="row-btns">
@@ -127,42 +129,35 @@ window.LVD_DESIGN_HTML = function (n) {
       '<div class="ff"><label>Project name (optional)</label>' +
       '<input class="d-name" data-design-name type="text" placeholder="e.g. Family name sign, tumbler engraving, or shirt design"></div>' +
       '<div class="nq-up">' +
-        '<div class="ff"><label>Upload your artwork</label>' +
         '<div class="upload-area"><div class="utrg" onclick="document.getElementById(\'fu-' + n + '\').click()">' +
         '<i class="ti ti-cloud-upload"></i><p>Upload your artwork</p>' +
         '<span>PNG, JPG, PDF, AI, EPS or SVG</span></div>' +
         '<input type="file" id="fu-' + n + '" multiple style="display:none" onchange="handleFiles(\'flist-' + n + '\',this)">' +
-        '<div class="flist" id="flist-' + n + '"></div></div></div>' +
-        '<div class="ff"><label>Add a reference (optional)</label>' +
+        '<div class="flist" id="flist-' + n + '"></div></div>' +
         '<div class="upload-area"><div class="utrg" onclick="document.getElementById(\'fr-' + n + '\').click()">' +
-        '<i class="ti ti-photo"></i><p>Add a reference</p>' +
+        '<i class="ti ti-cloud-upload"></i><p>Add a reference (optional)</p>' +
         '<span>Upload an example of the style or result you want</span></div>' +
         '<input type="file" id="fr-' + n + '" multiple style="display:none" onchange="handleFiles(\'rlist-' + n + '\',this)">' +
-        '<div class="flist" id="rlist-' + n + '"></div></div></div>' +
+        '<div class="flist" id="rlist-' + n + '"></div></div>' +
       '</div>' +
       '<div class="nq-size"><h3>Size &amp; details (optional)</h3>' +
       '<div class="nq-size-row">' +
         '<div class="ff"><label>Finished size (W × H)</label><input data-size="w" type="number" min="0" step="0.1" placeholder="W"></div>' +
         '<span class="nq-x">×</span>' +
         '<div class="ff"><label>&nbsp;</label><input data-size="h" type="number" min="0" step="0.1" placeholder="H"></div>' +
-        '<div class="ff"><label>Unit</label><select data-size-unit><option value="in">in</option><option value="mm">mm</option><option value="cm">cm</option></select></div>' +
+        '<div class="ff"><label>&nbsp;</label><select data-size-unit><option value="in">in</option><option value="mm">mm</option><option value="cm">cm</option></select></div>' +
         '<label class="nq-check"><input type="checkbox" data-keep-prop> Keep proportions (optional)</label>' +
       '</div>' +
       '<p class="nq-hint">Leave blank if you’re unsure. We’ll recommend the best size for your project.</p></div>' +
       '<div class="ff nq-note"><label>Tell us about your project</label>' +
-      '<textarea placeholder="Example: Cut the outside shape, engrave the name in the center, and prepare it for 3 mm acrylic."></textarea>' +
-      '<p class="nq-hint">Mention what should be cut, printed or engraved and share any important details.</p></div>' +
+      '<p class="nq-hint">Mention what should be cut, printed or engraved and share any important details.</p>' +
+      '<textarea placeholder="Example: Cut the outside shape, engrave the name in the center, and prepare it for 3 mm acrylic."></textarea></div>' +
     '</div>'
   );
 };
 </script>
 <script src="theme.js"></script>
 <script src="new-quote.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  if (!document.querySelector('#design-list .dcard')) addDesign();
-});
-</script>
 <script src="form-layout.js"></script>
 <script src="bridge.js"></script>
 </body>

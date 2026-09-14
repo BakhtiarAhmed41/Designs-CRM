@@ -2394,6 +2394,7 @@ button.primary i,
 .pick-copy { text-align: left; }
 .pick-copy { flex: 1; min-width: 0; }
 .quote-layout { display: grid; grid-template-columns: minmax(0,1fr) 210px; gap: 14px; align-items: start; }
+.quote-layout-form { grid-template-columns: 1fr; }
 .quote-frame { width: 100%; min-height: 360px; border: 0; }
 .help-card {
   position: sticky;

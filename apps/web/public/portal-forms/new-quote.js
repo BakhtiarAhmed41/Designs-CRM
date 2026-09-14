@@ -76,11 +76,8 @@
   };
 
   window.toggleFmt = function toggleFmt(el) {
+    if (el.getAttribute('data-included') === '1') return;
     el.classList.toggle('sel');
-    var other = document.getElementById('fmt-other-inp');
-    if (other && el.id === 'fmt-other-chip') {
-      other.style.display = el.classList.contains('sel') ? '' : 'none';
-    }
   };
 
   window.selRush = function selRush(v) {
@@ -88,9 +85,41 @@
     var rush = document.getElementById('r-rush');
     if (std) std.className = 'ropt' + (v === 'std' ? ' sel-s' : '');
     if (rush) rush.className = 'ropt' + (v === 'rush' ? ' sel-w' : '');
+    var stdIn = document.querySelector('input[name="turnaround"][value="standard"]');
+    var urgIn = document.querySelector('input[name="turnaround"][value="urgent"]');
+    if (stdIn) stdIn.checked = v === 'std';
+    if (urgIn) urgIn.checked = v === 'rush';
     var note = document.getElementById('rush-note');
     if (note) note.style.display = v === 'rush' ? 'flex' : 'none';
   };
+
+  function initServiceMenu() {
+    var wrap = document.getElementById('svc-dd');
+    if (!wrap) return;
+    var btn = wrap.querySelector('.nq-dd-btn');
+    var list = wrap.querySelector('.nq-dd-list');
+    var hidden = document.getElementById('svc-sel');
+    if (!btn || !list || !hidden) return;
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      wrap.classList.toggle('open');
+    });
+    list.querySelectorAll('[data-value]').forEach(function (opt) {
+      opt.addEventListener('click', function (e) {
+        e.preventDefault();
+        hidden.value = opt.getAttribute('data-value') || '';
+        btn.innerHTML = opt.innerHTML;
+        wrap.classList.remove('open');
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type: 'lvd-form-dirty' }, '*');
+        }
+      });
+    });
+    document.addEventListener('click', function () {
+      wrap.classList.remove('open');
+    });
+  }
 
   window.addExtraSize = function addExtraSize(btn) {
     var card = btn.closest('.dcard');
@@ -112,5 +141,6 @@
     if (modeD) modeD.classList.add('vis');
     if (document.getElementById('design-list') && count() === 0) window.addDesign();
     renumber();
+    initServiceMenu();
   });
 })();
