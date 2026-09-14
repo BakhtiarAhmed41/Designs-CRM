@@ -862,7 +862,12 @@ export class MessagingService {
     );
     const attachments = await this.saveAttachments(messageId, files);
     await this.db.execute(
-      'UPDATE conversations SET last_message_at = NOW(), unread_client = unread_client + 1, status = ? WHERE id = ?',
+      `UPDATE conversations
+          SET last_message_at = NOW(),
+              unread_client = unread_client + 1,
+              hidden_from_client = 0,
+              status = ?
+        WHERE id = ?`,
       [ConversationStatus.OPEN, conversationId],
     );
     await this.maybeAdoptTopicTitle(conversationId);
@@ -1134,8 +1139,20 @@ export class MessagingService {
     const customerId = await this.getCustomerIdForUser(user.id);
     if (!customerId) throw new NotFoundException('Conversation not found');
     const convo = await this.getConversationRow(conversationId);
-    if (!convo || convo.customer_id !== customerId || Boolean(convo.hidden_from_client))
+    if (!convo || convo.customer_id !== customerId)
       throw new NotFoundException('Conversation not found');
+    if (Boolean(convo.hidden_from_client)) {
+      // Staff reply after the customer hid the chat: restore it so the
+      // notification link can open the same thread.
+      if (Number(convo.unread_client) <= 0) {
+        throw new NotFoundException('Conversation not found');
+      }
+      await this.db.execute(
+        'UPDATE conversations SET hidden_from_client = 0 WHERE id = ?',
+        [conversationId],
+      );
+      convo.hidden_from_client = 0;
+    }
     return { convo, customerId };
   }
 
