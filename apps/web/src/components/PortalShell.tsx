@@ -125,13 +125,13 @@ export function PortalShell() {
       <NavGroup label="Billing" items={billing} />
       <p className="nav-label">Request a quote</p>
       <nav className="service-nav" aria-label="Quote services">
-        <NavLink to="/portal/quotes/new?service=embroidery">
+        <NavLink to="/portal/quotes/new?service=embroidery" className={() => undefined}>
           <i className="ti ti-needle-thread" /> Embroidery Digitizing
         </NavLink>
-        <NavLink to="/portal/quotes/new?service=vector">
+        <NavLink to="/portal/quotes/new?service=vector" className={() => undefined}>
           <i className="ti ti-vector-bezier" /> Vector &amp; Print
         </NavLink>
-        <NavLink to="/portal/quotes/new?service=laser">
+        <NavLink to="/portal/quotes/new?service=laser" className={() => undefined}>
           <i className="ti ti-router" /> Cut, Print &amp; Engraving
         </NavLink>
       </nav>

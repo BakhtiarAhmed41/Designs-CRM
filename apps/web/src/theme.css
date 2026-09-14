@@ -1959,15 +1959,18 @@ button.primary i,
   gap: 10px;
   min-height: 32px;
   padding: 5px 10px;
-  border-radius: 7px;
+  border-radius: 0;
   color: inherit;
   text-decoration: none;
   font-size: 13px;
+  background: transparent;
 }
 .service-nav a:hover,
 .service-nav a.active,
-.service-nav a.on {
-  background: var(--tint);
+.service-nav a.on,
+.service-nav a.active:hover,
+.service-nav a.on:hover {
+  background: transparent;
 }
 .date-range-select {
   display: flex;
@@ -2459,6 +2462,12 @@ button.primary i,
 .nav a:hover,
 .logout-link:hover {
   background: var(--sidebar-active-bg);
+}
+.portal-side .service-nav a,
+.portal-side .service-nav a:hover,
+.portal-side .service-nav a.active,
+.portal-side .service-nav a.on {
+  background: transparent;
 }
 .nav a.on,
 .nav a.on i {

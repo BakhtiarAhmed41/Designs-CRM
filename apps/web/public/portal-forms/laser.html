@@ -142,11 +142,15 @@ window.LVD_DESIGN_HTML = function (n) {
       '</div>' +
       '<div class="nq-size"><h3>Size &amp; details (optional)</h3>' +
       '<div class="nq-size-row">' +
-        '<div class="ff"><label>Finished size (W × H)</label><input data-size="w" type="number" min="0" step="0.1" placeholder="W"></div>' +
-        '<span class="nq-x">×</span>' +
-        '<div class="ff"><label>&nbsp;</label><input data-size="h" type="number" min="0" step="0.1" placeholder="H"></div>' +
-        '<div class="ff"><label>&nbsp;</label><select data-size-unit><option value="in">in</option><option value="mm">mm</option><option value="cm">cm</option></select></div>' +
-        '<label class="nq-check"><input type="checkbox" data-keep-prop> Keep proportions (optional)</label>' +
+        '<div class="nq-size-fields">' +
+          '<div class="ff"><label>Width</label><input data-size="w" type="number" min="0" step="0.1" placeholder="W"></div>' +
+          '<span class="nq-x" aria-hidden="true">×</span>' +
+          '<div class="ff"><label>Height</label><input data-size="h" type="number" min="0" step="0.1" placeholder="H"></div>' +
+          '<div class="ff nq-unit"><label>Unit</label><select data-size-unit><option value="in">in</option><option value="mm">mm</option><option value="cm">cm</option></select></div>' +
+        '</div>' +
+        '<div class="nq-size-opts">' +
+          '<label class="nq-check"><input type="checkbox" data-keep-prop> Keep proportions</label>' +
+        '</div>' +
       '</div>' +
       '<p class="nq-hint">Leave blank if you’re unsure. We’ll recommend the best size for your project.</p></div>' +
       '<div class="ff nq-note"><label>Tell us about your project</label>' +

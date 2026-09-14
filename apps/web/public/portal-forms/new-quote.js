@@ -130,8 +130,9 @@
     row.setAttribute('data-extra-size', '1');
     row.innerHTML =
       '<div class="ff"><label>Width</label><input type="number" min="0" step="0.1" placeholder="W"></div>' +
+      '<span class="nq-x" aria-hidden="true">×</span>' +
       '<div class="ff"><label>Height</label><input type="number" min="0" step="0.1" placeholder="H"></div>' +
-      '<button type="button" class="drow-del" onclick="this.parentNode.remove()"><i class="ti ti-trash"></i></button>';
+      '<button type="button" class="nq-extra-del" onclick="this.parentNode.remove()" aria-label="Remove size"><i class="ti ti-trash"></i></button>';
     box.appendChild(row);
     if (typeof window.LVD_REPORT_HEIGHT_SOON === 'function') window.LVD_REPORT_HEIGHT_SOON();
   };

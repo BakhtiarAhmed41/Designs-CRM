@@ -134,12 +134,16 @@ window.LVD_DESIGN_HTML = function (n) {
       '</div>' +
       '<div class="nq-size"><h3>Size</h3>' +
       '<div class="nq-size-row">' +
-        '<div class="ff"><label>Width</label><input data-size="w" type="number" min="0" step="0.1" placeholder="e.g. 3.5"></div>' +
-        '<span class="nq-x">×</span>' +
-        '<div class="ff"><label>Height</label><input data-size="h" type="number" min="0" step="0.1" placeholder="Auto"></div>' +
-        '<label class="nq-check"><input type="checkbox" data-keep-prop checked> Keep proportional</label>' +
-        '<button type="button" class="nq-add" style="margin:0" onclick="addExtraSize(this)"><i class="ti ti-plus"></i> another size</button>' +
-        '<label class="nq-check"><input type="checkbox" data-size-unsure> I\'m not sure of the size</label>' +
+        '<div class="nq-size-fields">' +
+          '<div class="ff"><label>Width</label><input data-size="w" type="number" min="0" step="0.1" placeholder="e.g. 3.5"></div>' +
+          '<span class="nq-x" aria-hidden="true">×</span>' +
+          '<div class="ff"><label>Height</label><input data-size="h" type="number" min="0" step="0.1" placeholder="Auto"></div>' +
+        '</div>' +
+        '<div class="nq-size-opts">' +
+          '<label class="nq-check"><input type="checkbox" data-keep-prop checked> Keep proportional</label>' +
+          '<button type="button" class="nq-add" onclick="addExtraSize(this)"><i class="ti ti-plus"></i> another size</button>' +
+          '<label class="nq-check"><input type="checkbox" data-size-unsure> I\'m not sure of the size</label>' +
+        '</div>' +
       '</div>' +
       '<div class="nq-extra" data-extra-sizes></div></div>' +
       '<div class="ff nq-note"><label>Tell us about your design</label>' +
