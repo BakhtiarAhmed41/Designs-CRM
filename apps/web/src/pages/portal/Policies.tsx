@@ -394,47 +394,45 @@ export function PortalPolicies() {
         </div>
       </header>
 
-      <div className="policy-layout">
-        <nav className="policy-toc" aria-label="On this page">
-          <p className="policy-toc-label">On this page</p>
-          <ol>
-            {FULL_POLICY.map((section) => {
-              const { n, heading } = splitTitle(section.title);
-              return (
-                <li key={n}>
-                  <a href={`#policy-${n}`}>
-                    <span>{n}</span>
-                    {heading}
-                  </a>
-                </li>
-              );
-            })}
-            <li>
-              <a href="#policy-summary">
-                <span>S</span>
-                Policy summary
-              </a>
-            </li>
-          </ol>
-        </nav>
-
-        <article className="policy-doc">
+      <nav className="policy-toc" aria-label="On this page">
+        <p className="policy-toc-label">On this page</p>
+        <ol>
           {FULL_POLICY.map((section) => {
             const { n, heading } = splitTitle(section.title);
             return (
-              <section key={n} id={`policy-${n}`} className="policy-section">
-                <div className="policy-section-head">
-                  <span className="policy-num">{n}</span>
-                  <h2>{heading}</h2>
-                </div>
-                <div className="policy-section-body">
-                  <PolicyBlocks id={n} blocks={section.blocks} />
-                </div>
-              </section>
+              <li key={n}>
+                <a href={`#policy-${n}`}>
+                  <span>{n}</span>
+                  {heading}
+                </a>
+              </li>
             );
           })}
-        </article>
-      </div>
+          <li>
+            <a href="#policy-summary">
+              <span>S</span>
+              Customer Portal Policy Summary
+            </a>
+          </li>
+        </ol>
+      </nav>
+
+      <article className="policy-doc">
+        {FULL_POLICY.map((section) => {
+          const { n, heading } = splitTitle(section.title);
+          return (
+            <section key={n} id={`policy-${n}`} className="policy-section">
+              <div className="policy-section-head">
+                <span className="policy-num">{n}</span>
+                <h2>{heading}</h2>
+              </div>
+              <div className="policy-section-body">
+                <PolicyBlocks id={n} blocks={section.blocks} />
+              </div>
+            </section>
+          );
+        })}
+      </article>
 
       <header className="policy-hero policy-hero-next" id="policy-summary">
         <div className="policy-hero-icon" aria-hidden>
