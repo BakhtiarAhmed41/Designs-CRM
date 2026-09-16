@@ -22,9 +22,9 @@ const SERVICE_CHIPS = [
   { id: 'cnc', label: 'CNC / Laser' },
 ];
 
-const EMB_FORMATS = ['DST', 'PES', 'EXP', 'XXX', 'PDF', 'PNG', 'JEF'];
-const DIG_FORMATS = ['SVG', 'PNG', 'EPS', 'AI', 'PDF', 'JPG'];
-const CNC_FORMATS = ['DXF', 'SVG', 'PDF', 'AI'];
+const EMB_FORMATS = ['DST', 'PES', 'EXP', 'XXX', 'PDF', 'PNG', 'JEF', 'HUS', 'SEW', 'Others'];
+const DIG_FORMATS = ['SVG', 'PNG', 'EPS', 'AI', 'PDF', 'JPG', 'Others'];
+const CNC_FORMATS = ['DXF', 'SVG', 'PDF', 'AI', 'Others'];
 const HOOP_OPTIONS = ['4x4', '5x7', '6x10', '7x12', '8x8', '8x12', 'Cap frame 2.5x6'];
 
 const DEFAULT_PREFS: Prefs = {
@@ -191,10 +191,10 @@ export function PortalProfile() {
   }
 
   return (
-    <div>
+    <div className="profile-elegant">
       <PageHeader
         title="Profile"
-        subtitle="Contact details, payment terms, and defaults used on new quotes."
+        subtitle="A simple place for your contact details and the files you usually need."
       />
 
       <div className="card card-pad">

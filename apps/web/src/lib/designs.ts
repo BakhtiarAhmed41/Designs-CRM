@@ -3,8 +3,11 @@ import type { Order } from './types';
 
 export type DesignStatus = 'WAITING' | 'IN_PROGRESS' | 'DONE' | 'DELIVERED';
 
-/** Same words on admin and customer: Waiting → In progress → Ready → Delivered */
-export function designStatusLabel(status: DesignStatus | string): string {
+/** Admin keeps Waiting. Customer sees In progress instead. */
+export function designStatusLabel(
+  status: DesignStatus | string,
+  audience: 'admin' | 'customer' = 'admin',
+): string {
   switch (status) {
     case 'DELIVERED':
       return 'Delivered';
@@ -13,7 +16,7 @@ export function designStatusLabel(status: DesignStatus | string): string {
     case 'IN_PROGRESS':
       return 'In progress';
     default:
-      return 'Waiting';
+      return audience === 'customer' ? 'In progress' : 'Waiting';
   }
 }
 
@@ -78,6 +81,8 @@ export type MyFile = {
   previewStatus?: 'PENDING' | 'APPROVED' | 'CHANGES_REQUESTED' | null;
   previewUrl?: string | null;
   canDownload?: boolean;
+  downloadedAt?: string | null;
+  downloadCount?: number;
 };
 
 export type QuoteBuilderLineInput = {

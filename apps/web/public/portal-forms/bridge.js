@@ -145,8 +145,15 @@
       });
       var keep = card.querySelector('[data-keep-prop]');
       var dpi = card.querySelector('[data-dpi]');
+      var svcInp = card.querySelector('[data-design-service]');
+      var fileNames = [];
+      card.querySelectorAll('input[type="file"]').forEach(function (inp) {
+        var bag = inp._lvdFiles || (inp.files ? Array.from(inp.files) : []);
+        bag.forEach(function (f) { fileNames.push(f.name); });
+      });
       designs.push({
         name: nameInp ? nameInp.value.trim() : '',
+        service: svcInp ? svcInp.value : '',
         placement: itemSel ? itemSel.value : '',
         fabric: itemSel ? itemSel.value : '',
         size: size,
@@ -156,6 +163,7 @@
         keepProportional: keep ? keep.checked : false,
         dpi300: dpi ? dpi.checked : false,
         sizes: sizes,
+        fileNames: fileNames,
       });
     });
     return designs;
@@ -321,12 +329,31 @@
 
   window.LVD_GET_FILES = function () {
     var files = [];
-    document.querySelectorAll('input[type="file"]').forEach(function (inp) {
-      if (inp.files) {
-        for (var i = 0; i < inp.files.length; i++) files.push(inp.files[i]);
-      }
-    });
+    var cards = document.querySelectorAll('#design-list .dcard');
+    if (cards.length) {
+      cards.forEach(function (card) {
+        card.querySelectorAll('input[type="file"]').forEach(function (inp) {
+          var bag = inp._lvdFiles || (inp.files ? Array.from(inp.files) : []);
+          bag.forEach(function (f) { files.push(f); });
+        });
+      });
+    } else {
+      document.querySelectorAll('input[type="file"]').forEach(function (inp) {
+        var bag = inp._lvdFiles || (inp.files ? Array.from(inp.files) : []);
+        bag.forEach(function (f) { files.push(f); });
+      });
+    }
     return files;
+  };
+
+  window.LVD_RESET_SUBMIT = function () {
+    document.querySelectorAll('.btn-p').forEach(function (btn) {
+      if (btn.id === 'lvd-next') return;
+      btn.dataset.busy = '';
+      btn.disabled = false;
+      if (!btn.dataset.label) btn.dataset.label = 'Submit quote request →';
+      btn.textContent = btn.dataset.label;
+    });
   };
 
   function apiBase() {
@@ -603,6 +630,11 @@
       if (btn.id === 'lvd-next') return;
       btn.addEventListener('click', function (e) {
         e.preventDefault();
+        if (btn.dataset.busy === '1') return;
+        btn.dataset.busy = '1';
+        btn.disabled = true;
+        if (!btn.dataset.label) btn.dataset.label = btn.textContent || 'Submit quote request →';
+        btn.textContent = 'Submitting…';
         if (inIframe()) {
           parent.postMessage({ type: 'lvd-quote-submit' }, '*');
         } else {
@@ -651,6 +683,9 @@
     }
     if (data.type === 'lvd-request-height') {
       reportHeightSoon();
+    }
+    if (data.type === 'lvd-quote-submit-result' && !data.ok && typeof window.LVD_RESET_SUBMIT === 'function') {
+      window.LVD_RESET_SUBMIT();
     }
     if (data.type === 'lvd-apply-theme' && typeof window.LVD_APPLY_THEME === 'function') {
       window.LVD_APPLY_THEME(data.colors);

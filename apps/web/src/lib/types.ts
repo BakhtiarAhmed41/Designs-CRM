@@ -100,6 +100,8 @@ export type DeliveryFile = {
   originalName: string;
   mimeType?: string | null;
   formatLabel: string | null;
+  downloadedAt?: string | null;
+  downloadCount?: number;
 };
 
 export type Delivery = {
@@ -142,6 +144,7 @@ export type Order = {
   createdByRole?: UserRole | null;
   createdById?: string | null;
   assignedDesignerId?: string | null;
+  designerNotNeeded?: boolean;
   internalNotes?: string | null;
   rejectionReason?: string | null;
   partiallyAccepted?: boolean;

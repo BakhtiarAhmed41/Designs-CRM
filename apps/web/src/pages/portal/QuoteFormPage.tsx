@@ -9,6 +9,7 @@ import { useDialog } from '@/components/ui/AppDialog';
 import { useTopbarLead } from '@/components/Shell';
 import { useTheme } from '@/context/ThemeContext';
 import { postThemeToWindow } from '@/lib/theme';
+import { filesFromQuoteForm } from '@/lib/quoteFiles';
 
 type ServiceKey = 'embroidery' | 'vector' | 'laser';
 
@@ -42,14 +43,14 @@ const SERVICES: Array<{
   {
     key: 'vector',
     serviceType: 'VECTOR',
-    label: 'Vector & Print',
+    label: 'Vector & Print Artwork',
     desc: 'Logo redraws and print-ready color separations.',
     icon: 'ti-vector-bezier',
   },
   {
     key: 'laser',
     serviceType: 'CNC_LASER',
-    label: 'Cut, Print & Engraving',
+    label: 'Cutting & Engraving Files',
     desc: 'Cutting, engraving, print files and plasma files.',
     icon: 'ti-router',
   },
@@ -58,7 +59,6 @@ const SERVICES: Array<{
 declare global {
   interface Window {
     LVD_COLLECT?: () => Collected;
-    LVD_GET_FILES?: () => File[];
   }
 }
 
@@ -161,7 +161,7 @@ export function QuoteFormPage() {
           advanced: {},
           formVersion: 1,
         } as Collected);
-      const files = win?.LVD_GET_FILES?.() ?? [];
+      const files = filesFromQuoteForm(win?.LVD_GET_FILES?.() ?? []);
       const { order } = await createOrder({
         type: 'QUOTE_REQUEST',
         serviceType: service.serviceType,
@@ -188,6 +188,7 @@ export function QuoteFormPage() {
       navigate(`/portal/quotes/${order.id}`);
     } catch (e) {
       setError(getErrorMessage(e));
+      iframeRef.current?.contentWindow?.postMessage({ type: 'lvd-quote-submit-result', ok: false }, '*');
     } finally {
       setBusy(false);
     }
@@ -330,7 +331,7 @@ export function QuoteFormPage() {
           </aside>
         )}
       </div>
-      {busy && <p className="muted">Submitting…</p>}
+      {busy && <div className="quote-submit-mask">Submitting your quote…</div>}
       {toast && <div className="toast show">{toast}</div>}
     </div>
   );

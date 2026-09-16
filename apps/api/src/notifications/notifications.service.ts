@@ -109,4 +109,22 @@ export class NotificationsService {
     );
     return { ok: true };
   }
+
+  async markFileReadyRead(userId: string, orderId: string) {
+    const orderLink = `/portal/orders/${orderId}`;
+    await this.db.execute(
+      `UPDATE notifications
+          SET read_at = NOW()
+        WHERE user_id = ?
+          AND read_at IS NULL
+          AND (
+            title = 'Your files are ready'
+            OR title LIKE '%files are ready%'
+            OR body LIKE '%ready to download%'
+          )
+          AND (link = ? OR link LIKE ?)`,
+      [userId, orderLink, `%/orders/${orderId}%`],
+    );
+    this.events.emitCreated(userId);
+  }
 }

@@ -46,6 +46,10 @@ function isAdminRole(role: UserRole): boolean {
   );
 }
 
+function sevenDigitRef() {
+  return String(Math.floor(1_000_000 + Math.random() * 9_000_000));
+}
+
 function isImageFile(name?: string | null, mime?: string | null) {
   if (mime?.startsWith('image/')) return true;
   return /\.(png|jpe?g|gif|webp|bmp)$/i.test(name ?? '');
@@ -97,6 +101,7 @@ type OrderRow = {
   created_by_role: UserRole | null;
   created_by_id: string | null;
   assigned_designer_id: string | null;
+  designer_not_needed?: number | boolean;
   parent_order_id: string | null;
   due_date: Date | null;
   turnaround_key: string | null;
@@ -633,6 +638,7 @@ export class OrdersService {
       createdByRole: o.created_by_role ?? null,
       createdById: o.created_by_id ?? null,
       assignedDesignerId: o.assigned_designer_id,
+      designerNotNeeded: Boolean(o.designer_not_needed),
       parentOrderId: o.parent_order_id,
       dueDate: o.due_date,
       internalNotes: o.internal_notes,
@@ -747,11 +753,13 @@ export class OrdersService {
         byteSize: number | null;
         formatLabel: string | null;
         createdAt: Date;
+        downloadedAt: Date | null;
+        downloadCount: number;
       }>
     >();
     const deliveryIds = deliveries.map((d) => d.id);
     if (deliveryIds.length > 0) {
-      const files = await this.db.query<{
+      type FileRow = {
         id: string;
         delivery_id: string;
         design_id: string | null;
@@ -760,13 +768,28 @@ export class OrdersService {
         byte_size: number | null;
         format_label: string | null;
         created_at: Date;
-      }>(
-        `SELECT id, delivery_id, design_id, original_name, mime_type, byte_size, format_label, created_at
-           FROM delivery_files
-          WHERE delivery_id IN (${this.sqlIn(deliveryIds)})
-          ORDER BY created_at ASC`,
-        deliveryIds,
-      );
+        downloaded_at?: Date | null;
+        download_count?: number | null;
+      };
+      let files: FileRow[] = [];
+      try {
+        files = await this.db.query<FileRow>(
+          `SELECT id, delivery_id, design_id, original_name, mime_type, byte_size, format_label, created_at,
+                  downloaded_at, download_count
+             FROM delivery_files
+            WHERE delivery_id IN (${this.sqlIn(deliveryIds)})
+            ORDER BY created_at ASC`,
+          deliveryIds,
+        );
+      } catch {
+        files = await this.db.query<FileRow>(
+          `SELECT id, delivery_id, design_id, original_name, mime_type, byte_size, format_label, created_at
+             FROM delivery_files
+            WHERE delivery_id IN (${this.sqlIn(deliveryIds)})
+            ORDER BY created_at ASC`,
+          deliveryIds,
+        );
+      }
       for (const f of files) {
         const list = filesByDelivery.get(f.delivery_id) ?? [];
         list.push({
@@ -777,6 +800,8 @@ export class OrdersService {
           byteSize: f.byte_size,
           formatLabel: f.format_label,
           createdAt: f.created_at,
+          downloadedAt: f.downloaded_at ?? null,
+          downloadCount: Number(f.download_count ?? 0),
         });
         filesByDelivery.set(f.delivery_id, list);
       }
@@ -812,6 +837,32 @@ export class OrdersService {
   }
 
   // --- client flows --------------------------------------------------------
+
+  private async nextHumanRef() {
+    for (let i = 0; i < 12; i += 1) {
+      const ref = `LVD-${sevenDigitRef()}`;
+      const existing = await this.db.queryOne<{ id: string }>(
+        'SELECT id FROM orders WHERE human_ref = ? LIMIT 1',
+        [ref],
+      );
+      if (!existing) return ref;
+    }
+    return `LVD-${String(Date.now()).slice(-7)}`;
+  }
+
+  private async recordDeliveryDownload(deliveryFileId: string) {
+    try {
+      await this.db.execute(
+        `UPDATE delivery_files
+            SET download_count = COALESCE(download_count, 0) + 1,
+                downloaded_at = NOW()
+          WHERE id = ?`,
+        [deliveryFileId],
+      );
+    } catch {
+      // Column may not exist on a stale database; download still works.
+    }
+  }
 
   async createOrder(
     client: AuthUser | undefined,
@@ -873,7 +924,7 @@ export class OrdersService {
     }
 
     const id = randomUUID();
-    const humanRef = `LVD-${Date.now()}`;
+    const humanRef = await this.nextHumanRef();
     const name =
       data.name?.trim() ||
       data.subCategory ||
@@ -1346,7 +1397,10 @@ export class OrdersService {
     if (!order || order.client_user_id !== user.id)
       throw new NotFoundException('Order not found');
     await this.assertCustomerCanSeeDeliveryFile(orderId, deliveryFileId);
-    return this.signDeliveryFile(orderId, deliveryFileId);
+    const signed = await this.signDeliveryFile(orderId, deliveryFileId);
+    await this.recordDeliveryDownload(deliveryFileId);
+    await this.notifications.markFileReadyRead(user.id, orderId);
+    return signed;
   }
 
   async getMyDeliveryFilePreviewUrl(
@@ -1639,39 +1693,7 @@ export class OrdersService {
   ) {
     assertAuthUser(user);
     if (user.role !== UserRole.CLIENT) throw new ForbiddenException();
-    throw new BadRequestException(
-      'This action is not available.',
-    );
-
-    const latest = await this.getLatestQuotation(orderId);
-    const nextVersion = (latest?.version ?? 0) + 1;
-    const id = randomUUID();
-    await this.db.execute(
-      `INSERT INTO quotations
-         (id, order_id, version, status, created_by_role, created_by_id, amount_cents, currency, comment)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id,
-        orderId,
-        nextVersion,
-        QuotationStatus.COUNTERED,
-        UserRole.CLIENT,
-        user.id,
-        typeof input.amountCents === 'number' ? input.amountCents : null,
-        (input.currency?.trim() || 'USD').toUpperCase(),
-        input.comment?.trim() || null,
-      ],
-    );
-    await this.db.execute('UPDATE orders SET status = ? WHERE id = ?', [
-      OrderStatus.WAITING_FOR_ADMIN_QUOTATION_APPROVAL,
-      orderId,
-    ]);
-    await this.notifyAdmins({
-      title: 'Counter quotation submitted',
-      body: `Client submitted a counter - ${order.name ?? ''}`,
-      link: `/admin/orders/${orderId}`,
-    });
-    return this.quotationDto((await this.getLatestQuotation(orderId))!);
+    throw new BadRequestException('This action is not available.');
   }
 
   // --- admin flows ---------------------------------------------------------
@@ -1932,7 +1954,7 @@ export class OrdersService {
     }
 
     const id = randomUUID();
-    const humanRef = `LVD-${Date.now()}`;
+    const humanRef = await this.nextHumanRef();
     const serviceType = toServiceType(data.serviceType);
     const name =
       data.name?.trim() ||
@@ -2800,7 +2822,9 @@ export class OrdersService {
       await this.notifications.createFor(order.client_user_id, {
         title: isPreview ? 'Design preview ready' : 'Your files are ready',
         body: isPreview
-          ? `A preview for ${order.name ?? 'your order'} is ready for your approval.`
+          ? order.type === OrderType.QUOTE_REQUEST
+            ? 'A preview for Quote request is ready for your approval.'
+            : 'Review the design to approve or request changes.'
           : partial
             ? `Some files for ${order.name ?? 'your order'} are ready to download.`
             : `Your files for ${order.name ?? 'your order'} are ready to download.`,
@@ -3265,9 +3289,12 @@ export class OrdersService {
       kind: string | null;
       preview_status: string | null;
       storage_key: string;
+      downloaded_at: Date | null;
+      download_count: number | null;
     }>(
       `SELECT df.id AS file_id, df.original_name, df.mime_type, df.format_label, df.byte_size,
               df.created_at AS delivered_at, df.storage_key,
+              df.downloaded_at, df.download_count,
               o.id AS order_id, o.name AS order_name, o.human_ref, o.service_type,
               d.delivered_via, d.kind, d.preview_status, u.email
          FROM delivery_files df
@@ -3305,6 +3332,8 @@ export class OrdersService {
           previewStatus: r.preview_status,
           previewUrl,
           canDownload: !isPreview,
+          downloadedAt: r.downloaded_at,
+          downloadCount: Number(r.download_count ?? 0),
         };
       }),
     );

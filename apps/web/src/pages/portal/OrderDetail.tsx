@@ -27,7 +27,6 @@ import {
 import type { Order, Quotation } from '@/lib/types';
 import { getMyCustomer } from '@/lib/customers';
 import { studioQuotation } from '@/lib/quoteHelpers';
-import { QuoteHistory } from '@/components/QuoteHistory';
 import { applyOrderChange, invalidateWorkCaches } from '@/lib/queryCache';
 import { freshOnOpen } from '@/lib/queryRefresh';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
@@ -53,6 +52,7 @@ export function PortalOrderDetail() {
   const [revOpen, setRevOpen] = useState(false);
   const [revNote, setRevNote] = useState('');
   const [revDesignIds, setRevDesignIds] = useState<string[]>([]);
+  const [changeNote, setChangeNote] = useState('');
   const [payBusy, setPayBusy] = useState(false);
   const paySyncStarted = useRef<number | null>(null);
 
@@ -266,7 +266,7 @@ export function PortalOrderDetail() {
     <div>
       <PageHeader
         title={order.name ?? 'Order'}
-        subtitle={`${order.serviceType ?? 'Order'} · #${order.humanRef ?? order.id.slice(0, 6)} · ${dateShort(order.createdAt)}`}
+        subtitle={`Order ${order.humanRef ?? order.id.slice(0, 6)} · ${dateShort(order.createdAt)}`}
         crumbs={[
           { label: 'Orders', to: '/portal/orders' },
           { label: order.humanRef ?? 'Order' },
@@ -311,6 +311,7 @@ export function PortalOrderDetail() {
             const chip = lifecycleChip(order.status, 'customer', {
               partiallyAccepted: order.partiallyAccepted,
               partiallyDelivered: order.partiallyDelivered,
+              paymentStatus: order.paymentStatus,
             });
             return <span className={chip.cls}>{chip.label}</span>;
           })()}
@@ -377,7 +378,7 @@ export function PortalOrderDetail() {
 
       <div className="od-grid">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {latestQuote && (
+          {canDecide && latestQuote && (
             <div className="card">
               <div className="card-h">
                 <span className="ct">
@@ -507,8 +508,6 @@ export function PortalOrderDetail() {
             </div>
           )}
 
-          <QuoteHistory quotations={order.quotations} />
-
           <div className="card">
             <div className="card-h">
               <span className="ct">
@@ -561,11 +560,19 @@ export function PortalOrderDetail() {
                                   previewDecision.mutate({
                                     deliveryId: d.id,
                                     decision: 'CHANGES_REQUESTED',
+                                    note: changeNote.trim() || undefined,
                                   })
                                 }
                               >
                                 Request changes
                               </button>
+                              <textarea
+                                className="stat-select"
+                                style={{ width: '100%', minHeight: 72, marginTop: 8 }}
+                                placeholder="Tell us what you want changed."
+                                value={changeNote}
+                                onChange={(e) => setChangeNote(e.target.value)}
+                              />
                             </div>
                           )}
                           {d.previewStatus === 'APPROVED' && (
@@ -593,14 +600,24 @@ export function PortalOrderDetail() {
                                 name={f.originalName}
                                 mimeType={f.mimeType}
                               />
+                              <div>
+                                {(f.downloadCount ?? 0) === 0 && (
+                                  <span className="file-new">NEW</span>
+                                )}
+                              </div>
                               <button
                                 type="button"
                                 className="btn btn-ghost btn-sm"
                                 onClick={() =>
-                                  downloadSignedFile(
+                                  void downloadSignedFile(
                                     myDeliveryFileUrl(order.id, f.id),
                                     f.originalName,
-                                  )
+                                  ).then(() => {
+                                    void qc.invalidateQueries({ queryKey: ['my-order', order.id] });
+                                    void qc.invalidateQueries({ queryKey: ['my-files'] });
+                                    void qc.invalidateQueries({ queryKey: ['my-activity'] });
+                                    void qc.invalidateQueries({ queryKey: ['notifications'] });
+                                  })
                                 }
                               >
                                 <i className="ti ti-download" /> Download
@@ -632,10 +649,23 @@ export function PortalOrderDetail() {
               <div className="card-h">
                 <span className="ct">Designs</span>
               </div>
-              {order.designs.map((d) => (
+              {order.designs.map((d) => {
+                const previewFile = (order.deliveries ?? [])
+                  .flatMap((del) => del.files.map((f) => ({ ...f, kind: del.kind })))
+                  .find((f) => f.designId === d.id && (f.mimeType?.startsWith('image/') || /\.(png|jpe?g|gif|webp)$/i.test(f.originalName)));
+                return (
                 <div key={d.id} className="orow orow-status-under" style={{ cursor: 'default' }}>
                   <div className={`thumb${serviceThumbClass(order.serviceType) ? ' m' : ''}`}>
-                    <i className={`ti ${serviceTi(order.serviceType)}`} />
+                    {previewFile ? (
+                      <DeliveryPreview
+                        orderId={order.id}
+                        fileId={previewFile.id}
+                        name={previewFile.originalName}
+                        mimeType={previewFile.mimeType}
+                      />
+                    ) : (
+                      <i className={`ti ${serviceTi(order.serviceType)}`} />
+                    )}
                   </div>
                   <div className="oinfo">
                     <div className="on">{d.name}</div>
@@ -645,7 +675,7 @@ export function PortalOrderDetail() {
                     </div>
                     <div className="ostatus">
                       <span className={designStatusChipClass(d.status)}>
-                        {designStatusLabel(d.status)}
+                        {designStatusLabel(d.status, 'customer')}
                       </span>
                       {Boolean(openRevision) &&
                         (revisionIds.length === 0 || revisionIds.includes(d.id)) && (
@@ -655,7 +685,8 @@ export function PortalOrderDetail() {
                   </div>
                   <div className="oprice">{money(d.priceCents)}</div>
                 </div>
-              ))}
+              );
+              })}
             </div>
           )}
 

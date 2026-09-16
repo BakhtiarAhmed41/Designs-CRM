@@ -115,6 +115,13 @@ export class AdminTeamController {
     return this.team.unassignOrder(orderId);
   }
 
+  @Post('team/skip-assign/:orderId')
+  @Roles(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+  @RequireFeatures('team')
+  async skipAssign(@Param('orderId') orderId: string) {
+    return this.team.skipAssign(orderId);
+  }
+
   @Get('team-chat/unread-summary')
   @RequireFeatures('messages', 'messages_team_view')
   async teamUnread(@CurrentUser() user: AuthUser) {

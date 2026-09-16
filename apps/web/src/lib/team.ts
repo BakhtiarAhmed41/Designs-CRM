@@ -91,6 +91,13 @@ export function unassignOrder(orderId: string) {
   );
 }
 
+export function skipAssignOrder(orderId: string) {
+  return apiFetch<{ orderId: string; assignedDesignerId: null; designerNotNeeded: boolean }>(
+    `/admin/team/skip-assign/${orderId}`,
+    { method: 'POST' },
+  );
+}
+
 export type TeamChatAttachment = {
   id: string;
   originalName: string;

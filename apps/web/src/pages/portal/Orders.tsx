@@ -71,7 +71,7 @@ function designLineIcon(status: Design['status']) {
 }
 
 function designChip(status: Design['status']) {
-  return { cls: designStatusChipClass(status), label: designStatusLabel(status) };
+  return { cls: designStatusChipClass(status), label: designStatusLabel(status, 'customer') };
 }
 
 function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {

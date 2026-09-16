@@ -1,5 +1,6 @@
 type FormDesign = {
   name?: string;
+  service?: string;
   placement?: string;
   fabric?: string;
   size?: string;
@@ -9,6 +10,7 @@ type FormDesign = {
   keepProportional?: boolean;
   dpi300?: boolean;
   sizes?: Array<{ label?: string; w?: string; h?: string }>;
+  fileNames?: string[];
 };
 
 type QuoteFormPreferences = {
@@ -129,6 +131,16 @@ export function FormPreferencesDisplay({ preferences }: { preferences: unknown }
               <div style={{ fontWeight: 600, marginBottom: 6 }}>
                 {d.name?.trim() || `Design ${i + 1}`}
               </div>
+              {d.service && (
+                <div>
+                  <b>Service:</b> {d.service}
+                </div>
+              )}
+              {(d.fileNames?.length ?? 0) > 0 && (
+                <div>
+                  <b>Files:</b> {d.fileNames!.join(', ')}
+                </div>
+              )}
               {d.placement && (
                 <div>
                   <b>Item / placement:</b> {d.placement}

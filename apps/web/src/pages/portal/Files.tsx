@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { listMyFiles, type MyFile } from '@/lib/designs';
 import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
 import { myDeliveryFileUrl } from '@/lib/orders';
@@ -65,6 +65,7 @@ export function PortalFiles() {
   const [method, setMethod] = useState('all');
   const [page, setPage] = useState(1);
   const [openKey, setOpenKey] = useState<string | null>(null);
+  const qc = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ['my-files'],
     queryFn: listMyFiles,
@@ -312,7 +313,12 @@ export function PortalFiles() {
                                                 previewUrl={f.previewUrl}
                                               />
                                             </td>
-                                            <td>{f.originalName}</td>
+                                            <td>
+                                              {f.originalName}
+                                              {(f.downloadCount ?? 0) === 0 && (
+                                                <span className="file-new">NEW</span>
+                                              )}
+                                            </td>
                                             <td className="muted">{fileSizeLabel(f.byteSize)}</td>
                                             <td>
                                               {f.canDownload === false ? (
@@ -322,10 +328,14 @@ export function PortalFiles() {
                                                   type="button"
                                                   className="btn btn-ghost btn-sm"
                                                   onClick={() =>
-                                                    downloadSignedFile(
+                                                    void downloadSignedFile(
                                                       myDeliveryFileUrl(f.orderId, f.fileId),
                                                       f.originalName,
-                                                    )
+                                                    ).then(() => {
+                                                      void qc.invalidateQueries({ queryKey: ['my-files'] });
+                                                      void qc.invalidateQueries({ queryKey: ['my-activity'] });
+                                                      void qc.invalidateQueries({ queryKey: ['notifications'] });
+                                                    })
                                                   }
                                                 >
                                                   <i className="ti ti-download" /> Download

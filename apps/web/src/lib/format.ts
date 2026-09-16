@@ -127,7 +127,11 @@ export function statusChipClass(status: OrderStatus | string | null | undefined)
 export function lifecycleChip(
   status: OrderStatus | string,
   audience: StatusAudience = 'shared',
-  opts?: { partiallyAccepted?: boolean; partiallyDelivered?: boolean },
+  opts?: {
+    partiallyAccepted?: boolean;
+    partiallyDelivered?: boolean;
+    paymentStatus?: string | null;
+  },
 ): StatusChip {
   const isAdmin = audience === 'admin';
   const isCustomer = audience === 'customer';
@@ -176,7 +180,13 @@ export function lifecycleChip(
       }
       return {
         cls: 'chip c-done',
-        label: isAdmin || isCustomer ? 'Accepted, in progress' : 'In progress',
+        label: isCustomer
+          ? opts?.paymentStatus === 'PAID'
+            ? 'Paid · In Progress'
+            : 'In Progress'
+          : isAdmin
+            ? 'Accepted, in progress'
+            : 'In progress',
       };
     case 'COMPLETED':
     case 'CLOSED':

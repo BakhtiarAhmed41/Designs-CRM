@@ -11,6 +11,7 @@
 .nq-prefs{display:grid;grid-template-columns:1fr 1fr auto;gap:28px;align-items:start;margin:18px 0 8px;}
 .nq-pref h3,.nq-sec h3{margin:0 0 10px;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#666;}
 .nq-radio,.nq-check{display:flex;align-items:center;gap:8px;margin:7px 0;font-size:14px;cursor:pointer;}
+.nq-radio-hi{background:#e8f1ff;border-radius:8px;padding:4px 8px;outline:1px solid #2563eb;}
 .nq-size{margin:16px 0 8px;}
 .nq-size h3{margin:0 0 10px;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#666;}
 .nq-size-row{display:flex;align-items:flex-end;gap:22px;flex-wrap:nowrap;}

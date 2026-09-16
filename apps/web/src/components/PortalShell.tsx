@@ -1,11 +1,14 @@
 import type { ReactNode } from 'react';
-import { NavLink } from 'react-router-dom';
+import { useEffect } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Brand, LogoutLink, Shell, useShellUser } from './Shell';
 import { getMyCustomer, portalLookFromPrefs } from '@/lib/customers';
 import { listMyOrderSummary } from '@/lib/orders';
 import { getMyInvoiceSummary } from '@/lib/billing';
 import { getMyUnreadSummary } from '@/lib/messaging';
+import { listNotifications, markNotificationRead } from '@/lib/notifications';
+import { unreadIdsForSection, unreadSections, type PortalNewSection } from '@/lib/portalNew';
 import { whenVisible } from '@/lib/queryRefresh';
 import { useMessagingSocket } from '@/hooks/useMessagingSocket';
 
@@ -15,6 +18,7 @@ type NavEntry = {
   icon: string;
   end?: boolean;
   badge?: ReactNode;
+  className?: string;
 };
 
 function NavGroup({ label, items }: { label: string; items: NavEntry[] }) {
@@ -27,7 +31,9 @@ function NavGroup({ label, items }: { label: string; items: NavEntry[] }) {
             key={item.to}
             to={item.to}
             end={item.end}
-            className={({ isActive }) => (isActive ? 'on' : undefined)}
+            className={({ isActive }) =>
+              [item.className, isActive ? 'on' : undefined].filter(Boolean).join(' ') || undefined
+            }
           >
             <i className={`ti ${item.icon}`} /> {item.label} {item.badge}
           </NavLink>
@@ -40,6 +46,7 @@ function NavGroup({ label, items }: { label: string; items: NavEntry[] }) {
 export function PortalShell() {
   const { onLogout } = useShellUser();
   const qc = useQueryClient();
+  const location = useLocation();
   useMessagingSocket({
     onUnreadChanged: () => {
       void qc.invalidateQueries({ queryKey: ['portal-unread'] });
@@ -49,11 +56,11 @@ export function PortalShell() {
     },
   });
 
-  const { data: quoteSummary } = useQuery({
+  useQuery({
     queryKey: ['my-orders-summary'],
     queryFn: listMyOrderSummary,
   });
-  const { data: invoicesData } = useQuery({
+  useQuery({
     queryKey: ['portal-invoices-summary'],
     queryFn: getMyInvoiceSummary,
   });
@@ -66,16 +73,40 @@ export function PortalShell() {
     queryKey: ['portal-customer-me'],
     queryFn: getMyCustomer,
   });
+  const { data: activityData } = useQuery({
+    queryKey: ['my-activity', 'nav'],
+    queryFn: () => listNotifications({ page: 1, pageSize: 40 }),
+    refetchInterval: whenVisible(20_000),
+  });
   const look = portalLookFromPrefs(meCustomer?.customer?.preferences);
-  const quoteCount = quoteSummary?.awaitingQuote ?? 0;
-  const orderCount = quoteSummary?.activeOrders ?? 0;
-  const invoiceCount = invoicesData?.awaitingCount ?? 0;
+  const notes = activityData?.notifications ?? [];
+  const news = unreadSections(notes);
   const msgUnread = (unread?.unreadConversations ?? 0) > 0;
 
-  const countBadge = (n: number, label: string) =>
-    n > 0 ? (
-      <span className="cnt" aria-label={`${n} ${label}`}>
-        {n}
+  useEffect(() => {
+    const path = location.pathname;
+    const section: PortalNewSection | null =
+      path.startsWith('/portal/quotes/new')
+        ? null
+        : path.startsWith('/portal/quotes')
+          ? 'quotes'
+          : path.startsWith('/portal/orders')
+            ? 'orders'
+            : path.startsWith('/portal/invoices')
+              ? 'invoices'
+              : null;
+    if (!section) return;
+    const ids = unreadIdsForSection(notes, section);
+    if (ids.length === 0) return;
+    void Promise.all(ids.map((id) => markNotificationRead(id))).then(() => {
+      void qc.invalidateQueries({ queryKey: ['my-activity'] });
+    });
+  }, [location.pathname, notes, qc]);
+
+  const newBadge = (section: PortalNewSection, label: string) =>
+    news.has(section) ? (
+      <span className="nav-new" aria-label={`New ${label}`}>
+        NEW
       </span>
     ) : null;
 
@@ -93,28 +124,46 @@ export function PortalShell() {
       to: '/portal/quotes',
       label: 'Quotes',
       icon: 'ti-file-invoice',
-      badge: countBadge(quoteCount, 'quotes'),
+      badge: newBadge('quotes', 'quotes'),
     },
     {
       to: '/portal/orders',
       label: 'Orders',
       icon: 'ti-package',
-      badge: countBadge(orderCount, 'active orders'),
+      badge: newBadge('orders', 'orders'),
     },
-    { to: '/portal/files', label: 'My Files', icon: 'ti-folder' },
+    {
+      to: '/portal/files',
+      label: 'My Files',
+      icon: 'ti-folder',
+      badge: newBadge('files', 'files'),
+    },
   ];
   const billing: NavEntry[] = [
     {
       to: '/portal/invoices',
       label: 'Invoices',
       icon: 'ti-receipt',
-      badge: countBadge(invoiceCount, 'pending invoices'),
+      badge: newBadge('invoices', 'invoices'),
     },
   ];
   const account: NavEntry[] = [
     { to: '/portal/profile', label: 'Profile', icon: 'ti-user' },
     { to: '/portal/settings', label: 'Settings', icon: 'ti-settings' },
-    { to: '/portal/policies', label: 'Policies', icon: 'ti-notes' },
+  ];
+  const policies: NavEntry[] = [
+    {
+      to: '/portal/policies/refund-store-credit-revision',
+      label: 'Refund Store Credit and Revision Policy',
+      icon: 'ti-file-text',
+      className: 'nav-multiline',
+    },
+    {
+      to: '/portal/policies/summary',
+      label: 'Customer Portal Policy Summary',
+      icon: 'ti-notes',
+      className: 'nav-multiline',
+    },
   ];
 
   const sidebar = (
@@ -129,13 +178,14 @@ export function PortalShell() {
           <i className="ti ti-needle-thread" /> Embroidery Digitizing
         </NavLink>
         <NavLink to="/portal/quotes/new?service=vector" className={() => undefined}>
-          <i className="ti ti-vector-bezier" /> Vector &amp; Print
+          <i className="ti ti-vector-bezier" /> Vector &amp; Print Artwork
         </NavLink>
         <NavLink to="/portal/quotes/new?service=laser" className={() => undefined}>
-          <i className="ti ti-router" /> Cut, Print &amp; Engraving
+          <i className="ti ti-router" /> Cutting &amp; Engraving Files
         </NavLink>
       </nav>
       <NavGroup label="Account" items={account} />
+      <NavGroup label="Our Policies" items={policies} />
       <div className="foot">
         <LogoutLink onClick={() => void onLogout()} />
       </div>

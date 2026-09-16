@@ -32,7 +32,7 @@ import {
 } from '@/lib/messaging';
 import { HelpRequestBadge } from '@/components/messaging/InboxTools';
 import { createInvoice, createPayLink, listInvoices, payInvoice, refundOrder, type RefundTo } from '@/lib/billing';
-import { assignOrder, listTeam, unassignOrder } from '@/lib/team';
+import { assignOrder, listTeam, skipAssignOrder, unassignOrder } from '@/lib/team';
 import {
   designStatusChipClass,
   designStatusLabel,
@@ -155,7 +155,13 @@ function SavedPublishFile({
   onDelete,
 }: {
   orderId: string;
-  file: { id: string; originalName: string; mimeType?: string | null };
+  file: {
+    id: string;
+    originalName: string;
+    mimeType?: string | null;
+    downloadedAt?: string | null;
+    downloadCount?: number;
+  };
   waiting?: boolean;
   preview?: boolean;
   previewStatus?: string | null;
@@ -197,6 +203,16 @@ function SavedPublishFile({
                 ? 'Changes requested'
                 : 'Preview'}
           </em>
+        )}
+        {!preview && (file.downloadCount ?? 0) > 0 && (
+          <em className="pub-file-tag is-downloaded">
+            Downloaded
+            {file.downloadedAt ? ` · ${dateShort(file.downloadedAt)}` : ''}
+            {(file.downloadCount ?? 0) > 1 ? ` · ${file.downloadCount} times` : ''}
+          </em>
+        )}
+        {!preview && (file.downloadCount ?? 0) === 0 && (
+          <em className="pub-file-tag is-waiting">Not downloaded yet</em>
         )}
       </button>
       {canDelete && (
@@ -429,6 +445,23 @@ export function AdminOrderDetail() {
         };
       });
       setToast(res.assignedDesignerId ? 'Designer assigned.' : 'Designer unassigned.');
+      void invalidateWorkCaches(qc);
+    },
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
+  const skipAssign = useMutation({
+    mutationFn: () => skipAssignOrder(id),
+    onSuccess: () => {
+      qc.setQueryData(['admin-order', id], (prev: unknown) => {
+        if (!prev || typeof prev !== 'object' || !('order' in prev)) return prev;
+        const current = (prev as { order: Order }).order;
+        return {
+          ...prev,
+          order: { ...current, assignedDesignerId: null, designerNotNeeded: true },
+        };
+      });
+      setToast('Marked as no designer needed.');
       void invalidateWorkCaches(qc);
     },
     onError: (e) => setError(getErrorMessage(e)),
@@ -905,21 +938,43 @@ export function AdminOrderDetail() {
               </span>
             </div>
             <div className="od-files">
-              {(order.attachments ?? []).length === 0 && (
-                <div style={{ fontSize: 12, color: 'var(--muted)' }}>No files uploaded.</div>
-              )}
-              {(order.attachments ?? []).map((a) => (
-                <button
-                  key={a.id}
-                  type="button"
-                  className="odf"
-                  title={a.originalName}
-                  onClick={() => downloadSignedFile(adminAttachmentUrl(order.id, a.id), a.originalName)}
-                >
-                  <i className="ti ti-file" />
-                  <span className="odf-name">{friendlyFileName(a.originalName)}</span>
-                </button>
-              ))}
+              {(() => {
+                const prefs = (order.preferences ?? {}) as { designs?: Array<{ name?: string; fileNames?: string[] }> };
+                const designsPref = prefs.designs ?? [];
+                const leftover = [...(order.attachments ?? [])];
+                const groups = designsPref.map((d, i) => {
+                  const names = new Set((d.fileNames ?? []).map((n) => n.toLowerCase()));
+                  const files = leftover.filter((a) => names.has(a.originalName.toLowerCase()));
+                  files.forEach((f) => {
+                    const idx = leftover.findIndex((x) => x.id === f.id);
+                    if (idx >= 0) leftover.splice(idx, 1);
+                  });
+                  return { label: d.name?.trim() || `Design ${i + 1}`, files };
+                });
+                if (leftover.length) groups.push({ label: 'Other files', files: leftover });
+                if (groups.every((g) => g.files.length === 0) && (order.attachments ?? []).length === 0) {
+                  return <div style={{ fontSize: 12, color: 'var(--muted)' }}>No files uploaded.</div>;
+                }
+                return groups
+                  .filter((g) => g.files.length > 0)
+                  .map((g) => (
+                    <div key={g.label} style={{ width: '100%' }}>
+                      <div className="od-files-label">{g.label}</div>
+                      {g.files.map((a) => (
+                        <button
+                          key={a.id}
+                          type="button"
+                          className="odf"
+                          title={a.originalName}
+                          onClick={() => downloadSignedFile(adminAttachmentUrl(order.id, a.id), a.originalName)}
+                        >
+                          <i className="ti ti-file" />
+                          <span className="odf-name">{friendlyFileName(a.originalName)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ));
+              })()}
               <label className="odf up">
                 <i className="ti ti-cloud-upload" />{' '}
                 {refUploading ? 'Uploading…' : 'Upload reference'}
@@ -974,8 +1029,24 @@ export function AdminOrderDetail() {
               <span className="ct">
                 <i className="ti ti-layout-list" /> Designs in this order
               </span>
-              <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>
+              <span style={{ fontSize: 11.5, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 8 }}>
                 {readyCount} ready · {progCount} in progress
+                {designs.length > 1 && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    disabled={setDesignStatus.isPending}
+                    onClick={() => {
+                      designs.forEach((d) => {
+                        if (d.status !== 'DELIVERED') {
+                          setDesignStatus.mutate({ designId: d.id, status: 'DONE' });
+                        }
+                      });
+                    }}
+                  >
+                    Close all designs
+                  </button>
+                )}
               </span>
             </div>
             {designs.length === 0 && (
@@ -1443,10 +1514,11 @@ export function AdminOrderDetail() {
               <span className="ct">
                 <i className="ti ti-user-star" /> Designer
               </span>
-              {!assigned && <span className="chip c-prog">Unassigned</span>}
+              {!assigned && !order.designerNotNeeded && <span className="chip c-prog">Unassigned</span>}
+              {order.designerNotNeeded && <span className="chip c-done">No designer needed</span>}
             </div>
             <div style={{ padding: '12px 16px 14px' }}>
-              {!assigned && (
+              {!assigned && !order.designerNotNeeded && (
                 <div className="note amber" style={{ margin: '0 0 10px' }}>
                   <i className="ti ti-alert-circle" /> New order. Assign a designer to start.
                 </div>
@@ -1480,6 +1552,15 @@ export function AdminOrderDetail() {
                 {designerId
                   ? 'Assign. Moves to their queue.'
                   : 'Move back to unassigned'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                style={{ width: '100%', justifyContent: 'center', marginTop: 8 }}
+                disabled={skipAssign.isPending}
+                onClick={() => skipAssign.mutate()}
+              >
+                No need to assign
               </button>
                 </>
               ) : null}

@@ -240,6 +240,29 @@ export async function runMigrations() {
     );
   }
 
+  if (!(await columnExists('orders', 'designer_not_needed'))) {
+    console.log('Adding orders.designer_not_needed column ...');
+    await conn.query(
+      'ALTER TABLE orders ADD COLUMN designer_not_needed TINYINT(1) NOT NULL DEFAULT 0',
+    );
+  }
+
+  if (!(await columnExists('delivery_files', 'downloaded_at'))) {
+    console.log('Adding delivery_files download tracking columns ...');
+    await conn.query(
+      `ALTER TABLE delivery_files
+         ADD COLUMN downloaded_at DATETIME NULL,
+         ADD COLUMN download_count INT NOT NULL DEFAULT 0`,
+    );
+  }
+
+  if (!(await columnExists('order_attachments', 'design_index'))) {
+    console.log('Adding order_attachments.design_index column ...');
+    await conn.query(
+      'ALTER TABLE order_attachments ADD COLUMN design_index INT NULL',
+    );
+  }
+
   if (!(await columnExists('format_requests', 'resolved_at'))) {
     console.log('Adding format_requests.resolved_at column ...');
     await conn.query(
@@ -380,6 +403,35 @@ export async function runMigrations() {
       `ALTER TABLE deliveries ADD COLUMN preview_status
          ENUM('PENDING','APPROVED','CHANGES_REQUESTED') NULL`,
     );
+  }
+
+  const [legacyRefs] = await conn.query<mysql.RowDataPacket[]>(
+    `SELECT id FROM orders
+      WHERE human_ref IS NULL
+         OR human_ref NOT REGEXP '^LVD-[0-9]{7}$'`,
+  );
+  if (legacyRefs.length > 0) {
+    // eslint-disable-next-line no-console
+    console.log(`Converting ${legacyRefs.length} quote/order numbers to LVD + 7 digits ...`);
+    const [allRefs] = await conn.query<mysql.RowDataPacket[]>(
+      'SELECT human_ref FROM orders WHERE human_ref IS NOT NULL',
+    );
+    const used = new Set(
+      allRefs.map((r) => String(r.human_ref ?? '')).filter(Boolean),
+    );
+    for (const row of legacyRefs) {
+      let next = '';
+      for (let i = 0; i < 24; i += 1) {
+        const candidate = `LVD-${String(Math.floor(1_000_000 + Math.random() * 9_000_000))}`;
+        if (!used.has(candidate)) {
+          next = candidate;
+          break;
+        }
+      }
+      if (!next) next = `LVD-${String(Date.now()).slice(-7)}`;
+      used.add(next);
+      await conn.query('UPDATE orders SET human_ref = ? WHERE id = ?', [next, row.id]);
+    }
   }
 
   if (existsSync(migrationsDir)) {

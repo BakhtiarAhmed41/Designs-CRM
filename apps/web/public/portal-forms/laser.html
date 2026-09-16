@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cut, Print &amp; Engraving File Quote</title>
+<title>Cutting &amp; Engraving Files</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -38,10 +38,10 @@ html.in-frame .ch{display:none;}
 <body>
 <div class="wrap">
 <div class="card">
-  <div class="ch"><i class="ti ti-router"></i><span class="ct">Cut, Print &amp; Engraving File Quote</span></div>
+  <div class="ch"><i class="ti ti-router"></i><span class="ct">Cutting &amp; Engraving Files</span></div>
   <div class="cb">
     <div class="mode-body vis" id="mode-d" data-single-page="1">
-      <p class="nq-lead">Tell us what you need. If you’re unsure, we’ll help.</p>
+      <p class="nq-lead">Tell us about your design. If you’re unsure about anything, we’ll help.</p>
       <div class="nq-top">
         <div class="ff">
           <label>How many designs?</label>
@@ -58,24 +58,6 @@ html.in-frame .ch{display:none;}
             <option value="10">10 designs</option>
           </select>
         </div>
-        <div class="ff">
-          <label>What service do you need?</label>
-          <input type="hidden" id="svc-sel" value="">
-          <div class="nq-dd" id="svc-dd">
-            <button type="button" class="nq-dd-btn">Select a service</button>
-            <div class="nq-dd-list">
-              <button type="button" data-value="SVG Cut File"><strong>SVG Cut File</strong><span>Solid-color Cricut or Silhouette file</span></button>
-              <button type="button" data-value="Print Design (SVG/DTF)"><strong>Print Design (SVG/DTF)</strong><span>Full color, gradients and print-ready artwork</span></button>
-              <button type="button" data-value="Laser Engraving"><strong>Laser Engraving</strong><span>Engraving only</span></button>
-              <button type="button" data-value="Laser Cut &amp; Engrave"><strong>Laser Cut &amp; Engrave</strong><span>Cutting and engraving combined</span></button>
-              <button type="button" data-value="CNC Cut File"><strong>CNC Cut File</strong><span>CNC or router cutting</span></button>
-              <button type="button" data-value="Vinyl Cut File"><strong>Vinyl Cut File</strong><span>Decals and heat-transfer vinyl</span></button>
-              <button type="button" data-value="Plasma Cut File"><strong>Plasma Cut File</strong><span>Metal cutting</span></button>
-              <button type="button" data-value="V-carve / CNC Engraving"><strong>V-carve / CNC Engraving</strong><span>For V-carve, Easel and routers</span></button>
-              <button type="button" data-value="Not sure"><strong>Not sure</strong><span>We’ll help you choose</span></button>
-            </div>
-          </div>
-        </div>
       </div>
 
       <div id="design-list"></div>
@@ -83,7 +65,7 @@ html.in-frame .ch{display:none;}
 
       <div class="nq-sec">
         <div class="sl">Output files</div>
-        <p class="nq-hint">We’ll provide the appropriate file for your selected service.</p>
+        <p class="nq-hint">Select the file formats you need for this design. Not sure? We’ll recommend the best options.</p>
         <div class="nq-fmts">
           <div class="fmt-chip fmt-tile sel" onclick="toggleFmt(this)"><i class="ti ti-file"></i><span class="fname">SVG</span><span class="dot"></span></div>
           <div class="fmt-chip fmt-tile sel" onclick="toggleFmt(this)"><i class="ti ti-file"></i><span class="fname">PNG</span><span class="dot"></span></div>
@@ -105,7 +87,7 @@ html.in-frame .ch{display:none;}
             <input type="radio" name="turnaround" value="standard" checked> Usually ready in 12–24 hours
           </label>
           <label class="ropt" id="r-rush" onclick="selRush('rush')">
-            <input type="radio" name="turnaround" value="urgent"> Urgent — contact us first
+            <input type="radio" name="turnaround" value="urgent"> Urgent — ask us first
           </label>
         </div>
         <div class="nq-warn"><i class="ti ti-alert-triangle"></i> Complex files may take up to 3 business days. We’ll confirm the turnaround before starting.</div>
@@ -128,6 +110,19 @@ window.LVD_DESIGN_HTML = function (n) {
       '<button type="button" class="drow-del" onclick="removeDesign(this)"><i class="ti ti-trash"></i> Remove</button></div>' +
       '<div class="ff"><label>Project name (optional)</label>' +
       '<input class="d-name" data-design-name type="text" placeholder="e.g. Family name sign, tumbler engraving, or shirt design"></div>' +
+      '<div class="ff"><label>What service do you need?</label>' +
+      '<select data-design-service>' +
+        '<option value="">Select a service</option>' +
+        '<option value="SVG Cut File">SVG Cut File</option>' +
+        '<option value="Print Design (SVG/DTF)">Print Design (SVG/DTF)</option>' +
+        '<option value="Laser Engraving">Laser Engraving</option>' +
+        '<option value="Laser Cut & Engrave">Laser Cut &amp; Engrave</option>' +
+        '<option value="CNC Cut File">CNC Cut File</option>' +
+        '<option value="Vinyl Cut File">Vinyl Cut File</option>' +
+        '<option value="Plasma Cut File">Plasma Cut File</option>' +
+        '<option value="V-carve / CNC Engraving">V-carve / CNC Engraving</option>' +
+        '<option value="Not sure">Not sure</option>' +
+      '</select></div>' +
       '<div class="nq-up">' +
         '<div class="upload-area"><div class="utrg" onclick="document.getElementById(\'fu-' + n + '\').click()">' +
         '<i class="ti ti-cloud-upload"></i><p>Upload your artwork</p>' +

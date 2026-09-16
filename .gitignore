@@ -44,6 +44,12 @@ apps/api/uploads
 # client change requests (reference only, not tracked)
 /Changes
 /Edit-2 09-09.xlsx
+/Edit-03 - 14-09.xlsx
+/_xlsx_extract
+/_edit03.zip
+/_policies_extract
+/_policies.zip
+/our policies.docx
 
 # local QA runs (not production)
 /qa-*.mjs

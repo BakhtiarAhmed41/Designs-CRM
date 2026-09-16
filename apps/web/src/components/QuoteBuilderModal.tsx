@@ -16,6 +16,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { postThemeToWindow } from '@/lib/theme';
 import { invalidateWorkCaches } from '@/lib/queryCache';
+import { filesFromQuoteForm } from '@/lib/quoteFiles';
 
 type PriceLine = { name: string; note: string; price: string };
 
@@ -91,7 +92,6 @@ const SERVICES: Array<{
 declare global {
   interface Window {
     LVD_COLLECT?: () => Collected;
-    LVD_GET_FILES?: () => File[];
   }
 }
 
@@ -215,7 +215,7 @@ export function QuoteBuilderModal({
           advanced: {},
           formVersion: 1,
         } as Collected);
-      const files = win?.LVD_GET_FILES?.() ?? [];
+      const files = filesFromQuoteForm(win?.LVD_GET_FILES?.() ?? []);
 
       const payload = {
         serviceType: service.serviceType,
@@ -262,6 +262,7 @@ export function QuoteBuilderModal({
       window.setTimeout(() => onClose(), 500);
     } catch (e) {
       setError(getErrorMessage(e));
+      iframeRef.current?.contentWindow?.postMessage({ type: 'lvd-quote-submit-result', ok: false }, '*');
     } finally {
       setBusy(false);
     }

@@ -1451,7 +1451,10 @@ button { font-family: inherit; }
 .file-split .file-thumb img,.file-split .file-thumb-icon{height:64px;}
 .file-inner td .file-thumb{width:72px;}
 .pub-file-tag{display:block;padding:0 8px 6px;font-size:10px;font-style:normal;color:#c2410c;font-weight:700;}
+.pub-file-tag.is-downloaded{color:#166534;}
+.pub-file-tag.is-waiting{color:#64748b;font-weight:600;}
 .pub-file.is-preview{outline:1px dashed #c2410c;}
+.file-new{display:inline-flex;align-items:center;margin-left:6px;padding:1px 7px;border-radius:999px;background:#2563eb;color:#fff;font-size:10px;font-weight:700;letter-spacing:.04em;}
 .msg-composer{border-top:0.5px solid var(--line);padding:10px 12px;background:#fff;flex-shrink:0;}
 .msg-composer-row{display:flex;gap:8px;align-items:flex-end;}
 .msg-composer-row textarea{

@@ -345,6 +345,26 @@ export class TeamService {
     return { orderId, assignedDesignerId: null };
   }
 
+  async skipAssign(orderId: string) {
+    const order = await this.db.queryOne<{ id: string }>(
+      'SELECT id FROM orders WHERE id = ? LIMIT 1',
+      [orderId],
+    );
+    if (!order) throw new NotFoundException('Order not found');
+    try {
+      await this.db.execute(
+        'UPDATE orders SET assigned_designer_id = NULL, designer_not_needed = 1 WHERE id = ?',
+        [orderId],
+      );
+    } catch {
+      await this.db.execute(
+        'UPDATE orders SET assigned_designer_id = NULL WHERE id = ?',
+        [orderId],
+      );
+    }
+    return { orderId, assignedDesignerId: null, designerNotNeeded: true };
+  }
+
   private async staffAttachments(messageIds: string[], channel: 'DM' | 'GROUP') {
     if (messageIds.length === 0) return new Map<string, Array<{
       id: string;

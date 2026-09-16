@@ -9,7 +9,7 @@ import {
 import { startMyOrderCheckout } from '@/lib/billing';
 import { openLinkedChat } from '@/lib/messaging';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
-import { dateShort, money, quoteLifecycleChip } from '@/lib/format';
+import { dateShort, friendlyFileName, money, quoteLifecycleChip } from '@/lib/format';
 import { isAdminRecounter, isStaffCreatedOrder, latestCounter, lineTotal, studioQuotation } from '@/lib/quoteHelpers';
 import type { Order } from '@/lib/types';
 import { applyOrderChange } from '@/lib/queryCache';
@@ -17,6 +17,7 @@ import { freshOnOpen } from '@/lib/queryRefresh';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { QuoteHistory } from '@/components/QuoteHistory';
+import { FormPreferencesDisplay } from '@/components/FormPreferencesDisplay';
 
 export function PortalQuoteDetail() {
   const { id = '' } = useParams();
@@ -193,7 +194,7 @@ export function PortalQuoteDetail() {
     <div>
       <PageHeader
         title={order.name ?? 'Quote request'}
-        subtitle={`Q-${order.humanRef ?? order.id.slice(0, 6)} · ${dateShort(order.createdAt)}${isStaffCreatedOrder(order) ? ' · Created by the team' : ''}`}
+        subtitle={`${order.humanRef ?? order.id.slice(0, 6)} · ${dateShort(order.createdAt)}${isStaffCreatedOrder(order) ? ' · Created by the team' : ''}`}
         crumbs={[
           { label: 'Quotes', to: '/portal/quotes' },
           { label: order.humanRef ?? 'Quote' },
@@ -296,9 +297,9 @@ export function PortalQuoteDetail() {
 
       <div className="card card-pad">
         {lines.length === 0 && !canDecide && (
-          <div className="muted">
+          <div className="dash-waiting-copy">
             {order.status === 'WAITING_FOR_QUOTATION' || order.status === 'CREATED'
-              ? 'Your request is being priced. You’ll see line items here when a quote is ready.'
+              ? 'Your quote is being prepared. Once it’s ready, you’ll see an update on your Dashboard. Click the quote to review pricing and full details.'
               : order.status === 'REJECTED'
                 ? 'This request was declined by the team.'
                 : 'No quotation lines yet.'}
@@ -396,6 +397,37 @@ export function PortalQuoteDetail() {
           </>
         )}
       </div>
+
+      <FormPreferencesDisplay preferences={order.preferences} />
+
+      {(order.attachments ?? []).length > 0 && (
+        <div className="card" style={{ marginTop: 14 }}>
+          <div className="card-h">
+            <span className="ct">
+              <i className="ti ti-paperclip" /> Your uploaded files
+            </span>
+          </div>
+          {(order.attachments ?? []).map((a) => (
+            <div key={a.id} className="orow" style={{ cursor: 'default' }}>
+              <div className="thumb">
+                <i className="ti ti-paperclip" />
+              </div>
+              <div className="oinfo">
+                <div className="on">{friendlyFileName(a.originalName)}</div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() =>
+                  downloadSignedFile(myAttachmentUrl(order.id, a.id), a.originalName)
+                }
+              >
+                <i className="ti ti-download" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <QuoteHistory quotations={order.quotations} />
     </div>

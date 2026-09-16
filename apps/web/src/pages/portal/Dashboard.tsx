@@ -10,7 +10,8 @@ import { datesForPortalPreset, inDateRange, type PortalRangePreset } from '@/lib
 import { useAuth } from '@/context/AuthContext';
 import { freshOnOpen } from '@/lib/queryRefresh';
 import { money, quoteLifecycleChip, customerOrderChip } from '@/lib/format';
-import { serviceCategoryLabel, serviceTi } from '@/lib/serviceIcon';
+import { serviceCategoryLabel } from '@/lib/serviceIcon';
+import { unreadSections } from '@/lib/portalNew';
 import type { Order } from '@/lib/types';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -93,6 +94,16 @@ export function PortalDashboard() {
     ...freshOnOpen,
   });
   const { data: quotesData, isLoading: quotesLoading } = useQuery({
+    queryKey: ['my-quotes', 'dash-active'],
+    queryFn: () =>
+      listMyOrders({
+        type: 'QUOTE_REQUEST',
+        page: 1,
+        pageSize: 50,
+      }),
+    ...freshOnOpen,
+  });
+  const { data: quotesRangeData } = useQuery({
     queryKey: ['my-quotes', 'dash', dateFrom, dateTo],
     queryFn: () =>
       listMyOrders({
@@ -116,7 +127,7 @@ export function PortalDashboard() {
   });
   const { data: activityData, isLoading: activityLoading } = useQuery({
     queryKey: ['my-activity', activityPage],
-    queryFn: () => listNotifications({ page: activityPage, pageSize: 10 }),
+    queryFn: () => listNotifications({ page: activityPage, pageSize: 6 }),
     ...freshOnOpen,
   });
 
@@ -139,7 +150,7 @@ export function PortalDashboard() {
   const activityPages = activityData?.totalPages ?? 1;
 
   const orderCount = ordersData?.total ?? orders.length;
-  const quoteCount = quotesData?.total ?? quotes.length;
+  const quoteCount = quotesRangeData?.total ?? quotes.length;
   const statTiles = useMemo(
     () => [
       { label: 'Orders', value: String(orderCount), sub: 'Orders placed' },
@@ -159,11 +170,12 @@ export function PortalDashboard() {
     [orderCount, quoteCount, paidCents, unpaidTotal],
   );
 
-  const tabs: Array<{ id: WorkTab; label: string; count: number; to: string; viewAll: string }> = [
-    { id: 'orders', label: 'Orders', count: orders.length, to: '/portal/orders', viewAll: 'View All Orders' },
-    { id: 'quotes', label: 'Quotes', count: quotes.length, to: '/portal/quotes', viewAll: 'View All Quotes' },
+  const news = unreadSections(activities);
+  const tabs: Array<{ id: WorkTab; label: string; count: number; to: string; viewAll: string; isNew?: boolean }> = [
+    { id: 'orders', label: 'Orders', count: orders.length, to: '/portal/orders', viewAll: 'View All Orders', isNew: news.has('orders') },
+    { id: 'quotes', label: 'Quotes', count: quotes.length, to: '/portal/quotes', viewAll: 'View All Quotes', isNew: news.has('quotes') },
     { id: 'revisions', label: 'Revisions', count: revisions.length, to: '/portal/revisions', viewAll: 'View All Revisions' },
-    { id: 'invoices', label: 'Invoices', count: unpaidInvoices.length, to: '/portal/invoices', viewAll: 'View All Invoices' },
+    { id: 'invoices', label: 'Invoices', count: unpaidInvoices.length, to: '/portal/invoices', viewAll: 'View All Invoices', isNew: news.has('invoices') },
   ];
   const activeMeta = tabs.find((t) => t.id === tab);
 
@@ -180,7 +192,7 @@ export function PortalDashboard() {
 
       <section className="pulse">
         <div className="pulse-h">
-          <h3>Statistics</h3>
+          <h3>Account Overview</h3>
           <div className="pulse-tools">
             <DateRangeSelect
               preset={preset}
@@ -227,7 +239,7 @@ export function PortalDashboard() {
               onClick={() => setTab(t.id)}
             >
               {t.label}
-              <span className="dash-tab-count">{t.count}</span>
+              {t.isNew ? <span className="dash-tab-new">NEW</span> : <span className="dash-tab-count">{t.count}</span>}
             </button>
           ))}
           {activeMeta && (
@@ -252,21 +264,21 @@ export function PortalDashboard() {
               <div className="dash-table-wrap">
                 <table className="dash-table">
                   <colgroup>
-                    <col className="dash-col-icon" />
                     <col className="dash-col-project" />
                     <col className="dash-col-id" />
                     <col className="dash-col-cat" />
                     <col className="dash-col-status" />
                     <col className="dash-col-amount" />
+                    <col className="dash-col-action" />
                   </colgroup>
                   <thead>
                     <tr>
-                      <th aria-hidden="true" />
                       <th>Project</th>
                       <th>ID</th>
                       <th>Category</th>
                       <th>Status</th>
                       <th>Amount</th>
+                      <th>Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -279,11 +291,6 @@ export function PortalDashboard() {
                           onClick={() => navigate(`/portal/orders/${o.id}`)}
                         >
                           <td>
-                            <div className="othumb">
-                              <i className={`ti ${serviceTi(o.serviceType)}`} />
-                            </div>
-                          </td>
-                          <td>
                             <div className="on">{o.name ?? o.serviceType ?? 'Order'}</div>
                           </td>
                           <td className="muted">{o.humanRef ?? o.id.slice(0, 6)}</td>
@@ -292,6 +299,9 @@ export function PortalDashboard() {
                             <span className={chip.cls}>{chip.label}</span>
                           </td>
                           <td>{money(o.priceCents)}</td>
+                          <td>
+                            <span className="activity-link">View</span>
+                          </td>
                         </tr>
                       );
                     })}
@@ -320,21 +330,21 @@ export function PortalDashboard() {
               <div className="dash-table-wrap">
                 <table className="dash-table">
                   <colgroup>
-                    <col className="dash-col-icon" />
                     <col className="dash-col-project" />
                     <col className="dash-col-id" />
                     <col className="dash-col-cat" />
                     <col className="dash-col-status" />
                     <col className="dash-col-amount" />
+                    <col className="dash-col-action" />
                   </colgroup>
                   <thead>
                     <tr>
-                      <th aria-hidden="true" />
                       <th>Project</th>
                       <th>ID</th>
                       <th>Category</th>
                       <th>Status</th>
                       <th>Amount</th>
+                      <th>Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -352,11 +362,6 @@ export function PortalDashboard() {
                           onClick={() => navigate(`/portal/quotes/${o.id}`)}
                         >
                           <td>
-                            <div className="othumb">
-                              <i className={`ti ${serviceTi(o.serviceType)}`} />
-                            </div>
-                          </td>
-                          <td>
                             <div className="on">{o.name ?? 'Quote request'}</div>
                           </td>
                           <td className="muted">{o.humanRef ?? o.id.slice(0, 6)}</td>
@@ -365,6 +370,9 @@ export function PortalDashboard() {
                             <span className={chip.cls}>{chip.label}</span>
                           </td>
                           <td>{o.priceCents ? money(o.priceCents) : '—'}</td>
+                          <td>
+                            <span className="activity-link">View</span>
+                          </td>
                         </tr>
                       );
                     })}
@@ -445,7 +453,6 @@ export function PortalDashboard() {
           <div className="dash-table-wrap">
             <table className="dash-table activity-table">
               <colgroup>
-                <col className="dash-col-icon" />
                 <col className="dash-col-activity" />
                 <col className="dash-col-detail" />
                 <col className="dash-col-time" />
@@ -453,7 +460,6 @@ export function PortalDashboard() {
               </colgroup>
               <thead>
                 <tr>
-                  <th aria-hidden="true" />
                   <th>Activity</th>
                   <th>Details</th>
                   <th>Time</th>
@@ -467,11 +473,6 @@ export function PortalDashboard() {
                   const title = displayActivityTitle(n.title);
                   return (
                     <tr key={n.id} className={`click-row${unread ? ' is-unread' : ''}`}>
-                      <td>
-                        <div className="activity-icon">
-                          <i className={`ti ${n.title.toLowerCase().includes('message') ? 'ti-message' : 'ti-bell'}`} />
-                        </div>
-                      </td>
                       <td>
                         <div className="activity-title">
                           <span className="on">{title}</span>
