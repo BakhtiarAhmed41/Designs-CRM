@@ -46,11 +46,8 @@ const PortalRevisions = lazy(() =>
 const PortalSettings = lazy(() =>
   import('@/pages/portal/Settings').then((m) => ({ default: m.PortalSettings })),
 );
-const PortalCompletePolicy = lazy(() =>
-  import('@/pages/portal/Policies').then((m) => ({ default: m.PortalCompletePolicy })),
-);
-const PortalPolicySummary = lazy(() =>
-  import('@/pages/portal/Policies').then((m) => ({ default: m.PortalPolicySummary })),
+const PortalPolicies = lazy(() =>
+  import('@/pages/portal/Policies').then((m) => ({ default: m.PortalPolicies })),
 );
 
 const AdminDashboard = lazy(() =>
@@ -163,11 +160,11 @@ export function App() {
           <Route path="messages" element={<PortalMessages />} />
           <Route path="profile" element={<PortalProfile />} />
           <Route path="settings" element={<PortalSettings />} />
-          <Route path="policies" element={<Navigate to="/portal/policies/summary" replace />} />
-          <Route path="policies/summary" element={<PortalPolicySummary />} />
+          <Route path="policies" element={<PortalPolicies />} />
+          <Route path="policies/summary" element={<Navigate to="/portal/policies" replace />} />
           <Route
             path="policies/refund-store-credit-revision"
-            element={<PortalCompletePolicy />}
+            element={<Navigate to="/portal/policies" replace />}
           />
         </Route>
 

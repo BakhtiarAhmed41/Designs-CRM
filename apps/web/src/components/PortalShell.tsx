@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Brand, LogoutLink, Shell, useShellUser } from './Shell';
@@ -20,15 +20,7 @@ type NavEntry = {
   badge?: ReactNode;
 };
 
-function NavGroup({
-  label,
-  items,
-  extra,
-}: {
-  label: string;
-  items: NavEntry[];
-  extra?: ReactNode;
-}) {
+function NavGroup({ label, items }: { label: string; items: NavEntry[] }) {
   return (
     <>
       <p className="nav-label">{label}</p>
@@ -43,50 +35,8 @@ function NavGroup({
             <i className={`ti ${item.icon}`} /> {item.label} {item.badge}
           </NavLink>
         ))}
-        {extra}
       </nav>
     </>
-  );
-}
-
-function PoliciesMenu() {
-  const { pathname } = useLocation();
-  const onPolicies = pathname.startsWith('/portal/policies');
-  const [open, setOpen] = useState(onPolicies);
-
-  useEffect(() => {
-    if (onPolicies) setOpen(true);
-  }, [onPolicies]);
-
-  return (
-    <div className={`nav-drop${open ? ' open' : ''}`}>
-      <button
-        type="button"
-        className={`nav-drop-btn${onPolicies ? ' on' : ''}`}
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-      >
-        <i className="ti ti-notes" />
-        <span>Policies</span>
-        <i className={`ti ti-chevron-down nav-drop-caret${open ? ' up' : ''}`} aria-hidden />
-      </button>
-      {open && (
-        <div className="nav-drop-menu" aria-label="Policy pages">
-          <NavLink
-            to="/portal/policies/refund-store-credit-revision"
-            className={({ isActive }) => (isActive ? 'on' : undefined)}
-          >
-            Refund, credit &amp; revisions
-          </NavLink>
-          <NavLink
-            to="/portal/policies/summary"
-            className={({ isActive }) => (isActive ? 'on' : undefined)}
-          >
-            Policy summary
-          </NavLink>
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -197,6 +147,7 @@ export function PortalShell() {
   const account: NavEntry[] = [
     { to: '/portal/profile', label: 'Profile', icon: 'ti-user' },
     { to: '/portal/settings', label: 'Settings', icon: 'ti-settings' },
+    { to: '/portal/policies', label: 'Policies', icon: 'ti-notes' },
   ];
   const sidebar = (
     <aside className="side portal-side">
@@ -216,7 +167,7 @@ export function PortalShell() {
           <i className="ti ti-router" /> Cutting &amp; Engraving Files
         </NavLink>
       </nav>
-      <NavGroup label="Account" items={account} extra={<PoliciesMenu />} />
+      <NavGroup label="Account" items={account} />
       <div className="foot">
         <LogoutLink onClick={() => void onLogout()} />
       </div>

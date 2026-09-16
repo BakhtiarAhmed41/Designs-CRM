@@ -1,51 +1,4 @@
-import type { ReactNode } from 'react';
-import { Link, NavLink } from 'react-router-dom';
-
-const COMPLETE_POLICY_PATH = '/portal/policies/refund-store-credit-revision';
-
 const COMPLETE_POLICY_URL = 'https://lasvegasdesignsusa.com/refund-policy/';
-
-const SUMMARY: Array<{ title: string; intro?: string; items?: string[]; text?: string }> = [
-  {
-    title: 'Refund eligibility',
-    intro: 'You may cancel for a full refund before work starts.',
-    items: [
-      'Once work starts or digital files are delivered, refunds are limited.',
-      'If a confirmed issue from our side cannot be corrected, we will provide an appropriate refund.',
-    ],
-  },
-  {
-    title: 'Store credit and compensation',
-    intro: 'Some cases may be resolved with credit instead of a refund.',
-    items: [
-      'Credit can be carried forward to your next order.',
-      'We may also offer a future-order discount or complimentary adjustment.',
-    ],
-  },
-  {
-    title: 'Free revisions',
-    intro: 'Minor changes within the original request are usually free.',
-    items: [
-      'Simple color and thread-color changes.',
-      'Additional available file formats for the same design.',
-      'Size adjustments up to approximately 20 percent, where technically possible.',
-      'Major redesigns or artwork changes may cost extra.',
-    ],
-  },
-  {
-    title: 'Machine and production issues',
-    intro: 'Digital-file results also depend on your machine, materials, and settings.',
-    items: [
-      'Machine settings, tension, fabric, stabilizer, and hooping are outside our control.',
-      'If a problem continues, we may request photographs, videos, or a sample stitch-out.',
-      'If testing confirms our file caused the issue, we will correct it or provide an appropriate refund.',
-    ],
-  },
-  {
-    title: 'Before opening a dispute',
-    text: 'Please message us with your order number and details. Most concerns can be resolved through troubleshooting, revisions, store credit, or another agreed solution.',
-  },
-];
 
 type Block =
   | { type: 'p'; text: string }
@@ -341,53 +294,7 @@ const FULL_POLICY: Array<{ title: string; blocks: Block[] }> = [
   },
 ];
 
-type PolicySection = {
-  n: string;
-  title: string;
-  blocks: Block[];
-};
-
-function PolicyBlocks({ blocks }: { blocks: Block[] }) {
-  return (
-    <>
-      {blocks.map((block, i) => {
-        if (block.type === 'ul') {
-          return (
-            <ul key={`ul-${i}`} className="policy-list">
-              {block.items.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
-          );
-        }
-        if (block.type === 'lead') {
-          return (
-            <p key={`lead-${i}`} className="policy-lead">
-              {block.text}
-            </p>
-          );
-        }
-        return <p key={`p-${i}`}>{block.text}</p>;
-      })}
-    </>
-  );
-}
-
-function PolicyPage({
-  title,
-  subtitle,
-  intro,
-  sections,
-  showToc,
-  actions,
-}: {
-  title: string;
-  subtitle: string;
-  intro?: string;
-  sections: PolicySection[];
-  showToc?: boolean;
-  actions?: ReactNode;
-}) {
+export function PortalPolicies() {
   return (
     <div className="policy-page">
       <header className="policy-hero">
@@ -395,132 +302,90 @@ function PolicyPage({
           <i className="ti ti-scale" />
         </div>
         <div className="policy-hero-copy">
-          <p className="policy-kicker">Las Vegas Designs USA · Our Policies</p>
-          <h1>{title}</h1>
-          <p className="policy-sub">{subtitle}</p>
+          <p className="policy-kicker">Las Vegas Designs USA · Policies</p>
+          <h1>Refund Store Credit and Revision Policy</h1>
+          <p className="policy-sub">
+            When refunds, store credit, revisions, and extra charges may apply.
+          </p>
         </div>
       </header>
 
-      <nav className="policy-switch" aria-label="Policy pages">
-        <NavLink
-          to="/portal/policies/summary"
-          className={({ isActive }) => (isActive ? 'on' : undefined)}
-        >
-          Policy summary
-        </NavLink>
-        <NavLink
-          to={COMPLETE_POLICY_PATH}
-          className={({ isActive }) => (isActive ? 'on' : undefined)}
-        >
-          Complete policy
-        </NavLink>
-      </nav>
+      <div className="policy-intro">
+        <i className="ti ti-info-circle" aria-hidden />
+        <p>
+          This policy explains when refunds, store credit, revisions, file testing, and additional
+          charges may apply to custom digital services. Our first priority is to correct any
+          confirmed file issue and deliver a usable result.
+        </p>
+      </div>
 
-      {intro && (
-        <div className="policy-intro">
-          <i className="ti ti-info-circle" aria-hidden />
-          <p>{intro}</p>
-        </div>
-      )}
-
-      {showToc && (
-        <nav className="policy-toc" aria-label="On this page">
-          <p className="policy-toc-label">On this page</p>
-          <ol>
-            {sections.map((section) => (
-              <li key={section.n}>
-                <a href={`#policy-${section.n}`}>
-                  <span>{section.n}</span>
-                  {section.title}
+      <nav className="policy-toc" aria-label="On this page">
+        <p className="policy-toc-label">On this page</p>
+        <ol>
+          {FULL_POLICY.map((section) => {
+            const match = section.title.match(/^(\d+)\s+(.+)$/);
+            const n = (match?.[1] ?? '').padStart(2, '0');
+            const title = match?.[2] ?? section.title;
+            return (
+              <li key={n}>
+                <a href={`#policy-${n}`}>
+                  <span>{n}</span>
+                  {title}
                 </a>
               </li>
-            ))}
-          </ol>
-        </nav>
-      )}
+            );
+          })}
+        </ol>
+      </nav>
 
       <article className="policy-doc">
-        {sections.map((section) => (
-          <section key={section.n} id={`policy-${section.n}`} className="policy-section">
-            <div className="policy-section-head">
-              <span className="policy-num">{section.n}</span>
-              <h2>{section.title}</h2>
-            </div>
-            <div className="policy-section-body">
-              <PolicyBlocks blocks={section.blocks} />
-            </div>
-          </section>
-        ))}
+        {FULL_POLICY.map((section) => {
+          const match = section.title.match(/^(\d+)\s+(.+)$/);
+          const n = (match?.[1] ?? '').padStart(2, '0');
+          const title = match?.[2] ?? section.title;
+          return (
+            <section key={n} id={`policy-${n}`} className="policy-section">
+              <div className="policy-section-head">
+                <span className="policy-num">{n}</span>
+                <h2>{title}</h2>
+              </div>
+              <div className="policy-section-body">
+                {section.blocks.map((block, i) => {
+                  if (block.type === 'ul') {
+                    return (
+                      <ul key={`${n}-ul-${i}`} className="policy-list">
+                        {block.items.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    );
+                  }
+                  if (block.type === 'lead') {
+                    return (
+                      <p key={`${n}-lead-${i}`} className="policy-lead">
+                        {block.text}
+                      </p>
+                    );
+                  }
+                  return <p key={`${n}-p-${i}`}>{block.text}</p>;
+                })}
+              </div>
+            </section>
+          );
+        })}
       </article>
 
-      {actions && <div className="policy-actions">{actions}</div>}
+      <div className="policy-actions">
+        <a
+          className="btn btn-ghost"
+          href={COMPLETE_POLICY_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Read on our website
+          <i className="ti ti-external-link" aria-hidden />
+        </a>
+      </div>
     </div>
-  );
-}
-
-function WebsitePolicyLink() {
-  return (
-    <a className="btn btn-ghost" href={COMPLETE_POLICY_URL} target="_blank" rel="noopener noreferrer">
-      Read on our website
-      <i className="ti ti-external-link" aria-hidden />
-    </a>
-  );
-}
-
-export function PortalCompletePolicy() {
-  const sections: PolicySection[] = FULL_POLICY.map((section) => {
-    const match = section.title.match(/^(\d+)\s+(.+)$/);
-    return {
-      n: (match?.[1] ?? '').padStart(2, '0'),
-      title: match?.[2] ?? section.title,
-      blocks: section.blocks,
-    };
-  });
-
-  return (
-    <PolicyPage
-      title="Refund Store Credit and Revision Policy"
-      subtitle="When refunds, store credit, revisions, and extra charges may apply."
-      intro="This policy explains when refunds, store credit, revisions, file testing, and additional charges may apply to custom digital services. Our first priority is to correct any confirmed file issue and deliver a usable result."
-      sections={sections}
-      showToc
-      actions={
-        <>
-          <Link className="btn btn-primary" to="/portal/policies/summary">
-            View policy summary
-          </Link>
-          <WebsitePolicyLink />
-        </>
-      }
-    />
-  );
-}
-
-export function PortalPolicySummary() {
-  const sections: PolicySection[] = SUMMARY.map((section, i) => ({
-    n: String(i + 1).padStart(2, '0'),
-    title: section.title,
-    blocks: [
-      ...(section.intro ? [{ type: 'p' as const, text: section.intro }] : []),
-      ...(section.items ? [{ type: 'ul' as const, items: section.items }] : []),
-      ...(section.text ? [{ type: 'p' as const, text: section.text }] : []),
-    ],
-  }));
-
-  return (
-    <PolicyPage
-      title="Customer Portal Policy Summary"
-      subtitle="A short overview of refunds, store credit, and revisions."
-      intro="Use this short version for a quick read. Open the complete policy for full details, or message us with your order number if you need help."
-      sections={sections}
-      actions={
-        <>
-          <Link className="btn btn-primary" to={COMPLETE_POLICY_PATH}>
-            Read complete policy
-          </Link>
-          <WebsitePolicyLink />
-        </>
-      }
-    />
   );
 }
