@@ -2782,10 +2782,20 @@ button.primary:hover:not(:disabled),
 .policy-actions {
   display: flex;
   flex-wrap: wrap;
+  align-self: flex-start;
+  width: fit-content;
+  gap: 8px;
+}
+.policy-actions .btn {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
   gap: 8px;
 }
 .policy-actions .btn i {
-  margin-left: 6px;
+  color: #fff;
+  font-size: 16px;
+  line-height: 1;
 }
 @media (max-width: 900px) {
   .policy-layout {

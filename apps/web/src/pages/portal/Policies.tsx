@@ -479,7 +479,7 @@ export function PortalPolicies() {
           rel="noopener noreferrer"
         >
           Read complete policy on our website
-          <i className="ti ti-external-link" aria-hidden />
+          <i className="ti ti-arrow-right" aria-hidden />
         </a>
       </div>
     </div>
