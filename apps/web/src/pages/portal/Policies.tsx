@@ -1,5 +1,5 @@
-import { Link } from 'react-router-dom';
-import { PageHeader } from '@/components/ui/PageHeader';
+import type { ReactNode } from 'react';
+import { Link, NavLink } from 'react-router-dom';
 
 const COMPLETE_POLICY_PATH = '/portal/policies/refund-store-credit-revision';
 
@@ -341,84 +341,186 @@ const FULL_POLICY: Array<{ title: string; blocks: Block[] }> = [
   },
 ];
 
-function PolicyList({ items }: { items: string[] }) {
+type PolicySection = {
+  n: string;
+  title: string;
+  blocks: Block[];
+};
+
+function PolicyBlocks({ blocks }: { blocks: Block[] }) {
   return (
-    <ul style={{ margin: '0 0 12px 18px', padding: 0 }}>
-      {items.map((item) => (
-        <li key={item} style={{ marginBottom: 8 }}>
-          {item}
-        </li>
-      ))}
-    </ul>
+    <>
+      {blocks.map((block, i) => {
+        if (block.type === 'ul') {
+          return (
+            <ul key={`ul-${i}`} className="policy-list">
+              {block.items.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          );
+        }
+        if (block.type === 'lead') {
+          return (
+            <p key={`lead-${i}`} className="policy-lead">
+              {block.text}
+            </p>
+          );
+        }
+        return <p key={`p-${i}`}>{block.text}</p>;
+      })}
+    </>
+  );
+}
+
+function PolicyPage({
+  title,
+  subtitle,
+  intro,
+  sections,
+  showToc,
+  actions,
+}: {
+  title: string;
+  subtitle: string;
+  intro?: string;
+  sections: PolicySection[];
+  showToc?: boolean;
+  actions?: ReactNode;
+}) {
+  return (
+    <div className="policy-page">
+      <header className="policy-hero">
+        <div className="policy-hero-icon" aria-hidden>
+          <i className="ti ti-scale" />
+        </div>
+        <div className="policy-hero-copy">
+          <p className="policy-kicker">Las Vegas Designs USA · Our Policies</p>
+          <h1>{title}</h1>
+          <p className="policy-sub">{subtitle}</p>
+        </div>
+      </header>
+
+      <nav className="policy-switch" aria-label="Policy pages">
+        <NavLink
+          to="/portal/policies/summary"
+          className={({ isActive }) => (isActive ? 'on' : undefined)}
+        >
+          Policy summary
+        </NavLink>
+        <NavLink
+          to={COMPLETE_POLICY_PATH}
+          className={({ isActive }) => (isActive ? 'on' : undefined)}
+        >
+          Complete policy
+        </NavLink>
+      </nav>
+
+      {intro && (
+        <div className="policy-intro">
+          <i className="ti ti-info-circle" aria-hidden />
+          <p>{intro}</p>
+        </div>
+      )}
+
+      {showToc && (
+        <nav className="policy-toc" aria-label="On this page">
+          <p className="policy-toc-label">On this page</p>
+          <ol>
+            {sections.map((section) => (
+              <li key={section.n}>
+                <a href={`#policy-${section.n}`}>
+                  <span>{section.n}</span>
+                  {section.title}
+                </a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+      )}
+
+      <article className="policy-doc">
+        {sections.map((section) => (
+          <section key={section.n} id={`policy-${section.n}`} className="policy-section">
+            <div className="policy-section-head">
+              <span className="policy-num">{section.n}</span>
+              <h2>{section.title}</h2>
+            </div>
+            <div className="policy-section-body">
+              <PolicyBlocks blocks={section.blocks} />
+            </div>
+          </section>
+        ))}
+      </article>
+
+      {actions && <div className="policy-actions">{actions}</div>}
+    </div>
+  );
+}
+
+function WebsitePolicyLink() {
+  return (
+    <a className="btn btn-ghost" href={COMPLETE_POLICY_URL} target="_blank" rel="noopener noreferrer">
+      Read on our website
+      <i className="ti ti-external-link" aria-hidden />
+    </a>
   );
 }
 
 export function PortalCompletePolicy() {
+  const sections: PolicySection[] = FULL_POLICY.map((section) => {
+    const match = section.title.match(/^(\d+)\s+(.+)$/);
+    return {
+      n: (match?.[1] ?? '').padStart(2, '0'),
+      title: match?.[2] ?? section.title,
+      blocks: section.blocks,
+    };
+  });
+
   return (
-    <div>
-      <PageHeader
-        title="Refund Store Credit and Revision Policy"
-        subtitle="Las Vegas Designs USA"
-      />
-
-      <div className="card card-pad">
-        <p>
-          This policy explains when refunds, store credit, revisions, file testing, and additional
-          charges may apply to custom digital services. Our first priority is to correct any
-          confirmed file issue and deliver a usable result.
-        </p>
-
-        {FULL_POLICY.map((section) => (
-          <section key={section.title}>
-            <h2 style={{ marginBottom: 10 }}>{section.title}</h2>
-            {section.blocks.map((block, i) => {
-              if (block.type === 'ul') return <PolicyList key={`${section.title}-ul-${i}`} items={block.items} />;
-              if (block.type === 'lead') {
-                return (
-                  <p key={`${section.title}-lead-${i}`} style={{ fontWeight: 600, marginBottom: 8 }}>
-                    {block.text}
-                  </p>
-                );
-              }
-              return <p key={`${section.title}-p-${i}`}>{block.text}</p>;
-            })}
-          </section>
-        ))}
-      </div>
-    </div>
+    <PolicyPage
+      title="Refund Store Credit and Revision Policy"
+      subtitle="When refunds, store credit, revisions, and extra charges may apply."
+      intro="This policy explains when refunds, store credit, revisions, file testing, and additional charges may apply to custom digital services. Our first priority is to correct any confirmed file issue and deliver a usable result."
+      sections={sections}
+      showToc
+      actions={
+        <>
+          <Link className="btn btn-primary" to="/portal/policies/summary">
+            View policy summary
+          </Link>
+          <WebsitePolicyLink />
+        </>
+      }
+    />
   );
 }
 
 export function PortalPolicySummary() {
+  const sections: PolicySection[] = SUMMARY.map((section, i) => ({
+    n: String(i + 1).padStart(2, '0'),
+    title: section.title,
+    blocks: [
+      ...(section.intro ? [{ type: 'p' as const, text: section.intro }] : []),
+      ...(section.items ? [{ type: 'ul' as const, items: section.items }] : []),
+      ...(section.text ? [{ type: 'p' as const, text: section.text }] : []),
+    ],
+  }));
+
   return (
-    <div>
-      <PageHeader
-        title="Customer Portal Policy Summary"
-        subtitle="A short overview of refunds, store credit, and revisions."
-      />
-
-      {SUMMARY.map((section) => (
-        <div key={section.title} className="card card-pad" style={{ marginBottom: 16 }}>
-          <h2 style={{ marginTop: 0 }}>{section.title}</h2>
-          {section.intro && <p>{section.intro}</p>}
-          {section.items && <PolicyList items={section.items} />}
-          {section.text && <p style={{ marginBottom: 0 }}>{section.text}</p>}
-        </div>
-      ))}
-
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        <Link className="btn btn-primary" to={COMPLETE_POLICY_PATH}>
-          Read complete policy
-        </Link>
-        <a
-          className="btn btn-ghost"
-          href={COMPLETE_POLICY_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Read complete policy on our website
-        </a>
-      </div>
-    </div>
+    <PolicyPage
+      title="Customer Portal Policy Summary"
+      subtitle="A short overview of refunds, store credit, and revisions."
+      intro="Use this short version for a quick read. Open the complete policy for full details, or message us with your order number if you need help."
+      sections={sections}
+      actions={
+        <>
+          <Link className="btn btn-primary" to={COMPLETE_POLICY_PATH}>
+            Read complete policy
+          </Link>
+          <WebsitePolicyLink />
+        </>
+      }
+    />
   );
 }
