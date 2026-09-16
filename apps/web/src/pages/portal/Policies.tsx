@@ -294,6 +294,88 @@ const FULL_POLICY: Array<{ title: string; blocks: Block[] }> = [
   },
 ];
 
+const SUMMARY: Array<{ title: string; intro?: string; items?: string[]; text?: string }> = [
+  {
+    title: 'Refund eligibility',
+    intro: 'You may cancel for a full refund before work starts.',
+    items: [
+      'Once work starts or digital files are delivered, refunds are limited.',
+      'If a confirmed issue from our side cannot be corrected, we will provide an appropriate refund.',
+    ],
+  },
+  {
+    title: 'Store credit and compensation',
+    intro: 'Some cases may be resolved with credit instead of a refund.',
+    items: [
+      'Credit can be carried forward to your next order.',
+      'We may also offer a future-order discount or complimentary adjustment.',
+    ],
+  },
+  {
+    title: 'Free revisions',
+    intro: 'Minor changes within the original request are usually free.',
+    items: [
+      'Simple color and thread-color changes.',
+      'Additional available file formats for the same design.',
+      'Size adjustments up to approximately 20 percent, where technically possible.',
+      'Major redesigns or artwork changes may cost extra.',
+    ],
+  },
+  {
+    title: 'Machine and production issues',
+    intro: 'Digital-file results also depend on your machine, materials, and settings.',
+    items: [
+      'Machine settings, tension, fabric, stabilizer, and hooping are outside our control.',
+      'If a problem continues, we may request photographs, videos, or a sample stitch-out.',
+      'If testing confirms our file caused the issue, we will correct it or provide an appropriate refund.',
+    ],
+  },
+  {
+    title: 'Before opening a dispute',
+    text: 'Please message us with your order number and details. Most concerns can be resolved through troubleshooting, revisions, store credit, or another agreed solution.',
+  },
+];
+
+function splitTitle(title: string) {
+  const match = title.match(/^(\d+)\s+(.+)$/);
+  return {
+    n: (match?.[1] ?? '').padStart(2, '0'),
+    heading: match?.[2] ?? title,
+  };
+}
+
+function PolicyBlocks({
+  id,
+  blocks,
+}: {
+  id: string;
+  blocks: Block[];
+}) {
+  return (
+    <>
+      {blocks.map((block, i) => {
+        if (block.type === 'ul') {
+          return (
+            <ul key={`${id}-ul-${i}`} className="policy-list">
+              {block.items.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          );
+        }
+        if (block.type === 'lead') {
+          return (
+            <p key={`${id}-lead-${i}`} className="policy-lead">
+              {block.text}
+            </p>
+          );
+        }
+        return <p key={`${id}-p-${i}`}>{block.text}</p>;
+      })}
+    </>
+  );
+}
+
 export function PortalPolicies() {
   return (
     <div className="policy-page">
@@ -305,70 +387,82 @@ export function PortalPolicies() {
           <p className="policy-kicker">Las Vegas Designs USA · Policies</p>
           <h1>Refund Store Credit and Revision Policy</h1>
           <p className="policy-sub">
-            When refunds, store credit, revisions, and extra charges may apply.
+            This policy explains when refunds, store credit, revisions, file testing, and additional
+            charges may apply to custom digital services. Our first priority is to correct any
+            confirmed file issue and deliver a usable result.
           </p>
         </div>
       </header>
-
-      <div className="policy-intro">
-        <i className="ti ti-info-circle" aria-hidden />
-        <p>
-          This policy explains when refunds, store credit, revisions, file testing, and additional
-          charges may apply to custom digital services. Our first priority is to correct any
-          confirmed file issue and deliver a usable result.
-        </p>
-      </div>
 
       <nav className="policy-toc" aria-label="On this page">
         <p className="policy-toc-label">On this page</p>
         <ol>
           {FULL_POLICY.map((section) => {
-            const match = section.title.match(/^(\d+)\s+(.+)$/);
-            const n = (match?.[1] ?? '').padStart(2, '0');
-            const title = match?.[2] ?? section.title;
+            const { n, heading } = splitTitle(section.title);
             return (
               <li key={n}>
                 <a href={`#policy-${n}`}>
                   <span>{n}</span>
-                  {title}
+                  {heading}
                 </a>
               </li>
             );
           })}
+          <li>
+            <a href="#policy-summary">
+              <span>S</span>
+              Customer Portal Policy Summary
+            </a>
+          </li>
         </ol>
       </nav>
 
       <article className="policy-doc">
         {FULL_POLICY.map((section) => {
-          const match = section.title.match(/^(\d+)\s+(.+)$/);
-          const n = (match?.[1] ?? '').padStart(2, '0');
-          const title = match?.[2] ?? section.title;
+          const { n, heading } = splitTitle(section.title);
           return (
             <section key={n} id={`policy-${n}`} className="policy-section">
               <div className="policy-section-head">
                 <span className="policy-num">{n}</span>
-                <h2>{title}</h2>
+                <h2>{heading}</h2>
               </div>
               <div className="policy-section-body">
-                {section.blocks.map((block, i) => {
-                  if (block.type === 'ul') {
-                    return (
-                      <ul key={`${n}-ul-${i}`} className="policy-list">
-                        {block.items.map((item) => (
-                          <li key={item}>{item}</li>
-                        ))}
-                      </ul>
-                    );
-                  }
-                  if (block.type === 'lead') {
-                    return (
-                      <p key={`${n}-lead-${i}`} className="policy-lead">
-                        {block.text}
-                      </p>
-                    );
-                  }
-                  return <p key={`${n}-p-${i}`}>{block.text}</p>;
-                })}
+                <PolicyBlocks id={n} blocks={section.blocks} />
+              </div>
+            </section>
+          );
+        })}
+      </article>
+
+      <header className="policy-hero policy-hero-next" id="policy-summary">
+        <div className="policy-hero-icon" aria-hidden>
+          <i className="ti ti-notes" />
+        </div>
+        <div className="policy-hero-copy">
+          <p className="policy-kicker">Customer portal</p>
+          <h1>Customer Portal Policy Summary</h1>
+          <p className="policy-sub">
+            A shorter version of the same policy for a quick read in the customer portal.
+          </p>
+        </div>
+      </header>
+
+      <article className="policy-doc">
+        {SUMMARY.map((section, i) => {
+          const n = String(i + 1).padStart(2, '0');
+          const blocks: Block[] = [
+            ...(section.intro ? [{ type: 'p' as const, text: section.intro }] : []),
+            ...(section.items ? [{ type: 'ul' as const, items: section.items }] : []),
+            ...(section.text ? [{ type: 'p' as const, text: section.text }] : []),
+          ];
+          return (
+            <section key={section.title} id={`summary-${n}`} className="policy-section">
+              <div className="policy-section-head">
+                <span className="policy-num">{n}</span>
+                <h2>{section.title}</h2>
+              </div>
+              <div className="policy-section-body">
+                <PolicyBlocks id={`s${n}`} blocks={blocks} />
               </div>
             </section>
           );
@@ -377,12 +471,12 @@ export function PortalPolicies() {
 
       <div className="policy-actions">
         <a
-          className="btn btn-ghost"
+          className="btn btn-primary"
           href={COMPLETE_POLICY_URL}
           target="_blank"
           rel="noopener noreferrer"
         >
-          Read on our website
+          Read complete policy on our website
           <i className="ti ti-external-link" aria-hidden />
         </a>
       </div>
