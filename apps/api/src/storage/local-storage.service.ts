@@ -26,25 +26,28 @@ function signSecret(): string {
  */
 @Injectable()
 export class LocalStorageService {
-  private baseDir(): string {
+  private candidateDirs(): string[] {
     const configured = getEnv().UPLOAD_DIR;
     if (configured.startsWith('/') || /^[A-Za-z]:[\\/]/.test(configured)) {
-      return resolve(configured);
+      return [resolve(configured)];
     }
-    const candidates = [
+    return [
       resolve(process.cwd(), configured),
       resolve(process.cwd(), 'apps', 'api', configured),
       // Compiled: dist/storage → apps/api/uploads
       resolve(__dirname, '..', '..', configured),
     ];
+  }
+
+  private baseDir(): string {
+    const candidates = this.candidateDirs();
     for (const candidate of candidates) {
       if (existsSync(candidate)) return candidate;
     }
     return candidates[candidates.length - 1];
   }
 
-  private absPath(key: string): string {
-    const base = this.baseDir();
+  private absPath(key: string, base = this.baseDir()): string {
     const full = normalize(join(base, key));
     if (full !== base && !full.startsWith(base + sep)) {
       throw new InternalServerErrorException('Invalid storage key');
@@ -109,11 +112,17 @@ export class LocalStorageService {
   }
 
   resolveExisting(key: string): string {
-    const full = this.absPath(key);
-    if (!existsSync(full)) {
-      throw new InternalServerErrorException('File not found on disk');
+    const dirs = this.candidateDirs();
+    for (const base of dirs) {
+      if (!existsSync(base)) continue;
+      try {
+        const full = this.absPath(key, base);
+        if (existsSync(full)) return full;
+      } catch {
+        /* skip invalid key for this base */
+      }
     }
-    return full;
+    throw new InternalServerErrorException('File not found on disk');
   }
 
   createStream(key: string) {

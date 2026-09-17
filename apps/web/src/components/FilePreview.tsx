@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { apiFetch, downloadSignedFile, resolveFileUrl } from '@/lib/api';
+import { downloadSignedFile, resolveFileUrl } from '@/lib/api';
 import { isImageFile } from '@/lib/format';
-import { myDeliveryFilePreviewUrl } from '@/lib/orders';
 
 export function ImageLightbox({
   src,
@@ -32,15 +30,21 @@ export function FileThumb({
   src?: string | null;
   onOpen?: () => void;
 }) {
+  const [broken, setBroken] = useState(false);
+  useEffect(() => {
+    setBroken(false);
+  }, [src]);
+  const showImg = Boolean(src) && !broken;
+
   return (
     <button
       type="button"
-      className={`file-thumb${src ? '' : ' is-fallback'}`}
+      className={`file-thumb${showImg ? '' : ' is-fallback'}`}
       onClick={onOpen}
       disabled={!onOpen}
     >
-      {src ? (
-        <img src={src} alt={name} />
+      {showImg ? (
+        <img src={src!} alt={name} onError={() => setBroken(true)} />
       ) : (
         <div className="file-thumb-icon" aria-hidden>
           <i className="ti ti-photo" />
@@ -51,9 +55,11 @@ export function FileThumb({
   );
 }
 
+function previewSrc(previewUrl?: string | null) {
+  return previewUrl ? resolveFileUrl(previewUrl) : null;
+}
+
 export function DeliveryPreview({
-  orderId,
-  fileId,
   name,
   mimeType,
   previewUrl,
@@ -68,18 +74,7 @@ export function DeliveryPreview({
 }) {
   const [open, setOpen] = useState(false);
   const show = isImageFile(name, mimeType);
-  const q = useQuery({
-    queryKey: ['delivery-preview', orderId, fileId],
-    queryFn: async () => {
-      const { url } = await apiFetch<{ url: string }>(
-        myDeliveryFilePreviewUrl(orderId, fileId),
-      );
-      return url;
-    },
-    enabled: show && !previewUrl,
-    staleTime: 60_000,
-  });
-  const src = previewUrl || q.data ? resolveFileUrl(previewUrl || q.data || '') : null;
+  const src = show ? previewSrc(previewUrl) : null;
 
   if (compact) {
     return src ? <img className="thumb-img" src={src} alt="" /> : <i className="ti ti-photo" aria-hidden />;
@@ -118,24 +113,16 @@ export function AttachmentPreview({
   compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [broken, setBroken] = useState(false);
   const show = isImageFile(name, mimeType);
-  const q = useQuery({
-    queryKey: ['attachment-preview', signedUrlPath],
-    queryFn: async () => {
-      const { url } = await apiFetch<{ url: string }>(`${signedUrlPath}?inline=1`);
-      return url;
-    },
-    enabled: show && !previewUrl,
-    staleTime: 60_000,
-  });
-  const src = previewUrl || q.data ? resolveFileUrl(previewUrl || q.data || '') : null;
+  const src = show && !broken ? previewSrc(previewUrl) : null;
 
   if (compact) {
     if (src) {
       return (
         <>
           <button type="button" className="pref-ref-img" onClick={() => setOpen(true)} title={name}>
-            <img src={src} alt={name} />
+            <img src={src} alt={name} onError={() => setBroken(true)} />
           </button>
           {open && <ImageLightbox src={src} name={name} onClose={() => setOpen(false)} />}
         </>

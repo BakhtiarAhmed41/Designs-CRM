@@ -269,7 +269,7 @@ export class OrdersService {
   }
 
   private async attachmentsFor(orderIds: string[]) {
-    const map = new Map<string, ReturnType<OrdersService['mapAttachment']>[]>();
+    const map = new Map<string, Awaited<ReturnType<OrdersService['mapAttachment']>>[]>();
     if (orderIds.length === 0) return map;
     const rows = await this.db.query<{
       id: string;
@@ -765,6 +765,7 @@ export class OrdersService {
         createdAt: Date;
         downloadedAt: Date | null;
         downloadCount: number;
+        previewUrl: string | null;
       }>
     >();
     const deliveryIds = deliveries.map((d) => d.id);

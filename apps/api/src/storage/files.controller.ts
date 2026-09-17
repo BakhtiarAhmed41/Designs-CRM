@@ -39,16 +39,26 @@ export class FilesController {
     if (!key || !exp || !sig) throw new BadRequestException('Missing token');
     const expNum = Number(exp);
     const inline = inlineFlag === '1';
-    if (!this.storage.verify(key, expNum, sig, inline)) {
+    const verifyOk = this.storage.verify(key, expNum, sig, inline);
+    if (!verifyOk) {
       throw new BadRequestException('Invalid or expired link');
     }
     const filename = name || key.split('/').pop() || 'download';
     const safeName = filename.replace(/"/g, '');
+    let fileExists = true;
+    try {
+      this.storage.resolveExisting(key);
+    } catch {
+      fileExists = false;
+    }
+    const type = guessContentType(safeName) || guessContentType(key);
+    if (!fileExists) {
+      throw new BadRequestException('File not found');
+    }
     res.setHeader(
       'Content-Disposition',
       `${inline ? 'inline' : 'attachment'}; filename="${safeName}"`,
     );
-    const type = guessContentType(safeName) || guessContentType(key);
     if (type) res.setHeader('Content-Type', type);
     const stream = this.storage.createStream(key);
     stream.on('error', () => {

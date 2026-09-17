@@ -134,9 +134,7 @@ export function FormPreferencesDisplay({
 
       {hasDesigns && (
         <div className="pref-block pref-designs">
-          {(() => {
-            const leftoverAttachments = [...(attachments ?? [])];
-            return p.designs!.map((d, i) => {
+          {p.designs!.map((d, i) => {
             const extras =
               d.sizes
                 ?.map((s) =>
