@@ -3,41 +3,89 @@ import { apiFetch, downloadSignedFile, resolveFileUrl } from '@/lib/api';
 import { isImageFile } from '@/lib/format';
 import { myDeliveryFilePreviewUrl } from '@/lib/orders';
 
+async function asDisplayUrl(url: string, safe: boolean) {
+  if (!safe) return url;
+  const res = await fetch(url, { credentials: 'include' });
+  if (!res.ok) return null;
+  const blob = await res.blob();
+  if (!blob.size || blob.type.includes('json') || blob.type.startsWith('text/')) return null;
+  const typed = blob.type.startsWith('image/')
+    ? blob
+    : new Blob([await blob.arrayBuffer()], { type: 'image/jpeg' });
+  return URL.createObjectURL(typed);
+}
+
 function usePreviewSrc(
   previewUrl: string | null | undefined,
   signedUrlPath: string | undefined,
   enabled: boolean,
+  safe = false,
 ) {
   const [src, setSrc] = useState<string | null>(() =>
-    previewUrl ? resolveFileUrl(previewUrl) : null,
+    !safe && previewUrl ? resolveFileUrl(previewUrl) : null,
   );
   const [fresh, setFresh] = useState<string | null>(null);
   const [triedFresh, setTriedFresh] = useState(false);
   const [dead, setDead] = useState(false);
 
   useEffect(() => {
-    if (!enabled) {
-      setSrc(null);
-      setFresh(null);
+    let blobUrl: string | null = null;
+    let cancelled = false;
+
+    async function load() {
+      if (!enabled) {
+        setSrc(null);
+        setFresh(null);
+        setTriedFresh(false);
+        setDead(false);
+        return;
+      }
       setTriedFresh(false);
       setDead(false);
-      return;
+
+      const urls: string[] = [];
+      if (previewUrl) urls.push(resolveFileUrl(previewUrl));
+      if (signedUrlPath) {
+        try {
+          const sep = signedUrlPath.includes('?') ? '&' : '?';
+          const r = await apiFetch<{ url: string }>(`${signedUrlPath}${sep}inline=1`);
+          if (r.url) urls.push(resolveFileUrl(r.url));
+        } catch {
+          /* keep going */
+        }
+      }
+
+      if (safe) {
+        for (const url of urls) {
+          try {
+            const next = await asDisplayUrl(url, true);
+            if (cancelled) {
+              if (next) URL.revokeObjectURL(next);
+              return;
+            }
+            if (next) {
+              blobUrl = next;
+              setSrc(next);
+              return;
+            }
+          } catch {
+            /* try next */
+          }
+        }
+        if (!cancelled) setSrc(null);
+        return;
+      }
+
+      setSrc(urls[0] ?? null);
+      if (urls[1]) setFresh(urls[1]);
     }
-    setTriedFresh(false);
-    setDead(false);
-    setSrc(previewUrl ? resolveFileUrl(previewUrl) : null);
-    if (!signedUrlPath) return;
-    let cancelled = false;
-    const sep = signedUrlPath.includes('?') ? '&' : '?';
-    apiFetch<{ url: string }>(`${signedUrlPath}${sep}inline=1`)
-      .then((r) => {
-        if (!cancelled && r.url) setFresh(resolveFileUrl(r.url));
-      })
-      .catch(() => {});
+
+    void load();
     return () => {
       cancelled = true;
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
     };
-  }, [previewUrl, signedUrlPath, enabled]);
+  }, [previewUrl, signedUrlPath, enabled, safe]);
 
   const current = dead ? null : triedFresh ? fresh : src || fresh;
   return {
@@ -60,7 +108,12 @@ export function ImageLightbox({
 }) {
   return (
     <div className="file-lightbox" onClick={onClose} role="dialog" aria-label={name}>
-      <img src={src} alt={name} onClick={(e) => e.stopPropagation()} />
+      <img
+        src={src}
+        alt={name}
+        onClick={(e) => e.stopPropagation()}
+        onError={onClose}
+      />
       <button type="button" className="file-lightbox-x" onClick={onClose} aria-label="Close">
         ×
       </button>
@@ -118,6 +171,7 @@ export function DeliveryPreview({
   mimeType,
   previewUrl,
   compact,
+  safe,
 }: {
   orderId: string;
   fileId: string;
@@ -125,6 +179,7 @@ export function DeliveryPreview({
   mimeType?: string | null;
   previewUrl?: string | null;
   compact?: boolean;
+  safe?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const show = isImageFile(name, mimeType);
@@ -132,6 +187,7 @@ export function DeliveryPreview({
     previewUrl,
     myDeliveryFilePreviewUrl(orderId, fileId),
     show,
+    safe,
   );
   const src = preview.src;
 
@@ -173,16 +229,18 @@ export function AttachmentPreview({
   signedUrlPath,
   previewUrl,
   compact,
+  safe,
 }: {
   name: string;
   mimeType?: string | null;
   signedUrlPath: string;
   previewUrl?: string | null;
   compact?: boolean;
+  safe?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const show = isImageFile(name, mimeType);
-  const preview = usePreviewSrc(previewUrl, signedUrlPath, show);
+  const preview = usePreviewSrc(previewUrl, signedUrlPath, show, safe);
   const src = show ? preview.src : null;
 
   if (compact) {

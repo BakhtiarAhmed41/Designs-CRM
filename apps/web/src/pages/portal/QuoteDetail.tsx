@@ -362,7 +362,8 @@ export function PortalQuoteDetail() {
                           void downloadSignedFile(
                             myAttachmentUrl(id, l.attachmentId!),
                             l.name,
-                          );
+                            { stayOnPage: true },
+                          ).catch((err) => setError(getErrorMessage(err)));
                         }}
                       >
                         <i className="ti ti-download" /> Download file
@@ -420,6 +421,7 @@ export function PortalQuoteDetail() {
 
       <FormPreferencesDisplay
         preferences={order.preferences}
+        safe
         attachments={(order.attachments ?? []).map((a) => ({
           name: a.originalName,
           mimeType: a.mimeType,
@@ -443,6 +445,7 @@ export function PortalQuoteDetail() {
                 mimeType={a.mimeType}
                 signedUrlPath={myAttachmentUrl(order.id, a.id)}
                 previewUrl={a.previewUrl}
+                safe
               />
             ))}
           </div>

@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { listMyFiles, type MyFile } from '@/lib/designs';
 import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
 import { myDeliveryFileUrl } from '@/lib/orders';
-import { downloadSignedFile } from '@/lib/api';
+import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import { dateShort, deliveryMethodLabel } from '@/lib/format';
 import { serviceCategoryLabel } from '@/lib/serviceIcon';
 import { DeliveryPreview } from '@/components/FilePreview';
@@ -65,6 +65,7 @@ export function PortalFiles() {
   const [method, setMethod] = useState('all');
   const [page, setPage] = useState(1);
   const [openKey, setOpenKey] = useState<string | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ['my-files'],
@@ -132,6 +133,12 @@ export function PortalFiles() {
         title="My Files"
         subtitle="Find and download files delivered with your completed orders."
       />
+
+      {fileError && (
+        <div className="alert-error" style={{ marginBottom: 12 }}>
+          {fileError}
+        </div>
+      )}
 
       <div className="list-toolbar">
         <div className="searchbar" style={{ flex: 1, maxWidth: 420 }}>
@@ -284,6 +291,7 @@ export function PortalFiles() {
                                             name={f.originalName}
                                             mimeType={f.mimeType}
                                             previewUrl={f.previewUrl}
+                                            safe
                                           />
                                         ))}
                                     </div>
@@ -311,6 +319,7 @@ export function PortalFiles() {
                                                 name={f.originalName}
                                                 mimeType={f.mimeType}
                                                 previewUrl={f.previewUrl}
+                                                safe
                                               />
                                             </td>
                                             <td>
@@ -331,11 +340,13 @@ export function PortalFiles() {
                                                     void downloadSignedFile(
                                                       myDeliveryFileUrl(f.orderId, f.fileId),
                                                       f.originalName,
+                                                      { stayOnPage: true },
                                                     ).then(() => {
+                                                      setFileError(null);
                                                       void qc.invalidateQueries({ queryKey: ['my-files'] });
                                                       void qc.invalidateQueries({ queryKey: ['my-activity'] });
                                                       void qc.invalidateQueries({ queryKey: ['notifications'] });
-                                                    })
+                                                    }).catch((err) => setFileError(getErrorMessage(err)))
                                                   }
                                                 >
                                                   <i className="ti ti-download" /> Download

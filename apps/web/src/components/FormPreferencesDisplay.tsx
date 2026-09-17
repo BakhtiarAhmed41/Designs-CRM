@@ -83,12 +83,14 @@ export function FormPreferencesDisplay({
   style,
   wide = false,
   attachments,
+  safe,
 }: {
   preferences: unknown;
   title?: string;
   style?: CSSProperties;
   wide?: boolean;
   attachments?: PrefAttachment[];
+  safe?: boolean;
 }) {
   const p = asPrefs(preferences);
   if (!p) return null;
@@ -181,6 +183,7 @@ export function FormPreferencesDisplay({
                   signedUrlPath={file.signedUrlPath}
                   previewUrl={file.previewUrl}
                   compact
+                  safe={safe}
                 />
               ) : (
                 <span key={`${file.name}-${fi}`} className="pref-file">

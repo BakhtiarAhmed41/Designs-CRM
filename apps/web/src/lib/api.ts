@@ -173,10 +173,31 @@ export async function apiFetchForm<T>(
 export async function downloadSignedFile(
   signedUrlPath: string,
   filename: string,
+  opts?: { stayOnPage?: boolean },
 ): Promise<void> {
   const { url } = await apiFetch<{ url: string }>(signedUrlPath);
+  const abs = resolveFileUrl(url);
+  if (opts?.stayOnPage) {
+    const res = await fetch(abs, { credentials: 'include' });
+    if (!res.ok) {
+      throw new ApiError(res.status, 'This file is no longer available.');
+    }
+    const blob = await res.blob();
+    if (!blob.size || blob.type.includes('json') || blob.type.startsWith('text/')) {
+      throw new ApiError(404, 'This file is no longer available.');
+    }
+    const href = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = href;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(href);
+    return;
+  }
   const a = document.createElement('a');
-  a.href = resolveFileUrl(url);
+  a.href = abs;
   a.download = filename;
   document.body.appendChild(a);
   a.click();

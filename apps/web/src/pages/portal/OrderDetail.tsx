@@ -539,6 +539,7 @@ export function PortalOrderDetail() {
                                 name={f.originalName}
                                 mimeType={f.mimeType}
                                 previewUrl={f.previewUrl}
+                                safe
                               />
                             ))}
                           </div>
@@ -605,6 +606,7 @@ export function PortalOrderDetail() {
                                 name={f.originalName}
                                 mimeType={f.mimeType}
                                 previewUrl={f.previewUrl}
+                                safe
                               />
                               <div>
                                 {(f.downloadCount ?? 0) === 0 && (
@@ -618,12 +620,13 @@ export function PortalOrderDetail() {
                                   void downloadSignedFile(
                                     myDeliveryFileUrl(order.id, f.id),
                                     f.originalName,
+                                    { stayOnPage: true },
                                   ).then(() => {
                                     void qc.invalidateQueries({ queryKey: ['my-order', order.id] });
                                     void qc.invalidateQueries({ queryKey: ['my-files'] });
                                     void qc.invalidateQueries({ queryKey: ['my-activity'] });
                                     void qc.invalidateQueries({ queryKey: ['notifications'] });
-                                  })
+                                  }).catch((err) => setActionError(getErrorMessage(err)))
                                 }
                               >
                                 <i className="ti ti-download" /> Download
@@ -653,6 +656,7 @@ export function PortalOrderDetail() {
               preferences={order.preferences}
               title="Instructions"
               wide
+              safe
               style={{ marginTop: 0 }}
               attachments={(order.attachments ?? []).map((a) => ({
                 name: a.originalName,
@@ -700,6 +704,7 @@ export function PortalOrderDetail() {
                     {previewFile ? (
                               <DeliveryPreview
                         compact
+                        safe
                         orderId={order.id}
                         fileId={previewFile.id}
                         name={previewFile.originalName}
@@ -785,6 +790,7 @@ export function PortalOrderDetail() {
                     mimeType={a.mimeType}
                     signedUrlPath={myAttachmentUrl(order.id, a.id)}
                     previewUrl={a.previewUrl}
+                    safe
                   />
                 ))}
               </div>
