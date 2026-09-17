@@ -46,7 +46,7 @@ function isQuote(o: Order) {
 function activityAction(title: string, link: string | null) {
   const t = title.toLowerCase();
   if (t.includes('quote')) return { label: 'Review quote', to: link || '/portal/quotes' };
-  if (t.includes('deliver') || t.includes('file')) return { label: 'Download files', to: link || '/portal/files' };
+  if (t.includes('deliver') || t.includes('file')) return { label: 'View files', to: '/portal/files' };
   if (t.includes('invoice') || t.includes('payment')) return { label: 'View invoice', to: link || '/portal/invoices' };
   if (link) return { label: 'View', to: link };
   return null;

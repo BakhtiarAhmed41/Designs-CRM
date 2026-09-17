@@ -647,6 +647,32 @@ export function PortalOrderDetail() {
               </div>
             )}
           </div>
+
+          {hasFormPreferences(order.preferences) ? (
+            <FormPreferencesDisplay
+              preferences={order.preferences}
+              title="Instructions"
+              wide
+              style={{ marginTop: 0 }}
+            />
+          ) : (
+            order.instructions && (
+              <div className="card">
+                <div className="card-h">
+                  <span className="ct">Instructions</span>
+                </div>
+                <div className="od-instruct">
+                  {order.instructions
+                    .replace(/\s*Design\s+(\d+)\s*:/g, '\nDesign $1:')
+                    .trim()
+                    .split('\n')
+                    .map((line, i) => (
+                      <p key={i}>{line.trim()}</p>
+                    ))}
+                </div>
+              </div>
+            )
+          )}
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -739,31 +765,6 @@ export function PortalOrderDetail() {
               </div>
             )}
           </div>
-
-          {hasFormPreferences(order.preferences) ? (
-            <FormPreferencesDisplay
-              preferences={order.preferences}
-              title="Instructions"
-              style={{ marginTop: 0 }}
-            />
-          ) : (
-            order.instructions && (
-              <div className="card">
-                <div className="card-h">
-                  <span className="ct">Instructions</span>
-                </div>
-                <div className="od-instruct">
-                  {order.instructions
-                    .replace(/\s*Design\s+(\d+)\s*:/g, '\nDesign $1:')
-                    .trim()
-                    .split('\n')
-                    .map((line, i) => (
-                      <p key={i}>{line.trim()}</p>
-                    ))}
-                </div>
-              </div>
-            )
-          )}
 
           {(canUploadRefs || (order.attachments && order.attachments.length > 0)) && (
             <div className="card">

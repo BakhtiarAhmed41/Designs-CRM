@@ -64,10 +64,12 @@ export function FormPreferencesDisplay({
   preferences,
   title = 'Form submission details',
   style,
+  wide = false,
 }: {
   preferences: unknown;
   title?: string;
   style?: CSSProperties;
+  wide?: boolean;
 }) {
   const p = asPrefs(preferences);
   if (!p) return null;
@@ -100,15 +102,15 @@ export function FormPreferencesDisplay({
   ].filter(Boolean) as Array<{ label: string; value: string }>;
 
   return (
-    <div className="card" style={{ marginTop: 14, ...style }}>
+    <div className={`card pref-card${wide ? ' pref-wide' : ''}`} style={{ marginTop: 14, ...style }}>
       <div className="card-h">
         <span className="ct">
-          <i className="ti ti-forms" /> {title}
+          <i className="ti ti-notes" /> {title}
         </span>
       </div>
 
       {hasDesigns && (
-        <div className="pref-block">
+        <div className="pref-block pref-designs">
           {p.designs!.map((d, i) => {
             const extras =
               d.sizes
@@ -119,34 +121,39 @@ export function FormPreferencesDisplay({
             const rows = [
               d.service && { label: 'Service', value: d.service },
               d.placement && { label: 'Item', value: d.placement },
+              d.fabric && { label: 'Fabric', value: d.fabric },
               d.size && { label: 'Size', value: d.size },
               extras.length > 0 && { label: 'Extra sizes', value: extras.join(' · ') },
               d.colors && { label: 'Color', value: d.colors },
               d.background && { label: 'Background', value: d.background },
-              d.notes && { label: 'Notes', value: d.notes },
-            ].filter(Boolean) as Array<{ label: string; value: string }>;
+              d.notes && { label: 'Notes', value: d.notes, note: true },
+            ].filter(Boolean) as Array<{ label: string; value: string; note?: boolean }>;
             const files = (d.fileNames ?? []).map((name) => friendlyFileName(name));
             return (
               <div key={i} className="pref-design">
                 <div className="pref-design-h">
                   <span className="pref-design-n">{i + 1}</span>
                   <strong>{d.name?.trim() || `Design ${i + 1}`}</strong>
+                  {files.length > 0 && (
+                    <div className="pref-files">
+                      {files.map((name, fi) => (
+                        <span key={`${name}-${fi}`} className="pref-file">
+                          <i className="ti ti-paperclip" /> {name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                {files.length > 0 && (
-                  <div className="pref-files">
-                    {files.map((name, fi) => (
-                      <span key={`${name}-${fi}`} className="pref-file">
-                        <i className="ti ti-photo" /> {name}
-                      </span>
+                {rows.length > 0 && (
+                  <div className="pref-specs">
+                    {rows.map((row) => (
+                      <div key={row.label} className={`pref-spec${row.note ? ' is-note' : ''}`}>
+                        <span>{row.label}</span>
+                        <b>{row.value}</b>
+                      </div>
                     ))}
                   </div>
                 )}
-                {rows.map((row) => (
-                  <div key={row.label} className="pref-row">
-                    <span>{row.label}</span>
-                    <b>{row.value}</b>
-                  </div>
-                ))}
               </div>
             );
           })}
@@ -157,13 +164,13 @@ export function FormPreferencesDisplay({
         <div className="pref-block">
           <div className="pref-options">
             {optionRows.map((row) => (
-              <div key={row.label} className="pref-row">
+              <div key={row.label} className="pref-spec">
                 <span>{row.label}</span>
                 <b>{row.value}</b>
               </div>
             ))}
             {hasFormats && (
-              <div className="pref-row">
+              <div className="pref-spec">
                 <span>Formats</span>
                 <div className="pref-chips">
                   {p.formats!.map((f) => (
