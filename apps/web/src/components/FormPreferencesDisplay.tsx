@@ -84,7 +84,7 @@ export function FormPreferencesDisplay({
   }
 
   const skipField =
-    /^(how many designs|measurement unit|form mode|turnaround|keep proportional|sizing)$/i;
+    /^(how many designs|measurement unit|form mode|turnaround|keep proportional|sizing)\??$/i;
   const extraRows = (p.fields ?? [])
     .map((f) => ({
       label: tidyLabel(f.label),
