@@ -1472,6 +1472,42 @@ select, textarea {
   .pulse-grid { grid-template-columns: 1fr; }
 }
 
+.publish-modal {
+  max-width: 520px;
+}
+.publish-modal .modal-b {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.publish-modal .modal-b > p.muted {
+  margin: 0;
+  line-height: 1.5;
+}
+.publish-modal .odf.up {
+  display: inline-flex;
+  margin: 0;
+  align-self: flex-start;
+}
+.publish-modal-files {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.publish-modal-files > .muted {
+  margin: 0;
+  font-size: 12px;
+}
+.publish-modal .pub-files {
+  margin-bottom: 0;
+}
+.publish-modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
 .pub-files {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));

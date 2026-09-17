@@ -1727,9 +1727,9 @@ export function AdminOrderDetail() {
             setPublishSaved(false);
           }}
         >
-          <div className="modal" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal publish-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-h">
-              <span>Publish {publishFor.name}</span>
+              <span>Upload design</span>
               <button
                 type="button"
                 className="modal-x"
@@ -1744,14 +1744,14 @@ export function AdminOrderDetail() {
               </button>
             </div>
             <div className="modal-b">
-              <p className="muted" style={{ marginTop: 0 }}>
+              <p className="muted">
                 {isDesigner
                   ? 'Attach up to 10 files, click Save, then publish to the customer or send to admin for approval.'
                   : showSendForApproval
                     ? 'Attach up to 10 files, click Save, then send them to admin for approval.'
                     : 'Attach up to 10 files, click Save, then send a view-only preview or publish the final files.'}
               </p>
-              <label className="odf up" style={{ marginBottom: 12, display: 'inline-flex' }}>
+              <label className="odf up">
                 <i className="ti ti-cloud-upload" /> Choose files
                 <input
                   type="file"
@@ -1779,9 +1779,9 @@ export function AdminOrderDetail() {
                 />
               </label>
               {publishFiles.length > 0 && (
-                <>
-                  <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>
-                    {publishFiles.length} of 10 files - click the trash on a picture to remove it
+                <div className="publish-modal-files">
+                  <div className="muted">
+                    {publishFiles.length} of 10 files — click the trash on a picture to remove it
                   </div>
                   <LocalPublishFiles
                     files={publishFiles}
@@ -1791,9 +1791,9 @@ export function AdminOrderDetail() {
                       setPublishSaved(false);
                     }}
                   />
-                </>
+                </div>
               )}
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              <div className="publish-modal-actions">
                 <button
                   type="button"
                   className="btn btn-ghost btn-sm"

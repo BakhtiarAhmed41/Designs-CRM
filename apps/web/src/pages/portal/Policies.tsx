@@ -677,7 +677,7 @@ export function PortalPolicies() {
               text: 'You may cancel for a full refund before work starts. After that, refunds are limited.',
             },
             {
-              icon: 'ti-gift',
+              icon: 'ti-wallet',
               title: 'Store credit',
               text: 'Some cases may be resolved with credit, a future-order discount, or an adjustment.',
             },
