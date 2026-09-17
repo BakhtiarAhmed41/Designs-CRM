@@ -2780,10 +2780,19 @@ button.primary:hover:not(:disabled),
 .policy-hero {
   padding: 26px 28px;
 }
+.policy-hero-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.policy-hero-copy {
+  min-width: 0;
+  flex: 1;
+}
 .policy-hero-icon {
   width: 48px;
   height: 48px;
-  margin-bottom: 14px;
+  flex-shrink: 0;
   border-radius: 12px;
   background: var(--hover-bg);
   color: var(--maroon);
@@ -2812,7 +2821,40 @@ button.primary:hover:not(:disabled),
   font-size: 14px;
   line-height: 1.55;
   color: var(--muted);
-  max-width: 60ch;
+  max-width: none;
+}
+.policy-hero-points {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+.policy-hero-point {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--hover-bg);
+}
+.policy-hero-point i {
+  flex: none;
+  margin-top: 1px;
+  font-size: 18px;
+  color: var(--maroon);
+}
+.policy-hero-point strong {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--ink);
+}
+.policy-hero-point p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--muted);
 }
 .policy-toc {
   padding: 22px 26px 24px;
@@ -3178,7 +3220,8 @@ button.primary:hover:not(:disabled),
 }
 @media (max-width: 720px) {
   .policy-toc ol,
-  .policy-outcome-cards {
+  .policy-outcome-cards,
+  .policy-hero-points {
     grid-template-columns: 1fr;
   }
   .policy-hero,

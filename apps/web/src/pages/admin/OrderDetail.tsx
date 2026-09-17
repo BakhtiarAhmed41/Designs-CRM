@@ -42,7 +42,7 @@ import {
 } from '@/lib/designs';
 import { useDialog } from '@/components/ui/AppDialog';
 import { apiFetch, downloadSignedFile, getErrorMessage, resolveFileUrl } from '@/lib/api';
-import { money, dateShort, lifecycleChip } from '@/lib/format';
+import { money, dateShort, lifecycleChip, isImageFile } from '@/lib/format';
 import { AdminCounterDecision } from '@/components/AdminCounterDecision';
 import { AttachmentPreview, LocalFilePreview } from '@/components/FilePreview';
 import { FormPreferencesDisplay, hasFormPreferences } from '@/components/FormPreferencesDisplay';
@@ -93,8 +93,7 @@ function relativeTime(iso: string) {
 }
 
 function isImageName(name: string, mime?: string | null) {
-  if (mime?.startsWith('image/')) return true;
-  return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name);
+  return isImageFile(name, mime);
 }
 
 function LocalPublishFiles({
@@ -107,7 +106,7 @@ function LocalPublishFiles({
   onRemove: (index: number) => void;
 }) {
   const urls = useMemo(
-    () => files.map((f) => (f.type.startsWith('image/') ? URL.createObjectURL(f) : '')),
+    () => files.map((f) => (isImageName(f.name, f.type) ? URL.createObjectURL(f) : '')),
     [files],
   );
   useEffect(() => {

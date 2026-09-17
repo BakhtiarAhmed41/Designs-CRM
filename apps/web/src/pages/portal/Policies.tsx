@@ -560,22 +560,41 @@ function DocHeader({
   kicker,
   title,
   desc,
+  points,
   id,
 }: {
   icon: string;
   kicker: string;
   title: string;
   desc: string;
+  points?: Array<{ icon: string; title: string; text: string }>;
   id?: string;
 }) {
   return (
     <header className="policy-card policy-hero" id={id}>
-      <div className="policy-hero-icon" aria-hidden>
-        <i className={`ti ${icon}`} />
+      <div className="policy-hero-row">
+        <div className="policy-hero-icon" aria-hidden>
+          <i className={`ti ${icon}`} />
+        </div>
+        <div className="policy-hero-copy">
+          <p className="policy-kicker">{kicker}</p>
+          <h1>{title}</h1>
+          <p className="policy-sub">{desc}</p>
+        </div>
       </div>
-      <p className="policy-kicker">{kicker}</p>
-      <h1>{title}</h1>
-      <p className="policy-sub">{desc}</p>
+      {points?.length ? (
+        <div className="policy-hero-points">
+          {points.map((point) => (
+            <div key={point.title} className="policy-hero-point">
+              <i className={`ti ${point.icon}`} aria-hidden />
+              <div>
+                <strong>{point.title}</strong>
+                <p>{point.text}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </header>
   );
 }
@@ -651,6 +670,23 @@ export function PortalPolicies() {
           kicker="Las Vegas Designs USA · Policies"
           title="Refund, Store Credit and Revision Policy"
           desc="This policy explains when refunds, store credit, revisions, file testing, and additional charges may apply to custom digital services. Our first priority is to correct any confirmed file issue and deliver a usable result."
+          points={[
+            {
+              icon: 'ti-cash',
+              title: 'Refunds',
+              text: 'You may cancel for a full refund before work starts. After that, refunds are limited.',
+            },
+            {
+              icon: 'ti-gift',
+              title: 'Store credit',
+              text: 'Some cases may be resolved with credit, a future-order discount, or an adjustment.',
+            },
+            {
+              icon: 'ti-pencil',
+              title: 'Revisions',
+              text: 'Minor changes within the original request are usually free. Major redesigns may cost extra.',
+            },
+          ]}
         />
 
         <nav className="policy-card policy-toc" aria-label="On this page">
