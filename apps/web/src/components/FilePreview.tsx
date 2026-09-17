@@ -1,6 +1,45 @@
 import { useEffect, useMemo, useState } from 'react';
-import { downloadSignedFile, resolveFileUrl } from '@/lib/api';
+import { apiFetch, downloadSignedFile, resolveFileUrl } from '@/lib/api';
 import { isImageFile } from '@/lib/format';
+
+function usePreviewSrc(
+  previewUrl: string | null | undefined,
+  signedUrlPath: string | undefined,
+  enabled: boolean,
+) {
+  const [src, setSrc] = useState<string | null>(() =>
+    previewUrl ? resolveFileUrl(previewUrl) : null,
+  );
+
+  useEffect(() => {
+    if (!enabled) {
+      setSrc(null);
+      return;
+    }
+    if (previewUrl) {
+      setSrc(resolveFileUrl(previewUrl));
+      return;
+    }
+    if (!signedUrlPath) {
+      setSrc(null);
+      return;
+    }
+    let cancelled = false;
+    const sep = signedUrlPath.includes('?') ? '&' : '?';
+    apiFetch<{ url: string }>(`${signedUrlPath}${sep}inline=1`)
+      .then((r) => {
+        if (!cancelled && r.url) setSrc(resolveFileUrl(r.url));
+      })
+      .catch(() => {
+        if (!cancelled) setSrc(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [previewUrl, signedUrlPath, enabled]);
+
+  return src;
+}
 
 export function ImageLightbox({
   src,
@@ -55,10 +94,6 @@ export function FileThumb({
   );
 }
 
-function previewSrc(previewUrl?: string | null) {
-  return previewUrl ? resolveFileUrl(previewUrl) : null;
-}
-
 export function DeliveryPreview({
   name,
   mimeType,
@@ -74,7 +109,7 @@ export function DeliveryPreview({
 }) {
   const [open, setOpen] = useState(false);
   const show = isImageFile(name, mimeType);
-  const src = show ? previewSrc(previewUrl) : null;
+  const src = usePreviewSrc(previewUrl, undefined, show);
 
   if (compact) {
     return src ? <img className="thumb-img" src={src} alt="" /> : <i className="ti ti-photo" aria-hidden />;
@@ -115,7 +150,8 @@ export function AttachmentPreview({
   const [open, setOpen] = useState(false);
   const [broken, setBroken] = useState(false);
   const show = isImageFile(name, mimeType);
-  const src = show && !broken ? previewSrc(previewUrl) : null;
+  const loaded = usePreviewSrc(previewUrl, signedUrlPath, show);
+  const src = show && !broken ? loaded : null;
 
   if (compact) {
     if (src) {

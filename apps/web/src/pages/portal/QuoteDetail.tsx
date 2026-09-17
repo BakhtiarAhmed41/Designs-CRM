@@ -217,7 +217,7 @@ export function PortalQuoteDetail() {
 
       {error && <ErrorBanner>{error}</ErrorBanner>}
       {toast && (
-        <div className="note" style={{ marginBottom: 12 }}>
+        <div className="alert-success" style={{ marginBottom: 12 }}>
           <i className="ti ti-circle-check" /> {toast}
         </div>
       )}
@@ -418,7 +418,15 @@ export function PortalQuoteDetail() {
       </div>
       )}
 
-      <FormPreferencesDisplay preferences={order.preferences} />
+      <FormPreferencesDisplay
+        preferences={order.preferences}
+        attachments={(order.attachments ?? []).map((a) => ({
+          name: a.originalName,
+          mimeType: a.mimeType,
+          previewUrl: a.previewUrl,
+          signedUrlPath: myAttachmentUrl(order.id, a.id),
+        }))}
+      />
 
       {(order.attachments ?? []).length > 0 && (
         <div className="card" style={{ marginTop: 14 }}>

@@ -1023,7 +1023,15 @@ export function AdminOrderDetail() {
             )}
           </div>
 
-          <FormPreferencesDisplay preferences={order.preferences} />
+          <FormPreferencesDisplay
+            preferences={order.preferences}
+            attachments={(order.attachments ?? []).map((a) => ({
+              name: a.originalName,
+              mimeType: a.mimeType,
+              previewUrl: a.previewUrl,
+              signedUrlPath: adminAttachmentUrl(order.id, a.id),
+            }))}
+          />
 
           <div className="card" style={{ marginTop: 14 }}>
             <div className="card-h">

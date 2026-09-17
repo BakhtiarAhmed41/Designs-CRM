@@ -325,7 +325,7 @@ export function PortalOrderDetail() {
 
       {actionError && <ErrorBanner>{actionError}</ErrorBanner>}
       {paidSuccess && (
-        <div className="note" style={{ marginBottom: 14 }}>
+        <div className="alert-success" style={{ marginBottom: 14 }}>
           <i className="ti ti-circle-check" /> Payment successful. Your order has been created.
         </div>
       )}

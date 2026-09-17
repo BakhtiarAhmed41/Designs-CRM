@@ -151,55 +151,45 @@ export function FormPreferencesDisplay({
               d.background && { label: 'Background', value: d.background },
               d.notes && { label: 'Notes', value: d.notes },
             ].filter(Boolean) as Array<{ label: string; value: string }>;
-            const files = (d.fileNames ?? []).map((name) => {
-              const match = leftoverAttachments.find(
+            const names =
+              d.fileNames && d.fileNames.length > 0
+                ? d.fileNames
+                : leftoverAttachments.length > 0
+                  ? [leftoverAttachments[0]!.name]
+                  : [];
+            const files = names.map((name) => {
+              const matchIdx = leftoverAttachments.findIndex(
                 (a) => a.name.toLowerCase() === name.toLowerCase(),
               );
-              if (match) {
-                leftoverAttachments.splice(leftoverAttachments.indexOf(match), 1);
-                return match;
-              }
+              if (matchIdx >= 0) return leftoverAttachments.splice(matchIdx, 1)[0]!;
+              if (leftoverAttachments.length) return leftoverAttachments.shift()!;
               return { name, signedUrlPath: '' };
             });
-            if (!files.some((f) => f.signedUrlPath) && leftoverAttachments.length) {
-              files.splice(0, files.length, leftoverAttachments.shift()!);
-            }
+            const fileThumbs = files.map((file, fi) =>
+              file.signedUrlPath || file.previewUrl ? (
+                <AttachmentPreview
+                  key={`${file.name}-${fi}`}
+                  name={file.name}
+                  mimeType={file.mimeType}
+                  signedUrlPath={file.signedUrlPath}
+                  previewUrl={file.previewUrl}
+                  compact
+                />
+              ) : (
+                <span key={`${file.name}-${fi}`} className="pref-file">
+                  {friendlyFileName(file.name)}
+                </span>
+              ),
+            );
             return (
               <div key={i} className="pref-design">
                 <div className="pref-design-h">
                   <span className="pref-design-n">{i + 1}</span>
                   <strong>{d.name?.trim() || `Design ${i + 1}`}</strong>
                   {wide && <span className="pref-tag">Design option</span>}
-                  {!wide && files.length > 0 && (
-                    <div className="pref-files">
-                      {files.map((file, fi) => (
-                        <span key={`${file.name}-${fi}`} className="pref-file">
-                          {friendlyFileName(file.name)}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  {!wide && files.length > 0 && <div className="pref-files">{fileThumbs}</div>}
                 </div>
-                {wide && files.length > 0 && (
-                  <div className="pref-ref">
-                    {files.map((file, fi) =>
-                      file.signedUrlPath ? (
-                        <AttachmentPreview
-                          key={`${file.name}-${fi}`}
-                          name={file.name}
-                          mimeType={file.mimeType}
-                          signedUrlPath={file.signedUrlPath}
-                          previewUrl={file.previewUrl}
-                          compact
-                        />
-                      ) : (
-                        <span key={`${file.name}-${fi}`} className="pref-file">
-                          {friendlyFileName(file.name)}
-                        </span>
-                      ),
-                    )}
-                  </div>
-                )}
+                {wide && files.length > 0 && <div className="pref-ref">{fileThumbs}</div>}
                 {rows.length > 0 && (
                   <div className="pref-specs">
                     {rows.map((row) => (

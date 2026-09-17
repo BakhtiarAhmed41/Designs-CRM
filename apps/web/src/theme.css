@@ -1652,10 +1652,18 @@ body,
 .lbl-imp,
 .note,
 .note.amber,
-.alert-success,
 .alert-error {
   background-color: var(--etsy-white) !important;
   color: var(--ink);
+}
+.alert-success,
+.note.ok {
+  background-color: #E7F1E4 !important;
+  color: #2f7d32 !important;
+}
+.alert-success i,
+.note.ok i {
+  color: #2f7d32 !important;
 }
 
 .app-topbar,

@@ -374,7 +374,7 @@ export function AdminQuoteDetail() {
 
       {error && <div className="alert-error" style={{ marginBottom: 12 }}>{error}</div>}
       {toast && (
-        <div className="note" style={{ marginBottom: 12 }}>
+        <div className="alert-success" style={{ marginBottom: 12 }}>
           <i className="ti ti-circle-check" /> {toast}
         </div>
       )}
@@ -407,7 +407,15 @@ export function AdminQuoteDetail() {
             </div>
           </div>
 
-          <FormPreferencesDisplay preferences={order.preferences} />
+          <FormPreferencesDisplay
+            preferences={order.preferences}
+            attachments={attachments.map((a) => ({
+              name: a.originalName,
+              mimeType: a.mimeType,
+              previewUrl: a.previewUrl,
+              signedUrlPath: adminAttachmentUrl(order.id, a.id),
+            }))}
+          />
 
           <div className="card">
             <div className="card-h">
