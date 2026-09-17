@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apiFetch, downloadSignedFile, resolveFileUrl } from '@/lib/api';
 import { isImageFile } from '@/lib/format';
+import { myDeliveryFilePreviewUrl } from '@/lib/orders';
 
 function usePreviewSrc(
   previewUrl: string | null | undefined,
@@ -10,35 +11,42 @@ function usePreviewSrc(
   const [src, setSrc] = useState<string | null>(() =>
     previewUrl ? resolveFileUrl(previewUrl) : null,
   );
+  const [fresh, setFresh] = useState<string | null>(null);
+  const [triedFresh, setTriedFresh] = useState(false);
+  const [dead, setDead] = useState(false);
 
   useEffect(() => {
     if (!enabled) {
       setSrc(null);
+      setFresh(null);
+      setTriedFresh(false);
+      setDead(false);
       return;
     }
-    if (previewUrl) {
-      setSrc(resolveFileUrl(previewUrl));
-      return;
-    }
-    if (!signedUrlPath) {
-      setSrc(null);
-      return;
-    }
+    setTriedFresh(false);
+    setDead(false);
+    setSrc(previewUrl ? resolveFileUrl(previewUrl) : null);
+    if (!signedUrlPath) return;
     let cancelled = false;
     const sep = signedUrlPath.includes('?') ? '&' : '?';
     apiFetch<{ url: string }>(`${signedUrlPath}${sep}inline=1`)
       .then((r) => {
-        if (!cancelled && r.url) setSrc(resolveFileUrl(r.url));
+        if (!cancelled && r.url) setFresh(resolveFileUrl(r.url));
       })
-      .catch(() => {
-        if (!cancelled) setSrc(null);
-      });
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, [previewUrl, signedUrlPath, enabled]);
 
-  return src;
+  const current = dead ? null : triedFresh ? fresh : src || fresh;
+  return {
+    src: current,
+    onError: () => {
+      if (!triedFresh && fresh && current !== fresh) setTriedFresh(true);
+      else setDead(true);
+    },
+  };
 }
 
 export function ImageLightbox({
@@ -64,10 +72,12 @@ export function FileThumb({
   name,
   src,
   onOpen,
+  onImgError,
 }: {
   name: string;
   src?: string | null;
   onOpen?: () => void;
+  onImgError?: () => void;
 }) {
   const [broken, setBroken] = useState(false);
   useEffect(() => {
@@ -83,7 +93,14 @@ export function FileThumb({
       disabled={!onOpen}
     >
       {showImg ? (
-        <img src={src!} alt={name} onError={() => setBroken(true)} />
+        <img
+          src={src!}
+          alt={name}
+          onError={() => {
+            setBroken(true);
+            onImgError?.();
+          }}
+        />
       ) : (
         <div className="file-thumb-icon" aria-hidden>
           <i className="ti ti-photo" />
@@ -95,6 +112,8 @@ export function FileThumb({
 }
 
 export function DeliveryPreview({
+  orderId,
+  fileId,
   name,
   mimeType,
   previewUrl,
@@ -109,10 +128,19 @@ export function DeliveryPreview({
 }) {
   const [open, setOpen] = useState(false);
   const show = isImageFile(name, mimeType);
-  const src = usePreviewSrc(previewUrl, undefined, show);
+  const preview = usePreviewSrc(
+    previewUrl,
+    myDeliveryFilePreviewUrl(orderId, fileId),
+    show,
+  );
+  const src = preview.src;
 
   if (compact) {
-    return src ? <img className="thumb-img" src={src} alt="" /> : <i className="ti ti-photo" aria-hidden />;
+    return src ? (
+      <img className="thumb-img" src={src} alt="" onError={preview.onError} />
+    ) : (
+      <i className="ti ti-photo" aria-hidden />
+    );
   }
 
   if (!show && !src) {
@@ -128,7 +156,12 @@ export function DeliveryPreview({
 
   return (
     <>
-      <FileThumb name={name} src={src} onOpen={src ? () => setOpen(true) : undefined} />
+      <FileThumb
+        name={name}
+        src={src}
+        onOpen={src ? () => setOpen(true) : undefined}
+        onImgError={preview.onError}
+      />
       {open && src && <ImageLightbox src={src} name={name} onClose={() => setOpen(false)} />}
     </>
   );
@@ -148,19 +181,23 @@ export function AttachmentPreview({
   compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [broken, setBroken] = useState(false);
   const show = isImageFile(name, mimeType);
-  const loaded = usePreviewSrc(previewUrl, signedUrlPath, show);
-  const src = show && !broken ? loaded : null;
+  const preview = usePreviewSrc(previewUrl, signedUrlPath, show);
+  const src = show ? preview.src : null;
 
   if (compact) {
-    if (src) {
+    if (show) {
       return (
         <>
-          <button type="button" className="pref-ref-img" onClick={() => setOpen(true)} title={name}>
-            <img src={src} alt={name} onError={() => setBroken(true)} />
+          <button
+            type="button"
+            className="pref-ref-img"
+            onClick={() => src && setOpen(true)}
+            title={name}
+          >
+            {src ? <img src={src} alt={name} onError={preview.onError} /> : <i className="ti ti-photo" />}
           </button>
-          {open && <ImageLightbox src={src} name={name} onClose={() => setOpen(false)} />}
+          {open && src && <ImageLightbox src={src} name={name} onClose={() => setOpen(false)} />}
         </>
       );
     }
@@ -184,7 +221,12 @@ export function AttachmentPreview({
 
   return (
     <>
-      <FileThumb name={name} src={src} onOpen={src ? () => setOpen(true) : undefined} />
+      <FileThumb
+        name={name}
+        src={src}
+        onOpen={src ? () => setOpen(true) : undefined}
+        onImgError={preview.onError}
+      />
       {open && src && <ImageLightbox src={src} name={name} onClose={() => setOpen(false)} />}
     </>
   );

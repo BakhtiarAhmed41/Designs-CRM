@@ -1,6 +1,15 @@
 import type { CSSProperties } from 'react';
 import { AttachmentPreview } from '@/components/FilePreview';
-import { friendlyFileName } from '@/lib/format';
+import { friendlyFileName, isImageFile } from '@/lib/format';
+
+function sameFile(a: string, b: string) {
+  const na = a.toLowerCase().trim();
+  const nb = b.toLowerCase().trim();
+  if (na === nb) return true;
+  const ba = na.split(/[/\\]/).pop() || na;
+  const bb = nb.split(/[/\\]/).pop() || nb;
+  return ba === bb || ba.endsWith(bb) || bb.endsWith(ba);
+}
 
 export type PrefAttachment = {
   name: string;
@@ -158,15 +167,13 @@ export function FormPreferencesDisplay({
                   ? [leftoverAttachments[0]!.name]
                   : [];
             const files = names.map((name) => {
-              const matchIdx = leftoverAttachments.findIndex(
-                (a) => a.name.toLowerCase() === name.toLowerCase(),
-              );
+              const matchIdx = leftoverAttachments.findIndex((a) => sameFile(a.name, name));
               if (matchIdx >= 0) return leftoverAttachments.splice(matchIdx, 1)[0]!;
               if (leftoverAttachments.length) return leftoverAttachments.shift()!;
-              return { name, signedUrlPath: '' };
+              return { name, signedUrlPath: '', previewUrl: null as string | null };
             });
             const fileThumbs = files.map((file, fi) =>
-              file.signedUrlPath || file.previewUrl ? (
+              file.signedUrlPath || file.previewUrl || isImageFile(file.name, file.mimeType) ? (
                 <AttachmentPreview
                   key={`${file.name}-${fi}`}
                   name={file.name}

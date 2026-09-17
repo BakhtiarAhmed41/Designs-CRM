@@ -51,7 +51,15 @@ type OrderEnvelope = { order: Order };
 function mergeOrder(prev: unknown, order: Order): OrderEnvelope {
   if (prev && typeof prev === 'object' && 'order' in prev) {
     const current = (prev as OrderEnvelope).order;
-    return { ...(prev as object), order: { ...current, ...order } } as OrderEnvelope;
+    return {
+      ...(prev as object),
+      order: {
+        ...current,
+        ...order,
+        attachments: order.attachments ?? current.attachments,
+        deliveries: order.deliveries ?? current.deliveries,
+      },
+    } as OrderEnvelope;
   }
   return { order };
 }

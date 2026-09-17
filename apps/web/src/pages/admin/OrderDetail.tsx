@@ -754,6 +754,7 @@ export function AdminOrderDetail() {
   const payment = payBadge(order.status, order.priceCents, hasPaidInvoice);
   const assigned = designers.find((d) => d.id === order.assignedDesignerId);
   const canDeliver =
+    order.status === 'PENDING_PAYMENT' ||
     order.status === 'IN_PROGRESS' ||
     order.status === 'READY_TO_SEND' ||
     order.status === 'COMPLETED' ||
@@ -1070,7 +1071,7 @@ export function AdminOrderDetail() {
               const inRevision = designInRevision(d.id);
               const editing = editingIds.includes(d.id) || inRevision;
               const locked = published && !editing;
-              const canOpenPublish = canDeliver && !locked && (editing || d.status === 'DONE');
+              const canOpenPublish = canDeliver && !pending;
               const markAwaiting = editing && published && !inRevision;
               const nextMark = markAwaiting
                 ? { label: 'Mark awaiting', status: 'WAITING' as const }
@@ -1106,10 +1107,22 @@ export function AdminOrderDetail() {
                         className="btn btn-primary btn-sm"
                         style={{ padding: '2px 8px', fontSize: 11 }}
                         disabled={!canOpenPublish}
+                        title={
+                          !canDeliver
+                            ? 'Start this order before publishing files.'
+                            : pending
+                              ? 'These files are waiting for approval.'
+                              : 'Attach files and send them to the customer.'
+                        }
                         onClick={() => {
                           setPublishFor(d);
                           setPublishFiles([]);
                           setPublishSaved(false);
+                          if (locked) {
+                            setEditingIds((prev) =>
+                              prev.includes(d.id) ? prev : [...prev, d.id],
+                            );
+                          }
                         }}
                       >
                         Attach file and publish
@@ -1166,7 +1179,7 @@ export function AdminOrderDetail() {
                         Release
                       </button>
                     )}
-                    {submitted && (
+                    {(submitted || published) && (
                       <button
                         type="button"
                         className="btn btn-ghost btn-sm"

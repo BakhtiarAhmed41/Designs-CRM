@@ -1557,7 +1557,10 @@ button { font-family: inherit; }
   overflow:hidden;
   background:#f3f4f6;
   cursor:pointer;
+  display:grid;
+  place-items:center;
 }
+.pref-ref-img i{font-size:22px;color:var(--muted);}
 .pref-ref-img img{
   display:block;
   width:100%;
