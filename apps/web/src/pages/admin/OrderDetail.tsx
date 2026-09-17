@@ -175,7 +175,11 @@ function SavedPublishFile({
     queryKey: ['delivery-thumb', orderId, file.id],
     queryFn: async () => {
       const { url } = await apiFetch<{ url: string }>(adminDeliveryFileUrl(orderId, file.id));
-      return resolveFileUrl(url);
+      const abs = resolveFileUrl(url);
+      const res = await fetch(abs, { credentials: 'include' });
+      if (!res.ok) return abs;
+      const blob = await res.blob();
+      return blob.size ? URL.createObjectURL(blob) : abs;
     },
     enabled: showImg,
     staleTime: 60_000,

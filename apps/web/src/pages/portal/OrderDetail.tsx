@@ -665,6 +665,7 @@ export function PortalOrderDetail() {
                   <div className={`thumb${serviceThumbClass(order.serviceType) ? ' m' : ''}`}>
                     {previewFile ? (
                       <DeliveryPreview
+                        compact
                         orderId={order.id}
                         fileId={previewFile.id}
                         name={previewFile.originalName}

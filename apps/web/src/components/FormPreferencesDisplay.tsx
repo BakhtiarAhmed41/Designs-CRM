@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { friendlyFileName } from '@/lib/format';
 
 type FormDesign = {
   name?: string;
@@ -64,6 +65,11 @@ export function FormPreferencesDisplay({
     return null;
   }
 
+  const skipField = /^(how many designs|measurement unit|form mode|turnaround)$/i;
+  const visibleFields = (p.fields ?? []).filter(
+    (f) => f.value?.trim() && !skipField.test((f.label ?? '').trim()),
+  );
+
   return (
     <div className="card" style={{ marginTop: 14, ...style }}>
       <div className="card-h">
@@ -101,21 +107,9 @@ export function FormPreferencesDisplay({
         </div>
       )}
 
-      {hasFields && (
-        <div style={{ padding: '0 16px 12px' }}>
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: 'var(--faint)',
-              textTransform: 'uppercase',
-              letterSpacing: '.4px',
-              marginBottom: 8,
-            }}
-          >
-            Form fields
-          </div>
-          {p.fields!.map((f, i) => (
+      {visibleFields.length > 0 && (
+        <div className="pref-block">
+          {visibleFields.map((f, i) => (
             <div key={`${f.label}-${i}`} className="od-line">
               <span className="l">{f.label || 'Field'}</span>
               <span className="v" style={{ fontWeight: 400 }}>
@@ -127,92 +121,48 @@ export function FormPreferencesDisplay({
       )}
 
       {hasDesigns && (
-        <div style={{ padding: '0 16px 16px' }}>
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: 'var(--faint)',
-              textTransform: 'uppercase',
-              letterSpacing: '.4px',
-              marginBottom: 8,
-            }}
-          >
-            Designs ({p.designs!.length})
-          </div>
-          {p.designs!.map((d, i) => (
-            <div
-              key={i}
-              style={{
-                background: 'var(--bg)',
-                borderRadius: 8,
-                padding: '10px 12px',
-                marginBottom: 8,
-                fontSize: 12.5,
-              }}
-            >
-              <div style={{ fontWeight: 600, marginBottom: 6 }}>
-                {d.name?.trim() || `Design ${i + 1}`}
+        <div className="pref-block">
+          {p.designs!.map((d, i) => {
+            const extras =
+              d.sizes
+                ?.map((s) =>
+                  [s.label, s.w && s.h ? `${s.w} × ${s.h}` : s.w || s.h].filter(Boolean).join(' '),
+                )
+                .filter(Boolean) ?? [];
+            const rows = [
+              d.service && { label: 'Service', value: d.service },
+              d.placement && { label: 'Item', value: d.placement },
+              d.size && { label: 'Size', value: d.size },
+              extras.length > 0 && { label: 'Extra sizes', value: extras.join(' · ') },
+              d.colors && { label: 'Color', value: d.colors },
+              d.background && { label: 'Background', value: d.background },
+              d.notes && { label: 'Notes', value: d.notes },
+            ].filter(Boolean) as Array<{ label: string; value: string }>;
+            const files = (d.fileNames ?? []).map((name) => friendlyFileName(name));
+            return (
+              <div key={i} className="pref-design">
+                <div className="pref-design-h">
+                  <span className="pref-design-n">{i + 1}</span>
+                  <strong>{d.name?.trim() || `Design ${i + 1}`}</strong>
+                </div>
+                {files.length > 0 && (
+                  <div className="pref-files">
+                    {files.map((name, fi) => (
+                      <span key={`${name}-${fi}`} className="pref-file">
+                        <i className="ti ti-photo" /> {name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {rows.map((row) => (
+                  <div key={row.label} className="pref-row">
+                    <span>{row.label}</span>
+                    <b>{row.value}</b>
+                  </div>
+                ))}
               </div>
-              {d.service && (
-                <div>
-                  <b>Service:</b> {d.service}
-                </div>
-              )}
-              {(d.fileNames?.length ?? 0) > 0 && (
-                <div>
-                  <b>Files:</b> {d.fileNames!.join(', ')}
-                </div>
-              )}
-              {d.placement && (
-                <div>
-                  <b>Item / placement:</b> {d.placement}
-                </div>
-              )}
-              {d.size && (
-                <div>
-                  <b>Size:</b> {d.size}
-                </div>
-              )}
-              {d.colors && (
-                <div>
-                  <b>Color mode:</b> {d.colors}
-                </div>
-              )}
-              {d.background && (
-                <div>
-                  <b>Background:</b> {d.background}
-                </div>
-              )}
-              {d.dpi300 && (
-                <div>
-                  <b>300 DPI:</b> Yes
-                </div>
-              )}
-              {d.keepProportional && (
-                <div>
-                  <b>Keep proportional:</b> Yes
-                </div>
-              )}
-              {d.notes && (
-                <div>
-                  <b>Notes:</b> {d.notes}
-                </div>
-              )}
-              {(d.sizes?.length ?? 0) > 0 && (
-                <div style={{ marginTop: 6 }}>
-                  <b>Extra sizes:</b>{' '}
-                  {d.sizes!
-                    .map((s) =>
-                      [s.label, s.w && s.h ? `${s.w}×${s.h}"` : s.w || s.h]
-                        .filter(Boolean)
-                        .join(' '),
-                    )
-                    .join(' · ')}
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

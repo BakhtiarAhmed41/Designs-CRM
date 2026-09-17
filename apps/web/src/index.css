@@ -1440,7 +1440,8 @@ button { font-family: inherit; }
 .file-thumb img,.file-thumb-icon{
   display:block;width:100%;height:84px;object-fit:cover;background:#f3f5f7;
 }
-.file-thumb-icon{display:flex;align-items:center;justify-content:center;color:var(--navy);font-size:22px;}
+.file-thumb-icon{display:flex;align-items:center;justify-content:center;color:var(--ink);font-size:22px;}
+.file-thumb.is-fallback .file-thumb-icon{height:84px;}
 .file-thumb span{
   display:block;padding:6px 8px;font-size:11px;color:var(--muted);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
@@ -1466,6 +1467,31 @@ button { font-family: inherit; }
 .od-instruct{padding:12px 16px 16px;}
 .od-instruct p{margin:0 0 8px;font-size:13px;line-height:1.45;color:var(--ink);}
 .od-instruct p:last-child{margin-bottom:0;}
+.pref-block{padding:4px 14px 14px;}
+.pref-design{
+  border:1px solid var(--line);border-radius:12px;padding:12px 12px 10px;margin-bottom:10px;
+  background:var(--etsy-white,#fff);
+}
+.pref-design:last-child{margin-bottom:0;}
+.pref-design-h{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.pref-design-n{
+  width:22px;height:22px;border-radius:50%;background:var(--tint);color:var(--ink);
+  display:grid;place-items:center;font-size:11px;font-weight:700;flex-shrink:0;
+}
+.pref-design-h strong{font-size:13.5px;letter-spacing:-.01em;}
+.pref-files{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px;}
+.pref-file{
+  display:inline-flex;align-items:center;gap:5px;max-width:100%;
+  padding:4px 8px;border-radius:999px;background:var(--tint);
+  font-size:11.5px;color:var(--muted);font-weight:600;
+}
+.pref-file i{font-size:13px;}
+.pref-row{
+  display:flex;justify-content:space-between;gap:12px;align-items:baseline;
+  padding:5px 0;border-top:1px solid var(--line);font-size:12.5px;
+}
+.pref-row span{color:var(--muted);flex-shrink:0;}
+.pref-row b{font-weight:600;text-align:right;word-break:break-word;}
 .od-files-hint{margin:0 0 8px;font-size:12.5px;}
 .od-preview-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
 .odf-final{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:0;border:none;background:none;}

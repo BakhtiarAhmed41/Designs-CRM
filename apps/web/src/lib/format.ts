@@ -23,8 +23,10 @@ export function friendlyFileName(name: string | null | undefined): string {
   const lastDot = trimmed.lastIndexOf('.');
   const ext = lastDot > 0 ? trimmed.slice(lastDot + 1) : '';
   const extOk = /^[A-Za-z0-9]{1,8}$/.test(ext);
-  const base = extOk ? trimmed.slice(0, lastDot) : trimmed;
-  const generated = base.length >= 36 && /^[A-Za-z0-9_-]+$/.test(base);
+  const base = (extOk ? trimmed.slice(0, lastDot) : trimmed).replace(/\s*\(\d+\)$/, '');
+  const generated =
+    /^Gemini_Generated/i.test(base) ||
+    (base.length >= 28 && /^[A-Za-z0-9_-]+$/.test(base));
 
   if (generated) {
     const lower = extOk ? ext.toLowerCase() : '';
