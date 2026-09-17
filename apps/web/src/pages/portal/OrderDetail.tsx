@@ -11,11 +11,11 @@ import {
   rejectQuotation,
   uploadAttachments,
 } from '@/lib/orders';
-import { DeliveryPreview } from '@/components/FilePreview';
+import { AttachmentPreview, DeliveryPreview } from '@/components/FilePreview';
 import { listMyEdits, requestEdit } from '@/lib/edits';
 import { RevisionRequestForm } from '@/components/RevisionRequestForm';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
-import { money, lifecycleChip, dateShort, paymentChip, friendlyFileName } from '@/lib/format';
+import { money, lifecycleChip, dateShort, paymentChip } from '@/lib/format';
 import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import { openLinkedChat } from '@/lib/messaging';
 import {
@@ -742,27 +742,15 @@ export function PortalOrderDetail() {
               <div className="card-h">
                 <span className="ct">Your references</span>
               </div>
-              {(order.attachments ?? []).map((a) => (
-                <div key={a.id} className="orow" style={{ cursor: 'default' }}>
-                  <div className="thumb">
-                    <i className="ti ti-paperclip" />
-                  </div>
-                  <div className="oinfo">
-                    <div className="on" title={a.originalName}>
-                      {friendlyFileName(a.originalName)}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    onClick={() =>
-                      downloadSignedFile(myAttachmentUrl(order.id, a.id), a.originalName)
-                    }
-                  >
-                    <i className="ti ti-download" />
-                  </button>
-                </div>
-              ))}
+              <div className="od-files">
+                {(order.attachments ?? []).map((a) => (
+                  <AttachmentPreview
+                    key={a.id}
+                    name={a.originalName}
+                    signedUrlPath={myAttachmentUrl(order.id, a.id)}
+                  />
+                ))}
+              </div>
               {canUploadRefs && (
                 <div style={{ padding: '10px 14px 14px' }}>
                   {uploadError && (

@@ -42,8 +42,9 @@ import {
 } from '@/lib/designs';
 import { useDialog } from '@/components/ui/AppDialog';
 import { apiFetch, downloadSignedFile, getErrorMessage, resolveFileUrl } from '@/lib/api';
-import { money, dateShort, lifecycleChip, friendlyFileName } from '@/lib/format';
+import { money, dateShort, lifecycleChip } from '@/lib/format';
 import { AdminCounterDecision } from '@/components/AdminCounterDecision';
+import { AttachmentPreview, LocalFilePreview } from '@/components/FilePreview';
 import { FormPreferencesDisplay } from '@/components/FormPreferencesDisplay';
 import { MessageAttachments } from '@/components/MessageAttachments';
 import { QuoteHistory } from '@/components/QuoteHistory';
@@ -961,16 +962,11 @@ export function AdminOrderDetail() {
                     <div key={g.label} style={{ width: '100%' }}>
                       <div className="od-files-label">{g.label}</div>
                       {g.files.map((a) => (
-                        <button
+                        <AttachmentPreview
                           key={a.id}
-                          type="button"
-                          className="odf"
-                          title={a.originalName}
-                          onClick={() => downloadSignedFile(adminAttachmentUrl(order.id, a.id), a.originalName)}
-                        >
-                          <i className="ti ti-file" />
-                          <span className="odf-name">{friendlyFileName(a.originalName)}</span>
-                        </button>
+                          name={a.originalName}
+                          signedUrlPath={adminAttachmentUrl(order.id, a.id)}
+                        />
                       ))}
                     </div>
                   ));
@@ -1406,14 +1402,11 @@ export function AdminOrderDetail() {
             {canMessageCustomer && msgFiles.length > 0 && (
               <div style={{ padding: '0 14px 8px', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {msgFiles.map((f, i) => (
-                  <button
+                  <LocalFilePreview
                     key={`${f.name}-${i}`}
-                    type="button"
-                    className="odf"
-                    onClick={() => setMsgFiles((prev) => prev.filter((_, idx) => idx !== i))}
-                  >
-                    <i className="ti ti-paperclip" /> {f.name} <i className="ti ti-x" />
-                  </button>
+                    file={f}
+                    onRemove={() => setMsgFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                  />
                 ))}
               </div>
             )}

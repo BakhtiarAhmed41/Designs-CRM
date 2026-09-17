@@ -2245,10 +2245,35 @@ button.primary i,
   line-height: 1;
 }
 .dash-waiting-copy {
-  font-size: 16px;
-  line-height: 1.5;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: max-content;
+  max-width: 100%;
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--tint, #f7f7f7);
   color: var(--ink);
-  max-width: 42rem;
+}
+.dash-waiting-copy i {
+  flex: none;
+  margin-top: 1px;
+  font-size: 16px;
+  color: var(--ink);
+}
+.dash-waiting-copy strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.dash-waiting-copy p {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted, #666);
 }
 .quote-submit-mask {
   position: fixed;

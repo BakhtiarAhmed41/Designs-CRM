@@ -78,12 +78,25 @@
 
   function renderFileList(inp, list) {
     var bag = inp._lvdFiles || [];
+    (list._lvdUrls || []).forEach(function (u) {
+      URL.revokeObjectURL(u);
+    });
+    list._lvdUrls = [];
     list.innerHTML = '';
     bag.forEach(function (f, i) {
       var d = document.createElement('div');
       d.className = 'fitem';
+      var isImg = f.type && f.type.indexOf('image/') === 0;
+      var thumb = '';
+      if (isImg) {
+        var url = URL.createObjectURL(f);
+        list._lvdUrls.push(url);
+        thumb = '<img class="fitem-img" alt="" src="' + url + '">';
+      } else {
+        thumb = '<span class="fitem-ico"><i class="ti ti-file"></i></span>';
+      }
       d.innerHTML =
-        '<span class="fitem-ico"><i class="ti ti-file"></i></span>' +
+        thumb +
         '<span class="fitem-meta"><span class="fitem-name">' +
         escapeText(f.name) +
         '</span><span class="fitem-size">' +

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MessageComposer } from '@/components/messaging/MessageComposer';
-import { getErrorMessage, resolveFileUrl } from '@/lib/api';
+import { MessageAttachments } from '@/components/MessageAttachments';
+import { getErrorMessage } from '@/lib/api';
 import {
   getTeamChat,
   sendTeamChat,
@@ -124,25 +125,7 @@ export function TeamChatPanel({
               }}
             >
               {m.body}
-              {(m.attachments?.length ?? 0) > 0 && (
-                <div style={{ marginTop: 6 }}>
-                  {m.attachments!.map((a) => (
-                    <a
-                      key={a.id}
-                      href={resolveFileUrl(a.url)}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{
-                        display: 'block',
-                        fontSize: 11.5,
-                        color: m.mine ? '#cfe0ff' : 'var(--navy)',
-                      }}
-                    >
-                      📎 {a.originalName}
-                    </a>
-                  ))}
-                </div>
-              )}
+              <MessageAttachments attachments={m.attachments} />
             </div>
           </div>
         ))}

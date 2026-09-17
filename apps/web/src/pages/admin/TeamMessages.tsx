@@ -2,9 +2,11 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MessageComposer } from '@/components/messaging/MessageComposer';
+import { MessageAttachments } from '@/components/MessageAttachments';
 import { useDialog } from '@/components/ui/AppDialog';
 import { useAuth } from '@/context/AuthContext';
 import { getErrorMessage, resolveFileUrl } from '@/lib/api';
+import { isImageFile } from '@/lib/format';
 import { canFeature } from '@/lib/permissions';
 import {
   deleteTeamChat,
@@ -135,10 +137,10 @@ export function AdminTeamMessages() {
     const msgs = groupMode
       ? (groupQuery.data?.messages ?? [])
       : (dmQuery.data?.messages ?? []);
-    const files: Array<{ id: string; originalName: string; url: string }> = [];
+    const files: Array<{ id: string; originalName: string; url: string; mimeType?: string | null }> = [];
     for (const m of msgs as Array<TeamChatMessage | GroupChatMessage>) {
       for (const a of m.attachments ?? []) {
-        files.push({ id: a.id, originalName: a.originalName, url: a.url });
+        files.push({ id: a.id, originalName: a.originalName, url: a.url, mimeType: a.mimeType });
       }
     }
     return files.slice(-20).reverse();
@@ -343,17 +345,7 @@ export function AdminTeamMessages() {
                       <div className="msg-sender">{m.senderName}</div>
                     )}
                     {m.body}
-                    {(m.attachments ?? []).map((a) => (
-                      <a
-                        key={a.id}
-                        className="msg-file"
-                        href={resolveFileUrl(a.url)}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <i className="ti ti-file" /> {a.originalName}
-                      </a>
-                    ))}
+                    <MessageAttachments attachments={m.attachments} />
                   </div>
                   <div className="msg-meta">{formatMsgTime(m.createdAt)}</div>
                 </div>
@@ -382,17 +374,7 @@ export function AdminTeamMessages() {
                 <div key={m.id} className={`msg-bubble ${m.mine ? 'mine' : 'theirs'}`}>
                   <div className="msg-bubble-body">
                     {m.body}
-                    {(m.attachments ?? []).map((a) => (
-                      <a
-                        key={a.id}
-                        className="msg-file"
-                        href={resolveFileUrl(a.url)}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <i className="ti ti-file" /> {a.originalName}
-                      </a>
-                    ))}
+                    <MessageAttachments attachments={m.attachments} />
                   </div>
                   <div className="msg-meta">{formatMsgTime(m.createdAt)}</div>
                 </div>
@@ -434,17 +416,33 @@ export function AdminTeamMessages() {
         )}
         <div className="msg-right-section">
           <div className="msg-right-title">Shared files</div>
-          {sharedFiles.map((f) => (
-            <a
-              key={f.id}
-              href={resolveFileUrl(f.url)}
-              target="_blank"
-              rel="noreferrer"
-              className="msg-side-row"
-            >
-              <b><i className="ti ti-file" /> {f.originalName}</b>
-            </a>
-          ))}
+          {sharedFiles.map((f) =>
+            isImageFile(f.originalName, f.mimeType) ? (
+              <a
+                key={f.id}
+                href={resolveFileUrl(f.url)}
+                target="_blank"
+                rel="noreferrer"
+                className="msg-file-preview"
+                style={{ textDecoration: 'none', color: 'inherit', marginBottom: 8 }}
+              >
+                <img src={resolveFileUrl(f.url)} alt={f.originalName} />
+                <span>{f.originalName}</span>
+              </a>
+            ) : (
+              <a
+                key={f.id}
+                href={resolveFileUrl(f.url)}
+                target="_blank"
+                rel="noreferrer"
+                className="msg-side-row"
+              >
+                <b>
+                  <i className="ti ti-file" /> {f.originalName}
+                </b>
+              </a>
+            ),
+          )}
           {sharedFiles.length === 0 && <div className="muted">No files yet</div>}
         </div>
       </aside>

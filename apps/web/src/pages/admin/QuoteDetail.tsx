@@ -23,10 +23,11 @@ import { submitQuoteBuilder } from '@/lib/designs';
 import { applyOrderChange, invalidateWorkCaches } from '@/lib/queryCache';
 import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
 import { getCustomer } from '@/lib/customers';
-import { downloadSignedFile, getErrorMessage } from '@/lib/api';
+import { getErrorMessage } from '@/lib/api';
 import { money, dateShort, quoteLifecycleChip, friendlyFileName } from '@/lib/format';
 import { isAdminRecounter, isStaffCreatedOrder, lineTotal, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
 import { useDialog } from '@/components/ui/AppDialog';
+import { AttachmentPreview, LocalFilePreview } from '@/components/FilePreview';
 import { FormPreferencesDisplay } from '@/components/FormPreferencesDisplay';
 import { MessageAttachments } from '@/components/MessageAttachments';
 import type { Order } from '@/lib/types';
@@ -419,17 +420,11 @@ export function AdminQuoteDetail() {
                 <span style={{ color: 'var(--muted)', fontSize: 12 }}>No artwork uploaded.</span>
               )}
               {attachments.map((a) => (
-                <button
+                <AttachmentPreview
                   key={a.id}
-                  type="button"
-                  className="odf"
-                  style={{ cursor: 'pointer' }}
-                  title={a.originalName}
-                  onClick={() => downloadSignedFile(adminAttachmentUrl(order.id, a.id), a.originalName)}
-                >
-                  <i className="ti ti-photo" style={{ color: 'var(--navy)' }} />
-                  <span className="odf-name">{friendlyFileName(a.originalName)}</span>
-                </button>
+                  name={a.originalName}
+                  signedUrlPath={adminAttachmentUrl(order.id, a.id)}
+                />
               ))}
               <label className="odf up">
                 <i className="ti ti-cloud-upload" />{' '}
@@ -471,14 +466,11 @@ export function AdminQuoteDetail() {
             {msgFiles.length > 0 && (
               <div style={{ padding: '0 14px 8px', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {msgFiles.map((f, i) => (
-                  <button
+                  <LocalFilePreview
                     key={`${f.name}-${i}`}
-                    type="button"
-                    className="odf"
-                    onClick={() => setMsgFiles((prev) => prev.filter((_, idx) => idx !== i))}
-                  >
-                    <i className="ti ti-paperclip" /> {f.name} <i className="ti ti-x" />
-                  </button>
+                    file={f}
+                    onRemove={() => setMsgFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                  />
                 ))}
               </div>
             )}

@@ -1445,6 +1445,13 @@ button { font-family: inherit; }
   display:block;padding:6px 8px;font-size:11px;color:var(--muted);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
+.file-thumb-local{position:relative;width:112px;}
+.file-thumb-local .file-thumb{width:100%;}
+.file-thumb-x{
+  position:absolute;top:4px;right:4px;width:22px;height:22px;border:none;
+  border-radius:50%;background:#fff;color:var(--ink);font-size:16px;line-height:1;
+  cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.18);
+}
 .file-lightbox{
   position:fixed;inset:0;z-index:80;background:rgba(10,18,28,.72);
   display:flex;align-items:center;justify-content:center;padding:24px;

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useDialog } from '@/components/ui/AppDialog';
+import { LocalFilePreview } from '@/components/FilePreview';
 
 type Props = {
   disabled?: boolean;
@@ -75,15 +76,11 @@ export function MessageComposer({
       {files.length > 0 && (
         <div className="msg-attach-preview">
           {files.map((f) => (
-            <span key={`${f.name}-${f.size}`} className="msg-chip">
-              <i className="ti ti-paperclip" /> {f.name}
-              <button
-                type="button"
-                onClick={() => setFiles((prev) => prev.filter((x) => x !== f))}
-              >
-                ×
-              </button>
-            </span>
+            <LocalFilePreview
+              key={`${f.name}-${f.size}`}
+              file={f}
+              onRemove={() => setFiles((prev) => prev.filter((x) => x !== f))}
+            />
           ))}
         </div>
       )}

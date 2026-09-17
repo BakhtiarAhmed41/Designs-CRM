@@ -17,6 +17,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { postThemeToWindow } from '@/lib/theme';
 import { invalidateWorkCaches } from '@/lib/queryCache';
 import { filesFromQuoteForm } from '@/lib/quoteFiles';
+import { LocalFilePreview } from '@/components/FilePreview';
 
 type PriceLine = { name: string; note: string; price: string };
 
@@ -672,23 +673,18 @@ export function QuoteBuilderModal({
                     <div className="ff">
                       <label>Attachments</label>
                       {(formFiles.length > 0 || extraFiles.length > 0) && (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
                           {formFiles.map((f, i) => (
-                            <span key={`form-${f.name}-${i}`} className="odf">
-                              <i className="ti ti-paperclip" /> {f.name}
-                            </span>
+                            <LocalFilePreview key={`form-${f.name}-${i}`} file={f} />
                           ))}
                           {extraFiles.map((f, i) => (
-                            <button
+                            <LocalFilePreview
                               key={`extra-${f.name}-${i}`}
-                              type="button"
-                              className="odf"
-                              onClick={() =>
+                              file={f}
+                              onRemove={() =>
                                 setExtraFiles((prev) => prev.filter((_, idx) => idx !== i))
                               }
-                            >
-                              <i className="ti ti-paperclip" /> {f.name} <i className="ti ti-x" />
-                            </button>
+                            />
                           ))}
                         </div>
                       )}

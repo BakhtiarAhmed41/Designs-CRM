@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { apiFetch, resolveFileUrl } from '@/lib/api';
+import { apiFetch, downloadSignedFile, resolveFileUrl } from '@/lib/api';
 import { isImageFile } from '@/lib/format';
 import { myDeliveryFilePreviewUrl } from '@/lib/orders';
 
@@ -95,5 +95,75 @@ export function DeliveryPreview({
         <ImageLightbox src={src} name={name} onClose={() => setOpen(false)} />
       )}
     </>
+  );
+}
+
+export function AttachmentPreview({
+  name,
+  mimeType,
+  signedUrlPath,
+}: {
+  name: string;
+  mimeType?: string | null;
+  signedUrlPath: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const show = isImageFile(name, mimeType);
+  const q = useQuery({
+    queryKey: ['attachment-preview', signedUrlPath],
+    queryFn: async () => {
+      const { url } = await apiFetch<{ url: string }>(signedUrlPath);
+      return resolveFileUrl(url);
+    },
+    enabled: show,
+    staleTime: 60_000,
+  });
+  const src = q.data;
+
+  if (!show) {
+    return (
+      <FileThumb
+        name={name}
+        onOpen={() => {
+          void downloadSignedFile(signedUrlPath, name);
+        }}
+      />
+    );
+  }
+
+  return (
+    <>
+      <FileThumb name={name} src={src} onOpen={src ? () => setOpen(true) : undefined} />
+      {open && src && <ImageLightbox src={src} name={name} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+export function LocalFilePreview({
+  file,
+  onRemove,
+}: {
+  file: File;
+  onRemove?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const src = useMemo(
+    () => (isImageFile(file.name, file.type) ? URL.createObjectURL(file) : null),
+    [file],
+  );
+  useEffect(() => () => {
+    if (src) URL.revokeObjectURL(src);
+  }, [src]);
+
+  return (
+    <div className="file-thumb-local">
+      <FileThumb name={file.name} src={src} onOpen={src ? () => setOpen(true) : undefined} />
+      {onRemove && (
+        <button type="button" className="file-thumb-x" onClick={onRemove} aria-label={`Remove ${file.name}`}>
+          ×
+        </button>
+      )}
+      {open && src && <ImageLightbox src={src} name={file.name} onClose={() => setOpen(false)} />}
+    </div>
   );
 }

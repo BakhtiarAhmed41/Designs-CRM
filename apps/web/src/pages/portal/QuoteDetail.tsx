@@ -17,6 +17,7 @@ import { freshOnOpen } from '@/lib/queryRefresh';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { QuoteHistory } from '@/components/QuoteHistory';
+import { AttachmentPreview } from '@/components/FilePreview';
 import { FormPreferencesDisplay } from '@/components/FormPreferencesDisplay';
 
 export function PortalQuoteDetail() {
@@ -295,16 +296,34 @@ export function PortalQuoteDetail() {
         </div>
       )}
 
-      <div className="card card-pad">
-        {lines.length === 0 && !canDecide && (
-          <div className="dash-waiting-copy">
-            {order.status === 'WAITING_FOR_QUOTATION' || order.status === 'CREATED'
-              ? 'Your quote is being prepared. Once it’s ready, you’ll see an update on your Dashboard. Click the quote to review pricing and full details.'
-              : order.status === 'REJECTED'
-                ? 'This request was declined by the team.'
-                : 'No quotation lines yet.'}
+      {lines.length === 0 && !canDecide && (
+        <div className="dash-waiting-copy">
+          <i
+            className={`ti ${
+              order.status === 'REJECTED' ? 'ti-circle-x' : 'ti-hourglass'
+            }`}
+          />
+          <div>
+            <strong>
+              {order.status === 'WAITING_FOR_QUOTATION' || order.status === 'CREATED'
+                ? 'Your quote is being prepared'
+                : order.status === 'REJECTED'
+                  ? 'This request was declined'
+                  : 'No quotation lines yet'}
+            </strong>
+            <p>
+              {order.status === 'WAITING_FOR_QUOTATION' || order.status === 'CREATED'
+                ? 'You’ll see an update on your Dashboard when it’s ready. Open this quote to review pricing and details.'
+                : order.status === 'REJECTED'
+                  ? 'The team declined this request.'
+                  : 'Pricing will show here when the quote is ready.'}
+            </p>
           </div>
-        )}
+        </div>
+      )}
+
+      {(lines.length > 0 || canDecide) && (
+      <div className="card card-pad">
         {lines.length > 0 && (
           <>
             {lines.map((l) => {
@@ -397,6 +416,7 @@ export function PortalQuoteDetail() {
           </>
         )}
       </div>
+      )}
 
       <FormPreferencesDisplay preferences={order.preferences} />
 
@@ -407,25 +427,15 @@ export function PortalQuoteDetail() {
               <i className="ti ti-paperclip" /> Your uploaded files
             </span>
           </div>
-          {(order.attachments ?? []).map((a) => (
-            <div key={a.id} className="orow" style={{ cursor: 'default' }}>
-              <div className="thumb">
-                <i className="ti ti-paperclip" />
-              </div>
-              <div className="oinfo">
-                <div className="on">{friendlyFileName(a.originalName)}</div>
-              </div>
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() =>
-                  downloadSignedFile(myAttachmentUrl(order.id, a.id), a.originalName)
-                }
-              >
-                <i className="ti ti-download" />
-              </button>
-            </div>
-          ))}
+          <div className="od-files">
+            {(order.attachments ?? []).map((a) => (
+              <AttachmentPreview
+                key={a.id}
+                name={a.originalName}
+                signedUrlPath={myAttachmentUrl(order.id, a.id)}
+              />
+            ))}
+          </div>
         </div>
       )}
 
