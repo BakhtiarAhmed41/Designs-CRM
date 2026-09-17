@@ -10,6 +10,7 @@ import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 import { freshOnOpen } from '@/lib/queryRefresh';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { useRequestQuote } from '@/context/RequestQuoteContext';
 
 const DRAFT_LABELS: Record<string, string> = {
   embroidery: 'Embroidery Digitizing',
@@ -35,6 +36,7 @@ function quoteRowAction(statusLabel: string) {
 export function PortalQuotes() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { openRequestQuote } = useRequestQuote();
   const [draftsOpen, setDraftsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -84,7 +86,7 @@ export function PortalQuotes() {
   function continueDraft(serviceKey: string) {
     setDraftsOpen(false);
     const key = serviceKey === 'svg' ? 'laser' : serviceKey;
-    navigate(`/portal/quotes/new?service=${encodeURIComponent(key)}`);
+    openRequestQuote(key);
   }
 
   return (
@@ -99,7 +101,7 @@ export function PortalQuotes() {
                 <i className="ti ti-device-floppy" /> Open drafts
               </button>
             )}
-            <button type="button" className="btn btn-primary" onClick={() => navigate('/portal/quotes/new')}>
+            <button type="button" className="btn btn-primary" onClick={() => openRequestQuote()}>
               <i className="ti ti-plus" /> Request a quote
             </button>
           </>
@@ -168,7 +170,7 @@ export function PortalQuotes() {
             title="No quotes yet"
             description="Request a quote and we’ll price it. Approve to start production."
             action={
-              <button type="button" className="btn btn-primary btn-sm" onClick={() => navigate('/portal/quotes/new')}>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => openRequestQuote()}>
                 Request a quote
               </button>
             }

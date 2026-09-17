@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react';
-import { useEffect } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Brand, LogoutLink, Shell, useShellUser } from './Shell';
+import { QuoteBuilderModal } from '@/components/QuoteBuilderModal';
+import { RequestQuoteContext } from '@/context/RequestQuoteContext';
 import { getMyCustomer, portalLookFromPrefs } from '@/lib/customers';
 import { listMyOrderSummary } from '@/lib/orders';
 import { getMyInvoiceSummary } from '@/lib/billing';
@@ -44,6 +46,16 @@ export function PortalShell() {
   const { onLogout } = useShellUser();
   const qc = useQueryClient();
   const location = useLocation();
+  const navigate = useNavigate();
+  const [quoteOpen, setQuoteOpen] = useState(false);
+  const [quoteService, setQuoteService] = useState<string | null>(null);
+  const [quoteNonce, setQuoteNonce] = useState(0);
+
+  const openRequestQuote = useCallback((service?: string | null) => {
+    setQuoteService(service ?? null);
+    setQuoteNonce((n) => n + 1);
+    setQuoteOpen(true);
+  }, []);
   useMessagingSocket({
     onUnreadChanged: () => {
       void qc.invalidateQueries({ queryKey: ['portal-unread'] });
@@ -157,15 +169,15 @@ export function PortalShell() {
       <NavGroup label="Billing" items={billing} />
       <p className="nav-label">Request a quote</p>
       <nav className="service-nav" aria-label="Quote services">
-        <NavLink to="/portal/quotes/new?service=embroidery" className={() => undefined}>
+        <button type="button" onClick={() => openRequestQuote('embroidery')}>
           <i className="ti ti-needle-thread" /> Embroidery Digitizing
-        </NavLink>
-        <NavLink to="/portal/quotes/new?service=vector" className={() => undefined}>
+        </button>
+        <button type="button" onClick={() => openRequestQuote('vector')}>
           <i className="ti ti-vector-bezier" /> Vector &amp; Print Artwork
-        </NavLink>
-        <NavLink to="/portal/quotes/new?service=laser" className={() => undefined}>
+        </button>
+        <button type="button" onClick={() => openRequestQuote('laser')}>
           <i className="ti ti-router" /> Cutting &amp; Engraving Files
-        </NavLink>
+        </button>
       </nav>
       <NavGroup label="Account" items={account} />
       <div className="foot">
@@ -175,24 +187,36 @@ export function PortalShell() {
   );
 
   return (
-    <div
-      className="portal-look"
-      style={{
-        ['--portal-heading' as string]: look.headingColor || undefined,
-        ['--portal-page-bg' as string]: look.backgroundColor || undefined,
-      }}
-    >
-    <Shell
-      sidebar={sidebar}
-      brandLabel="Customer portal"
-      contextLabel="Customer"
-      mobileItems={[
-        { to: '/portal', label: 'Home', icon: 'ti-layout-dashboard', end: true },
-        { to: '/portal/quotes', label: 'Quotes', icon: 'ti-file-invoice' },
-        { to: '/portal/orders', label: 'Orders', icon: 'ti-package' },
-        { to: '/portal/messages', label: 'Chat', icon: 'ti-message' },
-      ]}
-    />
-    </div>
+    <RequestQuoteContext.Provider value={{ openRequestQuote }}>
+      <div
+        className="portal-look"
+        style={{
+          ['--portal-heading' as string]: look.headingColor || undefined,
+          ['--portal-page-bg' as string]: look.backgroundColor || undefined,
+        }}
+      >
+        <Shell
+          sidebar={sidebar}
+          brandLabel="Customer portal"
+          contextLabel="Customer"
+          mobileItems={[
+            { to: '/portal', label: 'Home', icon: 'ti-layout-dashboard', end: true },
+            { to: '/portal/quotes', label: 'Quotes', icon: 'ti-file-invoice' },
+            { to: '/portal/orders', label: 'Orders', icon: 'ti-package' },
+            { to: '/portal/messages', label: 'Chat', icon: 'ti-message' },
+          ]}
+        />
+        <QuoteBuilderModal
+          key={quoteNonce}
+          open={quoteOpen}
+          initialService={quoteService}
+          onClose={() => setQuoteOpen(false)}
+          onSubmitted={(orderId) => {
+            setQuoteOpen(false);
+            navigate(`/portal/quotes/${orderId}`);
+          }}
+        />
+      </div>
+    </RequestQuoteContext.Provider>
   );
 }

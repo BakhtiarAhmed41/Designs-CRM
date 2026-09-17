@@ -997,17 +997,19 @@ html.in-frame .ch {
 }
 
 .btn-s {
-  background: none;
-  border: none;
+  background: var(--form-bg, #fff);
+  border: 1px solid var(--form-border, #d8d8d8);
+  border-radius: var(--nq-radius-pill, 8px);
   color: var(--form-muted, #555);
   font-weight: 700;
   font-size: 13.5px;
   cursor: pointer;
-  padding: 8px 6px;
+  padding: 8px 14px;
 }
 
 .btn-s:hover {
   color: var(--form-text, #222);
+  border-color: var(--form-text, #222);
 }
 
 .nq-actions-right {

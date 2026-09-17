@@ -1988,19 +1988,26 @@ button.primary i,
   gap: 4px;
   margin-bottom: 8px;
 }
-.service-nav a {
+.service-nav a,
+.service-nav button {
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
   min-height: 32px;
   padding: 5px 10px;
+  border: 0;
   border-radius: 0;
   color: inherit;
+  text-align: left;
   text-decoration: none;
+  font: inherit;
   font-size: 13px;
   background: transparent;
+  cursor: pointer;
 }
 .service-nav a:hover,
+.service-nav button:hover,
 .service-nav a.active,
 .service-nav a.on,
 .service-nav a.active:hover,
@@ -2481,6 +2488,14 @@ button.primary i,
   max-width: 1450px;
   gap: 0;
 }
+.main:not(.main-messaging) > div.policy-page {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 32px;
+  max-width: none;
+  width: 100%;
+}
 .quote-page-h {
   display: none;
   grid-template-columns: auto 1fr auto auto;
@@ -2570,13 +2585,17 @@ button.primary i,
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
   min-height: 36px;
   border: 1px solid var(--ink);
   border-radius: 7px;
   color: inherit;
   text-decoration: none;
+  font: inherit;
   font-size: 12px;
   font-weight: 700;
+  background: #fff;
+  cursor: pointer;
 }
 .sr-only {
   position: absolute;
@@ -2613,7 +2632,9 @@ button.primary i,
   background: var(--sidebar-active-bg);
 }
 .portal-side .service-nav a,
+.portal-side .service-nav button,
 .portal-side .service-nav a:hover,
+.portal-side .service-nav button:hover,
 .portal-side .service-nav a.active,
 .portal-side .service-nav a.on {
   background: transparent;
@@ -2691,14 +2712,15 @@ button.primary:hover:not(:disabled),
 /* ---------- Policy document pages ---------- */
 .policy-page {
   display: flex;
+  flex-direction: row;
   align-items: flex-start;
   gap: 32px;
-  max-width: 1240px;
+  width: 100%;
+  max-width: none;
 }
 .policy-main {
   flex: 1;
   min-width: 0;
-  max-width: 800px;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -2756,7 +2778,7 @@ button.primary:hover:not(:disabled),
   box-shadow: var(--shadow-sec);
 }
 .policy-hero {
-  padding: 22px 24px;
+  padding: 26px 28px;
 }
 .policy-hero-icon {
   width: 48px;
@@ -2793,7 +2815,7 @@ button.primary:hover:not(:disabled),
   max-width: 60ch;
 }
 .policy-toc {
-  padding: 16px 22px 18px;
+  padding: 22px 26px 24px;
 }
 .policy-toc-label {
   margin: 0 0 10px;
@@ -2809,7 +2831,7 @@ button.primary:hover:not(:disabled),
   list-style: none;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px 16px;
+  gap: 8px 24px;
 }
 .policy-toc a {
   display: flex;
@@ -2867,14 +2889,15 @@ button.primary:hover:not(:disabled),
 }
 .policy-doc {
   overflow: hidden;
+  padding: 6px 28px 8px;
 }
 .policy-section {
-  padding: 22px 24px 20px;
-  border-top: 1px solid var(--line);
+  padding: 26px 0;
+  border-bottom: 1px solid var(--line);
   scroll-margin-top: 80px;
 }
-.policy-section:first-child {
-  border-top: 0;
+.policy-section:last-child {
+  border-bottom: 0;
 }
 .policy-section-head {
   display: flex;
@@ -3068,6 +3091,7 @@ button.primary:hover:not(:disabled),
   display: flex;
   align-items: center;
   gap: 14px;
+  margin: 6px 0 0;
   scroll-margin-top: 80px;
 }
 .policy-divider span {
@@ -3090,7 +3114,7 @@ button.primary:hover:not(:disabled),
   justify-content: space-between;
   gap: 20px;
   flex-wrap: wrap;
-  padding: 22px 24px;
+  padding: 26px 28px;
 }
 .policy-final-copy h2 {
   margin: 0 0 4px;
@@ -3151,9 +3175,6 @@ button.primary:hover:not(:disabled),
   .policy-rail {
     display: none;
   }
-  .policy-page {
-    max-width: 860px;
-  }
 }
 @media (max-width: 720px) {
   .policy-toc ol,
@@ -3162,7 +3183,7 @@ button.primary:hover:not(:disabled),
   }
   .policy-hero,
   .policy-toc,
-  .policy-section,
+  .policy-doc,
   .policy-final {
     padding-left: 16px;
     padding-right: 16px;

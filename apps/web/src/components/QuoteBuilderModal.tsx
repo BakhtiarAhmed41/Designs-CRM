@@ -417,7 +417,9 @@ export function QuoteBuilderModal({
                   ? isAdmin
                     ? `${service.label} ${kindLabel}`
                     : `${service.label} ${kindLabel} request`
-                  : `Start a new ${kindLabel}`}
+                  : isAdmin
+                    ? `Start a new ${kindLabel}`
+                    : 'Request a quote'}
             </div>
             <button type="button" className="modal-x" onClick={onClose} aria-label="Close">
               <i className="ti ti-x" />
@@ -439,10 +441,9 @@ export function QuoteBuilderModal({
             {!service && (
               <>
                 <div className="pick-intro">
-                  Step 1 of {isAdmin ? 3 : 2}. Pick a service.{' '}
                   {isAdmin
-                    ? 'This will be filed under the selected customer.'
-                    : 'Your account details are already attached.'}
+                    ? 'Step 1 of 3. Pick a service. This will be filed under the selected customer.'
+                    : 'Pick a service to start your quote.'}
                 </div>
                 <div className="pick-grid">
                   {SERVICES.map((s) => (
@@ -473,6 +474,25 @@ export function QuoteBuilderModal({
                     </div>
                   ))}
                 </div>
+                {!isAdmin && (
+                  <aside className="help-card" style={{ marginTop: 14, position: 'static' }}>
+                    <span className="help-icon">
+                      <i className="ti ti-messages" />
+                    </span>
+                    <h2>Need help?</h2>
+                    <p>Not sure what to select? Our team can help with artwork, sizing and file requirements.</p>
+                    <button
+                      type="button"
+                      className="help-button"
+                      onClick={() => {
+                        onClose();
+                        navigate('/portal/messages');
+                      }}
+                    >
+                      Chat with our team
+                    </button>
+                  </aside>
+                )}
               </>
             )}
 
