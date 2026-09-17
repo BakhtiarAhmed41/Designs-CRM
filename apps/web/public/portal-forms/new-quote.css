@@ -505,6 +505,14 @@ html.in-frame .ch {
   color: var(--form-text, #222);
 }
 
+.nq-radio {
+  width: max-content;
+  max-width: 100%;
+  padding: 4px 10px;
+  border-radius: 14px;
+  outline: 1px solid transparent;
+}
+
 .nq-radio input,
 .nq-check input {
   accent-color: var(--button-bg, #222);
@@ -513,12 +521,8 @@ html.in-frame .ch {
 }
 
 .nq-radio-hi {
-  width: max-content;
-  max-width: 100%;
   background: var(--nq-tint);
-  border-radius: 14px;
-  padding: 4px 10px;
-  outline: 1px solid var(--form-focus, #222);
+  outline-color: var(--form-focus, #222);
 }
 
 /* Size */
