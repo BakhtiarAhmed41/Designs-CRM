@@ -23,26 +23,6 @@ export function ImageLightbox({
   );
 }
 
-async function signedImageSrc(path: string): Promise<string> {
-  const { url } = await apiFetch<{ url: string }>(path);
-  const abs = resolveFileUrl(url);
-  const res = await fetch(abs, { credentials: 'include' });
-  if (!res.ok) throw new Error('Could not open file');
-  const blob = await res.blob();
-  if (!blob.size) throw new Error('Empty file');
-  return URL.createObjectURL(blob);
-}
-
-function useSignedImage(path: string | null, enabled: boolean) {
-  return useQuery({
-    queryKey: ['signed-image', path],
-    queryFn: () => signedImageSrc(path!),
-    enabled: Boolean(enabled && path),
-    staleTime: 60_000,
-    retry: 1,
-  });
-}
-
 export function FileThumb({
   name,
   src,
@@ -88,15 +68,21 @@ export function DeliveryPreview({
 }) {
   const [open, setOpen] = useState(false);
   const show = isImageFile(name, mimeType);
-  const q = useSignedImage(show ? myDeliveryFilePreviewUrl(orderId, fileId) : null, show && !previewUrl);
-  const src = previewUrl ? resolveFileUrl(previewUrl) : q.data;
+  const q = useQuery({
+    queryKey: ['delivery-preview', orderId, fileId],
+    queryFn: async () => {
+      const { url } = await apiFetch<{ url: string }>(
+        myDeliveryFilePreviewUrl(orderId, fileId),
+      );
+      return url;
+    },
+    enabled: show && !previewUrl,
+    staleTime: 60_000,
+  });
+  const src = previewUrl || q.data ? resolveFileUrl(previewUrl || q.data || '') : null;
 
   if (compact) {
-    return src ? (
-      <img className="thumb-img" src={src} alt="" />
-    ) : (
-      <i className="ti ti-photo" aria-hidden />
-    );
+    return src ? <img className="thumb-img" src={src} alt="" /> : <i className="ti ti-photo" aria-hidden />;
   }
 
   if (!show && !src) {
@@ -109,12 +95,11 @@ export function DeliveryPreview({
       </div>
     );
   }
+
   return (
     <>
       <FileThumb name={name} src={src} onOpen={src ? () => setOpen(true) : undefined} />
-      {open && src && (
-        <ImageLightbox src={src} name={name} onClose={() => setOpen(false)} />
-      )}
+      {open && src && <ImageLightbox src={src} name={name} onClose={() => setOpen(false)} />}
     </>
   );
 }
@@ -123,16 +108,27 @@ export function AttachmentPreview({
   name,
   mimeType,
   signedUrlPath,
+  previewUrl,
 }: {
   name: string;
   mimeType?: string | null;
   signedUrlPath: string;
+  previewUrl?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const show = isImageFile(name, mimeType);
-  const q = useSignedImage(show ? signedUrlPath : null, show);
+  const q = useQuery({
+    queryKey: ['attachment-preview', signedUrlPath],
+    queryFn: async () => {
+      const { url } = await apiFetch<{ url: string }>(`${signedUrlPath}?inline=1`);
+      return url;
+    },
+    enabled: show && !previewUrl,
+    staleTime: 60_000,
+  });
+  const src = previewUrl || q.data ? resolveFileUrl(previewUrl || q.data || '') : null;
 
-  if (!show) {
+  if (!show && !src) {
     return (
       <FileThumb
         name={name}
@@ -145,8 +141,8 @@ export function AttachmentPreview({
 
   return (
     <>
-      <FileThumb name={name} src={q.data} onOpen={q.data ? () => setOpen(true) : undefined} />
-      {open && q.data && <ImageLightbox src={q.data} name={name} onClose={() => setOpen(false)} />}
+      <FileThumb name={name} src={src} onOpen={src ? () => setOpen(true) : undefined} />
+      {open && src && <ImageLightbox src={src} name={name} onClose={() => setOpen(false)} />}
     </>
   );
 }

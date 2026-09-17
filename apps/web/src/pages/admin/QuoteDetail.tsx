@@ -423,7 +423,9 @@ export function AdminQuoteDetail() {
                 <AttachmentPreview
                   key={a.id}
                   name={a.originalName}
+                  mimeType={a.mimeType}
                   signedUrlPath={adminAttachmentUrl(order.id, a.id)}
+                  previewUrl={a.previewUrl}
                 />
               ))}
               <label className="odf up">

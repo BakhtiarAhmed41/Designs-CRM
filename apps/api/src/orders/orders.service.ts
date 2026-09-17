@@ -224,14 +224,23 @@ export class OrdersService {
     return map;
   }
 
-  private mapAttachment(a: {
+  private async mapAttachment(a: {
     id: string;
     order_id: string;
     original_name: string;
     mime_type: string | null;
     byte_size: number | null;
+    storage_key?: string;
     created_at: Date;
   }) {
+    const previewUrl =
+      a.storage_key && isImageFile(a.original_name, a.mime_type)
+        ? await this.storage.createSignedUrl({
+            key: a.storage_key,
+            downloadAs: a.original_name,
+            inline: true,
+          })
+        : null;
     return {
       id: a.id,
       orderId: a.order_id,
@@ -239,6 +248,7 @@ export class OrdersService {
       mimeType: a.mime_type,
       byteSize: a.byte_size,
       createdAt: a.created_at,
+      previewUrl,
     };
   }
 
@@ -278,7 +288,7 @@ export class OrdersService {
     );
     for (const a of rows) {
       const list = map.get(a.order_id) ?? [];
-      list.push(this.mapAttachment(a));
+      list.push(await this.mapAttachment(a));
       map.set(a.order_id, list);
     }
     return map;
@@ -767,6 +777,7 @@ export class OrdersService {
         mime_type: string | null;
         byte_size: number | null;
         format_label: string | null;
+        storage_key?: string;
         created_at: Date;
         downloaded_at?: Date | null;
         download_count?: number | null;
@@ -774,7 +785,7 @@ export class OrdersService {
       let files: FileRow[] = [];
       try {
         files = await this.db.query<FileRow>(
-          `SELECT id, delivery_id, design_id, original_name, mime_type, byte_size, format_label, created_at,
+          `SELECT id, delivery_id, design_id, original_name, mime_type, byte_size, format_label, storage_key, created_at,
                   downloaded_at, download_count
              FROM delivery_files
             WHERE delivery_id IN (${this.sqlIn(deliveryIds)})
@@ -792,6 +803,14 @@ export class OrdersService {
       }
       for (const f of files) {
         const list = filesByDelivery.get(f.delivery_id) ?? [];
+        const previewUrl =
+          f.storage_key && isImageFile(f.original_name, f.mime_type)
+            ? await this.storage.createSignedUrl({
+                key: f.storage_key,
+                downloadAs: f.original_name,
+                inline: true,
+              })
+            : null;
         list.push({
           id: f.id,
           designId: f.design_id,
@@ -802,6 +821,7 @@ export class OrdersService {
           createdAt: f.created_at,
           downloadedAt: f.downloaded_at ?? null,
           downloadCount: Number(f.download_count ?? 0),
+          previewUrl,
         });
         filesByDelivery.set(f.delivery_id, list);
       }

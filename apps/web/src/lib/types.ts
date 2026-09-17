@@ -89,6 +89,8 @@ export type Attachment = {
   id: string;
   orderId: string;
   originalName: string;
+  mimeType?: string | null;
+  previewUrl?: string | null;
 };
 
 export type DeliveryKind = 'FINAL' | 'PREVIEW';
@@ -102,6 +104,7 @@ export type DeliveryFile = {
   formatLabel: string | null;
   downloadedAt?: string | null;
   downloadCount?: number;
+  previewUrl?: string | null;
 };
 
 export type Delivery = {

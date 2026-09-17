@@ -538,6 +538,7 @@ export function PortalOrderDetail() {
                                 fileId={f.id}
                                 name={f.originalName}
                                 mimeType={f.mimeType}
+                                previewUrl={f.previewUrl}
                               />
                             ))}
                           </div>
@@ -603,6 +604,7 @@ export function PortalOrderDetail() {
                                 fileId={f.id}
                                 name={f.originalName}
                                 mimeType={f.mimeType}
+                                previewUrl={f.previewUrl}
                               />
                               <div>
                                 {(f.downloadCount ?? 0) === 0 && (
@@ -664,12 +666,13 @@ export function PortalOrderDetail() {
                 <div key={d.id} className="orow orow-status-under" style={{ cursor: 'default' }}>
                   <div className={`thumb${serviceThumbClass(order.serviceType) ? ' m' : ''}`}>
                     {previewFile ? (
-                      <DeliveryPreview
+                              <DeliveryPreview
                         compact
                         orderId={order.id}
                         fileId={previewFile.id}
                         name={previewFile.originalName}
                         mimeType={previewFile.mimeType}
+                        previewUrl={previewFile.previewUrl}
                       />
                     ) : (
                       <i className={`ti ${serviceTi(order.serviceType)}`} />
@@ -772,7 +775,9 @@ export function PortalOrderDetail() {
                   <AttachmentPreview
                     key={a.id}
                     name={a.originalName}
+                    mimeType={a.mimeType}
                     signedUrlPath={myAttachmentUrl(order.id, a.id)}
+                    previewUrl={a.previewUrl}
                   />
                 ))}
               </div>

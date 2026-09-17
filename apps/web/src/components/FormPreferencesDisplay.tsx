@@ -26,6 +26,22 @@ type QuoteFormPreferences = {
   service?: string;
 };
 
+function tidyLabel(label?: string) {
+  return (label ?? '')
+    .replace(/sizing\s*/i, '')
+    .replace(/\s*\(recommended\)/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function tidyValue(value?: string) {
+  return (value ?? '')
+    .replace(/^no\s*:\s*/i, '')
+    .replace(/^yes\s*:\s*/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function asPrefs(preferences: unknown): QuoteFormPreferences | null {
   if (!preferences || typeof preferences !== 'object') return null;
   return preferences as QuoteFormPreferences;
@@ -65,10 +81,23 @@ export function FormPreferencesDisplay({
     return null;
   }
 
-  const skipField = /^(how many designs|measurement unit|form mode|turnaround)$/i;
-  const visibleFields = (p.fields ?? []).filter(
-    (f) => f.value?.trim() && !skipField.test((f.label ?? '').trim()),
-  );
+  const skipField =
+    /^(how many designs|measurement unit|form mode|turnaround|keep proportional|sizing)$/i;
+  const extraRows = (p.fields ?? [])
+    .map((f) => ({
+      label: tidyLabel(f.label),
+      value: tidyValue(f.value),
+    }))
+    .filter((f) => f.value && !skipField.test(f.label));
+  const optionRows = [
+    p.mode && p.mode !== 'd'
+      ? { label: 'Form mode', value: p.mode === 'd' ? 'Detailed request' : 'Quick request' }
+      : null,
+    p.turnaround
+      ? { label: 'Turnaround', value: p.turnaround === 'urgent' ? 'Rush' : 'Standard' }
+      : null,
+    ...extraRows,
+  ].filter(Boolean) as Array<{ label: string; value: string }>;
 
   return (
     <div className="card" style={{ marginTop: 14, ...style }}>
@@ -77,48 +106,6 @@ export function FormPreferencesDisplay({
           <i className="ti ti-forms" /> {title}
         </span>
       </div>
-
-      {(p.mode || p.turnaround || hasFormats) && (
-        <div style={{ padding: '0 16px 12px' }}>
-          {p.mode && p.mode !== 'd' && (
-            <div className="od-line">
-              <span className="l">Form mode</span>
-              <span className="v">{p.mode === 'd' ? 'Detailed request' : 'Quick request'}</span>
-            </div>
-          )}
-          {p.turnaround && (
-            <div className="od-line">
-              <span className="l">Turnaround</span>
-              <span className="v">{p.turnaround === 'urgent' ? 'Urgent' : 'Standard'}</span>
-            </div>
-          )}
-          {hasFormats && (
-            <div className="od-line">
-              <span className="l">Formats requested</span>
-              <span className="v">
-                {p.formats!.map((f) => (
-                  <span key={f} className="fmtchip">
-                    {f}
-                  </span>
-                ))}
-              </span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {visibleFields.length > 0 && (
-        <div className="pref-block">
-          {visibleFields.map((f, i) => (
-            <div key={`${f.label}-${i}`} className="od-line">
-              <span className="l">{f.label || 'Field'}</span>
-              <span className="v" style={{ fontWeight: 400 }}>
-                {f.value}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
 
       {hasDesigns && (
         <div className="pref-block">
@@ -163,6 +150,31 @@ export function FormPreferencesDisplay({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {(optionRows.length > 0 || hasFormats) && (
+        <div className="pref-block">
+          <div className="pref-options">
+            {optionRows.map((row) => (
+              <div key={row.label} className="pref-row">
+                <span>{row.label}</span>
+                <b>{row.value}</b>
+              </div>
+            ))}
+            {hasFormats && (
+              <div className="pref-row">
+                <span>Formats</span>
+                <div className="pref-chips">
+                  {p.formats!.map((f) => (
+                    <span key={f} className="pref-chip">
+                      {f}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

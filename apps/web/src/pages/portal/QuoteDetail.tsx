@@ -432,7 +432,9 @@ export function PortalQuoteDetail() {
               <AttachmentPreview
                 key={a.id}
                 name={a.originalName}
+                mimeType={a.mimeType}
                 signedUrlPath={myAttachmentUrl(order.id, a.id)}
+                previewUrl={a.previewUrl}
               />
             ))}
           </div>
