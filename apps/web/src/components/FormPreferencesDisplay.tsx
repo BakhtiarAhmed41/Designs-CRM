@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react';
+
 type FormDesign = {
   name?: string;
   service?: string;
@@ -28,7 +30,28 @@ function asPrefs(preferences: unknown): QuoteFormPreferences | null {
   return preferences as QuoteFormPreferences;
 }
 
-export function FormPreferencesDisplay({ preferences }: { preferences: unknown }) {
+export function hasFormPreferences(preferences: unknown): boolean {
+  const p = asPrefs(preferences);
+  if (!p) return false;
+  return (
+    (p.fields?.length ?? 0) > 0 ||
+    (p.designs?.length ?? 0) > 0 ||
+    (p.formats?.length ?? 0) > 0 ||
+    Boolean(p.turnaround) ||
+    Boolean(p.mode) ||
+    Boolean(p.advanced && Object.keys(p.advanced).length > 0)
+  );
+}
+
+export function FormPreferencesDisplay({
+  preferences,
+  title = 'Form submission details',
+  style,
+}: {
+  preferences: unknown;
+  title?: string;
+  style?: CSSProperties;
+}) {
   const p = asPrefs(preferences);
   if (!p) return null;
 
@@ -42,10 +65,10 @@ export function FormPreferencesDisplay({ preferences }: { preferences: unknown }
   }
 
   return (
-    <div className="card" style={{ marginTop: 14 }}>
+    <div className="card" style={{ marginTop: 14, ...style }}>
       <div className="card-h">
         <span className="ct">
-          <i className="ti ti-forms" /> Form submission details
+          <i className="ti ti-forms" /> {title}
         </span>
       </div>
 

@@ -32,6 +32,8 @@ export function FileThumb({
   src?: string | null;
   onOpen?: () => void;
 }) {
+  const [broken, setBroken] = useState(false);
+  const showImg = Boolean(src) && !broken;
   return (
     <button
       type="button"
@@ -39,8 +41,8 @@ export function FileThumb({
       onClick={onOpen}
       disabled={!onOpen}
     >
-      {src ? (
-        <img src={src} alt={name} />
+      {showImg ? (
+        <img src={src!} alt={name} onError={() => setBroken(true)} />
       ) : (
         <div className="file-thumb-icon">
           <i className="ti ti-file" />
@@ -109,10 +111,11 @@ export function AttachmentPreview({
 }) {
   const [open, setOpen] = useState(false);
   const show = isImageFile(name, mimeType);
+  const previewPath = `${signedUrlPath}${signedUrlPath.includes('?') ? '&' : '?'}inline=1`;
   const q = useQuery({
-    queryKey: ['attachment-preview', signedUrlPath],
+    queryKey: ['attachment-preview', previewPath],
     queryFn: async () => {
-      const { url } = await apiFetch<{ url: string }>(signedUrlPath);
+      const { url } = await apiFetch<{ url: string }>(previewPath);
       return resolveFileUrl(url);
     },
     enabled: show,

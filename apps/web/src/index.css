@@ -1433,7 +1433,7 @@ button { font-family: inherit; }
 }
 .msg-file-preview span{display:block;margin-top:4px;font-size:11px;font-weight:600;}
 .file-thumb{
-  width:112px;border:0.5px solid var(--line);border-radius:10px;background:#fff;
+  width:112px;flex-shrink:0;border:0.5px solid var(--line);border-radius:10px;background:#fff;
   padding:0;overflow:hidden;cursor:pointer;text-align:left;color:inherit;
 }
 .file-thumb:disabled{cursor:default;}
@@ -1463,6 +1463,9 @@ button { font-family: inherit; }
 }
 .od-files-block{padding:4px 16px 14px;}
 .od-files-label{font-size:12px;font-weight:700;margin:8px 0 4px;}
+.od-instruct{padding:12px 16px 16px;}
+.od-instruct p{margin:0 0 8px;font-size:13px;line-height:1.45;color:var(--ink);}
+.od-instruct p:last-child{margin-bottom:0;}
 .od-files-hint{margin:0 0 8px;font-size:12.5px;}
 .od-preview-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
 .odf-final{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:0;border:none;background:none;}

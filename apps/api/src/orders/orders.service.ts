@@ -1328,7 +1328,11 @@ export class OrdersService {
     return this.persistOrderAttachments(orderId, user, files);
   }
 
-  private async signAttachment(orderId: string, attachmentId: string) {
+  private async signAttachment(
+    orderId: string,
+    attachmentId: string,
+    opts?: { inline?: boolean },
+  ) {
     const att = await this.db.queryOne<{
       storage_key: string;
       original_name: string;
@@ -1340,6 +1344,7 @@ export class OrdersService {
     const url = await this.storage.createSignedUrl({
       key: att.storage_key,
       downloadAs: att.original_name || 'attachment',
+      inline: Boolean(opts?.inline),
     });
     return { url };
   }
@@ -1369,7 +1374,7 @@ export class OrdersService {
     }
     const url = await this.storage.createSignedUrl({
       key: file.storage_key,
-      downloadAs: opts?.inline ? undefined : file.original_name || 'delivery',
+      downloadAs: file.original_name || 'delivery',
       inline: Boolean(opts?.inline),
     });
     return { url };
@@ -1379,12 +1384,13 @@ export class OrdersService {
     user: AuthUser | undefined,
     orderId: string,
     attachmentId: string,
+    opts?: { inline?: boolean },
   ) {
     assertAuthUser(user);
     const order = await this.getOrderRow(orderId);
     if (!order || order.client_user_id !== user.id)
       throw new NotFoundException('Order not found');
-    return this.signAttachment(orderId, attachmentId);
+    return this.signAttachment(orderId, attachmentId, opts);
   }
 
   async getMyDeliveryFileSignedUrl(
@@ -2870,9 +2876,10 @@ export class OrdersService {
     user: AuthUser | undefined,
     orderId: string,
     attachmentId: string,
+    opts?: { inline?: boolean },
   ) {
     this.assertAdmin(user);
-    return this.signAttachment(orderId, attachmentId);
+    return this.signAttachment(orderId, attachmentId, opts);
   }
 
   async getAdminDeliveryFileSignedUrl(

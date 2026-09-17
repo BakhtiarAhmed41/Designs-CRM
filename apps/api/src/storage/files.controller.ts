@@ -48,7 +48,7 @@ export class FilesController {
       'Content-Disposition',
       `${inline ? 'inline' : 'attachment'}; filename="${safeName}"`,
     );
-    const type = guessContentType(safeName);
+    const type = guessContentType(safeName) || guessContentType(key);
     if (type) res.setHeader('Content-Type', type);
     const stream = this.storage.createStream(key);
     stream.on('error', () => {

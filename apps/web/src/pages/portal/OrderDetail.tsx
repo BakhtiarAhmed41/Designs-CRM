@@ -15,7 +15,7 @@ import { AttachmentPreview, DeliveryPreview } from '@/components/FilePreview';
 import { listMyEdits, requestEdit } from '@/lib/edits';
 import { RevisionRequestForm } from '@/components/RevisionRequestForm';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
-import { money, lifecycleChip, dateShort, paymentChip } from '@/lib/format';
+import { money, lifecycleChip, dateShort, paymentChip, isImageFile } from '@/lib/format';
 import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import { openLinkedChat } from '@/lib/messaging';
 import {
@@ -31,6 +31,10 @@ import { applyOrderChange, invalidateWorkCaches } from '@/lib/queryCache';
 import { freshOnOpen } from '@/lib/queryRefresh';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
+import {
+  FormPreferencesDisplay,
+  hasFormPreferences,
+} from '@/components/FormPreferencesDisplay';
 
 type QuoteWithLines = Quotation & { lines?: QuotationLine[] };
 
@@ -650,9 +654,12 @@ export function PortalOrderDetail() {
                 <span className="ct">Designs</span>
               </div>
               {order.designs.map((d) => {
-                const previewFile = (order.deliveries ?? [])
-                  .flatMap((del) => del.files.map((f) => ({ ...f, kind: del.kind })))
-                  .find((f) => f.designId === d.id && (f.mimeType?.startsWith('image/') || /\.(png|jpe?g|gif|webp)$/i.test(f.originalName)));
+                const imageFiles = (order.deliveries ?? [])
+                  .flatMap((del) => del.files)
+                  .filter((f) => isImageFile(f.originalName, f.mimeType));
+                const previewFile =
+                  imageFiles.find((f) => f.designId === d.id) ??
+                  (order.designs?.length === 1 ? imageFiles[0] : undefined);
                 return (
                 <div key={d.id} className="orow orow-status-under" style={{ cursor: 'default' }}>
                   <div className={`thumb${serviceThumbClass(order.serviceType) ? ' m' : ''}`}>
@@ -727,15 +734,32 @@ export function PortalOrderDetail() {
                 </button>
               </div>
             )}
-            {order.instructions && (
-              <div className="od-line">
-                <span className="l">Instructions</span>
-                <span className="v" style={{ maxWidth: 180, textAlign: 'right' }}>
-                  {order.instructions}
-                </span>
-              </div>
-            )}
           </div>
+
+          {hasFormPreferences(order.preferences) ? (
+            <FormPreferencesDisplay
+              preferences={order.preferences}
+              title="Instructions"
+              style={{ marginTop: 0 }}
+            />
+          ) : (
+            order.instructions && (
+              <div className="card">
+                <div className="card-h">
+                  <span className="ct">Instructions</span>
+                </div>
+                <div className="od-instruct">
+                  {order.instructions
+                    .replace(/\s*Design\s+(\d+)\s*:/g, '\nDesign $1:')
+                    .trim()
+                    .split('\n')
+                    .map((line, i) => (
+                      <p key={i}>{line.trim()}</p>
+                    ))}
+                </div>
+              </div>
+            )
+          )}
 
           {(canUploadRefs || (order.attachments && order.attachments.length > 0)) && (
             <div className="card">

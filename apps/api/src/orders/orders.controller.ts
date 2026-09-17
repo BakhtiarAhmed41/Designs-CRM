@@ -213,8 +213,11 @@ export class OrdersController {
     @CurrentUser() user: AuthUser | undefined,
     @Param('id') orderId: string,
     @Param('attachmentId') attachmentId: string,
+    @Query('inline') inline?: string,
   ) {
-    return this.orders.getMyAttachmentSignedUrl(user, orderId, attachmentId);
+    return this.orders.getMyAttachmentSignedUrl(user, orderId, attachmentId, {
+      inline: inline === '1' || inline === 'true',
+    });
   }
 
   @Get(':id/delivery-files/:deliveryFileId/signed-url')

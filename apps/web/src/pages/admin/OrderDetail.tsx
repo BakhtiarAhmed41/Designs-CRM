@@ -45,7 +45,7 @@ import { apiFetch, downloadSignedFile, getErrorMessage, resolveFileUrl } from '@
 import { money, dateShort, lifecycleChip } from '@/lib/format';
 import { AdminCounterDecision } from '@/components/AdminCounterDecision';
 import { AttachmentPreview, LocalFilePreview } from '@/components/FilePreview';
-import { FormPreferencesDisplay } from '@/components/FormPreferencesDisplay';
+import { FormPreferencesDisplay, hasFormPreferences } from '@/components/FormPreferencesDisplay';
 import { MessageAttachments } from '@/components/MessageAttachments';
 import { QuoteHistory } from '@/components/QuoteHistory';
 import { isStaffCreatedOrder, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
@@ -1008,7 +1008,7 @@ export function AdminOrderDetail() {
                 {order.turnaroundLabel ?? 'Not set'}
               </span>
             </div>
-            {order.instructions && (
+            {order.instructions && !hasFormPreferences(order.preferences) && (
               <div className="od-line">
                 <span className="l">Customer note</span>
                 <span className="v" style={{ fontWeight: 400, color: 'var(--muted)', maxWidth: '60%', textAlign: 'right' }}>
