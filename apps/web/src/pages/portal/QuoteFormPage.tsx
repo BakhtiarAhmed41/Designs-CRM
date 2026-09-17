@@ -251,7 +251,8 @@ export function QuoteFormPage() {
         <strong>{service ? `${service.label} quote` : 'Request a quote'}</strong>
         {service && (
           <button type="button" className="change-service" onClick={changeService}>
-            ← Change service
+            <i className="ti ti-arrow-left" />
+            Change service
           </button>
         )}
       </div>
@@ -271,7 +272,8 @@ export function QuoteFormPage() {
         </div>
         {service && (
           <button type="button" className="change-service" onClick={changeService}>
-            ← Change service
+            <i className="ti ti-arrow-left" />
+            Change service
           </button>
         )}
         <button type="button" className="close-form" onClick={() => void closePage()} aria-label="Close quote form">

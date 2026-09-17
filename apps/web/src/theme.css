@@ -161,7 +161,7 @@ body {
   gap: 12px;
   min-width: 0;
 }
-.quote-topbar-lead i { font-size: 18px; color: var(--ink); flex-shrink: 0; }
+.quote-topbar-lead > i { font-size: 18px; color: var(--ink); flex-shrink: 0; }
 .quote-topbar-lead strong {
   font-size: 15px;
   font-weight: 650;
@@ -2479,11 +2479,30 @@ button.primary i,
 .quote-page-h h1 { margin: 0; font-size: 18px; }
 .quote-page-h p { margin: 1px 0 0; color: var(--dash-muted); font-size: 12px; }
 .change-service {
-  border: 0;
-  background: none;
-  color: var(--brand, #9A1E22);
-  text-decoration: underline;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: max-content;
+  min-height: 32px;
+  padding: 6px 12px 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--tint, #fff);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
   cursor: pointer;
+}
+.change-service i {
+  font-size: 15px;
+  color: inherit;
+}
+.change-service:hover {
+  background: var(--tint-hover, #f2f2f2);
+  border-color: var(--ink);
 }
 .submitting { color: var(--dash-muted); font-size: 13px; padding-left: 16px; border-left: 1px solid var(--line); }
 .close-form {
