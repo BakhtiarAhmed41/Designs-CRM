@@ -1,5 +1,13 @@
 import type { CSSProperties } from 'react';
+import { AttachmentPreview } from '@/components/FilePreview';
 import { friendlyFileName } from '@/lib/format';
+
+export type PrefAttachment = {
+  name: string;
+  mimeType?: string | null;
+  previewUrl?: string | null;
+  signedUrlPath: string;
+};
 
 type FormDesign = {
   name?: string;
@@ -65,11 +73,13 @@ export function FormPreferencesDisplay({
   title = 'Form submission details',
   style,
   wide = false,
+  attachments,
 }: {
   preferences: unknown;
   title?: string;
   style?: CSSProperties;
   wide?: boolean;
+  attachments?: PrefAttachment[];
 }) {
   const p = asPrefs(preferences);
   if (!p) return null;
@@ -100,18 +110,33 @@ export function FormPreferencesDisplay({
       : null,
     ...extraRows,
   ].filter(Boolean) as Array<{ label: string; value: string }>;
+  const leftoverAttachments = [...(attachments ?? [])];
 
   return (
     <div className={`card pref-card${wide ? ' pref-wide' : ''}`} style={{ marginTop: 14, ...style }}>
-      <div className="card-h">
-        <span className="ct">
-          <i className="ti ti-notes" /> {title}
-        </span>
-      </div>
+      {wide ? (
+        <div className="pref-head">
+          <span className="pref-head-icon" aria-hidden>
+            <i className="ti ti-notes" />
+          </span>
+          <div>
+            <h3>{title}</h3>
+            <p>Add specific details for each design option, including size, format, and any notes.</p>
+          </div>
+        </div>
+      ) : (
+        <div className="card-h">
+          <span className="ct">
+            <i className="ti ti-notes" /> {title}
+          </span>
+        </div>
+      )}
 
       {hasDesigns && (
         <div className="pref-block pref-designs">
-          {p.designs!.map((d, i) => {
+          {(() => {
+            const leftoverAttachments = [...(attachments ?? [])];
+            return p.designs!.map((d, i) => {
             const extras =
               d.sizes
                 ?.map((s) =>
@@ -126,28 +151,61 @@ export function FormPreferencesDisplay({
               extras.length > 0 && { label: 'Extra sizes', value: extras.join(' · ') },
               d.colors && { label: 'Color', value: d.colors },
               d.background && { label: 'Background', value: d.background },
-              d.notes && { label: 'Notes', value: d.notes, note: true },
-            ].filter(Boolean) as Array<{ label: string; value: string; note?: boolean }>;
-            const files = (d.fileNames ?? []).map((name) => friendlyFileName(name));
+              d.notes && { label: 'Notes', value: d.notes },
+            ].filter(Boolean) as Array<{ label: string; value: string }>;
+            const files = (d.fileNames ?? []).map((name) => {
+              const match = leftoverAttachments.find(
+                (a) => a.name.toLowerCase() === name.toLowerCase(),
+              );
+              if (match) {
+                leftoverAttachments.splice(leftoverAttachments.indexOf(match), 1);
+                return match;
+              }
+              return { name, signedUrlPath: '' };
+            });
+            if (!files.some((f) => f.signedUrlPath) && leftoverAttachments.length) {
+              files.splice(0, files.length, leftoverAttachments.shift()!);
+            }
             return (
               <div key={i} className="pref-design">
                 <div className="pref-design-h">
                   <span className="pref-design-n">{i + 1}</span>
                   <strong>{d.name?.trim() || `Design ${i + 1}`}</strong>
-                  {files.length > 0 && (
+                  {wide && <span className="pref-tag">Design option</span>}
+                  {!wide && files.length > 0 && (
                     <div className="pref-files">
-                      {files.map((name, fi) => (
-                        <span key={`${name}-${fi}`} className="pref-file">
-                          <i className="ti ti-paperclip" /> {name}
+                      {files.map((file, fi) => (
+                        <span key={`${file.name}-${fi}`} className="pref-file">
+                          {friendlyFileName(file.name)}
                         </span>
                       ))}
                     </div>
                   )}
                 </div>
+                {wide && files.length > 0 && (
+                  <div className="pref-ref">
+                    {files.map((file, fi) =>
+                      file.signedUrlPath ? (
+                        <AttachmentPreview
+                          key={`${file.name}-${fi}`}
+                          name={file.name}
+                          mimeType={file.mimeType}
+                          signedUrlPath={file.signedUrlPath}
+                          previewUrl={file.previewUrl}
+                          compact
+                        />
+                      ) : (
+                        <span key={`${file.name}-${fi}`} className="pref-file">
+                          {friendlyFileName(file.name)}
+                        </span>
+                      ),
+                    )}
+                  </div>
+                )}
                 {rows.length > 0 && (
                   <div className="pref-specs">
                     {rows.map((row) => (
-                      <div key={row.label} className={`pref-spec${row.note ? ' is-note' : ''}`}>
+                      <div key={row.label} className="pref-spec">
                         <span>{row.label}</span>
                         <b>{row.value}</b>
                       </div>
@@ -164,13 +222,13 @@ export function FormPreferencesDisplay({
         <div className="pref-block">
           <div className="pref-options">
             {optionRows.map((row) => (
-              <div key={row.label} className="pref-spec">
+              <div key={row.label} className="pref-opt">
                 <span>{row.label}</span>
-                <b>{row.value}</b>
+                <b className="pref-chip">{row.value}</b>
               </div>
             ))}
             {hasFormats && (
-              <div className="pref-spec">
+              <div className="pref-opt">
                 <span>Formats</span>
                 <div className="pref-chips">
                   {p.formats!.map((f) => (

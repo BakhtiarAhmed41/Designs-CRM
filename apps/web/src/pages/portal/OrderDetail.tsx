@@ -654,6 +654,12 @@ export function PortalOrderDetail() {
               title="Instructions"
               wide
               style={{ marginTop: 0 }}
+              attachments={(order.attachments ?? []).map((a) => ({
+                name: a.originalName,
+                mimeType: a.mimeType,
+                previewUrl: a.previewUrl,
+                signedUrlPath: myAttachmentUrl(order.id, a.id),
+              }))}
             />
           ) : (
             order.instructions && (

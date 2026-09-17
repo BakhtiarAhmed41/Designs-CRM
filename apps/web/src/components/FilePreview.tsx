@@ -109,11 +109,13 @@ export function AttachmentPreview({
   mimeType,
   signedUrlPath,
   previewUrl,
+  compact,
 }: {
   name: string;
   mimeType?: string | null;
   signedUrlPath: string;
   previewUrl?: string | null;
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const show = isImageFile(name, mimeType);
@@ -127,6 +129,24 @@ export function AttachmentPreview({
     staleTime: 60_000,
   });
   const src = previewUrl || q.data ? resolveFileUrl(previewUrl || q.data || '') : null;
+
+  if (compact) {
+    if (src) {
+      return (
+        <>
+          <button type="button" className="pref-ref-img" onClick={() => setOpen(true)} title={name}>
+            <img src={src} alt={name} />
+          </button>
+          {open && <ImageLightbox src={src} name={name} onClose={() => setOpen(false)} />}
+        </>
+      );
+    }
+    return (
+      <span className="pref-file" title={name}>
+        {name}
+      </span>
+    );
+  }
 
   if (!show && !src) {
     return (
