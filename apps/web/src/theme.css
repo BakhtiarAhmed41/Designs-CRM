@@ -2493,14 +2493,17 @@ button.primary i,
   font-family: inherit;
   font-size: 13px;
   font-weight: 600;
-  text-decoration: none;
+  text-decoration: none !important;
   cursor: pointer;
 }
 .change-service i {
   font-size: 15px;
   color: inherit;
 }
-.change-service:hover {
+.change-service:hover,
+.change-service:focus,
+.change-service:active {
+  text-decoration: none !important;
   background: var(--tint-hover, #f2f2f2);
   border-color: var(--ink);
 }
