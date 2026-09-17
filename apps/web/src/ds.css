@@ -474,39 +474,85 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
 .ff, .pf, .login-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
 }
-.ff { margin-bottom: 12px; }
+.ff { margin-bottom: 14px; }
+.ff:last-child { margin-bottom: 0; }
 .ff label, .pf label, .login-field span {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 12.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
   color: var(--form-label, var(--muted));
 }
 .ff input, .ff select, .ff textarea,
 .pf input, .pf select, .pf textarea,
 .login-field input,
-.notes-box, .stat-select, .msg-search, .msg-composer-row textarea {
+.notes-box, .stat-select, .msg-search, .msg-composer-row textarea,
+.app-dialog-input, .inbox-start-input {
   border: 1px solid var(--form-border, var(--line));
-  border-radius: var(--radius-sm);
-  padding: 9px 11px;
-  font-size: 13.5px;
+  border-radius: 10px;
+  padding: 10px 13px;
+  min-height: 42px;
+  font-size: 14px;
+  line-height: 1.4;
   font-family: inherit;
   outline: none;
   background: var(--form-bg, var(--tint));
   color: var(--form-text, var(--ink));
   width: 100%;
   box-sizing: border-box;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.03);
   transition: border-color var(--ease), box-shadow var(--ease);
 }
+.ff textarea, .pf textarea, .notes-box {
+  min-height: 96px;
+  padding: 11px 13px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.ff select, .pf select, .stat-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23222222' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  padding-right: 36px;
+  cursor: pointer;
+}
+.ff input::placeholder, .ff textarea::placeholder,
+.pf input::placeholder, .pf textarea::placeholder,
+.login-field input::placeholder, .notes-box::placeholder,
+.app-dialog-input::placeholder {
+  color: var(--faint);
+  opacity: 0.8;
+}
+.ff input:hover, .ff select:hover, .ff textarea:hover,
+.pf input:hover, .pf select:hover, .pf textarea:hover,
+.login-field input:hover, .notes-box:hover, .app-dialog-input:hover {
+  border-color: rgba(34, 34, 34, 0.18);
+}
 .ff input:focus, .ff select:focus, .ff textarea:focus,
-.pf input:focus, .pf select:focus,
+.pf input:focus, .pf select:focus, .pf textarea:focus,
 .login-field input:focus,
-.notes-box:focus, .msg-search:focus, .msg-composer-row textarea:focus {
+.notes-box:focus, .msg-search:focus, .msg-composer-row textarea:focus,
+.app-dialog-input:focus, .inbox-start-input:focus {
   border-color: var(--form-focus, var(--navy));
   box-shadow: var(--focus);
 }
-.pform { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.ff input:disabled, .ff select:disabled, .ff textarea:disabled,
+.pf input:disabled, .pf select:disabled, .login-field input:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.pform { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 18px; }
 .pf.full { grid-column: 1 / -1; }
+.pform + .btn,
+.pform + button,
+form > .btn-primary {
+  margin-top: 6px;
+}
 
 /* ---------- Shell ---------- */
 .app-frame > .shell {
@@ -833,6 +879,26 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   overflow: auto;
 }
 .overlay.open { display: flex; animation: fade 0.18s ease; }
+.overlay.overlay-center { align-items: center; }
+.gen-modal { border-radius: 14px; overflow: hidden; }
+.gen-modal .modal-h { border-radius: 14px 14px 0 0; }
+.gen-modal .modal-b { border-radius: 0 0 14px 14px; }
+.gen-modal .gen-pick { position: relative; }
+.gen-modal .gen-search-drop {
+  position: relative;
+  top: auto;
+  left: auto;
+  right: auto;
+  margin-top: 8px;
+  max-height: 162px;
+  overflow-y: auto;
+}
+.gen-modal .ff input,
+.gen-modal .btn,
+.gen-modal .modal-x,
+.gen-modal .search-drop {
+  border-radius: 14px;
+}
 .modal, .omod {
   background: var(--etsy-white);
   border-radius: 14px;
@@ -1086,13 +1152,13 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   overflow: auto;
 }
 .login-card {
-  width: 380px;
+  width: 400px;
   max-width: 100%;
   background: var(--card);
-  border: 0.5px solid var(--line);
-  border-radius: 14px;
-  padding: 28px 26px 24px;
-  box-shadow: 0 10px 40px rgba(20, 63, 101, 0.08);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 32px 28px 28px;
+  box-shadow: 0 12px 40px rgba(20, 63, 101, 0.08);
 }
 .login-title {
   font-size: 16px;

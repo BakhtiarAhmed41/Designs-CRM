@@ -341,9 +341,11 @@ export function QuoteBuilderModal({
       } | null;
       if (!data || typeof data !== 'object') return;
       if (data.type === 'lvd-form-height' && typeof data.height === 'number') {
-        const next = Math.max(360, Math.ceil(data.height));
+        const next = Math.max(1, Math.ceil(data.height));
         const frame = iframeRef.current;
-        if (frame) frame.style.height = `${next}px`;
+        if (frame && Math.abs(frame.offsetHeight - next) > 2) {
+          frame.style.height = `${next}px`;
+        }
       }
       if (data.type === 'lvd-form-ready') {
         const win = iframeRef.current?.contentWindow;
@@ -520,7 +522,7 @@ export function QuoteBuilderModal({
                       display: 'flex',
                       justifyContent: 'flex-end',
                       gap: 10,
-                      marginTop: 16,
+                      marginTop: 8,
                     }}
                   >
                     <button
@@ -595,6 +597,26 @@ export function QuoteBuilderModal({
                             }
                             style={{
                               flex: 1,
+                              minWidth: 0,
+                              border: '0.5px solid var(--line)',
+                              borderRadius: 8,
+                              padding: '8px 10px',
+                              fontSize: 12,
+                              fontFamily: 'inherit',
+                            }}
+                          />
+                          <input
+                            placeholder="Price"
+                            inputMode="decimal"
+                            value={line.price}
+                            onChange={(e) =>
+                              setPriceLines((prev) =>
+                                prev.map((l, i) => (i === idx ? { ...l, price: e.target.value } : l)),
+                              )
+                            }
+                            style={{
+                              width: 110,
+                              flexShrink: 0,
                               border: '0.5px solid var(--line)',
                               borderRadius: 8,
                               padding: '8px 10px',
@@ -614,7 +636,7 @@ export function QuoteBuilderModal({
                             </button>
                           )}
                         </div>
-                        <div style={{ display: 'flex', gap: 6 }}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                           <input
                             placeholder="Note (optional)"
                             value={line.note}
@@ -625,6 +647,7 @@ export function QuoteBuilderModal({
                             }
                             style={{
                               flex: 1,
+                              minWidth: 0,
                               border: '0.5px solid var(--line)',
                               borderRadius: 8,
                               padding: '8px 10px',
@@ -632,35 +655,19 @@ export function QuoteBuilderModal({
                               fontFamily: 'inherit',
                             }}
                           />
-                          <input
-                            placeholder="Price"
-                            inputMode="decimal"
-                            value={line.price}
-                            onChange={(e) =>
-                              setPriceLines((prev) =>
-                                prev.map((l, i) => (i === idx ? { ...l, price: e.target.value } : l)),
-                              )
-                            }
-                            style={{
-                              width: 110,
-                              border: '0.5px solid var(--line)',
-                              borderRadius: 8,
-                              padding: '8px 10px',
-                              fontSize: 12,
-                              fontFamily: 'inherit',
-                            }}
-                          />
+                          {idx === priceLines.length - 1 && (
+                            <button
+                              type="button"
+                              className="btn btn-ghost btn-sm"
+                              style={{ flexShrink: 0, justifyContent: 'center' }}
+                              onClick={() => setPriceLines((prev) => [...prev, emptyPriceLine()])}
+                            >
+                              <i className="ti ti-plus" /> Add line
+                            </button>
+                          )}
                         </div>
                       </div>
                     ))}
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      style={{ width: '100%', justifyContent: 'center', margin: '0 0 14px' }}
-                      onClick={() => setPriceLines((prev) => [...prev, emptyPriceLine()])}
-                    >
-                      <i className="ti ti-plus" /> Add line
-                    </button>
 
                     <div className="ff">
                       <label>Attachments</label>
@@ -717,10 +724,11 @@ export function QuoteBuilderModal({
                         {money(priceTotalCents)}
                       </span>
                     </div>
+                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: 40 }}>
                     <button
                       type="button"
                       className="btn btn-primary"
-                      style={{ width: '100%', justifyContent: 'center' }}
+                      style={{ width: '30%', justifyContent: 'center' }}
                       disabled={busy}
                       onClick={() => void finishAdminPriced()}
                     >
@@ -733,6 +741,7 @@ export function QuoteBuilderModal({
                           ? 'Create approved order'
                           : 'Send quote'}
                     </button>
+                    </div>
                   </div>
                 )}
               </>

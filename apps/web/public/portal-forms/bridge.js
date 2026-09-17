@@ -491,6 +491,11 @@
     function setLabel(id, label, suffix) {
       var el = document.getElementById(id);
       if (!el || !label) return;
+      var name = el.querySelector('[data-turnaround-label]');
+      if (name) {
+        name.textContent = label;
+        return;
+      }
       var radio = el.querySelector('input[type="radio"]');
       var icon = el.querySelector('i');
       el.textContent = '';
@@ -581,17 +586,24 @@
         : titleBase;
   }
 
+  var lastSentHeight = 0;
+
+  function contentHeight() {
+    var wrap = document.querySelector('.wrap') || document.querySelector('.card') || document.body;
+    if (!wrap) return 0;
+    var style = window.getComputedStyle(document.body);
+    var pad =
+      (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0);
+    return Math.ceil(Math.max(wrap.scrollHeight, wrap.getBoundingClientRect().height) + pad);
+  }
+
   function reportHeight() {
     if (!inIframe()) return;
-    var body = document.body;
-    var root = document.documentElement;
-    var wrap = document.querySelector('.wrap') || document.querySelector('.card');
-    var h = Math.max(
-      body ? Math.max(body.scrollHeight, body.offsetHeight) : 0,
-      root ? Math.max(root.scrollHeight, root.offsetHeight) : 0,
-      wrap ? wrap.scrollHeight : 0,
-    );
-    parent.postMessage({ type: 'lvd-form-height', height: h + 16 }, '*');
+    var h = contentHeight();
+    if (h < 1) return;
+    if (Math.abs(h - lastSentHeight) < 2) return;
+    lastSentHeight = h;
+    parent.postMessage({ type: 'lvd-form-height', height: h }, '*');
   }
 
   function reportHeightSoon() {
@@ -614,12 +626,13 @@
     loadTurnaroundLabels();
     reportHeightSoon();
     if (window.ResizeObserver) {
-      var ro = new ResizeObserver(function () {
-        reportHeight();
-      });
-      if (document.body) ro.observe(document.body);
-      var wrap = document.querySelector('.wrap');
-      if (wrap) ro.observe(wrap);
+      var wrap = document.querySelector('.wrap') || document.querySelector('.card');
+      if (wrap) {
+        var ro = new ResizeObserver(function () {
+          reportHeight();
+        });
+        ro.observe(wrap);
+      }
     }
     window.addEventListener('load', reportHeightSoon);
     document.addEventListener('click', function () {

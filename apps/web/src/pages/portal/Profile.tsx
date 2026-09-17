@@ -283,18 +283,10 @@ export function PortalProfile() {
           </div>
         )}
 
-        <label
-          style={{
-            fontSize: 11,
-            fontWeight: 600,
-            color: 'var(--faint)',
-            textTransform: 'uppercase',
-            letterSpacing: '.4px',
-          }}
-        >
+        <label className="pref-section-label">
           What do you order from us?
         </label>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '8px 0 18px' }}>
+        <div className="pref-chip-row">
           {SERVICE_CHIPS.map((s) => (
             <ChipToggle
               key={s.id}
@@ -307,18 +299,10 @@ export function PortalProfile() {
 
         {prefs.services.includes('emb') && (
           <>
-            <label
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: 'var(--faint)',
-                textTransform: 'uppercase',
-                letterSpacing: '.4px',
-              }}
-            >
+            <label className="pref-section-label">
               My hoop sizes
             </label>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '8px 0 10px' }}>
+            <div className="pref-chip-row" style={{ marginBottom: 10 }}>
               {prefs.hoops.map((h) => (
                 <ChipToggle
                   key={h}
@@ -328,26 +312,11 @@ export function PortalProfile() {
                 />
               ))}
             </div>
-            <div
-              style={{
-                display: 'flex',
-                gap: 8,
-                alignItems: 'center',
-                marginBottom: 20,
-                flexWrap: 'wrap',
-              }}
-            >
+            <div className="pref-add-row">
               <select
                 value={hoopPick}
                 onChange={(e) => setHoopPick(e.target.value)}
                 aria-label="Common hoop sizes"
-                style={{
-                  border: '0.5px solid var(--line)',
-                  borderRadius: 8,
-                  padding: '8px 10px',
-                  fontSize: 12.5,
-                  fontFamily: 'inherit',
-                }}
               >
                 {HOOP_OPTIONS.map((o) => (
                   <option key={o}>{o}</option>
@@ -365,35 +334,20 @@ export function PortalProfile() {
                 placeholder="Or type a size, e.g. 10x12"
                 aria-label="Custom hoop size"
                 maxLength={40}
-                style={{
-                  border: '0.5px solid var(--line)',
-                  borderRadius: 8,
-                  padding: '8px 10px',
-                  fontSize: 12.5,
-                  fontFamily: 'inherit',
-                  minWidth: 180,
-                }}
+                style={{ minWidth: 180 }}
               />
-              <button type="button" className="btn btn-ghost" style={{ padding: '8px 14px' }} onClick={addHoop}>
+              <button type="button" className="btn btn-ghost" onClick={addHoop}>
                 <i className="ti ti-plus" /> Add hoop
               </button>
             </div>
 
-            <label
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: 'var(--faint)',
-                textTransform: 'uppercase',
-                letterSpacing: '.4px',
-              }}
-            >
+            <label className="pref-section-label">
               Embroidery formats I always need
             </label>
             <div style={{ fontSize: 12, color: 'var(--muted)', margin: '4px 0 8px' }}>
               Tap to select. Every embroidery delivery includes all of these.
             </div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+            <div className="pref-chip-row">
               {EMB_FORMATS.map((f) => (
                 <ChipToggle
                   key={f}
@@ -408,18 +362,10 @@ export function PortalProfile() {
 
         {prefs.services.includes('dig') && (
           <>
-            <label
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: 'var(--faint)',
-                textTransform: 'uppercase',
-                letterSpacing: '.4px',
-              }}
-            >
+            <label className="pref-section-label">
               Vector / SVG / print formats I always need
             </label>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+            <div className="pref-chip-row">
               {DIG_FORMATS.map((f) => (
                 <ChipToggle
                   key={f}
@@ -434,18 +380,10 @@ export function PortalProfile() {
 
         {prefs.services.includes('cnc') && (
           <>
-            <label
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: 'var(--faint)',
-                textTransform: 'uppercase',
-                letterSpacing: '.4px',
-              }}
-            >
+            <label className="pref-section-label">
               CNC / laser formats I always need
             </label>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+            <div className="pref-chip-row">
               {CNC_FORMATS.map((f) => (
                 <ChipToggle
                   key={f}

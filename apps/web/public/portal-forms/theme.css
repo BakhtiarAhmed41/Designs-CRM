@@ -48,6 +48,40 @@ html, body {
 .qbig textarea:focus,
 .qbox textarea:focus {
   border-color: var(--form-focus);
+  box-shadow: 0 0 0 3px rgba(34, 34, 34, 0.12);
+}
+
+.ff {
+  gap: 7px;
+}
+.ff label {
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.ff input,
+.ff select,
+.ff textarea,
+.qbig textarea,
+.qbox textarea {
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.03);
+}
+.ff input,
+.ff select {
+  min-height: 44px;
+}
+.ff textarea {
+  min-height: 100px;
+  line-height: 1.5;
+}
+.ff select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23222222' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  padding-right: 36px;
+  cursor: pointer;
 }
 
 .upload-area,

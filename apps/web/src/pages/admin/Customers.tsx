@@ -298,15 +298,7 @@ function CustomerDetailModal({
                 </div>
               </div>
               {customer.userId && (
-                <label
-                  style={{
-                    display: 'flex',
-                    gap: 8,
-                    alignItems: 'center',
-                    marginBottom: 12,
-                    fontSize: 13,
-                  }}
-                >
+                <label className="form-check">
                   <input
                     type="checkbox"
                     checked={customer.loginStatus !== 'DISABLED'}
@@ -529,7 +521,7 @@ function NewCustomerModal({ onClose }: { onClose: () => void }) {
               ))}
             </select>
           </div>
-          <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, fontSize: 13 }}>
+          <label className="form-check">
             <input
               type="checkbox"
               checked={form.active !== false}

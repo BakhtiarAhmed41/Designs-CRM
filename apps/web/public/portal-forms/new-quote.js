@@ -10,19 +10,27 @@
     return cards().length;
   }
 
-  function syncSelect() {
-    var sel = document.getElementById('how-many');
-    if (sel) sel.value = String(count());
+  function currentUnit() {
+    var sel = document.getElementById('unit-sel');
+    return sel && sel.value ? sel.value : 'in';
+  }
+
+  function syncUnitSuffixes() {
+    var unit = currentUnit();
+    document.querySelectorAll('[data-unit-suffix]').forEach(function (el) {
+      el.textContent = unit;
+    });
   }
 
   function renumber() {
     cards().forEach(function (card, i) {
+      var idx = card.querySelector('[data-card-index]');
+      if (idx) idx.textContent = String(i + 1);
       var title = card.querySelector('[data-card-title]');
       if (title) title.textContent = 'Design ' + (i + 1);
       var remove = card.querySelector('.drow-del');
       if (remove) remove.style.display = i === 0 ? 'none' : '';
     });
-    syncSelect();
   }
 
   window.addDesign = function addDesign() {
@@ -49,19 +57,23 @@
     if (typeof window.LVD_REPORT_HEIGHT_SOON === 'function') window.LVD_REPORT_HEIGHT_SOON();
   };
 
-  window.setHowMany = function setHowMany(val) {
-    var n = Math.max(1, Math.min(MAX, parseInt(val, 10) || 1));
-    while (count() < n) window.addDesign();
-    while (count() > n) {
-      var list = cards();
-      list[list.length - 1].remove();
-    }
-    renumber();
-    if (typeof window.LVD_REPORT_HEIGHT_SOON === 'function') window.LVD_REPORT_HEIGHT_SOON();
-  };
-
   function sameFile(a, b) {
     return a.name === b.name && a.size === b.size && a.lastModified === b.lastModified;
+  }
+
+  function escapeText(value) {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function formatSize(bytes) {
+    if (!bytes && bytes !== 0) return '';
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   }
 
   function renderFileList(inp, list) {
@@ -71,9 +83,13 @@
       var d = document.createElement('div');
       d.className = 'fitem';
       d.innerHTML =
-        '<span style="display:flex;align-items:center;gap:5px;"><i class="ti ti-file"></i>' +
-        f.name +
-        '</span><button type="button" class="frem"><i class="ti ti-x"></i></button>';
+        '<span class="fitem-ico"><i class="ti ti-file"></i></span>' +
+        '<span class="fitem-meta"><span class="fitem-name">' +
+        escapeText(f.name) +
+        '</span><span class="fitem-size">' +
+        formatSize(f.size) +
+        '</span></span>' +
+        '<button type="button" class="frem" aria-label="Remove file"><i class="ti ti-x"></i></button>';
       d.querySelector('.frem').addEventListener('click', function () {
         inp._lvdFiles = (inp._lvdFiles || []).filter(function (_, idx) { return idx !== i; });
         renderFileList(inp, list);
@@ -149,10 +165,17 @@
     var row = document.createElement('div');
     row.className = 'nq-extra-row';
     row.setAttribute('data-extra-size', '1');
+    var unit = currentUnit();
     row.innerHTML =
-      '<div class="ff"><label>Width</label><input type="number" min="0" step="0.1" placeholder="W"></div>' +
+      '<div class="nq-size-box"><span class="nq-size-lbl">Width</span><div class="nq-size-wrap">' +
+      '<input type="number" min="0" step="0.1" placeholder="W"><span class="nq-unit-sfx" data-unit-suffix>' +
+      unit +
+      '</span></div></div>' +
       '<span class="nq-x" aria-hidden="true">×</span>' +
-      '<div class="ff"><label>Height</label><input type="number" min="0" step="0.1" placeholder="H"></div>' +
+      '<div class="nq-size-box"><span class="nq-size-lbl">Height</span><div class="nq-size-wrap">' +
+      '<input type="number" min="0" step="0.1" placeholder="H"><span class="nq-unit-sfx" data-unit-suffix>' +
+      unit +
+      '</span></div></div>' +
       '<button type="button" class="nq-extra-del" onclick="this.parentNode.remove()" aria-label="Remove size"><i class="ti ti-trash"></i></button>';
     box.appendChild(row);
     if (typeof window.LVD_REPORT_HEIGHT_SOON === 'function') window.LVD_REPORT_HEIGHT_SOON();
@@ -164,5 +187,27 @@
     if (document.getElementById('design-list') && count() === 0) window.addDesign();
     renumber();
     initServiceMenu();
+
+    var unitSeg = document.getElementById('unit-seg');
+    var unitSel = document.getElementById('unit-sel');
+    if (unitSeg && unitSel) {
+      unitSeg.querySelectorAll('[data-unit]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          unitSel.value = btn.getAttribute('data-unit') || 'in';
+          unitSeg.querySelectorAll('[data-unit]').forEach(function (b) {
+            b.classList.toggle('on', b === btn);
+          });
+          syncUnitSuffixes();
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage({ type: 'lvd-form-dirty' }, '*');
+          }
+        });
+      });
+      var current = unitSel.value || 'in';
+      unitSeg.querySelectorAll('[data-unit]').forEach(function (b) {
+        b.classList.toggle('on', b.getAttribute('data-unit') === current);
+      });
+      syncUnitSuffixes();
+    }
   });
 })();

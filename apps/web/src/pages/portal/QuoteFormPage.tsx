@@ -199,8 +199,11 @@ export function QuoteFormPage() {
       const data = ev.data as { type?: string; height?: number } | null;
       if (!data || typeof data !== 'object') return;
       if (data.type === 'lvd-form-height' && typeof data.height === 'number') {
-        const next = Math.max(360, Math.ceil(data.height));
-        if (iframeRef.current) iframeRef.current.style.height = `${next}px`;
+        const next = Math.max(1, Math.ceil(data.height));
+        const frame = iframeRef.current;
+        if (frame && Math.abs(frame.offsetHeight - next) > 2) {
+          frame.style.height = `${next}px`;
+        }
       }
       if (data.type === 'lvd-form-ready') {
         const win = iframeRef.current?.contentWindow;

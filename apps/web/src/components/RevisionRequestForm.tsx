@@ -42,14 +42,7 @@ export function RevisionRequestForm({
           {choices.map((d) => (
             <label
               key={d.id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                fontSize: 13,
-                marginBottom: 6,
-                cursor: 'pointer',
-              }}
+              className="form-check"
             >
               <input
                 type="checkbox"
@@ -62,24 +55,15 @@ export function RevisionRequestForm({
           ))}
         </div>
       )}
-      <label style={{ fontSize: 12, fontWeight: 500, display: 'block', marginBottom: 6 }}>
-        What should we change?
-      </label>
-      <textarea
-        value={note}
-        onChange={(e) => onNote(e.target.value)}
-        placeholder="Describe the revision you need…"
-        rows={3}
-        style={{
-          width: '100%',
-          border: '0.5px solid var(--line)',
-          borderRadius: 8,
-          padding: '8px 10px',
-          fontSize: 13,
-          fontFamily: 'inherit',
-          resize: 'vertical',
-        }}
-      />
+      <div className="ff">
+        <label>What should we change?</label>
+        <textarea
+          value={note}
+          onChange={(e) => onNote(e.target.value)}
+          placeholder="Describe the revision you need…"
+          rows={3}
+        />
+      </div>
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 8 }}>
         <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>
           Cancel

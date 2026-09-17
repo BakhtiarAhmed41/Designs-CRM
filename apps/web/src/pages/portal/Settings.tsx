@@ -59,10 +59,10 @@ export function PortalSettings() {
       />
       {error && <ErrorBanner>{error}</ErrorBanner>}
       {msg && <SuccessBanner>{msg}</SuccessBanner>}
-      <form className="card card-pad" onSubmit={(e) => void onSave(e)} style={{ maxWidth: 480 }}>
+      <form className="card card-pad settings-form" onSubmit={(e) => void onSave(e)} style={{ maxWidth: 480 }}>
         <div className="ff">
           <label htmlFor="headingColor">Heading text color</label>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div className="color-field">
             <input
               id="headingColor"
               type="color"
@@ -78,7 +78,7 @@ export function PortalSettings() {
         </div>
         <div className="ff">
           <label htmlFor="backgroundColor">Page background</label>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div className="color-field">
             <input
               id="backgroundColor"
               type="color"

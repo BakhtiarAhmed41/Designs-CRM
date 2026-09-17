@@ -5,33 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Embroidery Digitizing Quote</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
-<style>
-*{box-sizing:border-box;margin:0;padding:0;}
-html,body{background:#fff;height:auto;overflow:visible;}
-body{font-family:system-ui,sans-serif;padding:4px 2px 8px;font-size:14px;color:#222;}
-.wrap{width:100%;margin:0;}
-.ch{padding:8px 6px;display:flex;align-items:center;gap:6px;}
-.ct{font-size:13px;font-weight:500;}
-.cb{padding:4px 0 6px;}
-.sl{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin:18px 0 8px;}
-.ff{display:flex;flex-direction:column;gap:6px;}
-.ff label{font-size:13px;font-weight:600;color:#444;}
-.ff input,.ff select,.ff textarea{font-size:14px;height:42px;padding:0 12px;border:1px solid rgba(34,34,34,.12);border-radius:8px;background:#fff;color:#222;outline:none;font-family:inherit;}
-.ff textarea{height:auto;min-height:88px;padding:10px 12px;resize:vertical;}
-.upload-area{border:1.5px dashed rgba(0,0,0,.2);border-radius:10px;background:#fff;overflow:hidden;}
-.utrg{padding:16px 10px;text-align:center;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;}
-.utrg p{font-size:14px;font-weight:600;}
-.utrg span{font-size:12px;color:#888;}
-.flist{padding:0 10px 8px;}
-.fitem{display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:6px;margin-bottom:4px;font-size:13px;border:0.5px solid rgba(0,0,0,.1);}
-.frem{background:none;border:none;cursor:pointer;color:#E24B4A;}
-.btn-p{padding:10px 16px;background:#222;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;}
-.btn-s{padding:10px 14px;border:1px solid rgba(0,0,0,.15);border-radius:8px;font-size:14px;background:#fff;cursor:pointer;}
-.form-hint{margin:6px 0 0;font-size:12px;color:#6B6B6B;text-align:right;}
-.mode-body{display:none;}
-.mode-body.vis{display:block;}
-html.in-frame .ch{display:none;}
-</style>
 <link rel="stylesheet" href="theme.css">
 <link rel="stylesheet" href="new-quote.css">
 </head>
@@ -44,24 +17,13 @@ html.in-frame .ch{display:none;}
       <p class="nq-lead">Tell us about your design. If you’re unsure about anything, we’ll help.</p>
       <div class="nq-top">
         <div class="ff">
-          <label>How many designs?</label>
-          <select id="how-many" onchange="setHowMany(this.value)">
-            <option value="1">1 design</option>
-            <option value="2">2 designs</option>
-            <option value="3">3 designs</option>
-            <option value="4">4 designs</option>
-            <option value="5">5 designs</option>
-            <option value="6">6 designs</option>
-            <option value="7">7 designs</option>
-            <option value="8">8 designs</option>
-            <option value="9">9 designs</option>
-            <option value="10">10 designs</option>
-          </select>
-          <p class="nq-hint">Have more than 10 designs? Select the main files, then add another one.</p>
-        </div>
-        <div class="ff">
           <label>Measurement unit</label>
-          <select id="unit-sel">
+          <div class="nq-seg" id="unit-seg" role="group" aria-label="Measurement unit">
+            <button type="button" class="nq-seg-btn on" data-unit="in">in</button>
+            <button type="button" class="nq-seg-btn" data-unit="cm">cm</button>
+            <button type="button" class="nq-seg-btn" data-unit="mm">mm</button>
+          </div>
+          <select id="unit-sel" class="nq-sr">
             <option value="in">Inches (in)</option>
             <option value="cm">Centimeters (cm)</option>
             <option value="mm">Millimeters (mm)</option>
@@ -85,7 +47,7 @@ html.in-frame .ch{display:none;}
           <label class="nq-fmt"><input type="checkbox" data-fmt="VP3"> VP3</label>
           <label class="nq-fmt"><input type="checkbox" data-fmt="XXX"> XXX</label>
           <label class="nq-fmt"><input type="checkbox" data-fmt="Other" id="fmt-other-chip"> Other</label>
-          <div id="fmt-other-inp" class="fmt-other"><input id="fmt-other-text" type="text" placeholder="Enter format(s)"></div>
+          <div id="fmt-other-inp" class="fmt-other"><input id="fmt-other-text" type="text" placeholder="Need another format?"></div>
         </div>
       </div>
 
@@ -93,21 +55,37 @@ html.in-frame .ch{display:none;}
         <div class="sl">Turnaround</div>
         <div class="rush-row">
           <label class="ropt sel-s" id="r-std" onclick="selRush('std')">
-            <input type="radio" name="turnaround" value="standard" checked> Usually ready in 12–24 hours
+            <input type="radio" name="turnaround" value="standard" checked>
+            <div class="ropt-top">
+              <span class="ropt-name" data-turnaround-label>Standard</span>
+              <span class="nq-badge">Included</span>
+            </div>
+            <p class="ropt-time">12–24 hours</p>
+            <p class="ropt-desc">Our regular digitizing queue. Fits most orders without extra cost.</p>
           </label>
           <label class="ropt" id="r-rush" onclick="selRush('rush')">
-            <input type="radio" name="turnaround" value="urgent"> Urgent — ask us first
+            <input type="radio" name="turnaround" value="urgent">
+            <div class="ropt-top">
+              <span class="ropt-name" data-turnaround-label>Rush</span>
+              <span class="nq-badge nq-badge-soft">Priority</span>
+            </div>
+            <p class="ropt-time">4–8 hours</p>
+            <p class="ropt-desc">We’ll contact you first to confirm availability.</p>
           </label>
         </div>
         <div class="nq-warn"><i class="ti ti-info-circle"></i> Complex designs may take up to 3 business days. We’ll confirm the turnaround before starting.</div>
       </div>
     </div>
 
-    <div class="row-btns">
-      <button type="button" class="btn-s">Save as draft</button>
-      <button type="button" class="btn-p">Submit quote request →</button>
+    <div class="nq-actions">
+      <div class="row-btns">
+        <button type="button" class="btn-s">Save as draft</button>
+        <div class="nq-actions-right">
+          <button type="button" class="btn-p">Submit quote request →</button>
+          <p class="form-hint">This sends your request to our team.</p>
+        </div>
+      </div>
     </div>
-    <p class="form-hint">This sends your request to our team.</p>
   </div>
 </div>
 </div>
@@ -115,17 +93,19 @@ html.in-frame .ch{display:none;}
 window.LVD_DESIGN_HTML = function (n) {
   return (
     '<div class="dcard nq-card" id="dr-' + n + '">' +
-      '<div class="nq-card-h"><strong data-card-title>Design ' + n + '</strong>' +
-      '<button type="button" class="drow-del" onclick="removeDesign(this)"><i class="ti ti-trash"></i> Remove</button></div>' +
+      '<div class="nq-card-h">' +
+        '<div class="nq-card-title"><span class="nq-idx" data-card-index>' + n + '</span>' +
+        '<strong data-card-title>Design ' + n + '</strong></div>' +
+        '<button type="button" class="drow-del" onclick="removeDesign(this)" aria-label="Remove this design"><i class="ti ti-trash"></i></button>' +
+      '</div>' +
       '<div class="ff"><label>Design name (optional)</label>' +
       '<input class="d-name" data-design-name type="text" placeholder="e.g. Aces cap logo"></div>' +
-      '<div class="nq-up">' +
-        '<div class="upload-area"><div class="utrg" onclick="document.getElementById(\'fu-' + n + '\').click()">' +
+      '<div class="nq-drop upload-area"><div class="utrg" onclick="document.getElementById(\'fu-' + n + '\').click()">' +
         '<i class="ti ti-cloud-upload"></i><p>Upload your design</p>' +
-        '<span>Logo, photo, screenshot or drawing</span></div>' +
+        '<span>Logo, photo, screenshot or drawing — click to browse</span></div>' +
         '<input type="file" id="fu-' + n + '" multiple style="display:none" onchange="handleFiles(\'flist-' + n + '\',this)">' +
         '<div class="flist" id="flist-' + n + '"></div></div>' +
-        '<div class="ff"><label>What will the design be embroidered on?</label>' +
+      '<div class="ff"><label>What will the design be embroidered on?</label>' +
         '<select data-item>' +
           '<option value="">Select an item or fabric</option>' +
           '<option>Hat</option><option>Cap</option><option>Visor</option>' +
@@ -133,21 +113,21 @@ window.LVD_DESIGN_HTML = function (n) {
           '<option>Other</option><option>I\'m not sure</option>' +
         '</select>' +
         '<p class="nq-hint">Hat, cap, jacket, fleece, polo, bag or other item.</p></div>' +
-      '</div>' +
-      '<div class="nq-size"><h3>Size</h3>' +
-      '<div class="nq-size-row">' +
-        '<div class="nq-size-fields">' +
-          '<div class="ff"><label>Width</label><input data-size="w" type="number" min="0" step="0.1" placeholder="e.g. 3.5"></div>' +
-          '<span class="nq-x" aria-hidden="true">×</span>' +
-          '<div class="ff"><label>Height</label><input data-size="h" type="number" min="0" step="0.1" placeholder="Auto"></div>' +
+      '<div class="nq-size">' +
+        '<div class="nq-size-head"><h3>Size</h3>' +
+        '<label class="nq-check nq-unsure"><input type="checkbox" data-size-unsure> I\'m not sure of the size</label></div>' +
+        '<div class="nq-size-row">' +
+          '<div class="nq-size-box"><span class="nq-size-lbl">Width</span>' +
+            '<div class="nq-size-wrap"><input data-size="w" type="number" min="0" step="0.1" placeholder="3.5">' +
+            '<span class="nq-unit-sfx" data-unit-suffix>in</span></div></div>' +
+          '<label class="nq-lock"><input type="checkbox" data-keep-prop checked> Keep proportional</label>' +
+          '<div class="nq-size-box"><span class="nq-size-lbl">Height</span>' +
+            '<div class="nq-size-wrap"><input data-size="h" type="number" min="0" step="0.1" placeholder="Auto">' +
+            '<span class="nq-unit-sfx" data-unit-suffix>in</span></div></div>' +
         '</div>' +
-        '<div class="nq-size-opts">' +
-          '<label class="nq-check"><input type="checkbox" data-keep-prop checked> Keep proportional</label>' +
-          '<button type="button" class="nq-add" onclick="addExtraSize(this)"><i class="ti ti-plus"></i> another size</button>' +
-          '<label class="nq-check"><input type="checkbox" data-size-unsure> I\'m not sure of the size</label>' +
-        '</div>' +
+        '<button type="button" class="nq-add-size" onclick="addExtraSize(this)"><i class="ti ti-plus"></i> Add another size</button>' +
+        '<div class="nq-extra" data-extra-sizes></div>' +
       '</div>' +
-      '<div class="nq-extra" data-extra-sizes></div></div>' +
       '<div class="ff nq-note"><label>Tell us about your design</label>' +
       '<p class="nq-hint">Please mention where the design will be placed and share any other details. We’ll recommend the best size.</p>' +
       '<textarea placeholder="Example: Left chest placement on a polo shirt. Please keep the small text clear."></textarea></div>' +

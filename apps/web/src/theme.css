@@ -1069,15 +1069,16 @@ button.ghost i { color: var(--ink); }
 
 input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):not([type="color"]),
 select, textarea {
-  border-radius: 8px;
+  border-radius: 10px;
 }
 .pform { gap: 16px 18px; }
 .pf label {
   display: block;
-  margin-bottom: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--muted);
+  margin-bottom: 0;
+  font-size: 12.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--form-label, var(--muted));
 }
 .note { margin-top: 14px; padding: 12px 14px; border-radius: 8px; }
 
@@ -1768,7 +1769,7 @@ button.primary i,
 
 .form-frame {
   width: 100%;
-  min-height: 420px;
+  min-height: 0;
   height: auto;
   border: none;
   background: transparent;
@@ -1778,6 +1779,40 @@ button.primary i,
 
 .modal-b.form-section {
   padding: 18px 22px 22px;
+}
+
+.overlay.overlay-center {
+  align-items: center;
+}
+
+.modal.gen-modal {
+  border-radius: 14px;
+  overflow: hidden;
+}
+.gen-modal .modal-h {
+  border-radius: 14px 14px 0 0;
+}
+.gen-modal .modal-b {
+  border-radius: 0 0 14px 14px;
+}
+.gen-modal .gen-pick {
+  position: relative;
+}
+.gen-modal .gen-search-drop {
+  position: relative;
+  top: auto;
+  left: auto;
+  right: auto;
+  z-index: 1;
+  margin-top: 8px;
+  max-height: 162px;
+  overflow-y: auto;
+}
+.gen-modal .ff input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.gen-modal .btn.btn-primary,
+.gen-modal .modal-x,
+.gen-modal .search-drop {
+  border-radius: 14px !important;
 }
 
 .theme-card + .theme-card { margin-top: 14px; }
@@ -2239,10 +2274,16 @@ button.primary i,
   border: 1px solid rgba(17, 24, 39, 0.06);
   box-shadow: 0 8px 24px rgba(17, 24, 39, 0.04);
 }
+.profile-elegant .card-pad {
+  padding: 22px 22px 20px;
+}
 .profile-elegant .pform {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px 18px;
+  gap: 16px 18px;
+}
+.profile-elegant .note {
+  margin-top: 16px;
 }
 @media (max-width: 720px) {
   .profile-elegant .pform {
@@ -2461,7 +2502,7 @@ button.primary i,
 .pick-copy { flex: 1; min-width: 0; }
 .quote-layout { display: grid; grid-template-columns: minmax(0,1fr) 210px; gap: 14px; align-items: start; }
 .quote-layout-form { grid-template-columns: 1fr; }
-.quote-frame { width: 100%; min-height: 360px; border: 0; }
+.quote-frame { width: 100%; min-height: 0; border: 0; }
 .help-card {
   position: sticky;
   top: 72px;
@@ -2554,12 +2595,14 @@ button.primary:hover:not(:disabled),
 .ff textarea,
 .pf input,
 .pf select,
+.pf textarea,
 .login-field input,
 .stat-select,
 .inbox-start-input,
 .notes-box,
 .msg-search,
-.msg-composer-row textarea {
+.msg-composer-row textarea,
+.app-dialog-input {
   background: var(--form-bg);
   color: var(--form-text);
   border-color: var(--form-border);
@@ -2570,12 +2613,15 @@ button.primary:hover:not(:disabled),
 .ff textarea:focus,
 .pf input:focus,
 .pf select:focus,
+.pf textarea:focus,
 .login-field input:focus,
 .inbox-start-input:focus,
 .notes-box:focus,
 .msg-search:focus,
-.msg-composer-row textarea:focus {
+.msg-composer-row textarea:focus,
+.app-dialog-input:focus {
   border-color: var(--form-focus);
+  box-shadow: var(--focus);
 }
 .orow:hover,
 .crow:hover,
@@ -2785,4 +2831,238 @@ button.primary:hover:not(:disabled),
   .policy-section {
     padding: 16px 14px 14px;
   }
+}
+
+/* ---------- Form look (same colors, calmer spacing) ---------- */
+.ff,
+.pf,
+.login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.ff {
+  margin-bottom: 14px;
+}
+.ff:last-child {
+  margin-bottom: 0;
+}
+.ff label,
+.pf label,
+.login-field span {
+  font-size: 12.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  color: var(--form-label, var(--muted));
+}
+.ff input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):not([type="color"]),
+.ff select,
+.ff textarea,
+.pf input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):not([type="color"]),
+.pf select,
+.pf textarea,
+.login-field input,
+.notes-box,
+.stat-select,
+.app-dialog-input,
+.inbox-start-input {
+  min-height: 42px;
+  padding: 10px 13px;
+  border: 1px solid var(--form-border, var(--line));
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.4;
+  font-family: inherit;
+  background: var(--form-bg);
+  color: var(--form-text);
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.03);
+  transition: border-color var(--ease), box-shadow var(--ease);
+}
+.ff textarea,
+.pf textarea,
+.notes-box {
+  min-height: 96px;
+  padding: 11px 13px;
+  line-height: 1.55;
+  resize: vertical;
+}
+.ff select,
+.pf select,
+.stat-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23222222' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  padding-right: 36px;
+  cursor: pointer;
+}
+.ff input::placeholder,
+.ff textarea::placeholder,
+.pf input::placeholder,
+.pf textarea::placeholder,
+.login-field input::placeholder,
+.notes-box::placeholder,
+.app-dialog-input::placeholder {
+  color: var(--faint);
+  opacity: 0.8;
+}
+.ff input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):not([type="color"]):hover,
+.ff select:hover,
+.ff textarea:hover,
+.pf input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):not([type="color"]):hover,
+.pf select:hover,
+.pf textarea:hover,
+.login-field input:hover,
+.notes-box:hover,
+.app-dialog-input:hover {
+  border-color: rgba(34, 34, 34, 0.18);
+}
+.ff input:focus,
+.ff select:focus,
+.ff textarea:focus,
+.pf input:focus,
+.pf select:focus,
+.pf textarea:focus,
+.login-field input:focus,
+.notes-box:focus,
+.app-dialog-input:focus,
+.inbox-start-input:focus {
+  border-color: var(--form-focus);
+  box-shadow: var(--focus);
+}
+.ff input:disabled,
+.ff select:disabled,
+.ff textarea:disabled,
+.pf input:disabled,
+.pf select:disabled,
+.login-field input:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.pform + .btn,
+.pform + button,
+.customer-form-grid + .customer-actions,
+.card-pad form > .btn,
+form.card-pad > .btn {
+  margin-top: 8px;
+}
+.customer-form-grid {
+  gap: 14px 16px;
+}
+.login-card {
+  width: 400px;
+  padding: 32px 28px 28px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+}
+.login-form {
+  gap: 16px;
+}
+.login-field input {
+  min-height: 44px;
+}
+.login-submit {
+  min-height: 44px;
+  margin-top: 4px;
+  border-radius: 10px;
+}
+.modal-b .ff:last-of-type {
+  margin-bottom: 16px;
+}
+.theme-field {
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.quote-counter-field > span {
+  font-size: 12.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.quote-counter-amount,
+.fmt-fee {
+  border-radius: 10px;
+}
+.msg-composer-row textarea {
+  min-height: 44px;
+}
+
+.color-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.color-field input[type="color"] {
+  width: 42px;
+  height: 42px;
+  padding: 3px;
+  border: 1px solid var(--form-border, var(--line));
+  border-radius: 10px;
+  background: var(--form-bg);
+  cursor: pointer;
+}
+.color-field input[type="color"]:hover {
+  border-color: rgba(34, 34, 34, 0.18);
+}
+.settings-form .ff:last-of-type {
+  margin-bottom: 16px;
+}
+
+.pref-section-label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 650;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0 0 8px;
+}
+.pref-chip-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0 0 18px;
+}
+.pref-add-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.pref-add-row select,
+.pref-add-row input {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--form-border, var(--line));
+  border-radius: 10px;
+  font-size: 13px;
+  font-family: inherit;
+  background: var(--form-bg);
+  color: var(--form-text);
+}
+.pref-add-row select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23222222' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px;
+  padding-right: 32px;
+}
+
+.form-check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 14px;
+  font-size: 13.5px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.form-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--form-focus, var(--ink));
 }

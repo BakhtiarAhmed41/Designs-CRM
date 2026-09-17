@@ -18,11 +18,13 @@ body{font-family:system-ui,sans-serif;background:#fff;padding:4px 2px 8px;font-s
 .sl{font-size:10px;font-weight:600;color:#888;letter-spacing:.05em;text-transform:uppercase;margin:8px 0 4px;}
 .sl:first-child{margin-top:0;}
 .fg{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;}
-.ff{display:flex;flex-direction:column;gap:4px;}
-.ff label{font-size:11px;font-weight:500;color:#555;}
-.ff input,.ff select{font-size:12px;height:32px;padding:0 10px;border:1px solid rgba(34,34,34,.12);border-radius:7px;background:#fff;color:#222222;outline:none;}
-.ff input:focus,.ff select:focus{border-color:#222222;box-shadow:0 0 0 2px rgba(34,34,34,.12);}
-.ff textarea{font-size:12px;padding:8px 10px;border:1px solid rgba(34,34,34,.12);border-radius:7px;resize:vertical;min-height:56px;outline:none;font-family:inherit;width:100%;background:#fff;color:#222222;}
+.ff{display:flex;flex-direction:column;gap:6px;}
+.ff label{font-size:12px;font-weight:650;letter-spacing:-.01em;color:#555;}
+.ff input,.ff select{font-size:13px;height:40px;padding:0 12px;border:1px solid rgba(34,34,34,.12);border-radius:10px;background:#fff;color:#222222;outline:none;box-shadow:0 1px 2px rgba(16,24,40,.03);}
+.ff input:hover,.ff select:hover{border-color:rgba(34,34,34,.22);}
+.ff input:focus,.ff select:focus{border-color:#222222;box-shadow:0 0 0 3px rgba(34,34,34,.12);}
+.ff textarea{font-size:13px;padding:10px 12px;border:1px solid rgba(34,34,34,.12);border-radius:10px;resize:vertical;min-height:88px;outline:none;font-family:inherit;width:100%;background:#fff;color:#222222;line-height:1.5;box-shadow:0 1px 2px rgba(16,24,40,.03);}
+.ff select{appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23222222' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");background-repeat:no-repeat;background-position:right 10px center;background-size:14px;padding-right:32px;cursor:pointer;}
 .lockable{transition:opacity .25s;}
 .lockable.locked{opacity:.25;pointer-events:none;user-select:none;}
 /* service type selector */
@@ -163,6 +165,8 @@ body{font-family:system-ui,sans-serif;background:#fff;padding:4px 2px 8px;font-s
 #mode-d .sl{font-size:11px;font-weight:700;color:#222222;letter-spacing:.05em;margin:8px 0 4px;padding-top:0;border-top:none;}
 #mode-d .sl:first-of-type{border-top:none;padding-top:0;margin-top:6px;}
 </style>
+<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="new-quote.css">
 </head>
 <body>
 <div class="wrap">
@@ -430,8 +434,24 @@ body{font-family:system-ui,sans-serif;background:#fff;padding:4px 2px 8px;font-s
       <!-- rush -->
       <div class="sl" style="margin-top:8px;">Turnaround</div>
       <div class="rush-row">
-        <div class="ropt sel-s" id="r-std" onclick="selRush('std')"><i class="ti ti-clock" style="font-size:13px"></i> Standard (12-24 hrs) : included</div>
-        <div class="ropt" id="r-rush" onclick="selRush('rush')"><i class="ti ti-bolt" style="font-size:13px"></i> Urgent : contact us before placing an order</div>
+        <div class="ropt sel-s" id="r-std" onclick="selRush('std')">
+          <input type="radio" name="turnaround" value="standard" checked>
+          <div class="ropt-top">
+            <span class="ropt-name" data-turnaround-label>Standard</span>
+            <span class="nq-badge">Included</span>
+          </div>
+          <p class="ropt-time">12–24 hours</p>
+          <p class="ropt-desc">Our regular queue. Fits most orders without extra cost.</p>
+        </div>
+        <div class="ropt" id="r-rush" onclick="selRush('rush')">
+          <input type="radio" name="turnaround" value="urgent">
+          <div class="ropt-top">
+            <span class="ropt-name" data-turnaround-label>Rush</span>
+            <span class="nq-badge nq-badge-soft">Priority</span>
+          </div>
+          <p class="ropt-time">4–8 hours</p>
+          <p class="ropt-desc">Contact us first so we can confirm the timeline.</p>
+        </div>
       </div>
       <div class="ibox" id="rush-note" style="display:none;"><i class="ti ti-message-circle"></i> For urgent orders, please text or email us first so we can confirm the timeline before you place the order.</div>
 
@@ -473,11 +493,15 @@ body{font-family:system-ui,sans-serif;background:#fff;padding:4px 2px 8px;font-s
       <a class="mc-btn" href="#">Message our team</a>
     </div>
 
-    <div class="row-btns">
-      <button class="btn-s">Save as draft</button>
-      <button class="btn-p">Submit quote request →</button>
+    <div class="nq-actions">
+      <div class="row-btns">
+        <button class="btn-s">Save as draft</button>
+        <div class="nq-actions-right">
+          <button class="btn-p">Submit quote request →</button>
+          <p class="form-hint">This sends your request to our team.</p>
+        </div>
+      </div>
     </div>
-    <p class="form-hint">This sends your request to our team.</p>
 
   </div>
 </div>

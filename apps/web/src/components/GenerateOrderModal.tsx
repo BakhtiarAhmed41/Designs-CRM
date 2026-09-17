@@ -112,12 +112,12 @@ export function GenerateOrderModal({
 
   return (
     <div
-      className="overlay open"
+      className="overlay overlay-center open"
       onClick={(e) => {
         if (e.target === e.currentTarget) handleClose();
       }}
     >
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480, overflow: 'visible' }}>
+      <div className="modal gen-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 480 }}>
         <div className="modal-h">
           <div className="mh-t">
             <i className={`ti ${defaultMode === 'QUOTE_REQUEST' ? 'ti-file-dollar' : 'ti-plus'}`} />
@@ -135,7 +135,7 @@ export function GenerateOrderModal({
           </p>
           <div className="ff">
             <label>Customer (required)</label>
-            <div ref={pickRef} style={{ position: 'relative' }}>
+            <div ref={pickRef} className="gen-pick">
               <input
                 placeholder="Search customers by name, email, phone…"
                 value={customerSearch}
@@ -148,7 +148,7 @@ export function GenerateOrderModal({
                 onFocus={() => setListOpen(true)}
               />
               {listOpen && (
-                <div className="search-drop open" style={{ maxHeight: 220, overflowY: 'auto' }}>
+                <div className="search-drop gen-search-drop open">
                   {customersQ.isLoading && <div className="sd-empty">Loading customers…</div>}
                   {!customersQ.isLoading && filteredCustomers.length === 0 && (
                     <div className="sd-empty">No matches.</div>
@@ -169,7 +169,7 @@ export function GenerateOrderModal({
                 {selected.email || selected.phone || 'Customer selected'}
               </div>
             ) : (
-              <div style={{ fontSize: 12, color: 'var(--amber)', marginTop: 6 }}>
+              <div style={{ fontSize: 12, color: 'var(--ink)', marginTop: 6 }}>
                 Select an existing customer. Create them under Customers first if needed.
               </div>
             )}
