@@ -931,7 +931,7 @@ html.in-frame .ch {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  width: 100%;
+  width: max-content;
   max-width: 100%;
 }
 
