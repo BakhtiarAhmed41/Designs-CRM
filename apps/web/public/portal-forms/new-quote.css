@@ -89,6 +89,10 @@ html.in-frame .ch {
   margin-bottom: 18px;
 }
 
+.nq-card .nq-top {
+  margin-bottom: 0;
+}
+
 .nq-top > .ff {
   flex: 0 0 auto;
   width: fit-content;
@@ -290,6 +294,9 @@ html.in-frame .ch {
 
 .nq-card.dcard,
 .dcard.nq-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   background: var(--form-bg, #fff);
   border: 1px solid var(--nq-line);
   border-radius: var(--nq-radius-lg);
@@ -303,7 +310,7 @@ html.in-frame .ch {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 0;
 }
 
 .nq-card-title {
@@ -371,7 +378,7 @@ html.in-frame .ch {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 14px;
-  margin: 14px 0 8px;
+  margin: 0;
 }
 
 .nq-up .upload-area {
@@ -516,7 +523,7 @@ html.in-frame .ch {
 
 /* Size */
 .nq-size {
-  margin: 16px 0 8px;
+  margin: 0;
 }
 
 .nq-size-head {
@@ -700,7 +707,7 @@ html.in-frame .ch {
 }
 
 .nq-note {
-  margin-top: 14px;
+  margin-top: 0;
 }
 
 /* Formats */
