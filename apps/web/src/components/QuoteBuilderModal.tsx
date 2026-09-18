@@ -17,6 +17,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { postThemeToWindow } from '@/lib/theme';
 import { invalidateWorkCaches } from '@/lib/queryCache';
 import { filesFromQuoteForm } from '@/lib/quoteFiles';
+import { isUsualQuoteService, quoteFormatsFromPrefs } from '@/lib/customerPrefs';
 import { LocalFilePreview } from '@/components/FilePreview';
 
 type PriceLine = { name: string; note: string; price: string };
@@ -114,6 +115,7 @@ export function QuoteBuilderModal({
   const { user } = useAuth();
   const { colors: themeColors } = useTheme();
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const draftRestoredRef = useRef(false);
   const [service, setService] = useState<(typeof SERVICES)[number] | null>(null);
   const isAdmin = Boolean(adminFor);
   const isDirectOrder = adminFor?.type === 'ORDER';
@@ -150,6 +152,7 @@ export function QuoteBuilderModal({
     setFormFiles([]);
     setExtraFiles([]);
     setPriceLines([emptyPriceLine()]);
+    draftRestoredRef.current = false;
     if (iframeRef.current) iframeRef.current.src = 'about:blank';
   }, []);
 
@@ -230,7 +233,7 @@ export function QuoteBuilderModal({
           serviceType: service.serviceType,
           mode: collected.mode,
           turnaround: collected.turnaround,
-          formats: collected.formats,
+          formats: quoteFormatsFromPrefs(collected.formats, customerPrefs, service.key),
           designs: collected.designs,
           fields: collected.fields,
           advanced: collected.advanced,
@@ -267,7 +270,7 @@ export function QuoteBuilderModal({
     } finally {
       setBusy(false);
     }
-  }, [service, qc, onClose, onSubmitted, adminFor]);
+  }, [service, qc, onClose, onSubmitted, adminFor, customerPrefs]);
 
   const priceTotalCents = priceLines.reduce((sum, line) => {
     const cents = dollarsToCents(line.price);
@@ -361,12 +364,13 @@ export function QuoteBuilderModal({
             '*',
           );
         }
-        if (win && customerPrefs) {
+        if (win && customerPrefs && !draftRestoredRef.current) {
           win.postMessage({ type: 'lvd-apply-prefs', prefs: customerPrefs }, '*');
         }
         if (service && !isAdmin) {
           void getQuoteDraft(service.key).then((res) => {
             if (res.draft && win) {
+              draftRestoredRef.current = true;
               win.postMessage({ type: 'lvd-restore-draft', draft: res.draft.payload }, '*');
               setToast('Restored your saved draft.');
             }
@@ -396,6 +400,12 @@ export function QuoteBuilderModal({
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
   }, [open, submitFromIframe, onClose, navigate, customerPrefs, service, isAdmin, isDirectOrder, themeColors]);
+
+  useEffect(() => {
+    if (!open || !service || !customerPrefs || draftRestoredRef.current) return;
+    const win = iframeRef.current?.contentWindow;
+    if (win) win.postMessage({ type: 'lvd-apply-prefs', prefs: customerPrefs }, '*');
+  }, [open, service, customerPrefs]);
 
   if (!open) return null;
 
@@ -443,13 +453,13 @@ export function QuoteBuilderModal({
                 <div className="pick-intro">
                   {isAdmin
                     ? 'Step 1 of 3. Pick a service. This will be filed under the selected customer.'
-                    : 'Pick a service to start your quote.'}
+                    : 'Pick a service to start your quote. Your usual ones are marked.'}
                 </div>
                 <div className="pick-grid">
                   {SERVICES.map((s) => (
                     <div
                       key={s.key}
-                      className={`pick${s.mar ? ' mar' : ''}`}
+                      className={`pick${s.mar ? ' mar' : ''}${isUsualQuoteService(customerPrefs, s.key) ? ' usual' : ''}`}
                       onClick={() => {
                         setService(s);
                         setError(null);
@@ -467,7 +477,12 @@ export function QuoteBuilderModal({
                         <i className={`ti ${s.icon}`} />
                       </div>
                       <div className="pick-copy">
-                        <div className="pt">{s.label}</div>
+                        <div className="pt">
+                          {s.label}
+                          {isUsualQuoteService(customerPrefs, s.key) && (
+                            <span className="pick-usual">Usual</span>
+                          )}
+                        </div>
                         <div className="pd">{s.desc}</div>
                       </div>
                       <i className="ti ti-arrow-right parr" />
@@ -518,6 +533,13 @@ export function QuoteBuilderModal({
                       Submitting as <b style={{ color: 'var(--navy)' }}>{accountName}</b>
                     </span>
                   </div>
+                  {quoteFormatsFromPrefs([], customerPrefs, service.key).length > 0 && (
+                    <p className="muted" style={{ margin: '0 0 12px', fontSize: 12.5 }}>
+                      {isAdmin
+                        ? 'Formats from this customer’s profile are pre-selected. Change them if this job is different.'
+                        : 'Your saved file formats are pre-selected. Change them if this job is different.'}
+                    </p>
+                  )}
                   <iframe
                     ref={iframeRef}
                     className="form-frame"

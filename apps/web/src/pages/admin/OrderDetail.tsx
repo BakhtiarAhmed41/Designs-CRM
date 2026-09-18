@@ -52,6 +52,12 @@ import { isStaffCreatedOrder, studioQuotation, type QuoteWithLines } from '@/lib
 import type { Order, OrderStatus } from '@/lib/types';
 import { useAuth } from '@/context/AuthContext';
 import { canFeature, canSupport } from '@/lib/permissions';
+import { getCustomer } from '@/lib/customers';
+import {
+  formatsForQuoteService,
+  orderRequestedFormats,
+  quoteKeyFromServiceType,
+} from '@/lib/customerPrefs';
 
 type AdminOrderFull = Order & {
   assignedDesignerId?: string | null;
@@ -318,6 +324,11 @@ export function AdminOrderDetail() {
         status: 'PAID',
       }),
     enabled: showMoney && !!id && !!order?.customerId,
+  });
+  const customerQ = useQuery({
+    queryKey: ['admin-customer', order?.customerId],
+    queryFn: () => getCustomer(order!.customerId as string),
+    enabled: !!order?.customerId,
   });
   const convo = useMemo(
     () => convosQ.data?.conversations.find((c) => c.orderId === id),
@@ -725,6 +736,14 @@ export function AdminOrderDetail() {
   if (!order) return <div className="empty-state"><div className="empty-state-title">Order not found</div></div>;
 
   const designs = order.designs ?? [];
+  const requestedFormats = (() => {
+    const fromOrder = orderRequestedFormats(order.preferences, designs);
+    if (fromOrder.length) return fromOrder;
+    return formatsForQuoteService(
+      customerQ.data?.customer?.preferences,
+      quoteKeyFromServiceType(order.serviceType),
+    );
+  })();
   const readyCount = designs.filter((d) => d.status === 'DONE' || d.status === 'DELIVERED').length;
   const progCount = designs.filter((d) => d.status === 'IN_PROGRESS').length;
   const deliveryFiles = (order.deliveries ?? []).flatMap((batch) =>
@@ -995,11 +1014,13 @@ export function AdminOrderDetail() {
             <div className="od-line">
               <span className="l">Formats requested</span>
               <span className="v">
-                {designs.flatMap((d) => d.requestedFormats ?? []).slice(0, 3).map((f) => (
-                  <span key={f} className="fmtchip">
-                    {f}
-                  </span>
-                )) || 'None'}
+                {requestedFormats.length
+                  ? requestedFormats.map((f) => (
+                      <span key={f} className="fmtchip">
+                        {f}
+                      </span>
+                    ))
+                  : 'None'}
               </span>
             </div>
             <div className="od-line">
@@ -1772,6 +1793,12 @@ export function AdminOrderDetail() {
                     ? 'Attach up to 10 files, click Save, then send them to admin for approval.'
                     : 'Attach up to 10 files, click Save, then send a view-only preview or publish the final files.'}
               </p>
+              {requestedFormats.length > 0 && (
+                <p style={{ margin: '8px 0 0', fontSize: 13 }}>
+                  Customer usually needs:{' '}
+                  <strong>{requestedFormats.join(', ')}</strong>
+                </p>
+              )}
               <label className="odf up">
                 <i className="ti ti-cloud-upload" /> Choose files
                 <input

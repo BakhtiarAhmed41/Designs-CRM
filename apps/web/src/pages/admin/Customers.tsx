@@ -22,6 +22,11 @@ import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { SkeletonRows } from '@/components/ui/Skeleton';
+import {
+  asCustomerFilePrefs,
+  formatsForQuoteService,
+  hasUsefulFilePrefs,
+} from '@/lib/customerPrefs';
 
 type FilterId = '' | 'NET_MONTHLY' | 'PAY_PER_ORDER' | 'top';
 
@@ -386,6 +391,27 @@ function CustomerDetailModal({
                   </div>
                 )}
               </div>
+              {hasUsefulFilePrefs(customer.preferences) && (
+                <div className="note" style={{ margin: '14px 0 0' }}>
+                  <b>Saved file preferences</b>
+                  {(() => {
+                    const p = asCustomerFilePrefs(customer.preferences);
+                    if (!p) return null;
+                    const emb = formatsForQuoteService(p, 'embroidery');
+                    const vec = formatsForQuoteService(p, 'vector');
+                    const cut = formatsForQuoteService(p, 'laser');
+                    return (
+                      <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.5 }}>
+                        {p.placement ? <div>Placement: {p.placement}</div> : null}
+                        {p.hoops.length ? <div>Hoops: {p.hoops.join(', ')}</div> : null}
+                        {emb.length ? <div>Embroidery: {emb.join(', ')}</div> : null}
+                        {vec.length ? <div>Vector / print: {vec.join(', ')}</div> : null}
+                        {cut.length ? <div>Cutting: {cut.join(', ')}</div> : null}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
               <div className="customer-actions">
                 <button
                   type="button"

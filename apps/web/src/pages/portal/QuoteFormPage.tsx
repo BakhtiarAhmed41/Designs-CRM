@@ -10,6 +10,7 @@ import { useTopbarLead } from '@/components/Shell';
 import { useTheme } from '@/context/ThemeContext';
 import { postThemeToWindow } from '@/lib/theme';
 import { filesFromQuoteForm } from '@/lib/quoteFiles';
+import { isUsualQuoteService, quoteFormatsFromPrefs } from '@/lib/customerPrefs';
 
 type ServiceKey = 'embroidery' | 'vector' | 'laser';
 
@@ -69,6 +70,7 @@ export function QuoteFormPage() {
   const [params] = useSearchParams();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const dirtyRef = useRef(false);
+  const draftRestoredRef = useRef(false);
   const requested = params.get('service');
   const initial = requested === 'svg' ? 'laser' : requested;
   const found = SERVICES.find((s) => s.key === initial);
@@ -86,6 +88,7 @@ export function QuoteFormPage() {
     }
     const match = SERVICES.find((s) => s.key === initial);
     setService(match ?? null);
+    draftRestoredRef.current = false;
   }, [initial, requested, navigate]);
 
   useEffect(() => {
@@ -175,7 +178,7 @@ export function QuoteFormPage() {
           serviceType: service.serviceType,
           mode: collected.mode,
           turnaround: collected.turnaround,
-          formats: collected.formats,
+          formats: quoteFormatsFromPrefs(collected.formats, customerPrefs, service.key),
           designs: collected.designs,
           fields: collected.fields,
           advanced: collected.advanced,
@@ -192,7 +195,7 @@ export function QuoteFormPage() {
     } finally {
       setBusy(false);
     }
-  }, [service, qc, navigate]);
+  }, [service, qc, navigate, customerPrefs]);
 
   useEffect(() => {
     function onMsg(ev: MessageEvent) {
@@ -211,12 +214,13 @@ export function QuoteFormPage() {
           postThemeToWindow(win, themeColors);
           win.postMessage({ type: 'lvd-set-context', role: 'customer', kind: 'quote' }, '*');
         }
-        if (win && customerPrefs) {
+        if (win && customerPrefs && !draftRestoredRef.current) {
           win.postMessage({ type: 'lvd-apply-prefs', prefs: customerPrefs }, '*');
         }
         if (service) {
           void getQuoteDraft(service.key).then((res) => {
             if (res.draft && win) {
+              draftRestoredRef.current = true;
               win.postMessage({ type: 'lvd-restore-draft', draft: res.draft.payload }, '*');
               setToast('Restored your saved draft.');
             }
@@ -243,6 +247,12 @@ export function QuoteFormPage() {
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
   }, [submitFromIframe, navigate, customerPrefs, service, qc, themeColors]);
+
+  useEffect(() => {
+    if (!service || !customerPrefs || draftRestoredRef.current) return;
+    const win = iframeRef.current?.contentWindow;
+    if (win) win.postMessage({ type: 'lvd-apply-prefs', prefs: customerPrefs }, '*');
+  }, [service, customerPrefs]);
 
   const topbarLead = useMemo(
     () => (
@@ -291,7 +301,7 @@ export function QuoteFormPage() {
                 <button
                   key={s.key}
                   type="button"
-                  className="pick"
+                  className={`pick${isUsualQuoteService(customerPrefs, s.key) ? ' usual' : ''}`}
                   onClick={() => {
                     setService(s);
                     navigate(`/portal/quotes/new?service=${s.key}`, { replace: true });
@@ -301,7 +311,12 @@ export function QuoteFormPage() {
                     <i className={`ti ${s.icon}`} />
                   </div>
                   <div className="pick-copy">
-                    <div className="pt">{s.label}</div>
+                    <div className="pt">
+                      {s.label}
+                      {isUsualQuoteService(customerPrefs, s.key) && (
+                        <span className="pick-usual">Usual</span>
+                      )}
+                    </div>
                     <div className="pd">{s.desc}</div>
                   </div>
                   <i className="ti ti-arrow-right parr" />

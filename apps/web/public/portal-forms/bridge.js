@@ -229,19 +229,81 @@
     else chip.classList.remove('sel');
   }
 
+  function fmtKey(s) {
+    s = String(s || '')
+      .trim()
+      .toUpperCase()
+      .replace(/\s+/g, ' ');
+    if (s === 'JPEG') return 'JPG';
+    if (s === 'OTHERS' || s === 'OTHER') return 'OTHER';
+    if (s === 'PREVIEW IMAGE' || s === 'PROOF PREVIEW' || s === 'PREVIEW') return 'PREVIEW';
+    return s;
+  }
+
+  function formatsForService(prefs, svc) {
+    if (!prefs) return [];
+    var list =
+      svc === 'embroidery'
+        ? prefs.embFormats || []
+        : svc === 'laser'
+          ? prefs.cncFormats || []
+          : prefs.digFormats || [];
+    var extra = svc === 'embroidery' && prefs.embOther ? String(prefs.embOther) : '';
+    extra.split(/[,;]+/).forEach(function (part) {
+      part = part.trim();
+      if (part) list = list.concat([part]);
+    });
+    return list;
+  }
+
   function applyFormats(formats) {
     if (!formats || !formats.length) return;
     var wanted = {};
+    var extras = [];
     formats.forEach(function (f) {
-      wanted[String(f).toUpperCase()] = true;
+      var key = fmtKey(f);
+      if (!key || key === 'OTHER') return;
+      wanted[key] = true;
+      extras.push(String(f).trim());
     });
+
+    document.querySelectorAll('[data-fmt]').forEach(function (el) {
+      var key = fmtKey(el.getAttribute('data-fmt'));
+      if (key === 'OTHER') return;
+      el.checked = !!wanted[key];
+    });
+
+    var knownOnPage = {};
     document.querySelectorAll('.fmt-chip').forEach(function (chip) {
       if (chip.getAttribute('data-included') === '1') return;
       var nameEl = chip.querySelector('.fname');
       if (!nameEl) return;
-      var name = nameEl.textContent.trim().toUpperCase();
-      setChipSelected(chip, !!wanted[name]);
+      var key = fmtKey(nameEl.textContent);
+      knownOnPage[key] = true;
+      setChipSelected(chip, !!wanted[key]);
     });
+    document.querySelectorAll('[data-fmt]').forEach(function (el) {
+      var key = fmtKey(el.getAttribute('data-fmt'));
+      if (key && key !== 'OTHER') knownOnPage[key] = true;
+    });
+
+    var unknown = extras.filter(function (f) {
+      var key = fmtKey(f);
+      return key && key !== 'OTHER' && !knownOnPage[key];
+    });
+    var wantOther = unknown.length > 0 || formats.some(function (f) {
+      return fmtKey(f) === 'OTHER';
+    });
+    var otherCb = document.querySelector('[data-fmt="Other"], [data-fmt="OTHER"], [data-fmt="Others"]');
+    if (otherCb) otherCb.checked = wantOther;
+    var otherChip = document.getElementById('fmt-other-chip');
+    if (otherChip && otherChip.classList.contains('fmt-chip')) setChipSelected(otherChip, wantOther);
+    var otherInp = document.querySelector('#fmt-other-inp input, #fmt-other-text');
+    var otherWrap = document.getElementById('fmt-other-inp');
+    if (otherInp && unknown.length && !otherInp.value.trim()) {
+      otherInp.value = unknown.join(', ');
+      if (otherWrap) otherWrap.classList.add('show');
+    }
   }
 
   function applyPlacement(placement) {
@@ -267,7 +329,7 @@
         sel.closest('.ff') && sel.closest('.ff').querySelector('label')
           ? sel.closest('.ff').querySelector('label').textContent.trim().toLowerCase()
           : '';
-      if (lbl.indexOf('hoop') === -1 && lbl.indexOf('size') === -1) return;
+      if (lbl.indexOf('hoop') === -1) return;
       var match = Array.prototype.find.call(sel.options, function (opt) {
         return (
           opt.value === first ||
@@ -279,11 +341,14 @@
     });
   }
 
-  function formatsForService(prefs, svc) {
-    if (!prefs) return [];
-    if (svc === 'embroidery') return prefs.embFormats || [];
-    if (svc === 'laser') return prefs.cncFormats || [];
-    return prefs.digFormats || [];
+  function applyUsualNotes(prefs) {
+    var parts = [];
+    if (prefs.placement) parts.push('Usual placement: ' + prefs.placement);
+    if (prefs.hoops && prefs.hoops.length) parts.push('Usual hoop sizes: ' + prefs.hoops.join(', '));
+    if (!parts.length) return;
+    var ta = document.querySelector('#mode-d .dcard textarea');
+    if (!ta || ta.value.trim()) return;
+    ta.value = parts.join('. ') + '.';
   }
 
   window.LVD_APPLY_PREFS = function (prefs) {
@@ -292,6 +357,7 @@
     applyFormats(formatsForService(prefs, svc));
     applyPlacement(prefs.placement);
     applyHoops(prefs.hoops);
+    if (svc === 'embroidery') applyUsualNotes(prefs);
   };
 
   window.LVD_COLLECT = function () {
