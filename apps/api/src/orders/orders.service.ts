@@ -2225,7 +2225,7 @@ export class OrdersService {
       await this.notifications.createFor(order.client_user_id, {
         title: 'Your files are ready',
         body: `Your deliverables for ${order.name ?? 'your order'} are available in the portal.`,
-        link: `/portal/orders/${orderId}`,
+        link: `/portal/files?order=${orderId}`,
       });
     }
     const email = await this.customerEmailForOrder(order);
@@ -2855,7 +2855,9 @@ export class OrdersService {
           : partial
             ? `Some files for ${order.name ?? 'your order'} are ready to download.`
             : `Your files for ${order.name ?? 'your order'} are ready to download.`,
-        link: `/portal/orders/${orderId}`,
+        link: isPreview
+          ? `/portal/orders/${orderId}`
+          : `/portal/files?order=${orderId}`,
       });
     }
     if (release && notifyEmail && (isNewUpload || !alreadyReleased)) {

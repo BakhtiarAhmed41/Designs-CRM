@@ -41,3 +41,25 @@ export function unreadIdsForSection(
     .filter((n) => !n.readAt && sectionForNotification(n.title, n.link) === section)
     .map((n) => n.id);
 }
+
+function orderIdFromLink(link: string | null) {
+  return link?.match(/\/orders\/([^/?#]+)/)?.[1] ?? null;
+}
+
+export function filesSectionPath(link: string | null) {
+  const orderId = orderIdFromLink(link);
+  return orderId ? `/portal/files?order=${orderId}` : '/portal/files';
+}
+
+export function portalActivityAction(title: string, link: string | null) {
+  const t = title.toLowerCase();
+  if (t.includes('quote')) return { label: 'Review quote', to: link || '/portal/quotes' };
+  if (t.includes('deliver') || t.includes('file')) {
+    return { label: 'View files', to: filesSectionPath(link) };
+  }
+  if (t.includes('invoice') || t.includes('payment')) {
+    return { label: 'View invoice', to: link || '/portal/invoices' };
+  }
+  if (link) return { label: 'View', to: link };
+  return null;
+}

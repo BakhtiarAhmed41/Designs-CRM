@@ -12,7 +12,7 @@ import { useAuth } from '@/context/AuthContext';
 import { freshOnOpen } from '@/lib/queryRefresh';
 import { money, quoteLifecycleChip, customerOrderChip } from '@/lib/format';
 import { serviceCategoryLabel } from '@/lib/serviceIcon';
-import { unreadSections } from '@/lib/portalNew';
+import { portalActivityAction, unreadSections } from '@/lib/portalNew';
 import type { Order } from '@/lib/types';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -41,15 +41,6 @@ function isQuote(o: Order) {
       o.status,
     )
   );
-}
-
-function activityAction(title: string, link: string | null) {
-  const t = title.toLowerCase();
-  if (t.includes('quote')) return { label: 'Review quote', to: link || '/portal/quotes' };
-  if (t.includes('deliver') || t.includes('file')) return { label: 'View files', to: '/portal/files' };
-  if (t.includes('invoice') || t.includes('payment')) return { label: 'View invoice', to: link || '/portal/invoices' };
-  if (link) return { label: 'View', to: link };
-  return null;
 }
 
 function displayActivityTitle(title: string) {
@@ -470,7 +461,7 @@ export function PortalDashboard() {
               </thead>
               <tbody>
                 {activities.map((n) => {
-                  const action = activityAction(n.title, n.link);
+                  const action = portalActivityAction(n.title, n.link);
                   const unread = !n.readAt;
                   const title = displayActivityTitle(n.title);
                   return (

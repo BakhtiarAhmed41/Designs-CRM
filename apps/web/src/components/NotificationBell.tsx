@@ -8,6 +8,7 @@ import {
   markNotificationRead,
 } from '@/lib/notifications';
 import { STAFF_ROLES } from '@/lib/types';
+import { portalActivityAction } from '@/lib/portalNew';
 import { whenVisible } from '@/lib/queryRefresh';
 import { IconBell } from './Icon';
 
@@ -60,10 +61,17 @@ export function NotificationBell() {
     qc.invalidateQueries({ queryKey: ['notifications'] });
   }
 
-  async function onItem(id: string, link: string | null) {
+  async function onItem(id: string, title: string, link: string | null) {
     await markNotificationRead(id);
     qc.invalidateQueries({ queryKey: ['notifications'] });
     setOpen(false);
+    if (!isStaff) {
+      const action = portalActivityAction(title, link);
+      if (action) {
+        navigate(action.to);
+        return;
+      }
+    }
     if (!link) return;
     let target = link;
     if (target.startsWith('/orders/')) {
@@ -141,7 +149,7 @@ export function NotificationBell() {
                 <div
                   key={n.id}
                   className={`nitem${n.readAt ? '' : ' unread'}`}
-                  onClick={() => void onItem(n.id, n.link)}
+                  onClick={() => void onItem(n.id, n.title, n.link)}
                 >
                   <div className={`nic ${ic.cls}`}>
                     <i className={`ti ${ic.icon}`} />

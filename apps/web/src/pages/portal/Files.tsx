@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { listMyFiles, type MyFile } from '@/lib/designs';
 import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
@@ -58,6 +58,8 @@ function fileSizeLabel(bytes?: number | null) {
 }
 
 export function PortalFiles() {
+  const [searchParams] = useSearchParams();
+  const focusOrder = searchParams.get('order');
   const [q, setQ] = useState('');
   const [month, setMonth] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
@@ -126,6 +128,17 @@ export function PortalFiles() {
   const pageSize = 10;
   const totalPages = Math.max(1, Math.ceil(visible.length / pageSize));
   const paged = visible.slice((page - 1) * pageSize, page * pageSize);
+
+  useEffect(() => {
+    if (!focusOrder) return;
+    const match =
+      visible.find((g) => g.orderId === focusOrder) ??
+      groups.find((g) => g.orderId === focusOrder);
+    if (!match) return;
+    setOpenKey(match.key);
+    const idx = visible.findIndex((g) => g.key === match.key);
+    if (idx >= 0) setPage(Math.floor(idx / pageSize) + 1);
+  }, [focusOrder, groups, visible]);
 
   return (
     <div>

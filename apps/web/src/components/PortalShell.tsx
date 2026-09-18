@@ -99,8 +99,10 @@ export function PortalShell() {
         ? null
         : path.startsWith('/portal/quotes')
           ? 'quotes'
-          : path.startsWith('/portal/orders')
-            ? 'orders'
+        : path.startsWith('/portal/orders')
+          ? 'orders'
+          : path.startsWith('/portal/files')
+            ? 'files'
             : path.startsWith('/portal/invoices')
               ? 'invoices'
               : null;
