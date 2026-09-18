@@ -81,17 +81,11 @@ export function AdminProfile() {
             </div>
             <div className="pf">
               <label>Email</label>
-              <div className="profile-lock-field">
-                <i className="ti ti-lock" aria-hidden />
-                <input type="email" value={user?.email ?? ''} disabled />
-              </div>
+              <input type="email" value={user?.email ?? ''} disabled />
             </div>
             <div className="pf">
               <label>Role</label>
-              <div className="profile-lock-field">
-                <i className="ti ti-lock" aria-hidden />
-                <input value={roleLabel(user?.role)} disabled />
-              </div>
+              <input value={roleLabel(user?.role)} disabled />
             </div>
           </div>
           <div className="note">

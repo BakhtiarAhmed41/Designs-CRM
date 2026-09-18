@@ -2345,7 +2345,7 @@ button.primary i,
 .profile-elegant {
   display: grid;
   gap: 16px;
-  max-width: 920px;
+  max-width: 880px;
 }
 .profile-elegant .card {
   border: 1px solid rgba(17, 24, 39, 0.08);
@@ -2353,17 +2353,23 @@ button.primary i,
   overflow: hidden;
 }
 .profile-elegant .card-pad {
-  padding: 0 24px 22px;
+  padding: 0 22px 20px;
 }
 .profile-card-head {
-  padding: 20px 0 16px;
-  margin-bottom: 18px;
+  padding: 18px 0 14px;
+  margin-bottom: 16px;
   border-bottom: 1px solid rgba(17, 24, 39, 0.06);
 }
 .profile-elegant .pform {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px 20px;
+  gap: 14px 18px;
+}
+.profile-elegant .pf input:disabled {
+  opacity: 1;
+  color: var(--muted);
+  background: #f7f7f7;
+  cursor: default;
 }
 .profile-card-title {
   margin: 0 0 4px;
@@ -2378,23 +2384,8 @@ button.primary i,
   line-height: 1.45;
   color: var(--muted);
 }
-.profile-lock-field {
-  position: relative;
-}
-.profile-lock-field input {
-  padding-left: 34px;
-}
-.profile-lock-field i {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 14px;
-  color: var(--faint);
-  pointer-events: none;
-}
 .profile-elegant .note {
-  margin-top: 16px;
+  margin-top: 14px;
 }
 .profile-actions {
   display: flex;

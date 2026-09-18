@@ -238,10 +238,7 @@ export function PortalProfile() {
             </div>
             <div className="pf">
               <label>Email</label>
-              <div className="profile-lock-field">
-                <i className="ti ti-lock" aria-hidden />
-                <input type="email" value={email} disabled />
-              </div>
+              <input type="email" value={email} disabled />
             </div>
             <div className="pf">
               <label>Phone</label>
@@ -249,10 +246,7 @@ export function PortalProfile() {
             </div>
             <div className="pf">
               <label>Account type</label>
-              <div className="profile-lock-field">
-                <i className="ti ti-lock" aria-hidden />
-                <input value={accountLabel} disabled />
-              </div>
+              <input value={accountLabel} disabled />
             </div>
           </div>
           <div className="note">
@@ -351,12 +345,15 @@ export function PortalProfile() {
             )}
           </div>
           <label className="pref-section-label">Usual placement</label>
-          <div className="profile-other" style={{ marginBottom: 14 }}>
-            <select value={placement} onChange={(e) => setPlacement(e.target.value)}>
-              <option>Left chest</option>
-              <option>Cap front</option>
-              <option>Full back</option>
-            </select>
+          <div className="profile-checks" style={{ marginBottom: 14 }}>
+            {['Left chest', 'Cap front', 'Full back'].map((opt) => (
+              <CheckPill
+                key={opt}
+                label={opt}
+                on={placement === opt}
+                onToggle={() => setPlacement(opt)}
+              />
+            ))}
           </div>
           <label className="pref-section-label">Embroidery file formats</label>
           <div className="profile-checks">
