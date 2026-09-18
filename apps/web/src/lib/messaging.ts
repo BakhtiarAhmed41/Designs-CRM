@@ -202,13 +202,13 @@ function isConversationListCache(value: unknown): value is ConversationListCache
   );
 }
 
-const conversationListKeys = [
+const conversationListKeys: string[][] = [
   ['admin-conversations'],
   ['admin-conversations-preview'],
   ['admin-conversations-order'],
   ['admin-conversations-quote'],
   ['my-conversations'],
-] as const;
+];
 
 /** Clear the unread mark on inbox rows as soon as a chat is opened. */
 export function markConversationSeenInCache(
@@ -273,8 +273,9 @@ export function applyIncomingMessageToLists(
   const keys = conversationListKeys;
 
   for (const queryKey of keys) {
-    void qc.cancelQueries({ queryKey });
-    qc.setQueriesData({ queryKey }, (prev: unknown) => {
+    const mutableKey = [...queryKey];
+    void qc.cancelQueries({ queryKey: mutableKey });
+    qc.setQueriesData({ queryKey: mutableKey }, (prev: unknown) => {
       if (!isConversationListCache(prev)) return prev;
       const next = prev.conversations.map((c) =>
         c.id === conversationId
