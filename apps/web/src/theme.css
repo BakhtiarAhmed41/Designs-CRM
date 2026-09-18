@@ -2365,12 +2365,6 @@ button.primary i,
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px 18px;
 }
-.profile-elegant .pf input:disabled {
-  opacity: 1;
-  color: var(--muted);
-  background: #f7f7f7;
-  cursor: default;
-}
 .profile-card-title {
   margin: 0 0 4px;
   font-size: 16px;
@@ -3565,6 +3559,14 @@ button.primary:hover:not(:disabled),
   opacity: 0.62;
   cursor: not-allowed;
   box-shadow: none;
+}
+.profile-elegant .pf input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]):not([type="color"]):disabled {
+  opacity: 1;
+  color: #6b6b6b;
+  background: #ececee;
+  border-color: rgba(17, 24, 39, 0.08);
+  box-shadow: none;
+  cursor: default;
 }
 .pform + .btn,
 .pform + button,
