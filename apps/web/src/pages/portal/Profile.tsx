@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
-import { requestEmailChange, updateProfile } from '@/lib/auth';
+import { updateProfile } from '@/lib/auth';
 import { getMyCustomer, updateMyCustomer } from '@/lib/customers';
 import { getErrorMessage } from '@/lib/api';
 import { ErrorBanner, SuccessBanner } from '@/components/ui/EmptyState';
@@ -70,8 +70,6 @@ export function PortalProfile() {
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [originalEmail, setOriginalEmail] = useState('');
-  const [verifyEmail, setVerifyEmail] = useState(true);
   const [phone, setPhone] = useState('');
   const [placement, setPlacement] = useState('Left chest');
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
@@ -120,9 +118,7 @@ export function PortalProfile() {
         [user.firstName, user.lastName].filter(Boolean).join(' ') ||
         '',
     );
-    const nextEmail = user.email ?? meCustomer?.customer?.email ?? '';
-    setEmail(nextEmail);
-    setOriginalEmail(nextEmail);
+    setEmail(user.email ?? meCustomer?.customer?.email ?? '');
     setPhone(user.phone ?? meCustomer?.customer?.phone ?? '');
   }, [user, meCustomer]);
 
@@ -142,22 +138,7 @@ export function PortalProfile() {
         name: name.trim() || undefined,
         phone: phone || null,
       });
-      const nextEmail = email.trim();
-      if (nextEmail && nextEmail.toLowerCase() !== originalEmail.toLowerCase()) {
-        if (!verifyEmail) {
-          setError('Turn on the email check so we can confirm the new address.');
-          setBusy(false);
-          return;
-        }
-        const res = await requestEmailChange(nextEmail);
-        setMsg(
-          res.emailSent
-            ? `Check ${res.pendingEmail} for a confirmation link.`
-            : `We saved a pending change to ${res.pendingEmail}. Email sending is off until SMTP is configured.`,
-        );
-      } else {
-        setMsg('Contact details saved.');
-      }
+      setMsg('Contact details saved.');
       await refresh();
       await refetchCustomer();
     } catch (err) {
@@ -237,14 +218,16 @@ export function PortalProfile() {
     <div className="profile-elegant">
       <PageHeader
         title="Profile"
-        subtitle="Manage your contact details and the files you usually need. These fill in on new quotes, and our team uses them when preparing your files."
+        subtitle="Your contact details and the files you usually need."
       />
 
       <div className="card card-pad">
-        <h2 className="profile-card-title">Contact details</h2>
-        <p className="profile-card-sub">
-          These details are used for your quotes, orders, and invoices.
-        </p>
+        <div className="profile-card-head">
+          <h2 className="profile-card-title">Contact details</h2>
+          <p className="profile-card-sub">
+            Used on quotes, orders, and invoices.
+          </p>
+        </div>
         {msg && <SuccessBanner>{msg}</SuccessBanner>}
         {error && <ErrorBanner>{error}</ErrorBanner>}
         <form onSubmit={(e) => void onSaveProfile(e)}>
@@ -254,23 +237,14 @@ export function PortalProfile() {
               <input value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div className="pf">
-              <label>Email address</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-              <label className="profile-email-check">
-                <input
-                  type="checkbox"
-                  checked={verifyEmail}
-                  onChange={(e) => setVerifyEmail(e.target.checked)}
-                />
-                Send a verification email before changing my email
-              </label>
+              <label>Email</label>
+              <div className="profile-lock-field">
+                <i className="ti ti-lock" aria-hidden />
+                <input type="email" value={email} disabled />
+              </div>
             </div>
             <div className="pf">
-              <label>Phone number</label>
+              <label>Phone</label>
               <input value={phone} onChange={(e) => setPhone(e.target.value)} />
             </div>
             <div className="pf">
@@ -283,8 +257,8 @@ export function PortalProfile() {
           </div>
           <div className="note">
             <i className="ti ti-info-circle" />
-            Account type and payment terms are managed by our team. Message us if you’d like to
-            discuss monthly billing.
+            Email, account type, and payment terms are managed by our team. Message us if you need a
+            change.
           </div>
           <div className="profile-actions">
             <button type="submit" className="btn btn-primary" disabled={busy}>
@@ -295,10 +269,12 @@ export function PortalProfile() {
       </div>
 
       <div className="card card-pad">
-        <h2 className="profile-card-title">My services &amp; file preferences</h2>
-        <p className="profile-card-sub">
-          Save your usual settings once. New quotes start with these formats, hoop sizes, and placement. Our team also sees them when they publish your files.
-        </p>
+        <div className="profile-card-head">
+          <h2 className="profile-card-title">Services &amp; file preferences</h2>
+          <p className="profile-card-sub">
+            Saved once, then used on new quotes and when we prepare your files.
+          </p>
+        </div>
 
         {prefMsg && <SuccessBanner>{prefMsg}</SuccessBanner>}
         {prefError && <ErrorBanner>{prefError}</ErrorBanner>}
@@ -437,7 +413,7 @@ export function PortalProfile() {
           )}
         </div>
 
-        <div className="profile-actions end">
+        <div className="profile-actions">
           <button type="button" className="btn btn-primary" disabled={prefBusy} onClick={() => void savePrefs()}>
             <i className="ti ti-check" /> {prefBusy ? 'Saving…' : 'Save file preferences'}
           </button>

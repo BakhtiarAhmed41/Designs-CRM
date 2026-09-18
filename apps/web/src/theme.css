@@ -2344,14 +2344,21 @@ button.primary i,
 }
 .profile-elegant {
   display: grid;
-  gap: 18px;
+  gap: 16px;
+  max-width: 920px;
 }
 .profile-elegant .card {
   border: 1px solid rgba(17, 24, 39, 0.08);
   box-shadow: 0 8px 24px rgba(17, 24, 39, 0.04);
+  overflow: hidden;
 }
 .profile-elegant .card-pad {
-  padding: 22px 22px 20px;
+  padding: 0 24px 22px;
+}
+.profile-card-head {
+  padding: 20px 0 16px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid rgba(17, 24, 39, 0.06);
 }
 .profile-elegant .pform {
   display: grid;
@@ -2366,55 +2373,10 @@ button.primary i,
   color: var(--ink);
 }
 .profile-card-sub {
-  margin: 0 0 20px;
+  margin: 0;
   font-size: 13px;
   line-height: 1.45;
   color: var(--muted);
-}
-.profile-email-btn {
-  align-self: flex-start;
-  width: max-content;
-  max-width: 100%;
-  margin-top: 2px;
-  padding: 7px 12px;
-  min-height: 34px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
-  color: var(--navy);
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.profile-email-btn:hover:not(:disabled) {
-  background: var(--tint);
-  border-color: rgba(34, 34, 34, 0.18);
-}
-.profile-email-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.profile-email-btn i {
-  font-size: 15px;
-}
-.profile-email-check {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-  font-size: 12.5px;
-  color: var(--muted);
-  cursor: pointer;
-}
-.profile-email-check input {
-  width: 15px;
-  height: 15px;
-  accent-color: var(--maroon);
 }
 .profile-lock-field {
   position: relative;
@@ -2439,14 +2401,11 @@ button.primary i,
   justify-content: flex-start;
   margin-top: 18px;
 }
-.profile-actions.end {
-  justify-content: flex-end;
-}
 .profile-svc {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
-  margin: 0 0 22px;
+  margin: 0 0 8px;
 }
 .profile-svc-btn {
   display: flex;
@@ -2487,13 +2446,18 @@ button.primary i,
   box-shadow: inset 0 0 0 2px #fff;
 }
 .profile-block {
-  margin: 0 0 20px;
+  margin: 18px 0 0;
+  padding: 16px 0 0;
+  border-top: 1px solid rgba(17, 24, 39, 0.06);
 }
 .profile-block-title {
-  margin: 0 0 10px;
+  margin: 0 0 12px;
   font-size: 14px;
   font-weight: 700;
   color: var(--ink);
+}
+.profile-elegant .pref-section-label {
+  margin-top: 4px;
 }
 .profile-checks {
   display: flex;
@@ -2537,7 +2501,7 @@ button.primary i,
 }
 .profile-other {
   margin-top: 10px;
-  max-width: 360px;
+  max-width: 280px;
 }
 .profile-other input,
 .profile-other select {
@@ -2557,6 +2521,9 @@ button.primary i,
   color: var(--faint);
 }
 @media (max-width: 720px) {
+  .profile-elegant .card-pad {
+    padding: 0 16px 18px;
+  }
   .profile-elegant .pform,
   .profile-svc {
     grid-template-columns: 1fr;
