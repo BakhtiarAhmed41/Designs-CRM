@@ -110,6 +110,25 @@ export class NotificationsService {
     return { ok: true };
   }
 
+  async markConversationRead(userId: string, conversationId: string) {
+    await this.db.execute(
+      `UPDATE notifications
+          SET read_at = NOW()
+        WHERE user_id = ?
+          AND read_at IS NULL
+          AND (
+            link = ?
+            OR link LIKE ?
+          )`,
+      [
+        userId,
+        `/portal/messages?c=${conversationId}`,
+        `%c=${conversationId}%`,
+      ],
+    );
+    this.events.emitCreated(userId);
+  }
+
   async markFileReadyRead(userId: string, orderId: string) {
     const orderLink = `/portal/orders/${orderId}`;
     await this.db.execute(

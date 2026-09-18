@@ -86,6 +86,8 @@ export function useMessagingSocket(handlers: {
       void qc.invalidateQueries({ queryKey: ['admin-unread-messages'] });
       void qc.invalidateQueries({ queryKey: ['team-unread'] });
       void qc.invalidateQueries({ queryKey: ['portal-unread'] });
+      void qc.invalidateQueries({ queryKey: ['my-conversations'] });
+      void qc.invalidateQueries({ queryKey: ['admin-conversations'] });
     };
     const onTeamMessage = (payload: unknown) => {
       handlersRef.current.onTeamMessage?.(payload);

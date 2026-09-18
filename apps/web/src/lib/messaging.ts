@@ -1,3 +1,4 @@
+import type { QueryClient } from '@tanstack/react-query';
 import { apiFetch, apiFetchForm } from './api';
 
 export type MessageLabel = 'EDIT' | 'PAYMENT' | 'CUSTOM' | 'IMPORTANT' | 'HELP';
@@ -201,6 +202,53 @@ function isConversationListCache(value: unknown): value is ConversationListCache
   );
 }
 
+const conversationListKeys = [
+  ['admin-conversations'],
+  ['admin-conversations-preview'],
+  ['admin-conversations-order'],
+  ['admin-conversations-quote'],
+  ['my-conversations'],
+] as const;
+
+/** Clear the unread mark on inbox rows as soon as a chat is opened. */
+export function markConversationSeenInCache(
+  qc: QueryClient,
+  conversationId: string,
+  viewer: 'client' | 'admin',
+) {
+  const unreadPatch =
+    viewer === 'client' ? { unreadClient: 0 } : { unreadAdmin: 0 };
+  for (const queryKey of conversationListKeys) {
+    qc.setQueriesData({ queryKey: [...queryKey] }, (prev: unknown) => {
+      if (!isConversationListCache(prev)) return prev;
+      return {
+        ...prev,
+        conversations: prev.conversations.map((c) =>
+          c.id === conversationId ? { ...c, ...unreadPatch } : c,
+        ),
+      };
+    });
+  }
+  if (viewer === 'client') {
+    const lists = qc.getQueriesData<ConversationListCache>({ queryKey: ['my-conversations'] });
+    let unreadConversations = 0;
+    let unreadMessages = 0;
+    for (const [, data] of lists) {
+      if (!isConversationListCache(data)) continue;
+      for (const c of data.conversations) {
+        if (c.archived || c.unreadClient <= 0) continue;
+        unreadConversations += 1;
+        unreadMessages += c.unreadClient;
+      }
+      break;
+    }
+    qc.setQueryData(['portal-unread'], (prev: unknown) => {
+      if (!prev || typeof prev !== 'object') return { unreadConversations, unreadMessages };
+      return { ...prev, unreadConversations, unreadMessages };
+    });
+  }
+}
+
 /** Put the newest message text on inbox rows as soon as the socket event arrives. */
 export function applyIncomingMessageToLists(
   qc: { cancelQueries: (opts: { queryKey: unknown[] }) => Promise<unknown>; setQueriesData: (opts: { queryKey: unknown[] }, updater: (prev: unknown) => unknown) => void },
@@ -222,13 +270,7 @@ export function applyIncomingMessageToLists(
   const lastMessageAt =
     p.message?.createdAt || p.conversation?.lastMessageAt || new Date().toISOString();
   const incoming = p.conversation ?? {};
-  const keys = [
-    ['admin-conversations'],
-    ['admin-conversations-preview'],
-    ['admin-conversations-order'],
-    ['admin-conversations-quote'],
-    ['my-conversations'],
-  ];
+  const keys = conversationListKeys;
 
   for (const queryKey of keys) {
     void qc.cancelQueries({ queryKey });

@@ -18,6 +18,7 @@ import {
   getCustomerMessagingContext,
   isStarred,
   listAdminConversations,
+  markConversationSeenInCache,
   createMessageTemplate,
   deleteMessageTemplate,
   listMessageTemplates,
@@ -161,6 +162,17 @@ export function AdminCustomerMessages() {
     enabled: !!activeConversationId,
     refetchInterval: whenVisible(20_000),
   });
+
+  useEffect(() => {
+    if (!activeConversationId) return;
+    markConversationSeenInCache(qc, activeConversationId, 'admin');
+  }, [activeConversationId, qc]);
+
+  useEffect(() => {
+    if (!activeConversationId || !threadQuery.isSuccess) return;
+    markConversationSeenInCache(qc, activeConversationId, 'admin');
+    void qc.invalidateQueries({ queryKey: ['admin-unread-messages'] });
+  }, [activeConversationId, threadQuery.isSuccess, qc]);
 
   const active = threadQuery.data?.conversation;
   const listedActive = conversations.find((c) => c.id === activeConversationId);

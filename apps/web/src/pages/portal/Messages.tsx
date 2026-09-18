@@ -9,6 +9,7 @@ import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 import { getErrorMessage } from '@/lib/api';
+import { markConversationNotificationsInCache } from '@/lib/notifications';
 import { whenVisible } from '@/lib/queryRefresh';
 import {
   sortConversationsNewestFirst,
@@ -18,6 +19,7 @@ import {
   isHelpRequest,
   isStarred,
   listMyConversations,
+  markConversationSeenInCache,
   sendMyMessage,
   updateMyConversation,
   type Conversation,
@@ -127,6 +129,20 @@ export function PortalMessages() {
     enabled: !!conversationId,
     refetchInterval: whenVisible(15_000),
   });
+
+  useEffect(() => {
+    if (!conversationId) return;
+    markConversationSeenInCache(qc, conversationId, 'client');
+    markConversationNotificationsInCache(qc, conversationId);
+  }, [conversationId, qc]);
+
+  useEffect(() => {
+    if (!conversationId || !threadQuery.isSuccess) return;
+    markConversationSeenInCache(qc, conversationId, 'client');
+    void qc.invalidateQueries({ queryKey: ['portal-unread'] });
+    void qc.invalidateQueries({ queryKey: ['my-activity'] });
+    void qc.invalidateQueries({ queryKey: ['notifications'] });
+  }, [conversationId, threadQuery.isSuccess, qc]);
 
   useMessagingSocket({
     conversationId,

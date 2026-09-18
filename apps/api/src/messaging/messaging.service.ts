@@ -1271,6 +1271,7 @@ export class MessagingService {
       convo.unread_client = 0;
       this.gateway?.emitToUser(user.id, 'unread:changed', { scope: 'customer' });
     }
+    await this.notifications.markConversationRead(user.id, id);
 
     let orderRef: string | null = null;
     let orderStatus: string | null = null;
