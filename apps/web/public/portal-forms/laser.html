@@ -2,138 +2,849 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Cutting &amp; Engraving Files</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
-<link rel="stylesheet" href="theme.css">
-<link rel="stylesheet" href="new-quote.css">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cutting &amp; Engraving Quote Request</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--accent:#1B1D22;--accent-soft:#F2F3F5;--accent-dark:#33373D;--ink:#1B1D22;--ink-soft:#2C2F35;--muted:#4B5563;--border:#C7C9CE;--border-soft:#D8D9DD;--bg:#FFFFFF;--page:#FFFFFF;--icon-bg:#F2F3F5;--warn-bg:#FCF3DF;--warn-ink:#8A5A0A;--warn-border:#F0DDA6;--ok-bg:#E7F5EC;--ok-ink:#2E7D4F;--ok-border:#BEE3CB;--stitch:rgba(27,29,34,.5)}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--page);font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+button,input,select,textarea{font-family:inherit}
+a{color:inherit}
+svg{stroke:currentColor}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1140px;margin:0 auto;padding:0 28px}
+
+/* Step indicator + top bar */
+.app-shell{display:flex;align-items:flex-start;min-height:100vh}
+.sidebar{width:236px;flex:0 0 236px;background:var(--bg);border-right:1px solid var(--border);height:100vh;position:sticky;top:0;overflow-y:auto;display:flex;flex-direction:column;padding:20px 14px 0;z-index:25}
+.brand{display:flex;align-items:center;gap:10px;padding:0 8px 14px}
+.brand-logo{font-family:Georgia,"Times New Roman",serif;font-style:italic;font-weight:600;font-size:27px;letter-spacing:-.06em;line-height:1;flex-shrink:0}
+.brand strong{display:block;font-size:12.5px;font-weight:600;line-height:1.25}
+.brand span{display:block;font-size:11px;color:var(--muted)}
+.nav-label{font-size:10px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:18px 12px 8px}
+.nav-item{position:relative;display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:8px;font-size:12.5px;font-weight:400;color:var(--ink);text-decoration:none}
+.nav-item svg{width:17px;height:17px;flex-shrink:0}
+.nav-item:hover{background:var(--icon-bg)}
+.nav-item.active{font-weight:500}
+.nav-item.active::before{content:"";position:absolute;left:-4px;top:2px;bottom:2px;width:9px;border:2px solid var(--ink);border-right:none;border-radius:10px 0 0 10px}
+.nav-end{margin-top:auto;border-top:1px solid var(--border);height:16px;flex-shrink:0}
+.main-area{flex:1 1 auto;min-width:0}
+.topbar{background:var(--bg);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20}
+.topbar-inner{padding:12px 28px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.icon-btn{position:relative;width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:var(--bg);display:grid;place-items:center;cursor:pointer;color:var(--ink)}
+.icon-btn:hover{background:var(--icon-bg)}
+.icon-btn svg{width:16px;height:16px}
+.badge-count{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--accent);color:#fff;font-size:9px;font-weight:600;display:grid;place-items:center}
+.user-menu{display:flex;align-items:center;gap:9px;cursor:pointer;padding:3px 9px 3px 3px;border-radius:999px;border:1px solid var(--border)}
+.user-menu:hover{background:var(--icon-bg)}
+.user-avatar{width:30px;height:30px;border-radius:50%;background:var(--ink);color:#fff;font-size:10px;font-weight:600;display:grid;place-items:center}
+.user-meta strong{display:block;font-size:11px;font-weight:500;line-height:1.25}
+.user-meta span{display:block;font-size:10px;color:var(--muted)}
+.user-menu>svg{width:14px;height:14px;color:var(--muted)}
+
+/* Layout */
+.layout{max-width:none;margin:0;justify-content:start;display:grid;grid-template-columns:minmax(0,880px) 264px;grid-template-areas:"main rail";gap:40px;align-items:start;padding-top:36px;padding-bottom:72px}
+.main{grid-area:main;width:100%;max-width:none;margin:0}
+.rail{grid-area:rail;position:sticky;top:88px;display:flex;flex-direction:column;gap:14px;max-height:calc(100vh - 104px);overflow:auto}
+
+/* Rail */
+.steps{display:flex;flex-direction:column;gap:2px}
+.steps a{display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:10px;font-size:12px;font-weight:400;color:var(--ink-soft);text-decoration:none}
+.steps a:hover{background:var(--icon-bg)}
+.steps b{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--border);background:var(--bg);display:grid;place-items:center;font-size:10px;font-weight:500;flex-shrink:0}
+.steps a.on{background:var(--accent-soft);color:var(--accent);font-weight:500}
+.steps a.on b{background:var(--accent);border-color:var(--accent);color:#fff}
+.actions{background:var(--bg);border:1px solid var(--border);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.actions .row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.submit-hint{font-size:11px;color:var(--muted);text-align:center;margin:2px 0 0}
+.btn{height:40px;font-size:11.5px;font-weight:500;border-radius:10px;padding:0 14px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid transparent;line-height:1;white-space:nowrap;transition:background .12s ease,border-color .12s ease,color .12s ease}
+.btn-ghost{background:none;color:var(--muted)}
+.btn-ghost:hover{color:var(--ink);background:var(--icon-bg)}
+.btn-outline{background:var(--bg);border-color:var(--border);color:var(--ink)}
+.btn-outline:hover{background:var(--icon-bg)}
+.btn-primary{background:var(--accent);color:#fff;height:46px;font-size:12px}
+.btn-primary:hover{background:var(--accent-dark)}
+.help{background:var(--accent-soft);border-radius:16px;padding:18px}
+.help-icon{width:34px;height:34px;border-radius:10px;background:var(--bg);color:var(--accent);display:grid;place-items:center;margin-bottom:12px}
+.help-icon svg{width:16px;height:16px}
+.help h3{font-size:12.5px;font-weight:600;margin:0 0 6px}
+.help p{font-size:11px;color:var(--ink-soft);line-height:1.55;margin:0 0 14px}
+.help .btn{width:100%;background:var(--bg);color:var(--accent);border-color:transparent}
+.help .btn:hover{border-color:var(--accent)}
+.help .btn svg{width:14px;height:14px}
+
+/* Steps (form sections) */
+.step{position:relative;padding-left:54px;padding-bottom:44px;scroll-margin-top:90px}
+.step:last-child{padding-bottom:0}
+.step::before{content:"";position:absolute;left:15px;top:42px;bottom:10px;border-left:2px dashed var(--stitch)}
+.step:last-child::before{display:none}
+.step-num{position:absolute;left:0;top:0;width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;font-weight:600;font-size:11.5px;display:grid;place-items:center}
+.step-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px;min-height:32px}
+.step-head h2{font-size:17px;font-weight:600;letter-spacing:-.01em;margin:0 0 3px;line-height:1.3}
+.step-head p{font-size:11.5px;color:var(--muted);margin:0;line-height:1.45}
+
+/* Fields */
+.field{margin-bottom:14px}
+.field:last-child{margin-bottom:0}
+.flabel{display:block;font-size:11px;font-weight:500;margin-bottom:6px;color:var(--ink)}
+.flabel .opt{font-weight:400;color:var(--muted)}
+input[type="text"],select,textarea{width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--ink);background:var(--bg);outline:none;accent-color:var(--accent);transition:border-color .12s ease,box-shadow .12s ease}
+input[type="text"]:hover,select:hover,textarea:hover{border-color:var(--accent)}
+input[type="text"]:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+textarea{resize:vertical;min-height:72px;line-height:1.5}
+select{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");background-repeat:no-repeat;background-position:right 12px center;background-size:15px;padding-right:34px;cursor:pointer;color-scheme:light}
+select:hover{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231B1D22' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>")}
+select option:checked,select option:hover{background:var(--accent-soft);color:var(--accent)}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.drop-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.check-row{display:flex;align-items:center;gap:9px;font-size:11.5px;color:var(--ink);cursor:pointer;user-select:none}
+.check-row input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;margin:0}
+
+/* Unit */
+.segmented{position:relative;display:inline-flex;background:var(--bg);border:1px solid var(--border);border-radius:999px;padding:3px;gap:2px}
+.segmented input{position:absolute;opacity:0;pointer-events:none}
+.segmented label{padding:7px 20px;font-size:11.5px;font-weight:500;color:var(--muted);border-radius:999px;cursor:pointer;transition:background .12s ease,color .12s ease}
+.segmented input:checked+label{background:var(--accent);color:#fff}
+.segmented input:focus-visible+label{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Design cards */
+.design-card{background:var(--bg);border:1px solid var(--border);border-radius:16px;margin-bottom:14px;overflow:hidden}
+.design-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border-soft)}
+.dtitle{display:flex;align-items:center;gap:10px;font-size:12.5px;font-weight:500}
+.design-num{width:24px;height:24px;border-radius:8px;background:var(--accent-soft);color:var(--accent);font-size:11px;font-weight:600;display:grid;place-items:center}
+.card-body{padding:18px}
+.remove-design,.remove-size{background:none;border:none;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500}
+.remove-design svg,.remove-size svg{width:13px;height:13px}
+.remove-design:hover,.remove-size:hover{color:var(--accent)}
+.dropzone{border:1.5px dashed var(--stitch);border-radius:12px;padding:20px 14px;text-align:center;cursor:pointer;background:var(--page);transition:border-color .12s ease,background .12s ease}
+.dropzone:hover{border-color:var(--accent);background:var(--accent-soft)}
+.dz-ico{width:38px;height:38px;border-radius:50%;background:var(--bg);color:var(--accent);display:grid;place-items:center;margin:0 auto 9px}
+.dz-ico svg{width:18px;height:18px}
+.dz-title{font-size:11.5px;font-weight:500;margin-bottom:2px}
+.dz-sub{font-size:10.5px;color:var(--muted);line-height:1.4}
+.dropzone input[type="file"]{display:none}
+.file-list{margin-top:8px;display:flex;flex-direction:column;gap:5px}
+.file-chip{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:11px;background:var(--bg)}
+.fname{display:flex;align-items:center;gap:7px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-chip svg{width:13px;height:13px;color:var(--muted);flex-shrink:0}
+.file-chip button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;padding:2px}
+.file-chip button:hover{color:var(--accent)}
+.size-row{background:var(--page);border:1px solid var(--border-soft);border-radius:12px;padding:14px;margin-top:10px}
+.size-row-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.stag{font-size:11px;font-weight:500;color:var(--ink-soft)}
+.add-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;width:100%;background:var(--bg);border:1.5px dashed var(--stitch);color:var(--accent);font-weight:500;font-size:11px;padding:10px 16px;border-radius:10px;cursor:pointer;transition:border-color .12s ease,background .12s ease}
+.add-btn:hover{border-color:var(--accent);background:var(--accent-soft)}
+.add-btn svg{width:14px;height:14px}
+.card-body>.add-btn{margin-top:10px}
+.add-design-btn{padding:14px 16px}
+.notes{margin-top:18px}
+
+/* Formats */
+.format-grid{display:flex;flex-wrap:wrap;gap:8px}
+.format-chip{position:relative}
+.format-chip input{position:absolute;opacity:0;inset:0;cursor:pointer;margin:0}
+.format-chip span{display:inline-flex;align-items:center;justify-content:center;min-width:68px;padding:10px 16px;border:1px solid var(--border);border-radius:10px;background:var(--bg);font-size:11.5px;font-weight:500;color:var(--ink);transition:all .12s ease}
+.format-chip input:hover+span{border-color:var(--accent)}
+.format-chip input:checked+span{background:var(--accent);border-color:var(--accent);color:#fff}
+.format-chip input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+.format-other{display:flex;align-items:center;gap:10px}
+.format-other input{max-width:260px}
+
+/* Turnaround */
+.turn-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.turn-option{position:relative;background:var(--bg);border:1.5px solid var(--border);border-radius:14px;padding:16px;cursor:pointer;transition:border-color .12s ease,background .12s ease}
+.turn-option input{position:absolute;opacity:0;inset:0;cursor:pointer;margin:0}
+.turn-option:hover{border-color:var(--accent)}
+.turn-option:has(input:checked),.turn-option.is-selected{border-color:var(--accent);background:var(--accent-soft)}
+.turn-option:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+.turn-inner{display:flex;flex-direction:column;gap:6px}
+.turn-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.turn-left{display:flex;align-items:center;gap:9px}
+.turn-radio{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--border);background:var(--bg);position:relative;flex-shrink:0}
+.turn-option input:checked~.turn-inner .turn-radio{border-color:var(--accent)}
+.turn-option input:checked~.turn-inner .turn-radio::after{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--accent)}
+.turn-name{font-size:12.5px;font-weight:500}
+.badge{font-size:10px;font-weight:500;padding:3px 9px;border-radius:999px;border:1px solid var(--border);background:var(--bg)}
+.badge.included{color:var(--ok-ink);background:var(--ok-bg);border-color:var(--ok-border)}
+.badge.priority{color:var(--warn-ink);background:var(--warn-bg);border-color:var(--warn-border)}
+.turn-time{font-size:16px;font-weight:600;letter-spacing:-.01em;margin:4px 0 0 25px}
+.turn-desc{font-size:11px;color:var(--muted);margin-left:25px;line-height:1.5}
+.note-banner{display:flex;gap:9px;align-items:flex-start;background:var(--warn-bg);color:var(--warn-ink);border-radius:10px;padding:12px 14px;font-size:11px;line-height:1.5;margin-top:12px}
+.note-banner svg{width:14px;height:14px;color:var(--warn-ink);flex-shrink:0;margin-top:1px}
+
+@media (max-width:1280px){
+  .layout{grid-template-columns:minmax(0,1fr);grid-template-areas:"main" "rail";gap:28px}
+  .rail{position:static;max-height:none;overflow:visible}
+  .steps{display:none}
+}
+@media (max-width:900px){.sidebar{display:none}}
+@media (max-width:640px){
+  .wrap{padding:0 16px}
+  .hero-top{padding:22px 0 20px}
+  .hero h1{font-size:20px}
+  .hero-icon{display:none}
+  .user-meta,.logout span{display:none}
+  .grid-2,.drop-row,.turn-grid{grid-template-columns:1fr}
+  .step{padding-left:44px}
+  .step-num{width:28px;height:28px;font-size:11px}
+  .step::before{left:13px;top:38px}
+  .layout{padding-top:28px}
+  .card-body{padding:14px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+/* Refinements */
+.page-id{display:flex;align-items:center;gap:13px;min-width:0}
+.page-icon{width:40px;height:40px;border-radius:11px;background:#F2F3F5;color:#fff;display:grid;place-items:center;flex-shrink:0;overflow:hidden}
+.page-icon svg{width:19px;height:19px}
+.page-id h1{font-size:15.5px;font-weight:600;letter-spacing:-.01em;margin:0;line-height:1.3}
+.page-id p{margin:1px 0 0;font-size:11px;color:var(--muted);line-height:1.4}
+.page-id p a{color:var(--ink);font-weight:500;text-underline-offset:2px}
+.top-right{display:flex;align-items:center;gap:12px;flex-shrink:0}
+.step{scroll-margin-top:96px}
+.rail{top:96px}
+input[type="text"],select,textarea{border-radius:10px;border:1px solid var(--border)}
+input[type="text"]:hover,select:hover,textarea:hover{border-color:var(--ink-soft)}
+input[type="text"]:focus,select:focus,textarea:focus{border-color:var(--ink);box-shadow:0 0 0 3px rgba(27,29,34,.08)}
+.dz-ico{background:var(--icon-bg)}
+.dropzone:hover,.add-btn:hover{border-color:var(--ink-soft);background:#FAFAFB}
+.format-chip input:hover+span,.turn-option:hover{border-color:var(--ink-soft)}
+.turn-option:has(input:checked),.turn-option.is-selected{background:var(--bg);border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+.badge.included{background:#D9F0E2;color:#1F6B41;border-color:#BEE3CB}
+.badge.priority{background:var(--bg);color:var(--ink);border-color:var(--border)}
+.note-banner{background:#F5F6F7;color:var(--ink-soft)}
+.note-banner svg{color:var(--muted)}
+@media (max-width:640px){.page-id p{display:none}}
+.logout{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:400;color:var(--muted);text-decoration:none;padding:8px 4px}
+.logout:hover{color:var(--ink)}
+.logout svg{width:15px;height:15px}
+.btn-primary{background:#7C1F2B}
+.btn-primary:hover{background:#611722}
+.badge-count{background:#7C1F2B}
+.page-id p a{color:#7C1F2B}
+.segmented input:checked+label{background:#7C1F2B;color:#fff}
+.format-chip input:checked+span,.format-chip input:checked:hover+span{background:#7C1F2B;border-color:#7C1F2B;color:#fff}
+.note-banner{background:#F7ECEC;color:#7C1F2B}
+.note-banner svg{color:#7C1F2B}
+.step:last-of-type{padding-bottom:0}
+.step:last-of-type::before,#s-turn::before{display:none}
+.form-actions{margin-top:36px;padding-top:20px;border-top:1px solid var(--border);display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-end;gap:10px}
+.form-actions .btn{height:44px;flex-shrink:0}
+@media (max-width:640px){.form-actions{gap:6px}.form-actions .btn{padding:0 10px;font-size:11px;flex-shrink:1;min-width:0}.form-actions .btn svg{display:none}}
+.unit-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 16px;border:1px solid var(--border);border-radius:12px;margin-bottom:16px}
+.unit-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.unit-row .flabel{margin:0;font-size:12px}
+.unit-row select{width:92px;flex-shrink:0}
+.unit-hint{font-size:11px;color:var(--muted)}
+.turn-grid{grid-template-columns:repeat(2,minmax(0,310px));gap:10px}
+.turn-option{padding:10px 12px;border-radius:12px}
+.turn-inner{gap:2px}
+.turn-name{font-size:11.5px}
+.turn-time{font-size:12.5px;margin:2px 0 0 25px}
+.turn-desc{font-size:10.5px;line-height:1.4;margin-left:25px}
+.badge{font-size:9.5px;padding:2px 8px}
+.note-banner{padding:9px 12px;font-size:10.5px;margin-top:10px;max-width:630px}
+@media (max-width:640px){.turn-grid{grid-template-columns:1fr}}
+input:focus-visible,select:focus-visible,textarea:focus-visible{outline:none}
+#s-formats{padding-bottom:26px}
+#s-formats .step-head,#s-turn .step-head{margin-bottom:12px;min-height:0}
+#s-formats .step-head h2,#s-turn .step-head h2{font-size:15.5px}
+#s-formats .step-head p,#s-turn .step-head p{font-size:11px}
+.format-grid{gap:6px}
+.format-chip span{min-width:54px;padding:7px 12px;font-size:11px;border-radius:8px}
+#s-formats .check-row{font-size:11px}
+.form-actions{margin-top:28px}
+/* Compact sizing */
+.btn{height:36px}
+.btn-primary,.form-actions .btn{height:38px}
+input[type="text"],textarea{padding:8px 11px}
+select{padding-top:8px;padding-bottom:8px;padding-left:11px}
+.format-chip span{min-width:0;padding:6px 8px}
+.nav-item{padding:7px 12px}
+.nav-item svg{width:16px;height:16px}
+.nav-label{padding:14px 12px 6px}
+.topbar-inner{padding:9px 28px}
+.page-icon{width:34px;height:34px;border-radius:10px}
+.page-icon svg{width:17px;height:17px}
+.step{padding-left:46px;padding-bottom:32px}
+.step:last-of-type{padding-bottom:0}
+.step-num{width:28px;height:28px;font-size:11.5px}
+.step::before{left:13px;top:36px}
+.design-head{padding:10px 16px}
+.card-body{padding:14px 16px}
+.dropzone{padding:14px 12px}
+.dz-ico{width:32px;height:32px;margin-bottom:6px}
+.size-row{padding:12px}
+.unit-row{padding:9px 14px}
+.form-actions{padding-left:0}
+.unit-item{display:flex;align-items:center;gap:10px}
+.unit-row{flex-wrap:wrap}
+.unit-row select{width:80px}
+.layout{padding-bottom:20px}
+.unit-row{display:flex;flex-wrap:nowrap;justify-content:flex-start;align-items:stretch;gap:20px;width:fit-content;max-width:100%;padding:12px 16px;background:#FFFFFF;border:1px solid var(--border);border-radius:12px;margin-bottom:16px}
+.unit-item{flex-direction:column;align-items:flex-start;gap:6px}
+.unit-item+.unit-item{border-left:1px solid var(--border);padding-left:20px}
+.unit-row .flabel{font-size:11.5px;font-weight:500;color:var(--muted)}
+.unit-row select{width:120px}
+.unit-row{flex-wrap:wrap;align-items:center;gap:12px 20px;padding:10px 14px}
+.unit-item{flex-direction:row;align-items:center;gap:10px}
+.unit-row .flabel{font-size:12px;font-weight:500;color:var(--ink-soft);white-space:nowrap}
+.unit-row select{width:76px}
+.unit-row,.unit-row select{background-color:#FFFFFF!important;box-shadow:none}
+/* Fill empty space: unit row stretches full width */
+.unit-row{width:100%}
+.unit-item{flex:1 1 0;min-width:0;justify-content:space-between}
+.unit-item+.unit-item{padding-left:24px}
+.unit-row select{width:160px;max-width:160px;flex-shrink:0}
+/* Tighter step 1 */
+.file-list:empty{display:none}
+.design-card{margin-bottom:10px}
+.card-body .field{margin-bottom:12px}
+.card-body .field.notes{margin-top:12px;margin-bottom:0}
+.drop-row,.drop-row .field{margin-bottom:0}
+.size-row{margin-top:8px;padding:10px 12px}
+.size-row-head{margin-bottom:6px}
+.size-row .field{margin-bottom:10px}
+.card-body>.add-btn{margin-top:8px}
+.dropzone{padding:12px}
+textarea{min-height:60px}
+#s-designs .step-head{margin-bottom:12px}
+.unit-row{margin-bottom:12px}
+/* Compact step 1 + inline format option */
+.format-grid{align-items:center}
+.other-check{margin-left:8px;font-size:12.5px;white-space:nowrap}
+#otherFormatField{margin-top:0}
+.add-btn{width:auto;padding:7px 14px}
+.add-design-btn{padding:8px 16px}
+.dropzone{padding:10px 12px}
+.dz-ico{width:28px;height:28px;margin-bottom:4px}
+.dz-ico svg{width:15px;height:15px}
+.card-body{padding:12px 14px}
+.design-head{padding:8px 14px}
+.card-body .field{margin-bottom:10px}
+.card-body .field.notes{margin-top:10px;margin-bottom:0}
+.size-row{padding:8px 12px}
+.unit-row{padding:6px 12px;margin-bottom:10px}
+.unit-row select{padding-top:6px;padding-bottom:6px}
+#s-designs .step-head{margin-bottom:10px}
+/* Clearer boxes */
+input[type="text"],select,textarea{border-color:#9AA0A8;box-shadow:0 1px 2px rgba(27,29,34,.08)}
+.dropzone{border-color:#6B7280}
+.format-chip span{border-color:#9AA0A8}
+.turn-option{border-color:#9AA0A8}
+.design-card{border-color:#B0B4BA}
+.size-row{border-color:#B0B4BA}
+.add-btn{border-color:#6B7280}
+/* Bold headings/labels */
+.flabel,.unit-row .flabel,.turn-name,.add-btn{font-weight:700}
+/* Dropdown hover states in red */
+select:hover{background-color:#F5F5F6;border-color:#C7C9CE}
+select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
+/* Vector & Print form additions */
+.pref-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:12px}
+@media (max-width:640px){.pref-grid{grid-template-columns:1fr}}
+.radio-row{display:flex;align-items:center;gap:9px;font-size:11.5px;color:var(--ink);cursor:pointer;user-select:none;margin-bottom:8px}
+.radio-row:last-child{margin-bottom:0}
+.radio-row input{width:16px;height:16px;accent-color:#7C1F2B;cursor:pointer;flex-shrink:0;margin:0}
+.hint-text{font-size:11px;color:var(--muted);line-height:1.5;margin:10px 0 0}
+.field-sub{font-size:11px;color:var(--muted);margin:6px 0 0}
+/* Fill empty space: format chips share equal width per row */
+.format-grid{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:8px;align-items:stretch}
+.format-chip{min-width:0}
+.format-chip span{width:100%;height:100%}
+.other-format-row{grid-column:1/-1;display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-top:2px}
+.other-check{min-height:32px;display:flex;align-items:center}
+.format-other input{height:32px;box-sizing:border-box;padding:4px 11px}
+.other-check{margin-left:0!important}
+/* Fill empty space: turnaround cards stretch across the row */
+.turn-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.note-banner{max-width:none}
+
+/* ---- Page icon: light chip matching reference, not solid dark ---- */
+.page-icon{background:#F2F3F5;color:var(--ink)}
+.page-icon svg{stroke:var(--ink)}
+
+/* ---- Background / Color Mode: one line each instead of stacked ---- */
+.pref-grid{grid-template-columns:1fr 1fr;gap:20px 24px}
+.radio-group{display:flex;flex-wrap:wrap;align-items:center;gap:8px 18px;margin-top:2px}
+.radio-row{margin-bottom:0}
+@media (max-width:760px){.pref-grid{grid-template-columns:1fr}.radio-group{gap:6px 14px}}
+
+/* ---- Format chips: 7 items for cutting & engraving ---- */
+.format-grid{grid-template-columns:repeat(7,minmax(0,1fr))}
+.format-chip span{white-space:nowrap}
+@media (max-width:760px){.format-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (max-width:480px){.format-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* ---- Size & Details row ---- */
+.size-inline{display:flex;align-items:flex-end;gap:10px}
+.size-field{flex:1;min-width:0}
+.size-field.size-unit{flex:0 0 108px}
+.size-x{padding-bottom:10px;color:var(--muted);font-size:13px;flex:0 0 auto}
+@media (max-width:520px){.size-inline{flex-wrap:wrap}.size-x{display:none}.size-field.size-unit{flex:1 1 100%}}
+
+/* ---- Add another design: align to the right ---- */
+#designsContainer{display:flex;flex-direction:column}
+.add-design-btn{align-self:flex-end;width:auto}
+
+/* ---- Remove extra empty space throughout ---- */
+.layout{padding-top:24px;padding-bottom:24px}
+.step{padding-bottom:26px}
+.step-head{margin-bottom:10px}
+.form-actions{margin-top:20px;padding-top:16px}
+.pref-title{font-weight:400;color:var(--ink-soft)}
+.pref-grid{grid-template-columns:1fr 1fr;column-gap:0;row-gap:10px}
+.pref-grid>div:first-child{padding-right:24px}
+.pref-grid>div+div{border-left:1px solid var(--border);padding-left:24px}
+.radio-group{width:100%;justify-content:space-between;gap:8px 12px}
+@media (max-width:760px){.pref-grid{grid-template-columns:1fr}.pref-grid>div:first-child{padding-right:0}.pref-grid>div+div{border-left:none;padding-left:0}.radio-group{justify-content:flex-start}}
+.note-banner{margin-top:10px}
+.step:last-of-type .note-banner{margin-bottom:0}
+.form-actions{margin-top:14px;padding-top:12px}
+
+/* ---- Custom dropdown (replaces native <select> for Services) ---- */
+.csel{position:relative}
+.csel-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--border);border-radius:10px;padding:9px 12px;font-size:12px;color:var(--ink);background:var(--bg);cursor:pointer;text-align:left;box-shadow:0 1px 2px rgba(27,29,34,.08)}
+.csel-trigger.is-placeholder .csel-value{color:#9AA0A8}
+.csel-trigger:hover{background:#F5F5F6;border-color:#C7C9CE}
+.csel-trigger svg{width:15px;height:15px;stroke:#6B7280;flex-shrink:0;transition:transform .12s ease}
+.csel.is-open .csel-trigger svg{transform:rotate(180deg)}
+.csel.is-open .csel-trigger{border-color:#C7C9CE;background:#F5F5F6}
+.csel-menu{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--bg);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 20px rgba(20,20,25,.12);padding:4px;z-index:40;display:none;max-height:240px;overflow:auto}
+.csel.is-open .csel-menu{display:block}
+.csel-option{padding:8px 10px;font-size:12px;color:var(--ink);border-radius:7px;cursor:pointer}
+.csel-option:hover{background:#F0F0F1}
+.csel-option.is-selected{background:#F5F5F6;font-weight:600}
+.topbar-inner{padding:10px 28px}
+.help{padding:14px}
+.rail{gap:10px}
+@media (max-width:640px){.layout{padding-top:18px;padding-bottom:28px}.step{padding-bottom:20px}}
+</style>
+<link rel="stylesheet" href="embed.css">
+<script>if(window.parent!==window)document.documentElement.classList.add('in-frame');</script>
 </head>
 <body>
-<div class="wrap">
-<div class="card">
-  <div class="ch"><i class="ti ti-router"></i><span class="ct">Cutting &amp; Engraving Files</span></div>
-  <div class="cb">
-    <div class="mode-body vis" id="mode-d" data-single-page="1">
-      <p class="nq-lead">Tell us about your design. If you’re unsure about anything, we’ll help.</p>
-      <div id="design-list"></div>
-      <button type="button" class="add-d nq-add" onclick="addDesign()"><i class="ti ti-plus"></i> Add another design</button>
 
-      <div class="nq-sec">
-        <div class="sl">Output files</div>
-        <p class="nq-hint">Select the file formats you need for this design. Not sure? We’ll recommend the best options.</p>
-        <div class="nq-fmts">
-          <div class="fmt-chip fmt-tile sel" onclick="toggleFmt(this)"><i class="ti ti-file"></i><span class="fname">SVG</span><span class="dot"></span></div>
-          <div class="fmt-chip fmt-tile sel" onclick="toggleFmt(this)"><i class="ti ti-file"></i><span class="fname">PNG</span><span class="dot"></span></div>
-          <div class="fmt-chip fmt-tile sel" onclick="toggleFmt(this)"><i class="ti ti-file"></i><span class="fname">PDF</span><span class="dot"></span></div>
-          <div class="fmt-chip fmt-tile" onclick="toggleFmt(this)"><i class="ti ti-file"></i><span class="fname">DXF</span><span class="dot"></span></div>
-          <div class="fmt-chip fmt-tile" onclick="toggleFmt(this)"><i class="ti ti-file"></i><span class="fname">EPS</span><span class="dot"></span></div>
-          <div class="fmt-chip fmt-tile" onclick="toggleFmt(this)"><i class="ti ti-file"></i><span class="fname">AI</span><span class="dot"></span></div>
-          <div class="fmt-chip fmt-tile" onclick="toggleFmt(this)"><i class="ti ti-file"></i><span class="fname">CDR</span><span class="dot"></span></div>
-          <div class="fmt-chip fmt-tile" id="fmt-other-chip" onclick="toggleFmt(this)"><i class="ti ti-file"></i><span class="fname">Other</span><span class="dot"></span></div>
-          <div id="fmt-other-inp" class="fmt-other"><input id="fmt-other-text" type="text" placeholder="Need another format?"></div>
-        </div>
-        <p class="nq-hint">You don’t need to select formats already saved in your profile.</p>
+<div class="app-shell">
+
+<aside class="sidebar">
+  <div class="brand">
+    <div class="brand-logo"><span style="color:#1F3A6B">V</span><span style="color:#B3242F">D</span></div>
+    <div><strong>Las Vegas Designs</strong><span>Customer portal</span></div>
+  </div>
+  <div class="nav-label">Main</div>
+    <a class="nav-item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Dashboard</a>
+    <a class="nav-item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h6"/></svg>Messages</a>
+  <div class="nav-label">My Projects</div>
+    <a class="nav-item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>Quotes</a>
+    <a class="nav-item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 3 6.5V17.5L12 22l9-4.5V6.5L12 2Z"/><path d="M3 6.5 12 11l9-4.5M12 11v11"/></svg>Orders</a>
+    <a class="nav-item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>My Files</a>
+  <div class="nav-label">Billing</div>
+    <a class="nav-item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>Invoices</a>
+  <div class="nav-label">Request a quote</div>
+    <a class="nav-item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8 19 13M15 9h.01M17.8 6.2 19 5M3 21l9-9M12.2 6.2 11 5"/></svg>Embroidery Digitizing</a>
+    <a class="nav-item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="14" r="2"/><circle cx="19" cy="14" r="2"/><circle cx="12" cy="7" r="2"/><path d="M6.8 13 10.5 8.4M13.5 8.4 17.2 13"/></svg>Vector &amp; Print Artwork</a>
+    <a class="nav-item active" href="#"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15h16v5H4z"/><path d="M8 15V9a4 4 0 0 1 8 0v6"/></svg>Cutting &amp; Engraving Files</a>
+  <div class="nav-label">Account</div>
+    <a class="nav-item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4.5 5-6.5 8-6.5s6.5 2 8 6.5"/></svg>Profile</a>
+    <a class="nav-item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/><circle cx="12" cy="12" r="7"/></svg>Settings</a>
+    <a class="nav-item" href="#"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>Policies</a>
+  <div class="nav-end"></div>
+</aside>
+
+<div class="main-area">
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <div class="page-id">
+      <div class="page-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15h16v5H4z"/><path d="M8 15V9a4 4 0 0 1 8 0v6"/></svg>
       </div>
-
-      <div class="nq-sec">
-        <div class="sl">Turnaround</div>
-        <div class="rush-row">
-          <label class="ropt sel-s" id="r-std" onclick="selRush('std')">
-            <input type="radio" name="turnaround" value="standard" checked>
-            <div class="ropt-top">
-              <span class="ropt-name" data-turnaround-label>Standard</span>
-              <span class="nq-badge">Included</span>
-            </div>
-            <p class="ropt-time">12–24 hours</p>
-            <p class="ropt-desc">Our regular queue. Fits most orders without extra cost.</p>
-          </label>
-          <label class="ropt" id="r-rush" onclick="selRush('rush')">
-            <input type="radio" name="turnaround" value="urgent">
-            <div class="ropt-top">
-              <span class="ropt-name" data-turnaround-label>Rush</span>
-              <span class="nq-badge nq-badge-soft">Priority</span>
-            </div>
-            <p class="ropt-time">4–8 hours</p>
-            <p class="ropt-desc">We’ll contact you first to confirm availability.</p>
-          </label>
-        </div>
-        <div class="nq-warn"><i class="ti ti-alert-triangle"></i> Complex files may take up to 3 business days. We’ll confirm the turnaround before starting.</div>
+      <div>
+        <h1>Cutting &amp; Engraving Quote</h1>
+        <p>Tell us about your design. If you're unsure about anything, we'll help.</p>
       </div>
     </div>
-
-    <div class="nq-actions">
-      <div class="row-btns">
-        <button type="button" class="btn-s">Save as draft</button>
-        <div class="nq-actions-right">
-          <button type="button" class="btn-p">Submit quote request →</button>
-          <p class="form-hint">This sends your request to our team.</p>
-        </div>
-      </div>
+    <div class="top-right">
+      <button class="icon-btn" type="button" aria-label="Notifications">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10.5 21a1.75 1.75 0 0 0 3 0"/></svg>
+      <span class="badge-count">3</span>
+    </button>
+      <div class="user-menu">
+      <div class="user-avatar">FC</div>
+      <div class="user-meta"><strong>fawadclient</strong><span>Customer</span></div>
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+      <a class="logout" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
+        <span>Logout</span>
+      </a>
     </div>
   </div>
+</header>
+
+<div class="wrap layout">
+
+  <form class="main" id="quoteForm">
+
+    <section class="step" id="s-designs">
+      <span class="step-num">1</span>
+      <div class="step-head">
+        <div>
+          <h2>Designs</h2>
+          <p>Tell us what you need cut, printed, or engraved, one design at a time</p>
+        </div>
+      </div>
+      <div id="designsContainer"></div>
+    </section>
+
+    <section class="step" id="s-formats">
+      <span class="step-num">2</span>
+      <div class="step-head">
+        <div>
+          <h2>Format Files</h2>
+          <p>Choose the file formats you need, or let us recommend the best options</p>
+        </div>
+      </div>
+      <div class="format-grid" id="formatGrid">
+        <label class="format-chip"><input type="checkbox" name="format" value="SVG"><span>SVG</span></label>
+        <label class="format-chip"><input type="checkbox" name="format" value="PNG"><span>PNG</span></label>
+        <label class="format-chip"><input type="checkbox" name="format" value="PDF"><span>PDF</span></label>
+        <label class="format-chip"><input type="checkbox" name="format" value="DXF"><span>DXF</span></label>
+        <label class="format-chip"><input type="checkbox" name="format" value="EPS"><span>EPS</span></label>
+        <label class="format-chip"><input type="checkbox" name="format" value="AI"><span>AI</span></label>
+        <label class="format-chip"><input type="checkbox" name="format" value="CDR"><span>CDR</span></label>
+        <div class="other-format-row">
+          <label class="check-row other-check"><input type="checkbox" id="otherFormatCheck">Need another format?</label>
+          <div class="format-other" id="otherFormatField" style="display:none;">
+            <input type="text" placeholder="Tell us the format you need">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="step" id="s-turn">
+      <span class="step-num">3</span>
+      <div class="step-head">
+        <div>
+          <h2>Turnaround Time</h2>
+          <p>Choose how quickly you need this order back</p>
+        </div>
+      </div>
+      <div class="turn-grid">
+        <label class="turn-option">
+          <input type="radio" name="turnaround" checked>
+          <div class="turn-inner">
+            <div class="turn-top">
+              <div class="turn-left"><span class="turn-radio"></span><span class="turn-name">Standard</span></div>
+              <span class="badge included">Included</span>
+            </div>
+            <div class="turn-time">12 to 24 hours</div>
+            <div class="turn-desc">Our regular queue. Fits most orders without extra cost.</div>
+          </div>
+        </label>
+        <label class="turn-option">
+          <input type="radio" name="turnaround">
+          <div class="turn-inner">
+            <div class="turn-top">
+              <div class="turn-left"><span class="turn-radio"></span><span class="turn-name">Rush</span></div>
+              <span class="badge priority">Priority</span>
+            </div>
+            <div class="turn-time">4 to 8 hours</div>
+            <div class="turn-desc">We'll contact you first to confirm availability.</div>
+          </div>
+        </label>
+      </div>
+      <div class="note-banner">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+        Complex files may take up to 3 business days. We'll confirm the turnaround before starting.
+      </div>
+    </section>
+
+    <div class="form-actions">
+      <button type="button" class="btn btn-ghost" id="cancelBtn">Cancel</button>
+      <button type="button" class="btn btn-outline" id="draftBtn">Save as draft</button>
+      <button type="button" class="btn btn-primary" id="submitBtn">Submit quote request <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+    </div>
+
+  </form>
+
+  <aside class="rail">
+    <nav class="steps" aria-label="Form sections">
+      <a class="on" href="#s-designs"><b>1</b>Designs</a>
+      <a href="#s-formats"><b>2</b>Format files</a>
+      <a href="#s-turn"><b>3</b>Turnaround Time</a>
+    </nav>
+
+    <div class="help">
+      <div class="help-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 6l9 6 9-6"/></svg>
+      </div>
+      <h3>Need help?</h3>
+      <p>Not sure what to select? Our team can help with artwork, sizing, and file requirements.</p>
+      <button type="button" class="btn" id="messageUsBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 6l9 6 9-6"/></svg>
+        Message us
+      </button>
+    </div>
+  </aside>
+
+</div>
+
 </div>
 </div>
+
 <script>
-window.LVD_DESIGN_HTML = function (n) {
-  return (
-    '<div class="dcard nq-card" id="dr-' + n + '">' +
-      '<div class="nq-card-h">' +
-        '<div class="nq-card-title"><span class="nq-idx" data-card-index>' + n + '</span>' +
-        '<strong data-card-title>Design ' + n + '</strong></div>' +
-        '<button type="button" class="drow-del" onclick="removeDesign(this)" aria-label="Remove this design"><i class="ti ti-trash"></i></button>' +
-      '</div>' +
-      '<div class="nq-top">' +
-        '<div class="ff"><label>Project name (optional)</label>' +
-        '<input class="d-name" data-design-name type="text" placeholder="e.g. Family name sign, tumbler engraving, or shirt design"></div>' +
-        '<div class="ff"><label>What service do you need?</label>' +
-        '<select data-design-service>' +
-          '<option value="">Select a service</option>' +
-          '<option value="SVG Cut File">SVG Cut File</option>' +
-          '<option value="Print Design (SVG/DTF)">Print Design (SVG/DTF)</option>' +
-          '<option value="Laser Engraving">Laser Engraving</option>' +
-          '<option value="Laser Cut & Engrave">Laser Cut &amp; Engrave</option>' +
-          '<option value="CNC Cut File">CNC Cut File</option>' +
-          '<option value="Vinyl Cut File">Vinyl Cut File</option>' +
-          '<option value="Plasma Cut File">Plasma Cut File</option>' +
-          '<option value="V-carve / CNC Engraving">V-carve / CNC Engraving</option>' +
-          '<option value="Not sure">Not sure</option>' +
-        '</select></div>' +
-      '</div>' +
-      '<div class="nq-up">' +
-        '<div class="upload-area"><div class="utrg" onclick="document.getElementById(\'fu-' + n + '\').click()">' +
-        '<i class="ti ti-cloud-upload"></i><p>Upload your artwork</p>' +
-        '<span>PNG, JPG, PDF, AI, EPS or SVG</span></div>' +
-        '<input type="file" id="fu-' + n + '" multiple style="display:none" onchange="handleFiles(\'flist-' + n + '\',this)">' +
-        '<div class="flist" id="flist-' + n + '"></div></div>' +
-        '<div class="upload-area"><div class="utrg" onclick="document.getElementById(\'fr-' + n + '\').click()">' +
-        '<i class="ti ti-cloud-upload"></i><p>Add a reference (optional)</p>' +
-        '<span>Upload an example of the style or result you want</span></div>' +
-        '<input type="file" id="fr-' + n + '" multiple style="display:none" onchange="handleFiles(\'rlist-' + n + '\',this)">' +
-        '<div class="flist" id="rlist-' + n + '"></div></div>' +
-      '</div>' +
-      '<div class="nq-size"><h3>Size &amp; details (optional)</h3>' +
-      '<div class="nq-size-row">' +
-        '<div class="nq-size-box"><span class="nq-size-lbl">Width</span>' +
-          '<div class="nq-size-wrap"><input data-size="w" type="number" min="0" step="0.1" placeholder="W"></div></div>' +
-        '<span class="nq-x" aria-hidden="true">×</span>' +
-        '<div class="nq-size-box"><span class="nq-size-lbl">Height</span>' +
-          '<div class="nq-size-wrap"><input data-size="h" type="number" min="0" step="0.1" placeholder="H"></div></div>' +
-        '<div class="ff nq-unit"><label>Unit</label><select data-size-unit><option value="in">in</option><option value="mm">mm</option><option value="cm">cm</option></select></div>' +
-        '<div class="nq-size-opts">' +
-          '<label class="nq-check"><input type="checkbox" data-keep-prop> Keep proportions</label>' +
-        '</div>' +
-      '</div>' +
-      '<p class="nq-hint">Leave blank if you’re unsure. We’ll recommend the best size for your project.</p></div>' +
-      '<div class="ff nq-note"><label>Tell us about your project</label>' +
-      '<p class="nq-hint">Mention what should be cut, printed or engraved and share any important details.</p>' +
-      '<textarea placeholder="Example: Cut the outside shape, engrave the name in the center, and prepare it for 3 mm acrylic."></textarea></div>' +
-    '</div>'
-  );
-};
+  const services = ["SVG Cut File","Print Design (SVG/DTF)","Laser Engraving","Laser Cut & Engrave","CNC Cut File","Vinyl Cut File","Plasma Cut File","V-carve / CNC Engraving","Not sure"];
+  const units = ["in","cm","mm"];
+  const upIcon = '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>';
+  const plusIcon = '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>';
+
+  function serviceOptions(){
+    return services.map(s => `<div class="csel-option" data-csel-option data-value="${s}">${s}</div>`).join("");
+  }
+  function unitOptions(){
+    return units.map((u,i) => `<div class="csel-option${i===0?' is-selected':''}" data-csel-option data-value="${u}">${u}</div>`).join("");
+  }
+
+  function designCardTemplate(n){
+    return `
+      <div class="design-card" data-design-card>
+        <div class="design-head">
+          <div class="dtitle">
+            <span data-design-label>Design ${n}</span>
+          </div>
+          <button type="button" class="remove-design" data-remove-design style="${n === 1 ? 'display:none' : ''}">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
+            Remove design
+          </button>
+        </div>
+        <div class="card-body">
+          <div class="grid-2">
+            <div class="field">
+              <label class="flabel">Project Name <span class="opt">(optional)</span></label>
+              <input type="text" placeholder="e.g. Family name sign, tumbler">
+            </div>
+            <div class="field">
+              <label class="flabel">Services</label>
+              <div class="csel" data-csel>
+                <button type="button" class="csel-trigger is-placeholder" data-csel-trigger>
+                  <span data-csel-value>Select a service</span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+                </button>
+                <div class="csel-menu" data-csel-menu>${serviceOptions()}</div>
+                <input type="hidden" data-csel-input value="">
+              </div>
+            </div>
+          </div>
+
+          <div class="drop-row">
+            <div class="field">
+              <label class="flabel">Artwork <span class="opt">(at least one file required)</span></label>
+              <div class="dropzone" data-dropzone>
+                <span class="dz-ico">${upIcon}</span>
+                <div class="dz-title">Upload your artwork</div>
+                <div class="dz-sub">PNG, JPG, PDF, AI, EPS or SVG</div>
+                <input type="file" multiple data-file-input>
+              </div>
+              <div class="file-list" data-file-list></div>
+            </div>
+            <div class="field">
+              <label class="flabel">Reference <span class="opt">(optional)</span></label>
+              <div class="dropzone" data-dropzone-ref>
+                <span class="dz-ico">${upIcon}</span>
+                <div class="dz-title">Add a reference</div>
+                <div class="dz-sub">Upload an example of the style or result you want</div>
+                <input type="file" multiple data-file-input-ref>
+              </div>
+              <div class="file-list" data-file-list-ref></div>
+            </div>
+          </div>
+
+          <div class="field notes">
+            <label class="flabel">Size &amp; Details <span class="opt">(optional)</span></label>
+            <div class="size-inline">
+              <div class="size-field">
+                <label class="flabel">Width</label>
+                <input type="text" placeholder="W">
+              </div>
+              <span class="size-x">×</span>
+              <div class="size-field">
+                <label class="flabel">Height</label>
+                <input type="text" placeholder="H">
+              </div>
+              <div class="size-field size-unit">
+                <label class="flabel">Unit</label>
+                <div class="csel" data-csel>
+                  <button type="button" class="csel-trigger" data-csel-trigger>
+                    <span data-csel-value>${units[0]}</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+                  </button>
+                  <div class="csel-menu" data-csel-menu>${unitOptions()}</div>
+                  <input type="hidden" data-csel-input value="${units[0]}">
+                </div>
+              </div>
+            </div>
+            <label class="check-row" style="margin-top:10px"><input type="checkbox" checked>Keep proportions</label>
+            <p class="hint-text">Leave blank if you're unsure. We'll recommend the best size for your project.</p>
+          </div>
+
+          <div class="field notes">
+            <label class="flabel">Tell Us About Your Project <span class="opt">(optional)</span></label>
+            <textarea placeholder="Example: Cut the outside shape, engrave the name in the center, and prepare it for 3 mm acrylic."></textarea>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  const designsContainer = document.getElementById('designsContainer');
+  let designCount = 0;
+  const MAX_DESIGNS = 10;
+  const designCards = () => designsContainer.querySelectorAll('[data-design-card]');
+
+  function attachFileHandlers(el){
+    [['[data-dropzone]','[data-file-input]','[data-file-list]'],['[data-dropzone-ref]','[data-file-input-ref]','[data-file-list-ref]']].forEach(([z,i,l]) => {
+      const dz = el.querySelector(z), input = el.querySelector(i), list = el.querySelector(l);
+      dz.addEventListener('click', () => input.click());
+      input.addEventListener('change', () => renderFiles(input.files, list));
+    });
+  }
+
+  function initCustomSelects(el){
+    el.querySelectorAll('[data-csel]').forEach(csel => {
+      const trigger = csel.querySelector('[data-csel-trigger]');
+      const menu = csel.querySelector('[data-csel-menu]');
+      const valueEl = csel.querySelector('[data-csel-value]');
+      const hiddenInput = csel.querySelector('[data-csel-input]');
+      trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const willOpen = !csel.classList.contains('is-open');
+        document.querySelectorAll('.csel.is-open').forEach(o => o.classList.remove('is-open'));
+        if(willOpen) csel.classList.add('is-open');
+      });
+      menu.querySelectorAll('[data-csel-option]').forEach(opt => {
+        opt.addEventListener('click', () => {
+          menu.querySelectorAll('[data-csel-option]').forEach(o => o.classList.remove('is-selected'));
+          opt.classList.add('is-selected');
+          valueEl.textContent = opt.dataset.value;
+          if(hiddenInput) hiddenInput.value = opt.dataset.value;
+          trigger.classList.remove('is-placeholder');
+          csel.classList.remove('is-open');
+        });
+      });
+    });
+  }
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.csel.is-open').forEach(o => o.classList.remove('is-open'));
+  });
+
+  function renderFiles(files, listEl){
+    listEl.innerHTML = "";
+    Array.from(files).forEach(f => {
+      const chip = document.createElement('div');
+      chip.className = 'file-chip';
+      chip.innerHTML = `
+        <span class="fname">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+          ${f.name}
+        </span>
+        <button type="button" aria-label="Remove">✕</button>`;
+      chip.querySelector('button').addEventListener('click', () => chip.remove());
+      listEl.appendChild(chip);
+    });
+  }
+
+  function renumberDesigns(){
+    designsContainer.querySelectorAll('[data-design-card]').forEach((card, i) => {
+      card.querySelector('[data-design-label]').textContent = `Design ${i + 1}`;
+    });
+    const btns = designsContainer.querySelectorAll('[data-remove-design]');
+    btns.forEach(b => { b.style.display = btns.length > 1 ? '' : 'none'; });
+    const b = document.getElementById('addDesignBtn');
+    if(b) b.style.display = designCards().length >= MAX_DESIGNS ? 'none' : '';
+  }
+
+  function addDesign(){
+    designCount++;
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = designCardTemplate(designCount).trim();
+    const card = wrapper.firstElementChild;
+    const addBtn = document.getElementById('addDesignBtn');
+    addBtn ? designsContainer.insertBefore(card, addBtn) : designsContainer.appendChild(card);
+    attachFileHandlers(card);
+    initCustomSelects(card);
+    card.querySelector('[data-remove-design]').addEventListener('click', () => { card.remove(); renumberDesigns(); });
+    renumberDesigns();
+  }
+
+  function ensureAddDesignButton(){
+    if(document.getElementById('addDesignBtn')) return;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'addDesignBtn';
+    btn.className = 'add-btn add-design-btn';
+    btn.innerHTML = `${plusIcon}Add Another Design`;
+    btn.addEventListener('click', addDesign);
+    designsContainer.appendChild(btn);
+  }
+
+  addDesign();
+  ensureAddDesignButton();
+
+  // Turnaround selection styling
+  const turnOptions = document.querySelectorAll('.turn-option');
+  const syncTurn = () => turnOptions.forEach(o => o.classList.toggle('is-selected', o.querySelector('input').checked));
+  turnOptions.forEach(o => o.querySelector('input').addEventListener('change', syncTurn));
+  syncTurn();
+
+  // "Need another format" toggle
+  const otherCheck = document.getElementById('otherFormatCheck');
+  const otherField = document.getElementById('otherFormatField');
+  otherCheck.addEventListener('change', () => { otherField.style.display = otherCheck.checked ? 'flex' : 'none'; });
+
+  // Right step bar follows scroll: starts at step 1, then 2, 3, 4
+  const stepEls = [...document.querySelectorAll('.step')];
+  const stepLinks = [...document.querySelectorAll('.steps a')];
+  let lockUntil = 0;
+  function setStep(id){ stepLinks.forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + id)); }
+  function updateSteps(){
+    if(Date.now() < lockUntil) return;
+    const y = window.scrollY, vh = window.innerHeight;
+    const max = document.documentElement.scrollHeight - vh;
+    let idx = 0;
+    if(y > 8){
+      const ref = 140 + (vh - 140) * (max > 0 ? Math.min(y / max, 1) : 0);
+      stepEls.forEach((el, k) => { if(el.getBoundingClientRect().top <= ref) idx = k; });
+      if(y >= max - 4) idx = stepEls.length - 1;
+    }
+    setStep(stepEls[idx].id);
+  }
+  stepLinks.forEach(a => a.addEventListener('click', () => { lockUntil = Date.now() + 900; setStep(a.getAttribute('href').slice(1)); }));
+  addEventListener('scroll', updateSteps, {passive:true});
+  addEventListener('resize', updateSteps);
+  updateSteps();
+
+  document.getElementById('cancelBtn').addEventListener('click', () => {
+    parent.postMessage({ type: 'lvd-quote-cancel' }, '*');
+  });
+  document.getElementById('draftBtn').addEventListener('click', () => {
+    parent.postMessage({ type: 'lvd-quote-draft' }, '*');
+  });
+  document.getElementById('submitBtn').addEventListener('click', () => {
+    const btn = document.getElementById('submitBtn');
+    if(btn.dataset.busy === '1') return;
+    btn.dataset.busy = '1';
+    btn.disabled = true;
+    parent.postMessage({ type: 'lvd-quote-submit' }, '*');
+  });
+  document.getElementById('messageUsBtn').addEventListener('click', () => {
+    parent.postMessage({ type: 'lvd-open-messages' }, '*');
+  });
 </script>
-<script src="theme.js"></script>
-<script src="new-quote.js"></script>
-<script src="form-layout.js"></script>
 <script src="bridge.js"></script>
+
 </body>
 </html>

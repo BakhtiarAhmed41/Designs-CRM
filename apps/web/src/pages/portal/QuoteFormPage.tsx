@@ -19,6 +19,7 @@ type Collected = {
   designName: string;
   instructions: string;
   size: string | null;
+  unit?: string | null;
   turnaround: string | null;
   formats: string[];
   designs: Array<Record<string, unknown>>;
@@ -157,6 +158,7 @@ export function QuoteFormPage() {
           designName: 'New design request',
           instructions: '',
           size: null,
+          unit: null,
           turnaround: null,
           formats: [],
           designs: [],
@@ -178,6 +180,7 @@ export function QuoteFormPage() {
           serviceType: service.serviceType,
           mode: collected.mode,
           turnaround: collected.turnaround,
+          unit: collected.unit ?? null,
           formats: quoteFormatsFromPrefs(collected.formats, customerPrefs, service.key),
           designs: collected.designs,
           fields: collected.fields,
@@ -201,13 +204,7 @@ export function QuoteFormPage() {
     function onMsg(ev: MessageEvent) {
       const data = ev.data as { type?: string; height?: number } | null;
       if (!data || typeof data !== 'object') return;
-      if (data.type === 'lvd-form-height' && typeof data.height === 'number') {
-        const next = Math.max(1, Math.ceil(data.height));
-        const frame = iframeRef.current;
-        if (frame && Math.abs(frame.offsetHeight - next) > 2) {
-          frame.style.height = `${next}px`;
-        }
-      }
+      if (data.type === 'lvd-quote-cancel') void closePage();
       if (data.type === 'lvd-form-ready') {
         const win = iframeRef.current?.contentWindow;
         if (win) {
@@ -246,7 +243,7 @@ export function QuoteFormPage() {
     }
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
-  }, [submitFromIframe, navigate, customerPrefs, service, qc, themeColors]);
+  }, [submitFromIframe, navigate, customerPrefs, service, qc, themeColors, closePage]);
 
   useEffect(() => {
     if (!service || !customerPrefs || draftRestoredRef.current) return;
@@ -272,7 +269,7 @@ export function QuoteFormPage() {
   useTopbarLead(topbarLead);
 
   return (
-    <div className="quote-page">
+    <div className={`quote-page${service ? ' quote-page-live' : ''}`}>
       <header className="quote-page-h quote-page-h-mobile">
         <div className="service-icon">
           <i className={`ti ${service?.icon ?? 'ti-file-pencil'}`} />

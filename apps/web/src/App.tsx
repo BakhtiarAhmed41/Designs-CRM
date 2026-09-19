@@ -26,7 +26,7 @@ const PortalQuoteDetail = lazy(() =>
   import('@/pages/portal/QuoteDetail').then((m) => ({ default: m.PortalQuoteDetail })),
 );
 const PortalNewQuote = lazy(() =>
-  import('@/pages/portal/NewQuote').then((m) => ({ default: m.PortalNewQuote })),
+  import('@/pages/portal/QuoteFormPage').then((m) => ({ default: m.QuoteFormPage })),
 );
 const PortalProfile = lazy(() =>
   import('@/pages/portal/Profile').then((m) => ({ default: m.PortalProfile })),

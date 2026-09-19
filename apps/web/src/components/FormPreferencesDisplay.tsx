@@ -29,7 +29,7 @@ type FormDesign = {
   background?: string;
   keepProportional?: boolean;
   dpi300?: boolean;
-  sizes?: Array<{ label?: string; w?: string; h?: string }>;
+  sizes?: Array<{ label?: string; w?: string; h?: string; detail?: string; placement?: string; unit?: string }>;
   fileNames?: string[];
 };
 
@@ -149,17 +149,26 @@ export function FormPreferencesDisplay({
             const extras =
               d.sizes
                 ?.map((s) =>
-                  [s.label, s.w && s.h ? `${s.w} × ${s.h}` : s.w || s.h].filter(Boolean).join(' '),
+                  [
+                    s.label,
+                    s.detail,
+                    s.placement,
+                    s.w || s.h ? `${s.w || ''} × ${s.h || ''}${s.unit ? ` ${s.unit}` : ''}`.trim() : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' · '),
                 )
-                .filter(Boolean) ?? [];
+                .filter((v) => v && v !== d.size) ?? [];
             const rows = [
               d.service && { label: 'Service', value: d.service },
-              d.placement && { label: 'Item', value: d.placement },
+              d.placement && { label: 'Placement', value: d.placement },
               d.fabric && { label: 'Fabric', value: d.fabric },
               d.size && { label: 'Size', value: d.size },
-              extras.length > 0 && { label: 'Extra sizes', value: extras.join(' · ') },
-              d.colors && { label: 'Color', value: d.colors },
+              extras.length > 0 && { label: extras.length > 1 ? 'Sizes' : 'Size details', value: extras.join(' · ') },
+              d.colors && { label: 'Color mode', value: d.colors },
               d.background && { label: 'Background', value: d.background },
+              d.keepProportional && { label: 'Keep proportional', value: 'Yes' },
+              d.dpi300 && { label: '300 DPI', value: 'Yes' },
               d.notes && { label: 'Notes', value: d.notes },
             ].filter(Boolean) as Array<{ label: string; value: string }>;
             const names =

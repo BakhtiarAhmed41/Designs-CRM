@@ -1,0 +1,63 @@
+/* Hide only the mock portal chrome. Keep the reference layout, rail, and sticky. */
+html.in-frame .sidebar,
+html.in-frame .top-right {
+  display: none !important;
+}
+
+html.in-frame .app-shell {
+  display: block;
+  min-height: 0;
+  width: 100%;
+}
+
+html.in-frame .main-area {
+  width: 100%;
+  min-width: 0;
+}
+
+/* One scroll container so position:sticky on .rail works like the standalone page. */
+html.in-frame {
+  height: 100%;
+  overflow-y: auto;
+}
+
+html.in-frame body {
+  min-height: 100%;
+  overflow: visible;
+  background: var(--page, #fff);
+}
+
+/*
+  The portal iframe is often under 1280px, which would collapse the reference
+  desktop layout (hide steps, unstick the rail). Keep the desktop form + rail.
+*/
+html.in-frame .layout {
+  grid-template-columns: minmax(0, 880px) 264px !important;
+  grid-template-areas: "main rail" !important;
+  gap: 40px !important;
+}
+
+html.in-frame .rail {
+  position: sticky !important;
+  display: flex !important;
+  flex-direction: column;
+  max-height: calc(100vh - 104px) !important;
+  overflow: auto;
+}
+
+html.in-frame .steps {
+  display: flex !important;
+  flex-direction: column;
+}
+
+@media (max-width: 640px) {
+  html.in-frame .layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-areas: "main" "rail" !important;
+    gap: 28px !important;
+  }
+  html.in-frame .rail {
+    position: static !important;
+    max-height: none !important;
+  }
+}

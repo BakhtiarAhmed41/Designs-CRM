@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
-import { useRequestQuote } from '@/context/RequestQuoteContext';
+import { RequestQuoteMenu } from '@/components/RequestQuoteMenu';
 import { DateRangeSelect } from '@/components/ui/DateRangeSelect';
 import { listMyOrders } from '@/lib/orders';
 import { listMyInvoices } from '@/lib/billing';
@@ -66,7 +66,6 @@ function relativeTime(iso: string) {
 export function PortalDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { openRequestQuote } = useRequestQuote();
   const qc = useQueryClient();
   const [preset, setPreset] = useState<PortalRangePreset>('thisMonth');
   const [customFrom, setCustomFrom] = useState('');
@@ -177,9 +176,9 @@ export function PortalDashboard() {
       <PageHeader
         title={`Welcome back, ${firstName}`}
         actions={
-          <button type="button" className="btn btn-primary" onClick={() => openRequestQuote()}>
+          <RequestQuoteMenu>
             <i className="ti ti-plus" /> Request a quote
-          </button>
+          </RequestQuoteMenu>
         }
       />
 
@@ -313,9 +312,9 @@ export function PortalDashboard() {
                 title="No open quotes"
                 description="Start a new quote when you are ready."
                 action={
-                  <button type="button" className="btn btn-primary btn-sm" onClick={() => openRequestQuote()}>
+                  <RequestQuoteMenu className="btn btn-primary btn-sm">
                     Request a quote
-                  </button>
+                  </RequestQuoteMenu>
                 }
               />
             )}

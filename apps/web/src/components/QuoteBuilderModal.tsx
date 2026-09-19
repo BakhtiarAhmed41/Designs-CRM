@@ -51,6 +51,7 @@ type Collected = {
   designName: string;
   instructions: string;
   size: string | null;
+  unit?: string | null;
   turnaround: string | null;
   formats: string[];
   designs: Array<Record<string, unknown>>;
@@ -233,6 +234,7 @@ export function QuoteBuilderModal({
           serviceType: service.serviceType,
           mode: collected.mode,
           turnaround: collected.turnaround,
+          unit: collected.unit ?? null,
           formats: quoteFormatsFromPrefs(collected.formats, customerPrefs, service.key),
           designs: collected.designs,
           fields: collected.fields,
@@ -392,6 +394,7 @@ export function QuoteBuilderModal({
             .catch((e) => setError(getErrorMessage(e)));
         }
       }
+      if (data.type === 'lvd-quote-cancel') onClose();
       if (data.type === 'lvd-open-messages') {
         onClose();
         navigate('/portal/messages');

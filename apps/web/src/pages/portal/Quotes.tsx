@@ -11,6 +11,7 @@ import { SkeletonRows } from '@/components/ui/Skeleton';
 import { freshOnOpen } from '@/lib/queryRefresh';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { useRequestQuote } from '@/context/RequestQuoteContext';
+import { RequestQuoteMenu } from '@/components/RequestQuoteMenu';
 
 const DRAFT_LABELS: Record<string, string> = {
   embroidery: 'Embroidery Digitizing',
@@ -101,9 +102,9 @@ export function PortalQuotes() {
                 <i className="ti ti-device-floppy" /> Open drafts
               </button>
             )}
-            <button type="button" className="btn btn-primary" onClick={() => openRequestQuote()}>
+            <RequestQuoteMenu>
               <i className="ti ti-plus" /> Request a quote
-            </button>
+            </RequestQuoteMenu>
           </>
         }
       />
@@ -170,9 +171,9 @@ export function PortalQuotes() {
             title="No quotes yet"
             description="Request a quote and we’ll price it. Approve to start production."
             action={
-              <button type="button" className="btn btn-primary btn-sm" onClick={() => openRequestQuote()}>
+              <RequestQuoteMenu className="btn btn-primary btn-sm">
                 Request a quote
-              </button>
+              </RequestQuoteMenu>
             }
           />
         )}

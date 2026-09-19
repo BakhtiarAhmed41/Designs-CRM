@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Brand, LogoutLink, Shell, useShellUser } from './Shell';
-import { QuoteBuilderModal } from '@/components/QuoteBuilderModal';
 import { RequestQuoteContext } from '@/context/RequestQuoteContext';
 import { getMyCustomer, portalLookFromPrefs } from '@/lib/customers';
 import { listMyOrderSummary } from '@/lib/orders';
@@ -47,15 +46,10 @@ export function PortalShell() {
   const qc = useQueryClient();
   const location = useLocation();
   const navigate = useNavigate();
-  const [quoteOpen, setQuoteOpen] = useState(false);
-  const [quoteService, setQuoteService] = useState<string | null>(null);
-  const [quoteNonce, setQuoteNonce] = useState(0);
-
   const openRequestQuote = useCallback((service?: string | null) => {
-    setQuoteService(service ?? null);
-    setQuoteNonce((n) => n + 1);
-    setQuoteOpen(true);
-  }, []);
+    if (service) navigate(`/portal/quotes/new?service=${encodeURIComponent(service)}`);
+    else navigate('/portal/quotes/new');
+  }, [navigate]);
   useMessagingSocket({
     onUnreadChanged: () => {
       void qc.invalidateQueries({ queryKey: ['portal-unread'] });
@@ -207,16 +201,6 @@ export function PortalShell() {
             { to: '/portal/orders', label: 'Orders', icon: 'ti-package' },
             { to: '/portal/messages', label: 'Chat', icon: 'ti-message' },
           ]}
-        />
-        <QuoteBuilderModal
-          key={quoteNonce}
-          open={quoteOpen}
-          initialService={quoteService}
-          onClose={() => setQuoteOpen(false)}
-          onSubmitted={(orderId) => {
-            setQuoteOpen(false);
-            navigate(`/portal/quotes/${orderId}`);
-          }}
         />
       </div>
     </RequestQuoteContext.Provider>
