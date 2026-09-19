@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import { AttachmentPreview } from '@/components/FilePreview';
-import { friendlyFileName, isImageFile, sameFileName } from '@/lib/format';
+import { isImageFile, sameFileName } from '@/lib/format';
 
 export type PrefAttachment = {
   name: string;
@@ -121,11 +121,9 @@ function FileTile({
   kind: FileKind;
   safe?: boolean;
 }) {
-  const label = kind === 'artwork' ? 'Artwork' : kind === 'reference' ? 'Reference' : 'File';
   const canPreview = Boolean(file.signedUrlPath || file.previewUrl || isImageFile(file.name, file.mimeType));
   return (
     <div className={`pref-shot pref-shot-${kind}`}>
-      <span className="pref-shot-tag">{label}</span>
       {canPreview ? (
         <AttachmentPreview
           name={file.name}
@@ -136,11 +134,10 @@ function FileTile({
           safe={safe}
         />
       ) : (
-        <span className="pref-file">{friendlyFileName(file.name)}</span>
+        <span className="pref-file" title={file.name}>
+          <i className="ti ti-paperclip" aria-hidden /> File
+        </span>
       )}
-      <span className="pref-shot-name" title={file.name}>
-        {friendlyFileName(file.name)}
-      </span>
     </div>
   );
 }

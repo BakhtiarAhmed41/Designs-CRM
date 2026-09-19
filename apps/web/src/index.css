@@ -1658,17 +1658,6 @@ button { font-family: inherit; }
 .pref-shots{display:flex;flex-wrap:wrap;gap:12px;}
 .pref-shot{width:112px;min-width:0;}
 .pref-shot .pref-ref-img{width:112px;height:112px;border-radius:10px;background:#fff;}
-.pref-shot-tag{
-  display:inline-flex;align-items:center;margin-bottom:6px;
-  font-size:11px;font-weight:700;letter-spacing:.01em;
-}
-.pref-shot-art .pref-shot-tag{color:var(--maroon);}
-.pref-shot-ref .pref-shot-tag,
-.pref-shot-other .pref-shot-tag{color:var(--ink);}
-.pref-shot-name{
-  display:block;margin-top:6px;font-size:11px;color:var(--muted);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
 .pref-card-v2 .pref-specs{
   display:grid;
   grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
