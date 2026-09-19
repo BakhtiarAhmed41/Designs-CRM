@@ -992,6 +992,29 @@
     (root || document).querySelectorAll('input[type="file"]').forEach(patchFileInput);
   }
 
+  function positionCselMenu(csel) {
+    var menu = csel && csel.querySelector('.csel-menu, [data-csel-menu]');
+    if (!menu) return;
+    menu.style.top = 'calc(100% + 4px)';
+    menu.style.bottom = 'auto';
+    menu.style.maxHeight = '';
+    var rect = csel.getBoundingClientRect();
+    var spaceBelow = window.innerHeight - rect.bottom - 12;
+    var spaceAbove = rect.top - 12;
+    var wanted = Math.min(menu.scrollHeight || 280, 320);
+    if (spaceBelow < Math.min(wanted, 160) && spaceAbove > spaceBelow) {
+      menu.style.top = 'auto';
+      menu.style.bottom = 'calc(100% + 4px)';
+      menu.style.maxHeight = Math.max(120, Math.min(320, spaceAbove)) + 'px';
+    } else {
+      menu.style.maxHeight = Math.max(120, Math.min(320, spaceBelow)) + 'px';
+    }
+  }
+
+  function positionOpenCselMenus() {
+    document.querySelectorAll('.csel.is-open').forEach(positionCselMenu);
+  }
+
   document.addEventListener(
     'dragover',
     function (e) {
@@ -1064,7 +1087,10 @@
     window.addEventListener('load', reportHeightSoon);
     document.addEventListener('click', function () {
       setTimeout(reportHeight, 60);
+      setTimeout(positionOpenCselMenus, 0);
     });
+    window.addEventListener('resize', positionOpenCselMenus);
+    window.addEventListener('scroll', positionOpenCselMenus, true);
     document.addEventListener('input', function () {
       parent.postMessage({ type: 'lvd-form-dirty' }, '*');
     });

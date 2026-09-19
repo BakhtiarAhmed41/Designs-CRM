@@ -9,6 +9,10 @@ export type PrefAttachment = {
   signedUrlPath: string;
 };
 
+type FileKind = 'artwork' | 'reference' | 'other';
+
+type LabeledFile = PrefAttachment & { kind: FileKind };
+
 type FormDesign = {
   name?: string;
   service?: string;
@@ -26,12 +30,22 @@ type FormDesign = {
   referenceFileNames?: string[];
 };
 
-function designFileNames(d: FormDesign): string[] {
-  const names = [
-    ...(d.artworkFileNames ?? []),
-    ...(d.referenceFileNames ?? []),
-    ...(d.fileNames ?? []),
-  ];
+function takeAttachment(leftover: PrefAttachment[], name?: string): PrefAttachment | null {
+  if (name) {
+    const matchIdx = leftover.findIndex((a) => sameFileName(a.name, name));
+    if (matchIdx >= 0) return leftover.splice(matchIdx, 1)[0]!;
+  }
+  if (name) return { name, signedUrlPath: '', previewUrl: null };
+  return leftover.shift() ?? null;
+}
+
+function takeNamed(leftover: PrefAttachment[], names: string[]): PrefAttachment[] {
+  return names
+    .map((name) => takeAttachment(leftover, name))
+    .filter((file): file is PrefAttachment => Boolean(file));
+}
+
+function uniqueNames(names: string[]): string[] {
   const seen = new Set<string>();
   return names.filter((name) => {
     const key = name.toLowerCase().trim();
@@ -41,14 +55,17 @@ function designFileNames(d: FormDesign): string[] {
   });
 }
 
-function takeAttachment(leftover: PrefAttachment[], name?: string): PrefAttachment | null {
-  if (name) {
-    const matchIdx = leftover.findIndex((a) => sameFileName(a.name, name));
-    if (matchIdx >= 0) return leftover.splice(matchIdx, 1)[0]!;
-  }
-  if (leftover.length) return leftover.shift()!;
-  if (name) return { name, signedUrlPath: '', previewUrl: null };
-  return null;
+function collectDesignFiles(d: FormDesign, leftover: PrefAttachment[]): LabeledFile[] {
+  const artNames = uniqueNames(d.artworkFileNames ?? []);
+  const refNames = uniqueNames(d.referenceFileNames ?? []);
+  const artwork = takeNamed(leftover, artNames).map((file) => ({ ...file, kind: 'artwork' as const }));
+  const reference = takeNamed(leftover, refNames).map((file) => ({ ...file, kind: 'reference' as const }));
+  const claimed = [...artNames, ...refNames];
+  const restNames = uniqueNames(d.fileNames ?? []).filter(
+    (name) => !claimed.some((claimedName) => sameFileName(claimedName, name)),
+  );
+  const rest = takeNamed(leftover, restNames).map((file) => ({ ...file, kind: 'other' as const }));
+  return [...artwork, ...reference, ...rest];
 }
 
 type QuoteFormPreferences = {
@@ -95,9 +112,128 @@ export function hasFormPreferences(preferences: unknown): boolean {
   );
 }
 
+function FileTile({
+  file,
+  kind,
+  safe,
+}: {
+  file: PrefAttachment;
+  kind: FileKind;
+  safe?: boolean;
+}) {
+  const label = kind === 'artwork' ? 'Artwork' : kind === 'reference' ? 'Reference' : 'File';
+  const canPreview = Boolean(file.signedUrlPath || file.previewUrl || isImageFile(file.name, file.mimeType));
+  return (
+    <div className={`pref-shot pref-shot-${kind}`}>
+      <span className="pref-shot-tag">{label}</span>
+      {canPreview ? (
+        <AttachmentPreview
+          name={file.name}
+          mimeType={file.mimeType}
+          signedUrlPath={file.signedUrlPath}
+          previewUrl={file.previewUrl}
+          compact
+          safe={safe}
+        />
+      ) : (
+        <span className="pref-file">{friendlyFileName(file.name)}</span>
+      )}
+      <span className="pref-shot-name" title={file.name}>
+        {friendlyFileName(file.name)}
+      </span>
+    </div>
+  );
+}
+
+function MediaColumn({
+  kind,
+  files,
+  safe,
+  empty,
+}: {
+  kind: FileKind;
+  files: LabeledFile[];
+  safe?: boolean;
+  empty: string;
+}) {
+  const title = kind === 'artwork' ? 'Artwork' : kind === 'reference' ? 'Reference' : 'Other files';
+  const hint =
+    kind === 'artwork'
+      ? 'The design to work from'
+      : kind === 'reference'
+        ? 'Style or result example'
+        : 'Uploaded with this request';
+  const icon = kind === 'artwork' ? 'ti-palette' : kind === 'reference' ? 'ti-photo' : 'ti-paperclip';
+  return (
+    <div className={`pref-media-col pref-media-${kind}`}>
+      <div className="pref-media-h">
+        <i className={`ti ${icon}`} aria-hidden />
+        <div>
+          <strong>{title}</strong>
+          <span>{hint}</span>
+        </div>
+      </div>
+      {files.length > 0 ? (
+        <div className="pref-shots">
+          {files.map((file, i) => (
+            <FileTile key={`${file.name}-${i}`} file={file} kind={kind} safe={safe} />
+          ))}
+        </div>
+      ) : (
+        <p className="pref-media-empty">{empty}</p>
+      )}
+    </div>
+  );
+}
+
+function FileGallery({
+  files,
+  leftover,
+  safe,
+}: {
+  files: LabeledFile[];
+  leftover?: PrefAttachment[];
+  safe?: boolean;
+}) {
+  const artwork = files.filter((f) => f.kind === 'artwork');
+  const reference = files.filter((f) => f.kind === 'reference');
+  const other = [
+    ...files.filter((f) => f.kind === 'other'),
+    ...(leftover ?? []).map((file) => ({ ...file, kind: 'other' as const })),
+  ];
+  const hasSplit = artwork.length > 0 || reference.length > 0;
+  if (!hasSplit && other.length === 0) return null;
+
+  return (
+    <div className="pref-media">
+      {hasSplit ? (
+        <>
+          <MediaColumn
+            kind="artwork"
+            files={artwork}
+            safe={safe}
+            empty="No artwork uploaded"
+          />
+          <MediaColumn
+            kind="reference"
+            files={reference}
+            safe={safe}
+            empty="No reference uploaded"
+          />
+        </>
+      ) : (
+        <MediaColumn kind="other" files={other} safe={safe} empty="No files uploaded" />
+      )}
+      {hasSplit && other.length > 0 && (
+        <MediaColumn kind="other" files={other} safe={safe} empty="" />
+      )}
+    </div>
+  );
+}
+
 export function FormPreferencesDisplay({
   preferences,
-  title = 'Form submission details',
+  title = 'What you sent',
   style,
   wide = false,
   attachments,
@@ -140,30 +276,26 @@ export function FormPreferencesDisplay({
     ...extraRows,
   ].filter(Boolean) as Array<{ label: string; value: string }>;
   const leftoverAttachments = [...(attachments ?? [])];
+  const designs = (p.designs ?? []).map((d) => ({
+    design: d,
+    files: collectDesignFiles(d, leftoverAttachments),
+  }));
 
   return (
-    <div className={`card pref-card${wide ? ' pref-wide' : ''}`} style={{ marginTop: 14, ...style }}>
-      {wide ? (
-        <div className="pref-head">
-          <span className="pref-head-icon" aria-hidden>
-            <i className="ti ti-notes" />
-          </span>
-          <div>
-            <h3>{title}</h3>
-            <p>Add specific details for each design option, including size, format, and any notes.</p>
-          </div>
+    <div className={`card pref-card pref-card-v2${wide ? ' pref-wide' : ''}`} style={{ marginTop: 14, ...style }}>
+      <div className="pref-head">
+        <span className="pref-head-icon" aria-hidden>
+          <i className="ti ti-notes" />
+        </span>
+        <div>
+          <h3>{title}</h3>
+          <p>Artwork is the file to work from. Reference is an example of the look you want.</p>
         </div>
-      ) : (
-        <div className="card-h">
-          <span className="ct">
-            <i className="ti ti-notes" /> {title}
-          </span>
-        </div>
-      )}
+      </div>
 
       {hasDesigns && (
         <div className="pref-block pref-designs">
-          {p.designs!.map((d, i) => {
+          {designs.map(({ design: d, files }, i) => {
             const extras =
               d.sizes
                 ?.map((s) =>
@@ -189,40 +321,13 @@ export function FormPreferencesDisplay({
               d.dpi300 && { label: '300 DPI', value: 'Yes' },
               d.notes && { label: 'Notes', value: d.notes },
             ].filter(Boolean) as Array<{ label: string; value: string }>;
-            const names = designFileNames(d);
-            const files = (
-              names.length > 0
-                ? names.map((name) => takeAttachment(leftoverAttachments, name))
-                : leftoverAttachments.length > 0
-                  ? [takeAttachment(leftoverAttachments)]
-                  : []
-            ).filter((file): file is PrefAttachment => Boolean(file));
-            const fileThumbs = files.map((file, fi) =>
-              file.signedUrlPath || file.previewUrl || isImageFile(file.name, file.mimeType) ? (
-                <AttachmentPreview
-                  key={`${file.name}-${fi}`}
-                  name={file.name}
-                  mimeType={file.mimeType}
-                  signedUrlPath={file.signedUrlPath}
-                  previewUrl={file.previewUrl}
-                  compact
-                  safe={safe}
-                />
-              ) : (
-                <span key={`${file.name}-${fi}`} className="pref-file">
-                  {friendlyFileName(file.name)}
-                </span>
-              ),
-            );
             return (
               <div key={i} className="pref-design">
                 <div className="pref-design-h">
                   <span className="pref-design-n">{i + 1}</span>
                   <strong>{d.name?.trim() || `Design ${i + 1}`}</strong>
-                  {wide && <span className="pref-tag">Design option</span>}
-                  {!wide && files.length > 0 && <div className="pref-files">{fileThumbs}</div>}
                 </div>
-                {wide && files.length > 0 && <div className="pref-ref">{fileThumbs}</div>}
+                <FileGallery files={files} safe={safe} />
                 {rows.length > 0 && (
                   <div className="pref-specs">
                     {rows.map((row) => (
@@ -239,27 +344,9 @@ export function FormPreferencesDisplay({
           {leftoverAttachments.length > 0 && (
             <div className="pref-design">
               <div className="pref-design-h">
-                <strong>Uploaded files</strong>
-                <div className="pref-files">
-                  {leftoverAttachments.map((file, fi) =>
-                    file.signedUrlPath || file.previewUrl || isImageFile(file.name, file.mimeType) ? (
-                      <AttachmentPreview
-                        key={`${file.name}-extra-${fi}`}
-                        name={file.name}
-                        mimeType={file.mimeType}
-                        signedUrlPath={file.signedUrlPath}
-                        previewUrl={file.previewUrl}
-                        compact
-                        safe={safe}
-                      />
-                    ) : (
-                      <span key={`${file.name}-extra-${fi}`} className="pref-file">
-                        {friendlyFileName(file.name)}
-                      </span>
-                    ),
-                  )}
-                </div>
+                <strong>More files</strong>
               </div>
+              <FileGallery files={[]} leftover={leftoverAttachments} safe={safe} />
             </div>
           )}
         </div>
@@ -268,28 +355,7 @@ export function FormPreferencesDisplay({
       {!hasDesigns && leftoverAttachments.length > 0 && (
         <div className="pref-block pref-designs">
           <div className="pref-design">
-            <div className="pref-design-h">
-              <strong>Uploaded files</strong>
-              <div className="pref-files">
-                {leftoverAttachments.map((file, fi) =>
-                  file.signedUrlPath || file.previewUrl || isImageFile(file.name, file.mimeType) ? (
-                    <AttachmentPreview
-                      key={`${file.name}-loose-${fi}`}
-                      name={file.name}
-                      mimeType={file.mimeType}
-                      signedUrlPath={file.signedUrlPath}
-                      previewUrl={file.previewUrl}
-                      compact
-                      safe={safe}
-                    />
-                  ) : (
-                    <span key={`${file.name}-loose-${fi}`} className="pref-file">
-                      {friendlyFileName(file.name)}
-                    </span>
-                  ),
-                )}
-              </div>
-            </div>
+            <FileGallery files={[]} leftover={leftoverAttachments} safe={safe} />
           </div>
         </div>
       )}

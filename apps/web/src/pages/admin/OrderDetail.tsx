@@ -1060,6 +1060,7 @@ export function AdminOrderDetail() {
 
           <FormPreferencesDisplay
             preferences={order.preferences}
+            title="Customer request"
             wide
             safe
             attachments={(order.attachments ?? []).map((a) => ({

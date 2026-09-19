@@ -409,6 +409,7 @@ export function AdminQuoteDetail() {
 
           <FormPreferencesDisplay
             preferences={order.preferences}
+            title="Customer request"
             wide
             safe
             attachments={attachments.map((a) => ({
@@ -422,7 +423,7 @@ export function AdminQuoteDetail() {
           <div className="card">
             <div className="card-h">
               <span className="ct">
-                <i className="ti ti-photo" /> Customer&apos;s artwork
+                <i className="ti ti-photo" /> Add files
               </span>
             </div>
             <div className="card-b" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

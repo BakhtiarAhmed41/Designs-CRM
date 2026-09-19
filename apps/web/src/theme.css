@@ -1128,6 +1128,52 @@ select, textarea {
   flex-wrap: wrap;
   gap: 8px;
 }
+.qd-page { max-width: 920px; }
+.qd-hero-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.qd-page .ph { margin-bottom: 18px; }
+.qd-wait {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  width: 100%;
+  margin: 0 0 16px;
+  padding: 20px 22px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+}
+.qd-wait.is-declined { border-color: #e8d4d6; }
+.qd-wait-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1;
+}
+.qd-wait.is-declined .qd-wait-icon { color: var(--maroon); }
+.qd-wait-copy { min-width: 0; flex: 1; }
+.qd-wait-copy strong {
+  display: block;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.qd-wait-copy p {
+  margin: 6px 0 14px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .qd-wait { padding: 16px; }
+  .qd-wait-copy p { white-space: normal; }
+}
+.qd-offer {
+  margin-bottom: 4px;
+  border-radius: 14px;
+}
+.qd-page .quote-counter { border-radius: 14px; }
 .quote-counter {
   margin-top: 16px;
   padding: 16px 18px 18px;

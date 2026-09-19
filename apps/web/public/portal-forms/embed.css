@@ -56,6 +56,98 @@ html.in-frame .steps {
   flex-direction: column;
 }
 
+html.in-frame .design-card,
+html.in-frame .card-body,
+html.in-frame .size-row,
+html.in-frame .field,
+html.in-frame .step {
+  overflow: visible !important;
+}
+
+html.in-frame .csel {
+  z-index: 2;
+}
+
+html.in-frame .csel.is-open {
+  z-index: 90;
+}
+
+html.in-frame .csel-menu {
+  max-height: min(320px, 55vh) !important;
+  overflow-y: auto !important;
+}
+
+html.in-frame .dropzone {
+  position: relative;
+}
+
+html.in-frame .dz-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+html.in-frame .dropzone-art {
+  border-color: #c9a4a8;
+  background: #fff8f8;
+}
+
+html.in-frame .dropzone-art .dz-badge {
+  background: #f3e4e5;
+  color: #7C1F2B;
+}
+
+html.in-frame .dropzone-ref {
+  border-color: #b7c0cc;
+  background: #f7f9fc;
+}
+
+html.in-frame .dropzone-ref .dz-badge {
+  background: #e4e9f0;
+  color: #3d4d63;
+}
+
+html.in-frame .file-list-art .file-chip,
+html.in-frame [data-file-list] .file-chip {
+  border-color: #e8d4d6;
+  background: #fff8f8;
+}
+
+html.in-frame .file-list-art .file-chip::before,
+html.in-frame [data-file-list]:not([data-file-list-ref]) .file-chip::before {
+  content: "Artwork";
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #f3e4e5;
+  color: #7C1F2B;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+html.in-frame .file-list-ref .file-chip,
+html.in-frame [data-file-list-ref] .file-chip {
+  border-color: #d7dde6;
+  background: #f7f9fc;
+}
+
+html.in-frame .file-list-ref .file-chip::before,
+html.in-frame [data-file-list-ref] .file-chip::before {
+  content: "Reference";
+  margin-right: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #e4e9f0;
+  color: #3d4d63;
+  font-size: 9px;
+  font-weight: 700;
+}
+
 @media (max-width: 640px) {
   html.in-frame .layout {
     grid-template-columns: minmax(0, 1fr) !important;

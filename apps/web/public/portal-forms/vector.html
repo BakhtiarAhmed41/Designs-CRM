@@ -112,7 +112,7 @@ select option:checked,select option:hover{background:var(--accent-soft);color:va
 .segmented input:focus-visible+label{outline:2px solid var(--accent);outline-offset:2px}
 
 /* Design cards */
-.design-card{background:var(--bg);border:1px solid var(--border);border-radius:16px;margin-bottom:14px;overflow:hidden}
+.design-card{background:var(--bg);border:1px solid var(--border);border-radius:16px;margin-bottom:14px;overflow:visible}
 .design-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border-soft)}
 .dtitle{display:flex;align-items:center;gap:10px;font-size:12.5px;font-weight:500}
 .design-num{width:24px;height:24px;border-radius:8px;background:var(--accent-soft);color:var(--accent);font-size:11px;font-weight:600;display:grid;place-items:center}
@@ -120,7 +120,12 @@ select option:checked,select option:hover{background:var(--accent-soft);color:va
 .remove-design,.remove-size{background:none;border:none;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500}
 .remove-design svg,.remove-size svg{width:13px;height:13px}
 .remove-design:hover,.remove-size:hover{color:var(--accent)}
-.dropzone{border:1.5px dashed var(--stitch);border-radius:12px;padding:20px 14px;text-align:center;cursor:pointer;background:var(--page);transition:border-color .12s ease,background .12s ease}
+.dropzone{position:relative;border:1.5px dashed var(--stitch);border-radius:12px;padding:20px 14px;text-align:center;cursor:pointer;background:var(--page);transition:border-color .12s ease,background .12s ease}
+.dz-badge{position:absolute;top:10px;left:10px;padding:3px 8px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.02em}
+.dropzone-art{border-color:#c9a4a8;background:#fff8f8}
+.dropzone-art .dz-badge{background:#f3e4e5;color:#7C1F2B}
+.dropzone-ref{border-color:#b7c0cc;background:#f7f9fc}
+.dropzone-ref .dz-badge{background:#e4e9f0;color:#3d4d63}
 .dropzone:hover{border-color:var(--accent);background:var(--accent-soft)}
 .dz-ico{width:38px;height:38px;border-radius:50%;background:var(--bg);color:var(--accent);display:grid;place-items:center;margin:0 auto 9px}
 .dz-ico svg{width:18px;height:18px}
@@ -399,13 +404,14 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
 .form-actions{margin-top:14px;padding-top:12px}
 
 /* ---- Custom dropdown (replaces native <select> for Services) ---- */
-.csel{position:relative}
+.csel{position:relative;z-index:2}
+.csel.is-open{z-index:80}
 .csel-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--border);border-radius:10px;padding:9px 12px;font-size:12px;color:var(--ink);background:var(--bg);cursor:pointer;text-align:left;box-shadow:0 1px 2px rgba(27,29,34,.08)}
 .csel-trigger:hover{background:#F5F5F6;border-color:#C7C9CE}
 .csel-trigger svg{width:15px;height:15px;stroke:#6B7280;flex-shrink:0;transition:transform .12s ease}
 .csel.is-open .csel-trigger svg{transform:rotate(180deg)}
 .csel.is-open .csel-trigger{border-color:#C7C9CE;background:#F5F5F6}
-.csel-menu{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--bg);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 20px rgba(20,20,25,.12);padding:4px;z-index:40;display:none;max-height:240px;overflow:auto}
+.csel-menu{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--bg);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 20px rgba(20,20,25,.12);padding:4px;z-index:40;display:none;max-height:min(320px,60vh);overflow:auto}
 .csel.is-open .csel-menu{display:block}
 .csel-option{padding:8px 10px;font-size:12px;color:var(--ink);border-radius:7px;cursor:pointer}
 .csel-option:hover{background:#F0F0F1}
@@ -633,23 +639,25 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
           <div class="drop-row">
             <div class="field">
               <label class="flabel">Artwork <span class="opt">(at least one file required)</span></label>
-              <div class="dropzone" data-dropzone>
+              <div class="dropzone dropzone-art" data-dropzone>
+                <span class="dz-badge">Artwork</span>
                 <span class="dz-ico">${upIcon}</span>
                 <div class="dz-title">Upload your artwork</div>
                 <div class="dz-sub">PNG, JPG, PDF, AI, EPS or SVG</div>
                 <input type="file" multiple data-file-input>
               </div>
-              <div class="file-list" data-file-list></div>
+              <div class="file-list file-list-art" data-file-list></div>
             </div>
             <div class="field">
               <label class="flabel">Reference <span class="opt">(optional)</span></label>
-              <div class="dropzone" data-dropzone-ref>
+              <div class="dropzone dropzone-ref" data-dropzone-ref>
+                <span class="dz-badge">Reference</span>
                 <span class="dz-ico">${upIcon}</span>
                 <div class="dz-title">Add a reference</div>
                 <div class="dz-sub">Upload an example of the style or result you want</div>
                 <input type="file" multiple data-file-input-ref>
               </div>
-              <div class="file-list" data-file-list-ref></div>
+              <div class="file-list file-list-ref" data-file-list-ref></div>
             </div>
           </div>
 

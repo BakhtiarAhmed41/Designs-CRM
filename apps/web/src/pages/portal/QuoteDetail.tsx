@@ -9,7 +9,7 @@ import {
 import { startMyOrderCheckout } from '@/lib/billing';
 import { openLinkedChat } from '@/lib/messaging';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
-import { dateShort, friendlyFileName, money, quoteLifecycleChip } from '@/lib/format';
+import { dateShort, money, quoteLifecycleChip } from '@/lib/format';
 import { isAdminRecounter, isStaffCreatedOrder, latestCounter, lineTotal, studioQuotation } from '@/lib/quoteHelpers';
 import type { Order } from '@/lib/types';
 import { applyOrderChange } from '@/lib/queryCache';
@@ -17,7 +17,6 @@ import { freshOnOpen } from '@/lib/queryRefresh';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { QuoteHistory } from '@/components/QuoteHistory';
-import { AttachmentPreview } from '@/components/FilePreview';
 import { FormPreferencesDisplay } from '@/components/FormPreferencesDisplay';
 
 export function PortalQuoteDetail() {
@@ -192,7 +191,7 @@ export function PortalQuoteDetail() {
   });
 
   return (
-    <div>
+    <div className="qd-page">
       <PageHeader
         title={order.name ?? 'Quote request'}
         subtitle={`${order.humanRef ?? order.id.slice(0, 6)} · ${dateShort(order.createdAt)}${isStaffCreatedOrder(order) ? ' · Created by the team' : ''}`}
@@ -201,7 +200,7 @@ export function PortalQuoteDetail() {
           { label: order.humanRef ?? 'Quote' },
         ]}
         actions={
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="qd-hero-actions">
             <span className={statusChip.cls}>{statusChip.label}</span>
             <button
               type="button"
@@ -297,33 +296,39 @@ export function PortalQuoteDetail() {
       )}
 
       {lines.length === 0 && !canDecide && (
-        <div className="dash-waiting-copy">
-          <i
-            className={`ti ${
-              order.status === 'REJECTED' ? 'ti-circle-x' : 'ti-hourglass'
-            }`}
-          />
-          <div>
+        <div className={`qd-wait${order.status === 'REJECTED' ? ' is-declined' : ''}`}>
+          <div className="qd-wait-icon" aria-hidden>
+            <i className={`ti ${order.status === 'REJECTED' ? 'ti-alert-circle' : 'ti-clock'}`} />
+          </div>
+          <div className="qd-wait-copy">
             <strong>
               {order.status === 'WAITING_FOR_QUOTATION' || order.status === 'CREATED'
                 ? 'Your quote is being prepared'
                 : order.status === 'REJECTED'
                   ? 'This request was declined'
-                  : 'No quotation lines yet'}
+                  : 'Pricing is not ready yet'}
             </strong>
             <p>
               {order.status === 'WAITING_FOR_QUOTATION' || order.status === 'CREATED'
-                ? 'You’ll see an update on your Dashboard when it’s ready. Open this quote to review pricing and details.'
+                ? 'The team is reviewing your files and details. The price will show here when it is ready.'
                 : order.status === 'REJECTED'
-                  ? 'The team declined this request.'
+                  ? 'The team declined this request. Start a chat if you need help with a new one.'
                   : 'Pricing will show here when the quote is ready.'}
             </p>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              disabled={startChat.isPending}
+              onClick={() => startChat.mutate()}
+            >
+              <i className="ti ti-message" /> {startChat.isPending ? 'Opening…' : 'Ask a question'}
+            </button>
           </div>
         </div>
       )}
 
       {(lines.length > 0 || canDecide) && (
-      <div className="card card-pad">
+      <div className="card card-pad qd-offer">
         {lines.length > 0 && (
           <>
             {lines.map((l) => {
@@ -421,6 +426,8 @@ export function PortalQuoteDetail() {
 
       <FormPreferencesDisplay
         preferences={order.preferences}
+        title="Your request"
+        wide
         safe
         attachments={(order.attachments ?? []).map((a) => ({
           name: a.originalName,
@@ -429,28 +436,6 @@ export function PortalQuoteDetail() {
           signedUrlPath: myAttachmentUrl(order.id, a.id),
         }))}
       />
-
-      {(order.attachments ?? []).length > 0 && (
-        <div className="card" style={{ marginTop: 14 }}>
-          <div className="card-h">
-            <span className="ct">
-              <i className="ti ti-paperclip" /> Your uploaded files
-            </span>
-          </div>
-          <div className="od-files">
-            {(order.attachments ?? []).map((a) => (
-              <AttachmentPreview
-                key={a.id}
-                name={a.originalName}
-                mimeType={a.mimeType}
-                signedUrlPath={myAttachmentUrl(order.id, a.id)}
-                previewUrl={a.previewUrl}
-                safe
-              />
-            ))}
-          </div>
-        </div>
-      )}
 
       <QuoteHistory quotations={order.quotations} />
     </div>
