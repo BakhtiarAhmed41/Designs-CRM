@@ -42,9 +42,11 @@ const SERVICES = [
 export function RequestQuoteMenu({
   className = 'btn btn-primary',
   children,
+  beforePick,
 }: {
   className?: string;
   children: React.ReactNode;
+  beforePick?: () => boolean | Promise<boolean>;
 }) {
   const navigate = useNavigate();
   const { openRequestQuote } = useRequestQuote();
@@ -60,7 +62,11 @@ export function RequestQuoteMenu({
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
-  function pick(key: string) {
+  async function pick(key: string) {
+    if (beforePick) {
+      const ok = await beforePick();
+      if (!ok) return;
+    }
     setOpen(false);
     openRequestQuote(key);
   }

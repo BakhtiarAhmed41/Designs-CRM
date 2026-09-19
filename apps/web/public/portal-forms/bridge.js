@@ -993,6 +993,38 @@
   }
 
   document.addEventListener(
+    'dragover',
+    function (e) {
+      var dz = e.target && e.target.closest && e.target.closest('[data-dropzone], [data-dropzone-ref], .dropzone');
+      if (!dz) return;
+      e.preventDefault();
+    },
+    true,
+  );
+
+  document.addEventListener(
+    'drop',
+    function (e) {
+      var dz = e.target && e.target.closest && e.target.closest('[data-dropzone], [data-dropzone-ref], .dropzone');
+      if (!dz || !e.dataTransfer || !e.dataTransfer.files.length) return;
+      e.preventDefault();
+      var field = dz.closest('.field') || dz.parentElement;
+      var input = field && field.querySelector('input[type="file"]');
+      if (!input) return;
+      patchFileInput(input);
+      Array.from(e.dataTransfer.files).forEach(function (f) {
+        var exists = input._lvdFiles.some(function (x) {
+          return x.name === f.name && x.size === f.size && x.lastModified === f.lastModified;
+        });
+        if (!exists) input._lvdFiles.push(f);
+      });
+      syncInputFiles(input);
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    },
+    true,
+  );
+
+  document.addEventListener(
     'click',
     function (e) {
       var btn = e.target && e.target.closest && e.target.closest('.file-chip button');
@@ -1050,7 +1082,12 @@
         if (!btn.dataset.label) btn.dataset.label = btn.textContent || 'Submit quote request →';
         btn.textContent = 'Submitting…';
         if (inIframe()) {
-          parent.postMessage({ type: 'lvd-quote-submit' }, '*');
+          var files = window.LVD_GET_FILES ? window.LVD_GET_FILES() : [];
+          try {
+            parent.postMessage({ type: 'lvd-quote-submit', files: files }, '*');
+          } catch (err) {
+            parent.postMessage({ type: 'lvd-quote-submit' }, '*');
+          }
         } else {
           submitStandalone(svc);
         }

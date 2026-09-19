@@ -14,6 +14,12 @@ html.in-frame .main-area {
   width: 100%;
   min-width: 0;
 }
+html.in-frame .topbar {
+  display: none !important;
+}
+html.in-frame .rail {
+  top: 16px !important;
+}
 
 /* One scroll container so position:sticky on .rail works like the standalone page. */
 html.in-frame {
@@ -41,7 +47,7 @@ html.in-frame .rail {
   position: sticky !important;
   display: flex !important;
   flex-direction: column;
-  max-height: calc(100vh - 104px) !important;
+  max-height: calc(100vh - 32px) !important;
   overflow: auto;
 }
 

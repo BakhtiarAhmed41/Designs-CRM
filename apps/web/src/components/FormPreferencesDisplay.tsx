@@ -1,15 +1,6 @@
 import type { CSSProperties } from 'react';
 import { AttachmentPreview } from '@/components/FilePreview';
-import { friendlyFileName, isImageFile } from '@/lib/format';
-
-function sameFile(a: string, b: string) {
-  const na = a.toLowerCase().trim();
-  const nb = b.toLowerCase().trim();
-  if (na === nb) return true;
-  const ba = na.split(/[/\\]/).pop() || na;
-  const bb = nb.split(/[/\\]/).pop() || nb;
-  return ba === bb || ba.endsWith(bb) || bb.endsWith(ba);
-}
+import { friendlyFileName, isImageFile, sameFileName } from '@/lib/format';
 
 export type PrefAttachment = {
   name: string;
@@ -31,7 +22,34 @@ type FormDesign = {
   dpi300?: boolean;
   sizes?: Array<{ label?: string; w?: string; h?: string; detail?: string; placement?: string; unit?: string }>;
   fileNames?: string[];
+  artworkFileNames?: string[];
+  referenceFileNames?: string[];
 };
+
+function designFileNames(d: FormDesign): string[] {
+  const names = [
+    ...(d.artworkFileNames ?? []),
+    ...(d.referenceFileNames ?? []),
+    ...(d.fileNames ?? []),
+  ];
+  const seen = new Set<string>();
+  return names.filter((name) => {
+    const key = name.toLowerCase().trim();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function takeAttachment(leftover: PrefAttachment[], name?: string): PrefAttachment | null {
+  if (name) {
+    const matchIdx = leftover.findIndex((a) => sameFileName(a.name, name));
+    if (matchIdx >= 0) return leftover.splice(matchIdx, 1)[0]!;
+  }
+  if (leftover.length) return leftover.shift()!;
+  if (name) return { name, signedUrlPath: '', previewUrl: null };
+  return null;
+}
 
 type QuoteFormPreferences = {
   mode?: string;
@@ -171,18 +189,14 @@ export function FormPreferencesDisplay({
               d.dpi300 && { label: '300 DPI', value: 'Yes' },
               d.notes && { label: 'Notes', value: d.notes },
             ].filter(Boolean) as Array<{ label: string; value: string }>;
-            const names =
-              d.fileNames && d.fileNames.length > 0
-                ? d.fileNames
+            const names = designFileNames(d);
+            const files = (
+              names.length > 0
+                ? names.map((name) => takeAttachment(leftoverAttachments, name))
                 : leftoverAttachments.length > 0
-                  ? [leftoverAttachments[0]!.name]
-                  : [];
-            const files = names.map((name) => {
-              const matchIdx = leftoverAttachments.findIndex((a) => sameFile(a.name, name));
-              if (matchIdx >= 0) return leftoverAttachments.splice(matchIdx, 1)[0]!;
-              if (leftoverAttachments.length) return leftoverAttachments.shift()!;
-              return { name, signedUrlPath: '', previewUrl: null as string | null };
-            });
+                  ? [takeAttachment(leftoverAttachments)]
+                  : []
+            ).filter((file): file is PrefAttachment => Boolean(file));
             const fileThumbs = files.map((file, fi) =>
               file.signedUrlPath || file.previewUrl || isImageFile(file.name, file.mimeType) ? (
                 <AttachmentPreview
@@ -222,6 +236,61 @@ export function FormPreferencesDisplay({
               </div>
             );
           })}
+          {leftoverAttachments.length > 0 && (
+            <div className="pref-design">
+              <div className="pref-design-h">
+                <strong>Uploaded files</strong>
+                <div className="pref-files">
+                  {leftoverAttachments.map((file, fi) =>
+                    file.signedUrlPath || file.previewUrl || isImageFile(file.name, file.mimeType) ? (
+                      <AttachmentPreview
+                        key={`${file.name}-extra-${fi}`}
+                        name={file.name}
+                        mimeType={file.mimeType}
+                        signedUrlPath={file.signedUrlPath}
+                        previewUrl={file.previewUrl}
+                        compact
+                        safe={safe}
+                      />
+                    ) : (
+                      <span key={`${file.name}-extra-${fi}`} className="pref-file">
+                        {friendlyFileName(file.name)}
+                      </span>
+                    ),
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!hasDesigns && leftoverAttachments.length > 0 && (
+        <div className="pref-block pref-designs">
+          <div className="pref-design">
+            <div className="pref-design-h">
+              <strong>Uploaded files</strong>
+              <div className="pref-files">
+                {leftoverAttachments.map((file, fi) =>
+                  file.signedUrlPath || file.previewUrl || isImageFile(file.name, file.mimeType) ? (
+                    <AttachmentPreview
+                      key={`${file.name}-loose-${fi}`}
+                      name={file.name}
+                      mimeType={file.mimeType}
+                      signedUrlPath={file.signedUrlPath}
+                      previewUrl={file.previewUrl}
+                      compact
+                      safe={safe}
+                    />
+                  ) : (
+                    <span key={`${file.name}-loose-${fi}`} className="pref-file">
+                      {friendlyFileName(file.name)}
+                    </span>
+                  ),
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

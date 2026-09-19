@@ -42,7 +42,7 @@ import {
 } from '@/lib/designs';
 import { useDialog } from '@/components/ui/AppDialog';
 import { apiFetch, downloadSignedFile, getErrorMessage, resolveFileUrl } from '@/lib/api';
-import { money, dateShort, lifecycleChip, isImageFile } from '@/lib/format';
+import { money, dateShort, lifecycleChip, isImageFile, sameFileName } from '@/lib/format';
 import { AdminCounterDecision } from '@/components/AdminCounterDecision';
 import { AttachmentPreview, LocalFilePreview } from '@/components/FilePreview';
 import { FormPreferencesDisplay, hasFormPreferences } from '@/components/FormPreferencesDisplay';
@@ -963,16 +963,28 @@ export function AdminOrderDetail() {
             </div>
             <div className="od-files">
               {(() => {
-                const prefs = (order.preferences ?? {}) as { designs?: Array<{ name?: string; fileNames?: string[] }> };
+                const prefs = (order.preferences ?? {}) as {
+                  designs?: Array<{
+                    name?: string;
+                    fileNames?: string[];
+                    artworkFileNames?: string[];
+                    referenceFileNames?: string[];
+                  }>;
+                };
                 const designsPref = prefs.designs ?? [];
                 const leftover = [...(order.attachments ?? [])];
                 const groups = designsPref.map((d, i) => {
-                  const names = new Set((d.fileNames ?? []).map((n) => n.toLowerCase()));
-                  const files = leftover.filter((a) => names.has(a.originalName.toLowerCase()));
-                  files.forEach((f) => {
-                    const idx = leftover.findIndex((x) => x.id === f.id);
-                    if (idx >= 0) leftover.splice(idx, 1);
-                  });
+                  const names = [
+                    ...(d.artworkFileNames ?? []),
+                    ...(d.referenceFileNames ?? []),
+                    ...(d.fileNames ?? []),
+                  ];
+                  const files = names
+                    .map((name) => {
+                      const idx = leftover.findIndex((a) => sameFileName(a.originalName, name));
+                      return idx >= 0 ? leftover.splice(idx, 1)[0] : null;
+                    })
+                    .filter((a): a is (typeof leftover)[number] => Boolean(a));
                   return { label: d.name?.trim() || `Design ${i + 1}`, files };
                 });
                 if (leftover.length) groups.push({ label: 'Other files', files: leftover });
@@ -991,6 +1003,7 @@ export function AdminOrderDetail() {
                           mimeType={a.mimeType}
                           signedUrlPath={adminAttachmentUrl(order.id, a.id)}
                           previewUrl={a.previewUrl}
+                          safe
                         />
                       ))}
                     </div>
@@ -1047,6 +1060,8 @@ export function AdminOrderDetail() {
 
           <FormPreferencesDisplay
             preferences={order.preferences}
+            wide
+            safe
             attachments={(order.attachments ?? []).map((a) => ({
               name: a.originalName,
               mimeType: a.mimeType,

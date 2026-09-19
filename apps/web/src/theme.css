@@ -162,13 +162,32 @@ body {
   min-width: 0;
 }
 .quote-topbar-lead > i { font-size: 18px; color: var(--ink); flex-shrink: 0; }
+.quote-topbar-copy {
+  min-width: 0;
+}
 .quote-topbar-lead strong {
+  display: block;
   font-size: 15px;
   font-weight: 650;
   letter-spacing: -0.02em;
   white-space: nowrap;
 }
+.quote-topbar-copy span {
+  display: block;
+  margin-top: 1px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--dash-muted, #6B7280);
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .quote-topbar-lead .change-service { margin-left: 6px; }
+.quote-topbar-lead .quote-menu .quote-dropdown {
+  left: 0;
+  right: auto;
+}
 .app-topbar .top-right {
   display: flex;
   align-items: center;

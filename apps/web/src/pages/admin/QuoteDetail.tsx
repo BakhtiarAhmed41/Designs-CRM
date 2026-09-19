@@ -409,6 +409,8 @@ export function AdminQuoteDetail() {
 
           <FormPreferencesDisplay
             preferences={order.preferences}
+            wide
+            safe
             attachments={attachments.map((a) => ({
               name: a.originalName,
               mimeType: a.mimeType,
@@ -434,6 +436,7 @@ export function AdminQuoteDetail() {
                   mimeType={a.mimeType}
                   signedUrlPath={adminAttachmentUrl(order.id, a.id)}
                   previewUrl={a.previewUrl}
+                  safe
                 />
               ))}
               <label className="odf up">

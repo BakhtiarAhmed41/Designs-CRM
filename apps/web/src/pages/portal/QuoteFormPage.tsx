@@ -11,6 +11,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { postThemeToWindow } from '@/lib/theme';
 import { filesFromQuoteForm } from '@/lib/quoteFiles';
 import { isUsualQuoteService, quoteFormatsFromPrefs } from '@/lib/customerPrefs';
+import { RequestQuoteMenu } from '@/components/RequestQuoteMenu';
 
 type ServiceKey = 'embroidery' | 'vector' | 'laser';
 
@@ -32,6 +33,8 @@ const SERVICES: Array<{
   key: ServiceKey;
   serviceType: string;
   label: string;
+  title: string;
+  blurb: string;
   desc: string;
   icon: string;
 }> = [
@@ -39,6 +42,8 @@ const SERVICES: Array<{
     key: 'embroidery',
     serviceType: 'EMBROIDERY',
     label: 'Embroidery Digitizing',
+    title: 'Embroidery Digitizing Quote',
+    blurb: "Tell us about your design and we'll get back to you with pricing. Not sure about something?",
     desc: 'Turn your logo into a stitch file. DST, PES and more.',
     icon: 'ti-needle-thread',
   },
@@ -46,6 +51,8 @@ const SERVICES: Array<{
     key: 'vector',
     serviceType: 'VECTOR',
     label: 'Vector & Print Artwork',
+    title: 'Vector & Print Quote',
+    blurb: "Tell us about your design. If you're unsure about anything, we'll help.",
     desc: 'Logo redraws and print-ready color separations.',
     icon: 'ti-vector-bezier',
   },
@@ -53,6 +60,8 @@ const SERVICES: Array<{
     key: 'laser',
     serviceType: 'CNC_LASER',
     label: 'Cutting & Engraving Files',
+    title: 'Cutting & Engraving Quote',
+    blurb: "Tell us about your design. If you're unsure about anything, we'll help.",
     desc: 'Cutting, engraving, print files and plasma files.',
     icon: 'ti-router',
   },
@@ -113,23 +122,18 @@ export function QuoteFormPage() {
     return () => window.clearTimeout(t);
   }, [toast]);
 
-  const changeService = useCallback(() => {
-    void (async () => {
-      if (dirtyRef.current) {
-        const ok = await dialog.confirm({
-          title: 'Discard this quote request?',
-          message: 'Your unsaved information will be lost.',
-          confirmLabel: 'Discard & Close',
-          cancelLabel: 'Continue Editing',
-          danger: true,
-        });
-        if (!ok) return;
-      }
-      dirtyRef.current = false;
-      setService(null);
-      navigate('/portal/quotes/new', { replace: true });
-    })();
-  }, [dialog, navigate]);
+  const confirmChangeService = useCallback(async () => {
+    if (!dirtyRef.current) return true;
+    const ok = await dialog.confirm({
+      title: 'Switch service?',
+      message: 'Your unsaved information on this form will be lost.',
+      confirmLabel: 'Switch service',
+      cancelLabel: 'Keep editing',
+      danger: true,
+    });
+    if (ok) dirtyRef.current = false;
+    return ok;
+  }, [dialog]);
 
   const closePage = useCallback(async () => {
     if (dirtyRef.current) {
@@ -145,7 +149,7 @@ export function QuoteFormPage() {
     navigate('/portal/quotes');
   }, [dialog, navigate]);
 
-  const submitFromIframe = useCallback(async () => {
+  const submitFromIframe = useCallback(async (postedFiles?: unknown) => {
     if (!service) return;
     setError(null);
     setBusy(true);
@@ -166,7 +170,11 @@ export function QuoteFormPage() {
           advanced: {},
           formVersion: 1,
         } as Collected);
-      const files = filesFromQuoteForm(win?.LVD_GET_FILES?.() ?? []);
+      const files = filesFromQuoteForm(
+        (Array.isArray(postedFiles) && postedFiles.length
+          ? postedFiles
+          : win?.LVD_GET_FILES?.()) ?? [],
+      );
       const { order } = await createOrder({
         type: 'QUOTE_REQUEST',
         serviceType: service.serviceType,
@@ -224,7 +232,9 @@ export function QuoteFormPage() {
           });
         }
       }
-      if (data.type === 'lvd-quote-submit') void submitFromIframe();
+      if (data.type === 'lvd-quote-submit') {
+        void submitFromIframe((data as { files?: unknown }).files);
+      }
       if (data.type === 'lvd-quote-draft' || data.type === 'lvd-draft-saved') {
         const win = iframeRef.current?.contentWindow;
         const collected = win?.LVD_COLLECT?.();
@@ -255,16 +265,19 @@ export function QuoteFormPage() {
     () => (
       <div className="quote-topbar-lead">
         <i className={`ti ${service?.icon ?? 'ti-file-pencil'}`} />
-        <strong>{service ? `${service.label} quote` : 'Request a quote'}</strong>
+        <div className="quote-topbar-copy">
+          <strong>{service ? service.title : 'Request a quote'}</strong>
+          {service && <span>{service.blurb}</span>}
+        </div>
         {service && (
-          <button type="button" className="change-service" onClick={changeService}>
+          <RequestQuoteMenu className="change-service" beforePick={confirmChangeService}>
             <i className="ti ti-arrow-left" />
             Change service
-          </button>
+          </RequestQuoteMenu>
         )}
       </div>
     ),
-    [service, changeService],
+    [service, confirmChangeService],
   );
   useTopbarLead(topbarLead);
 
@@ -275,13 +288,13 @@ export function QuoteFormPage() {
           <i className={`ti ${service?.icon ?? 'ti-file-pencil'}`} />
         </div>
         <div className="title-wrap">
-          <h1>{service ? `${service.label} quote` : 'Request a quote'}</h1>
+          <h1>{service ? service.title : 'Request a quote'}</h1>
         </div>
         {service && (
-          <button type="button" className="change-service" onClick={changeService}>
+          <RequestQuoteMenu className="change-service" beforePick={confirmChangeService}>
             <i className="ti ti-arrow-left" />
             Change service
-          </button>
+          </RequestQuoteMenu>
         )}
         <button type="button" className="close-form" onClick={() => void closePage()} aria-label="Close quote form">
           ×

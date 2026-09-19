@@ -200,7 +200,7 @@ export function QuoteBuilderModal({
     return () => window.clearTimeout(t);
   }, [toast]);
 
-  const submitFromIframe = useCallback(async () => {
+  const submitFromIframe = useCallback(async (postedFiles?: unknown) => {
     if (!service) return;
     setError(null);
     setBusy(true);
@@ -220,7 +220,11 @@ export function QuoteBuilderModal({
           advanced: {},
           formVersion: 1,
         } as Collected);
-      const files = filesFromQuoteForm(win?.LVD_GET_FILES?.() ?? []);
+      const files = filesFromQuoteForm(
+        (Array.isArray(postedFiles) && postedFiles.length
+          ? postedFiles
+          : win?.LVD_GET_FILES?.()) ?? [],
+      );
 
       const payload = {
         serviceType: service.serviceType,
@@ -380,7 +384,7 @@ export function QuoteBuilderModal({
         }
       }
       if (data.type === 'lvd-quote-submit') {
-        void submitFromIframe();
+        void submitFromIframe((data as { files?: unknown }).files);
       }
       if (!isAdmin && (data.type === 'lvd-quote-draft' || data.type === 'lvd-draft-saved')) {
         const win = iframeRef.current?.contentWindow;

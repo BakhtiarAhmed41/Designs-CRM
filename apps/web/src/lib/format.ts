@@ -44,6 +44,16 @@ export function isImageFile(name?: string | null, mime?: string | null) {
   return !!ext && IMAGE_EXTS.has(ext);
 }
 
+export function sameFileName(a?: string | null, b?: string | null) {
+  const na = (a ?? '').toLowerCase().trim();
+  const nb = (b ?? '').toLowerCase().trim();
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  const ba = na.split(/[/\\]/).pop() || na;
+  const bb = nb.split(/[/\\]/).pop() || nb;
+  return ba === bb || ba.endsWith(bb) || bb.endsWith(ba);
+}
+
 export function money(cents: number | null | undefined, currency = 'USD'): string {
   if (cents == null) return '-';
   const amount = cents / 100;
