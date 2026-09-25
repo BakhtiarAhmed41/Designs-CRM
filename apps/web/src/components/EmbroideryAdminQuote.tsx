@@ -8,7 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import type { CustomerDetail } from '@/lib/customers';
 import { submitQuoteBuilder } from '@/lib/designs';
-import { money, orderNumber } from '@/lib/format';
+import { money, orderNumber, orderSlug } from '@/lib/format';
 import {
   asEmbroideryPrefs,
   backgroundLabel,
@@ -258,7 +258,7 @@ export function EmbroideryAdminQuote({
     mutationFn: () => approveCounter(order.id),
     onSuccess: (res) => {
       void applyOrderChange(qc, res.order);
-      navigate(`/admin/orders/${order.id}`);
+      navigate(`/admin/orders/${orderSlug(order.humanRef, order.id)}`);
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -823,7 +823,7 @@ export function EmbroideryAdminQuote({
               </button>
               <div className={ordersOpen ? 'ead-orders open' : 'ead-orders'}>
                 {pastOrders.slice(0, 3).map((past) => (
-                  <Link key={past.id} to={`/admin/orders/${past.id}`} className="ead-oc">
+                  <Link key={past.id} to={`/admin/orders/${orderSlug(past.humanRef, past.id)}`} className="ead-oc">
                     <div className="ead-ot">
                       <span>Order {orderNumber(past.humanRef, past.id.slice(0, 8))}</span>
                       <span className="ead-st">{orderStatusLabel(past.status)}</span>

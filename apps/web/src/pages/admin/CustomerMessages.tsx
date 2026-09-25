@@ -29,7 +29,7 @@ import {
   type ConversationStatus,
 } from '@/lib/messaging';
 import { HelpRequestBadge, InboxBulkBar, InboxStarButton } from '@/components/messaging/InboxTools';
-import { dateShort, money, statusChipClass, statusLabel, orderNumber } from '@/lib/format';
+import { dateShort, money, statusChipClass, statusLabel, orderNumber, orderSlug } from '@/lib/format';
 import { useDialog } from '@/components/ui/AppDialog';
 import { canFeature } from '@/lib/permissions';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
@@ -627,7 +627,7 @@ export function AdminCustomerMessages() {
                   <div className="muted" style={{ fontSize: 13 }}>No orders yet.</div>
                 )}
               {(contextQuery.data?.recentOrders ?? []).map((o) => (
-                <Link key={o.id} to={`/admin/orders/${o.id}`} className="msg-order-row">
+                <Link key={o.id} to={`/admin/orders/${orderSlug(o.humanRef, o.id)}`} className="msg-order-row">
                   <div>
                     <b>{o.humanRef ? `Order ${orderNumber(o.humanRef)}` : 'Order'}</b>
                     <div className="msg-order-date">{dateShort(o.createdAt)}</div>

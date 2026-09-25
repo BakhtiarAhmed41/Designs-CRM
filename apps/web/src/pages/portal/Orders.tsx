@@ -7,7 +7,7 @@ import { listMyEdits, requestEdit } from '@/lib/edits';
 import { getMyCustomer } from '@/lib/customers';
 import { RevisionRequestForm } from '@/components/RevisionRequestForm';
 import { getErrorMessage } from '@/lib/api';
-import { money, dateShort, customerOrderChip, deliveryMethodLabel, orderNumber } from '@/lib/format';
+import { money, dateShort, customerOrderChip, deliveryMethodLabel, orderNumber, orderSlug } from '@/lib/format';
 import { serviceCategoryLabel, serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import { designStatusChipClass, designStatusLabel, type Design } from '@/lib/designs';
 import type { Order } from '@/lib/types';
@@ -146,7 +146,7 @@ function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
 
   const expandLinks = (
     <div className="order-expand-actions">
-      <Link to={`/portal/orders/${orderId}`} className="btn btn-primary btn-sm" onClick={(e) => e.stopPropagation()}>
+      <Link to={`/portal/orders/${orderSlug(order?.humanRef, orderId)}`} className="btn btn-primary btn-sm" onClick={(e) => e.stopPropagation()}>
         View order
       </Link>
       <Link to="/portal/messages" className="btn btn-ghost btn-sm" onClick={(e) => e.stopPropagation()}>
@@ -474,7 +474,7 @@ export function PortalOrders() {
                 const chip = customerOrderChip(o);
                 return (
                   <Fragment key={o.id}>
-                    <tr className="click-row" onClick={() => navigate(`/portal/orders/${o.id}`)}>
+                    <tr className="click-row" onClick={() => navigate(`/portal/orders/${orderSlug(o.humanRef, o.id)}`)}>
                       <td>
                         <div className="cell-main">
                           <div className={`thumb${serviceThumbClass(o.serviceType) ? ' m' : ''}`}>

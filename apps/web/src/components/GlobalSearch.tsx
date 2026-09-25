@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { globalSearch } from '@/lib/messaging';
-import { orderNumber } from '@/lib/format';
+import { orderNumber, orderSlug } from '@/lib/format';
 
 /**
  * Admin global search matching prototype `.searchbar` chrome.
@@ -80,7 +80,7 @@ export function GlobalSearch({
                 <div
                   key={o.id}
                   className="sd-item"
-                  onClick={() => go(`/admin/orders/${o.id}`)}
+                  onClick={() => go(`/admin/orders/${orderSlug(o.ref, o.id)}`)}
                 >
                   <div>
                     <div className="sd-t">{o.name || o.ref || 'Order'}</div>

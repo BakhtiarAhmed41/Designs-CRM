@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EmbroideryFileCard } from '@/components/EmbroideryFileCard';
+import { ImageLightbox } from '@/components/FilePreview';
 import { useTopbarLead } from '@/components/Shell';
 import { useDialog } from '@/components/ui/AppDialog';
 import { ErrorBanner } from '@/components/ui/EmptyState';
@@ -24,7 +25,7 @@ import {
   turnaroundLabel,
   type EmbAttachment,
 } from '@/lib/embroideryQuote';
-import { dateShort, money, orderNumber } from '@/lib/format';
+import { dateShort, isImageFile, money, orderNumber } from '@/lib/format';
 import { createAdminConversation } from '@/lib/messaging';
 import {
   adminAttachmentUrl,
@@ -114,6 +115,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
   const [uploadFor, setUploadFor] = useState<DeliveryRow | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [filesFor, setFilesFor] = useState<DeliveryRow | null>(null);
+  const [preview, setPreview] = useState<{ src: string; name: string } | null>(null);
   const [revisionOpen, setRevisionOpen] = useState(false);
   const [revisionNote, setRevisionNote] = useState('');
   const [revisionKind, setRevisionKind] = useState<EditKind>('FREE');
@@ -286,9 +288,25 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
       batch.files.filter((file) => file.designId && file.designId === row.design?.id),
     );
 
-  async function previewFile(fileId: string) {
-    const { url } = await apiFetch<{ url: string }>(adminDeliveryFileUrl(order.id, fileId));
-    window.open(resolveFileUrl(url), '_blank', 'noopener');
+  async function previewFile(file: { id: string; originalName: string; mimeType?: string | null }) {
+    setError(null);
+    const image = isImageFile(file.originalName, file.mimeType);
+    const tab = image ? null : window.open('', '_blank', 'noopener');
+    try {
+      const { url } = await apiFetch<{ url: string }>(
+        `${adminDeliveryFileUrl(order.id, file.id)}?inline=1`,
+      );
+      const abs = resolveFileUrl(url);
+      if (image) {
+        setPreview({ src: abs, name: file.originalName });
+        return;
+      }
+      if (tab) tab.location.replace(abs);
+      else window.location.assign(abs);
+    } catch (e) {
+      tab?.close();
+      setError(getErrorMessage(e));
+    }
   }
 
   return (
@@ -837,13 +855,24 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
               {deliveredFiles(filesFor).map((file) => (
                 <div key={file.id} className="sod-file">
                   <span>{file.originalName}</span>
-                  <span>
-                    <button type="button" onClick={() => void previewFile(file.id)}>Preview</button>
+                  <span className="sod-file-acts">
                     <button
                       type="button"
+                      className="sod-eye"
+                      title="Preview"
+                      aria-label={`Preview ${file.originalName}`}
+                      onClick={() => void previewFile(file)}
+                    >
+                      <i className="ti ti-eye" />
+                    </button>
+                    <button
+                      type="button"
+                      className="sod-eye"
+                      title="Download"
+                      aria-label={`Download ${file.originalName}`}
                       onClick={() => void downloadSignedFile(adminDeliveryFileUrl(order.id, file.id), file.originalName)}
                     >
-                      Download
+                      <i className="ti ti-download" />
                     </button>
                   </span>
                 </div>
@@ -960,6 +989,9 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
             </button>
           </div>
         </div>
+      )}
+      {preview && (
+        <ImageLightbox src={preview.src} name={preview.name} onClose={() => setPreview(null)} />
       )}
     </div>
   );

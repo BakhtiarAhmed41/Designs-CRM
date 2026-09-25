@@ -693,10 +693,32 @@ export class OrdersService {
     };
   }
 
+  /** UUID or the public order number (the digits in human_ref). */
+  async resolveOrderId(value: string): Promise<string | null> {
+    const raw = value.trim().replace(/^#/, '');
+    if (!raw) return null;
+    if (/^\d{6,12}$/.test(raw)) {
+      const row = await this.db.queryOne<{ id: string }>(
+        `SELECT id FROM orders
+          WHERE human_ref = ?
+             OR REPLACE(REPLACE(REPLACE(human_ref, 'LVD-', ''), '#', ''), '-', '') = ?
+          LIMIT 1`,
+        [raw, raw],
+      );
+      return row?.id ?? null;
+    }
+    const row = await this.db.queryOne<{ id: string }>(
+      'SELECT id FROM orders WHERE id = ? LIMIT 1',
+      [raw],
+    );
+    return row?.id ?? null;
+  }
+
   private async getOrderRow(id: string): Promise<OrderRow | null> {
+    const resolved = (await this.resolveOrderId(id)) ?? id;
     return this.db.queryOne<OrderRow>(
       'SELECT * FROM orders WHERE id = ? LIMIT 1',
-      [id],
+      [resolved],
     );
   }
 
@@ -981,10 +1003,12 @@ export class OrdersService {
       ],
     );
 
+    const isQuote = type === OrderType.QUOTE_REQUEST;
+    const publicRef = /^\d{6,12}$/.test(humanRef) ? humanRef : id;
     await this.notifyAdmins({
-      title: 'New order received',
+      title: isQuote ? 'New quote request' : 'New order received',
       body: `Client is waiting for quotation - ${name}`,
-      link: `/admin/orders/${id}`,
+      link: isQuote ? `/admin/quotes/${publicRef}` : `/admin/orders/${publicRef}`,
     });
 
     return this.assembleOrder(id);
@@ -1418,15 +1442,20 @@ export class OrdersService {
     user: AuthUser | undefined,
     orderId: string,
     deliveryFileId: string,
+    opts?: { inline?: boolean },
   ) {
     assertAuthUser(user);
     const order = await this.getOrderRow(orderId);
     if (!order || order.client_user_id !== user.id)
       throw new NotFoundException('Order not found');
     await this.assertCustomerCanSeeDeliveryFile(orderId, deliveryFileId);
-    const signed = await this.signDeliveryFile(orderId, deliveryFileId);
-    await this.recordDeliveryDownload(deliveryFileId);
-    await this.notifications.markFileReadyRead(user.id, orderId);
+    const signed = await this.signDeliveryFile(orderId, deliveryFileId, {
+      inline: Boolean(opts?.inline),
+    });
+    if (!opts?.inline) {
+      await this.recordDeliveryDownload(deliveryFileId);
+      await this.notifications.markFileReadyRead(user.id, orderId);
+    }
     return signed;
   }
 
@@ -2909,10 +2938,12 @@ export class OrdersService {
     user: AuthUser | undefined,
     orderId: string,
     deliveryFileId: string,
+    opts?: { inline?: boolean },
   ) {
     this.assertAdmin(user);
     return this.signDeliveryFile(orderId, deliveryFileId, {
       allowPreviewDownload: true,
+      inline: Boolean(opts?.inline),
     });
   }
 

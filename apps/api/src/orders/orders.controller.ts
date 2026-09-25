@@ -225,8 +225,11 @@ export class OrdersController {
     @CurrentUser() user: AuthUser | undefined,
     @Param('id') orderId: string,
     @Param('deliveryFileId') deliveryFileId: string,
+    @Query('inline') inline?: string,
   ) {
-    return this.orders.getMyDeliveryFileSignedUrl(user, orderId, deliveryFileId);
+    return this.orders.getMyDeliveryFileSignedUrl(user, orderId, deliveryFileId, {
+      inline: inline === '1' || inline === 'true',
+    });
   }
 
   @Get(':id/delivery-files/:deliveryFileId/preview-url')

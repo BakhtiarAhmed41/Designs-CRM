@@ -589,8 +589,11 @@ export class AdminOrdersController {
     @CurrentUser() user: AuthUser | undefined,
     @Param('id') orderId: string,
     @Param('deliveryFileId') deliveryFileId: string,
+    @Query('inline') inline?: string,
   ) {
-    return this.orders.getAdminDeliveryFileSignedUrl(user, orderId, deliveryFileId);
+    return this.orders.getAdminDeliveryFileSignedUrl(user, orderId, deliveryFileId, {
+      inline: inline === '1' || inline === 'true',
+    });
   }
 
   @Delete(':id/delivery-files/:deliveryFileId')

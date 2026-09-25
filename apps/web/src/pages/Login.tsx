@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { confirmEmailChange, forgotPassword, resetPassword, verifyEmail } from '@/lib/auth';
 import { claimQuoteIntent } from '@/lib/orders';
 import { getErrorMessage } from '@/lib/api';
+import { orderSlug } from '@/lib/format';
 
 type Mode = 'login' | 'register' | 'forgot' | 'reset';
 
@@ -104,7 +105,7 @@ export function Login() {
         if (claim) {
           try {
             const claimed = await claimQuoteIntent(claim);
-            navigate(`/portal/quotes/${claimed.order.id}`, { replace: true });
+            navigate(`/portal/quotes/${orderSlug(claimed.order.humanRef, claimed.order.id)}`, { replace: true });
             return;
           } catch (err) {
             navigate('/portal/quotes', {

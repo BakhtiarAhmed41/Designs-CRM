@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { listMyOrderSummary, listMyOrders, listQuoteDrafts } from '@/lib/orders';
-import { money, dateShort, quoteLifecycleChip, orderNumber } from '@/lib/format';
+import { money, dateShort, quoteLifecycleChip, orderNumber, orderSlug } from '@/lib/format';
 import { serviceCategoryLabel } from '@/lib/serviceIcon';
 import { isAdminRecounter, studioQuotation } from '@/lib/quoteHelpers';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
@@ -202,7 +202,9 @@ export function PortalQuotes() {
                 const quote = studioQuotation(o.quotations);
                 const designCount = o.designCount ?? quote?.lines?.length ?? 0;
                 const total = quote?.amountCents ?? null;
-                const href = o.type === 'ORDER' ? `/portal/orders/${o.id}` : `/portal/quotes/${o.id}`;
+                const href = o.type === 'ORDER'
+                  ? `/portal/orders/${orderSlug(o.humanRef, o.id)}`
+                  : `/portal/quotes/${orderSlug(o.humanRef, o.id)}`;
 
                 return (
                   <tr key={o.id} className="click-row" onClick={() => navigate(href)}>

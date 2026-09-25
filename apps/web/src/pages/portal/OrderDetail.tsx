@@ -15,9 +15,10 @@ import { AttachmentPreview, DeliveryPreview } from '@/components/FilePreview';
 import { listMyEdits, requestEdit } from '@/lib/edits';
 import { RevisionRequestForm } from '@/components/RevisionRequestForm';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
-import { money, lifecycleChip, dateShort, paymentChip, isImageFile, orderNumber } from '@/lib/format';
+import { money, lifecycleChip, dateShort, paymentChip, isImageFile, orderNumber, orderSlug } from '@/lib/format';
 import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import { openLinkedChat } from '@/lib/messaging';
+import { useCanonicalOrderUrl } from '@/lib/useCanonicalOrderUrl';
 import { serviceOrderKind } from '@/lib/embroideryQuote';
 import { ServiceCustomerOrder } from '@/components/ServiceCustomerOrder';
 import {
@@ -225,23 +226,19 @@ export function PortalOrderDetail() {
     onError: (e) => setActionError(getErrorMessage(e)),
   });
 
+  const loadedOrder = data?.order as PortalOrderFull | undefined;
+  useCanonicalOrderUrl('portal', 'orders', id, loadedOrder?.humanRef);
+
   if (isLoading) return <EmptyState icon="ti-loader" title="Loading order…" />;
-  const order = data?.order as PortalOrderFull | undefined;
+  const order = loadedOrder;
   if (order && serviceOrderKind(order)) {
     return (
-      <>
-        {paidSuccess && (
-          <div className="alert-success" style={{ marginBottom: 14 }}>
-            <i className="ti ti-circle-check" /> Payment successful. Your order has been created.
-          </div>
-        )}
-        {paidReturn && order.paymentStatus !== 'PAID' && (
-          <div className="note" style={{ marginBottom: 14 }}>
-            <i className="ti ti-loader" /> Confirming payment with Stripe…
-          </div>
-        )}
-        <ServiceCustomerOrder order={order} />
-      </>
+      <ServiceCustomerOrder
+        order={order}
+        notice={
+          paidSuccess ? 'paid' : paidReturn && order.paymentStatus !== 'PAID' ? 'confirming' : null
+        }
+      />
     );
   }
   if (!order) {

@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { listMyAllEdits } from '@/lib/edits';
-import { dateShort } from '@/lib/format';
+import { dateShort, orderSlug } from '@/lib/format';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { SkeletonRows } from '@/components/ui/Skeleton';
@@ -31,7 +31,7 @@ export function PortalRevisions() {
           />
         )}
         {edits.map((e) => (
-          <Link key={e.id} to={`/portal/orders/${e.orderId}`} className="orow">
+          <Link key={e.id} to={`/portal/orders/${orderSlug(e.orderRef, e.orderId)}`} className="orow">
             <div className="othumb">
               <i className="ti ti-refresh" />
             </div>

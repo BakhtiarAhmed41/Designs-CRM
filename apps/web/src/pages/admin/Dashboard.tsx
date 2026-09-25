@@ -8,7 +8,7 @@ import { datesForPreset, inDateRange, type RangePreset } from '@/lib/dateRange';
 import { listAdminEdits } from '@/lib/edits';
 import { listAdminOrders } from '@/lib/orders';
 import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
-import { money, dateShort, statusChipClass, statusLabel, orderNumber } from '@/lib/format';
+import { money, dateShort, statusChipClass, statusLabel, orderNumber, orderSlug } from '@/lib/format';
 import { serviceTi } from '@/lib/serviceIcon';
 import { canFeature } from '@/lib/permissions';
 import { useAuth } from '@/context/AuthContext';
@@ -209,7 +209,7 @@ export function AdminDashboard() {
                 <EmptyState icon="ti-package" title="No orders yet" description="New orders in this range will show up here." />
               )}
               {orders.slice(0, 8).map((o) => (
-                <Link key={o.id} to={`/admin/orders/${o.id}`} className="orow">
+                <Link key={o.id} to={`/admin/orders/${orderSlug(o.humanRef, o.id)}`} className="orow">
                   <div className="othumb">
                     <i className={`ti ${serviceTi(o.serviceType)}`} />
                   </div>
@@ -235,7 +235,7 @@ export function AdminDashboard() {
                 <EmptyState icon="ti-file-invoice" title="No quotes waiting" description="Quotes that need a price will land here." />
               )}
               {quoteOrders.slice(0, 8).map((o) => (
-                <Link key={o.id} to={`/admin/quotes/${o.id}`} className="orow">
+                <Link key={o.id} to={`/admin/quotes/${orderSlug(o.humanRef, o.id)}`} className="orow">
                   <div className="othumb">
                     <i className={`ti ${serviceTi(o.serviceType)}`} />
                   </div>
@@ -259,7 +259,7 @@ export function AdminDashboard() {
                 <EmptyState icon="ti-refresh" title="No open revisions" description="Revisions in this range will land here." />
               )}
               {edits.slice(0, 8).map((e) => (
-                <Link key={e.id} to={`/admin/orders/${e.orderId}`} className="orow">
+                <Link key={e.id} to={`/admin/orders/${orderSlug(e.orderRef, e.orderId)}`} className="orow">
                   <div className="othumb">
                     <i className="ti ti-refresh" />
                   </div>

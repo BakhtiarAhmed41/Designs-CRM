@@ -5,7 +5,7 @@ import { listMyFiles, type MyFile } from '@/lib/designs';
 import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
 import { myDeliveryFileUrl } from '@/lib/orders';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
-import { dateShort, deliveryMethodLabel, orderNumber } from '@/lib/format';
+import { dateShort, deliveryMethodLabel, orderNumber, orderSlug } from '@/lib/format';
 import { serviceCategoryLabel } from '@/lib/serviceIcon';
 import { DeliveryPreview } from '@/components/FilePreview';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -281,7 +281,7 @@ export function PortalFiles() {
                                   {g.files.length} file{g.files.length === 1 ? '' : 's'} were sent to{' '}
                                   {maskEmail(g.deliveryEmail)}.
                                 </p>
-                                <Link to={`/portal/orders/${g.orderId}`} className="btn btn-ghost btn-sm">
+                                <Link to={`/portal/orders/${orderSlug(g.humanRef, g.orderId)}`} className="btn btn-ghost btn-sm">
                                   View order
                                 </Link>
                               </div>

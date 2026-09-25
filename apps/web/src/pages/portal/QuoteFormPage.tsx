@@ -12,6 +12,7 @@ import { postThemeToWindow } from '@/lib/theme';
 import { filesFromQuoteForm } from '@/lib/quoteFiles';
 import { isUsualQuoteService, quoteFormatsFromPrefs } from '@/lib/customerPrefs';
 import { RequestQuoteMenu } from '@/components/RequestQuoteMenu';
+import { orderSlug } from '@/lib/format';
 
 type ServiceKey = 'embroidery' | 'vector' | 'laser';
 
@@ -199,7 +200,7 @@ export function QuoteFormPage() {
       if (files.length > 0) await uploadAttachments(order.id, files);
       dirtyRef.current = false;
       await invalidateWorkCaches(qc);
-      navigate(`/portal/quotes/${order.id}`);
+      navigate(`/portal/quotes/${orderSlug(order.humanRef, order.id)}`);
     } catch (e) {
       setError(getErrorMessage(e));
       iframeRef.current?.contentWindow?.postMessage({ type: 'lvd-quote-submit-result', ok: false }, '*');

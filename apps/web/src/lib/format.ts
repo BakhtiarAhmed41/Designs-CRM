@@ -55,6 +55,13 @@ export function sameFileName(a?: string | null, b?: string | null) {
 }
 
 /** Quote and order numbers are 10 digits, shown as #1326379573. */
+/** Short public id for quote and order URLs. Old UUID links still open. */
+export function orderSlug(ref?: string | null, id?: string | null): string {
+  const digits = (ref ?? '').replace(/\D/g, '');
+  if (/^\d{6,12}$/.test(digits)) return digits;
+  return id ?? '';
+}
+
 export function orderNumber(ref?: string | null, fallback?: string | null): string {
   const digits = (ref ?? '').replace(/\D/g, '');
   if (digits.length === 10) return `#${digits}`;

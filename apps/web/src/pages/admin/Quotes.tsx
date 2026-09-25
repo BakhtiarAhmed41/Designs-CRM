@@ -11,7 +11,7 @@ import {
 import { getErrorMessage } from '@/lib/api';
 import { invalidateWorkCaches } from '@/lib/queryCache';
 import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
-import { money, dateShort, quoteLifecycleChip, orderNumber } from '@/lib/format';
+import { money, dateShort, quoteLifecycleChip, orderNumber, orderSlug } from '@/lib/format';
 import { isAdminRecounter, isStaffCreatedOrder } from '@/lib/quoteHelpers';
 import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
 import type { Order, OrderStatus } from '@/lib/types';
@@ -246,7 +246,7 @@ export function AdminQuotes() {
                   adminRecounter: isAdminRecounter(o.quotations),
                 });
                 return (
-                  <tr key={o.id} className="click-row" onClick={() => navigate(`/admin/quotes/${o.id}`)}>
+                  <tr key={o.id} className="click-row" onClick={() => navigate(`/admin/quotes/${orderSlug(o.humanRef, o.id)}`)}>
                     <td>
                       <div className="cell-main">
                         <div className={`othumb ${serviceThumbClass(o.serviceType)}`}>

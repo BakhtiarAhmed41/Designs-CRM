@@ -9,7 +9,8 @@ import {
 import { startMyOrderCheckout } from '@/lib/billing';
 import { openLinkedChat } from '@/lib/messaging';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
-import { dateShort, money, quoteLifecycleChip, orderNumber } from '@/lib/format';
+import { dateShort, money, quoteLifecycleChip, orderNumber, orderSlug } from '@/lib/format';
+import { useCanonicalOrderUrl } from '@/lib/useCanonicalOrderUrl';
 import { isCuttingRequest, isEmbroideryRequest, isVectorRequest, serviceOrderKind } from '@/lib/embroideryQuote';
 import { ServiceCustomerOrder } from '@/components/ServiceCustomerOrder';
 import { isAdminRecounter, isStaffCreatedOrder, latestCounter, lineTotal, studioQuotation } from '@/lib/quoteHelpers';
@@ -46,6 +47,7 @@ export function PortalQuoteDetail() {
   }, [toast]);
 
   const order = data?.order as Order | undefined;
+  useCanonicalOrderUrl('portal', 'quotes', id, order?.humanRef);
   const studio = studioQuotation(order?.quotations);
   const counterQuote = latestCounter(order?.quotations);
   const lines = studio?.lines ?? [];
@@ -66,7 +68,7 @@ export function PortalQuoteDetail() {
       const res = await startMyOrderCheckout(orderId);
       if (res?.alreadyPaid) {
         setToast('Payment successful. Your order has been created.');
-        window.setTimeout(() => navigate(`/portal/orders/${orderId}`), 700);
+        window.setTimeout(() => navigate(`/portal/orders/${orderSlug(order?.humanRef, orderId)}`), 700);
       }
     } catch (e) {
       setError(getErrorMessage(e));
@@ -90,7 +92,7 @@ export function PortalQuoteDetail() {
           ? 'Partially accepted. Opening your order…'
           : 'Quote accepted. Opening your order…',
       );
-      window.setTimeout(() => navigate(`/portal/orders/${id}`), 700);
+      window.setTimeout(() => navigate(`/portal/orders/${orderSlug(next.humanRef, next.id)}`), 700);
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -175,7 +177,7 @@ export function PortalQuoteDetail() {
         title="This quote is now an order"
         description="You accepted the price. Track production from the order workspace."
         action={
-          <Link to={`/portal/orders/${order.id}`} className="btn btn-primary">
+          <Link to={`/portal/orders/${orderSlug(order.humanRef, order.id)}`} className="btn btn-primary">
             Open order
           </Link>
         }

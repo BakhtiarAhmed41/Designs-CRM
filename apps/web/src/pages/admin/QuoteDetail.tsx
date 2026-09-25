@@ -24,7 +24,7 @@ import { applyOrderChange, invalidateWorkCaches } from '@/lib/queryCache';
 import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
 import { getCustomer } from '@/lib/customers';
 import { getErrorMessage } from '@/lib/api';
-import { money, dateShort, quoteLifecycleChip, friendlyFileName, orderNumber } from '@/lib/format';
+import { money, dateShort, quoteLifecycleChip, friendlyFileName, orderNumber, orderSlug } from '@/lib/format';
 import { isCuttingRequest, isEmbroideryRequest, isVectorRequest } from '@/lib/embroideryQuote';
 import { isAdminRecounter, isStaffCreatedOrder, lineTotal, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
 import { useDialog } from '@/components/ui/AppDialog';
@@ -109,10 +109,14 @@ export function AdminQuoteDetail() {
   }, [toast]);
 
   useEffect(() => {
-    if (order?.type === 'ORDER') {
-      navigate(`/admin/orders/${id}`, { replace: true });
+    if (!order) return;
+    const slug = orderSlug(order.humanRef, order.id);
+    if (order.type === 'ORDER') {
+      navigate(`/admin/orders/${slug}`, { replace: true });
+      return;
     }
-  }, [order?.type, id, navigate]);
+    if (slug !== id) navigate(`/admin/quotes/${slug}`, { replace: true });
+  }, [order, id, navigate]);
 
   const customerId = order?.customerId;
 
@@ -259,7 +263,7 @@ export function AdminQuoteDetail() {
     mutationFn: () => adminAcceptQuotation(id),
     onSuccess: (res) => {
       void applyOrderChange(qc, res.order);
-      navigate(`/admin/orders/${id}`);
+      navigate(`/admin/orders/${orderSlug(res.order.humanRef, res.order.id)}`);
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -276,7 +280,7 @@ export function AdminQuoteDetail() {
     mutationFn: () => approveCounter(id),
     onSuccess: (res) => {
       void applyOrderChange(qc, res.order);
-      navigate(`/admin/orders/${id}`);
+      navigate(`/admin/orders/${orderSlug(res.order.humanRef, res.order.id)}`);
     },
     onError: (e) => setError(getErrorMessage(e)),
   });

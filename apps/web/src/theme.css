@@ -1844,6 +1844,13 @@ i.ti,
 .bottom-nav button i {
   color: var(--ink);
 }
+.btn-primary i,
+.btn-green i,
+.btn-danger-solid i,
+.ead-btn.pri i,
+.ecd-btn.pri i {
+  color: #fff;
+}
 
 .othumb,
 .othumb.m,
@@ -4004,4 +4011,15 @@ form.card-pad > .btn {
   .ph-actions .quote-menu .btn {
     width: 100%;
   }
+}
+
+.ead-btn.pri i,
+.ead-btn.pri i::before,
+.ecd-btn.pri i,
+.ecd-btn.pri i::before,
+.btn-primary i,
+.btn-primary i::before,
+.btn-danger-solid i,
+.btn-danger-solid i::before {
+  color: #fff !important;
 }

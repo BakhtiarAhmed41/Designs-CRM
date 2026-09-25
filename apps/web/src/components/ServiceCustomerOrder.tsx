@@ -2,11 +2,12 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { EmbroideryFileCard } from '@/components/EmbroideryFileCard';
+import { ImageLightbox } from '@/components/FilePreview';
 import { useTopbarLead } from '@/components/Shell';
 import { ErrorBanner } from '@/components/ui/EmptyState';
 import { apiFetch, downloadSignedFile, getErrorMessage, resolveFileUrl } from '@/lib/api';
 import { startMyOrderCheckout } from '@/lib/billing';
-import type { Design } from '@/lib/designs';
+import { designStatusLabel, type Design } from '@/lib/designs';
 import {
   asEmbroideryPrefs,
   backgroundLabel,
@@ -20,9 +21,9 @@ import {
   turnaroundLabel,
   type EmbAttachment,
 } from '@/lib/embroideryQuote';
-import { dateShort, money, orderNumber } from '@/lib/format';
+import { dateShort, isImageFile, money, orderNumber, orderSlug } from '@/lib/format';
 import { openLinkedChat } from '@/lib/messaging';
-import { myAttachmentUrl, myDeliveryFileUrl } from '@/lib/orders';
+import { myAttachmentUrl, myDeliveryFilePreviewUrl, myDeliveryFileUrl } from '@/lib/orders';
 import { isStaffCreatedOrder, quoteHistoryLabel, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
 import { deliveryCounts, orderDeliveryGroups, type DeliveryRow } from '@/lib/serviceOrderView';
 import type { Order } from '@/lib/types';
@@ -30,7 +31,19 @@ import '@/styles/embroidery-quote.css';
 
 type CustomerOrder = Order & { designs?: Design[] };
 
-export function ServiceCustomerOrder({ order }: { order: CustomerOrder }) {
+function deliveryStatusClass(status?: string) {
+  if (status === 'DELIVERED') return 'sod-cstatus delivered';
+  if (status === 'DONE') return 'sod-cstatus ready';
+  return 'sod-cstatus';
+}
+
+export function ServiceCustomerOrder({
+  order,
+  notice,
+}: {
+  order: CustomerOrder;
+  notice?: 'paid' | 'confirming' | null;
+}) {
   const kind = serviceOrderKind(order) ?? 'embroidery';
   const cutting = kind === 'cutting';
   const vector = kind === 'vector';
@@ -66,6 +79,7 @@ export function ServiceCustomerOrder({ order }: { order: CustomerOrder }) {
 
   const [open, setOpen] = useState({ summary: false, request: false, delivery: false, history: false });
   const [filesFor, setFilesFor] = useState<DeliveryRow | null>(null);
+  const [preview, setPreview] = useState<{ src: string; name: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [payBusy, setPayBusy] = useState(false);
 
@@ -103,7 +117,7 @@ export function ServiceCustomerOrder({ order }: { order: CustomerOrder }) {
     setError(null);
     try {
       const res = await startMyOrderCheckout(order.id);
-      if (res?.alreadyPaid) navigate(`/portal/orders/${order.id}`);
+      if (res?.alreadyPaid) navigate(`/portal/orders/${orderSlug(order.humanRef, order.id)}`);
     } catch (e) {
       setError(getErrorMessage(e));
     } finally {
@@ -111,13 +125,48 @@ export function ServiceCustomerOrder({ order }: { order: CustomerOrder }) {
     }
   }
 
-  async function previewFile(fileId: string) {
-    const { url } = await apiFetch<{ url: string }>(myDeliveryFileUrl(order.id, fileId));
-    window.open(resolveFileUrl(url), '_blank', 'noopener');
+  async function previewFile(file: { id: string; originalName: string; mimeType?: string | null }) {
+    setError(null);
+    const image = isImageFile(file.originalName, file.mimeType);
+    const tab = image ? null : window.open('', '_blank', 'noopener');
+    try {
+      const path = image
+        ? myDeliveryFilePreviewUrl(order.id, file.id)
+        : `${myDeliveryFileUrl(order.id, file.id)}?inline=1`;
+      const { url } = await apiFetch<{ url: string }>(path);
+      const abs = resolveFileUrl(url);
+      if (image) {
+        setPreview({ src: abs, name: file.originalName });
+        return;
+      }
+      if (tab) tab.location.replace(abs);
+      else window.location.assign(abs);
+    } catch (e) {
+      tab?.close();
+      setError(getErrorMessage(e));
+    }
   }
 
   return (
     <div className="ecd">
+      {notice === 'paid' && (
+        <div className="ecd-notice" role="status">
+          <i className="ti ti-circle-check" />
+          <div>
+            <strong>Payment successful</strong>
+            <span>Your order has been created.</span>
+          </div>
+        </div>
+      )}
+      {notice === 'confirming' && (
+        <div className="ecd-notice wait" role="status">
+          <i className="ti ti-loader" />
+          <div>
+            <strong>Confirming payment</strong>
+            <span>This updates as soon as Stripe finishes.</span>
+          </div>
+        </div>
+      )}
       {error && <ErrorBanner>{error}</ErrorBanner>}
       <div className="ecd-head">
         <div>
@@ -152,12 +201,13 @@ export function ServiceCustomerOrder({ order }: { order: CustomerOrder }) {
               <div key={group.title} className="sod-cgroup">
                 <div className="sod-cgroup-name">{group.title}</div>
                 {group.rows.map((row) => {
-                  const delivered = row.design?.status === 'DELIVERED';
+                  const status = row.design?.status;
+                  const delivered = status === 'DELIVERED';
                   return (
                     <div key={row.key} className="sod-crow">
                       <span className="sod-cname">{row.name}</span>
-                      <span className={delivered ? 'sod-cstatus delivered' : 'sod-cstatus'}>
-                        {delivered ? 'Delivered' : 'In progress'}
+                      <span className={deliveryStatusClass(status)}>
+                        {designStatusLabel(status ?? '', 'customer')}
                       </span>
                       {delivered && (
                         <button
@@ -421,13 +471,13 @@ export function ServiceCustomerOrder({ order }: { order: CustomerOrder }) {
                 {history.map((quote) => (
                   <div key={quote.id} className="ecd-tl-row">
                     <div>
-                      <div style={{ fontWeight: 600 }}>{quoteHistoryLabel(quote, history)}</div>
-                      <div className="ecd-wait" style={{ marginTop: 4 }}>
+                      <div className="ecd-tl-name">{quoteHistoryLabel(quote, history)}</div>
+                      <div className="ecd-tl-sub">
                         {dateShort(quote.createdAt)}
                         {quote.status === 'APPROVED' && paid ? ' · Accepted & paid' : ''}
                       </div>
                     </div>
-                    <div style={{ fontWeight: 600 }}>{money(quote.amountCents, quote.currency)}</div>
+                    <div className="ecd-tl-price">{money(quote.amountCents, quote.currency)}</div>
                   </div>
                 ))}
               </div>
@@ -445,19 +495,30 @@ export function ServiceCustomerOrder({ order }: { order: CustomerOrder }) {
                 <i className="ti ti-x" />
               </button>
             </div>
-            <p>Preview or download the files published for this item.</p>
+            <p>Preview or download the files delivered for this item.</p>
             <div className="sod-flist">
               {deliveredFiles(filesFor).length === 0 && <div>No files are available yet.</div>}
               {deliveredFiles(filesFor).map((file) => (
                 <div key={file.id} className="sod-file">
                   <span>{file.originalName}</span>
-                  <span>
-                    <button type="button" onClick={() => void previewFile(file.id)}>Preview</button>
+                  <span className="sod-file-acts">
                     <button
                       type="button"
+                      className="sod-eye"
+                      title="Preview"
+                      aria-label={`Preview ${file.originalName}`}
+                      onClick={() => void previewFile(file)}
+                    >
+                      <i className="ti ti-eye" />
+                    </button>
+                    <button
+                      type="button"
+                      className="sod-eye"
+                      title="Download"
+                      aria-label={`Download ${file.originalName}`}
                       onClick={() => void downloadSignedFile(myDeliveryFileUrl(order.id, file.id), file.originalName)}
                     >
-                      Download
+                      <i className="ti ti-download" />
                     </button>
                   </span>
                 </div>
@@ -468,6 +529,9 @@ export function ServiceCustomerOrder({ order }: { order: CustomerOrder }) {
             </div>
           </div>
         </div>
+      )}
+      {preview && (
+        <ImageLightbox src={preview.src} name={preview.name} onClose={() => setPreview(null)} />
       )}
     </div>
   );

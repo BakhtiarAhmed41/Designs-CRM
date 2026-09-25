@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { listAdminEdits, updateAdminEdit, type EditRequest, type EditStatus } from '@/lib/edits';
 import { listTeam } from '@/lib/team';
 import { getErrorMessage } from '@/lib/api';
-import { money, dateShort, orderNumber } from '@/lib/format';
+import { money, dateShort, orderNumber, orderSlug } from '@/lib/format';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -181,7 +181,7 @@ function EditRow({
 
   return (
     <Link
-      to={`/admin/orders/${e.orderId}`}
+      to={`/admin/orders/${orderSlug(e.orderRef, e.orderId)}`}
       className="orow"
       style={{ textDecoration: 'none', color: 'inherit' }}
     >

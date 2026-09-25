@@ -9,7 +9,7 @@ import { SkeletonRows } from '@/components/ui/Skeleton';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { listAdminOrders } from '@/lib/orders';
 import { freshOnOpen } from '@/lib/queryRefresh';
-import { money, dateShort, lifecycleChip, orderNumber } from '@/lib/format';
+import { money, dateShort, lifecycleChip, orderNumber, orderSlug } from '@/lib/format';
 import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
 import type { Order, OrderStatus } from '@/lib/types';
 
@@ -131,7 +131,7 @@ export function AdminOrders() {
                   partiallyDelivered: o.partiallyDelivered,
                 });
                 return (
-                  <tr key={o.id} className="click-row" onClick={() => navigate(`/admin/orders/${o.id}`)}>
+                  <tr key={o.id} className="click-row" onClick={() => navigate(`/admin/orders/${orderSlug(o.humanRef, o.id)}`)}>
                     <td>
                       <div className="cell-main">
                         <div className={`othumb ${serviceThumbClass(o.serviceType)}`}>

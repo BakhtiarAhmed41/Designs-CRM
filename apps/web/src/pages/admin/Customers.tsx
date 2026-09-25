@@ -15,7 +15,7 @@ import {
   type NetTerms,
 } from '@/lib/customers';
 import { getErrorMessage } from '@/lib/api';
-import { money, dateShort, statusChipClass, statusLabel, orderNumber } from '@/lib/format';
+import { money, dateShort, statusChipClass, statusLabel, orderNumber, orderSlug } from '@/lib/format';
 import type { OrderStatus } from '@/lib/types';
 import { useDialog } from '@/components/ui/AppDialog';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
@@ -450,7 +450,7 @@ function CustomerDetailModal({
                   <div className="muted" style={{ fontSize: 13 }}>No orders yet.</div>
                 )}
                 {customer.recentOrders.map((o) => (
-                  <Link key={o.id} to={`/admin/orders/${o.id}`} className="cust-order">
+                  <Link key={o.id} to={`/admin/orders/${orderSlug(o.humanRef, o.id)}`} className="cust-order">
                     <div className="cust-order-top">
                       <div className="cust-order-name">{o.name ?? 'Order'}</div>
                       <div className="cust-order-price">{money(o.priceCents, o.currency)}</div>

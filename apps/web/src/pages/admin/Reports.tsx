@@ -5,7 +5,7 @@ import { BarChart } from '@/components/BarChart';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { getErrorMessage } from '@/lib/api';
-import { money, statusLabel, orderNumber } from '@/lib/format';
+import { money, statusLabel, orderNumber, orderSlug } from '@/lib/format';
 import {
   getReport,
   REPORT_OPTIONS,
@@ -701,7 +701,7 @@ function RevisionsView({ report }: { report: RevisionsReport }) {
                   report.perOrder.map((row) => (
                     <tr key={row.orderId}>
                       <td>
-                        <Link to={`/admin/orders/${row.orderId}`}>{row.orderName}</Link>
+                        <Link to={`/admin/orders/${orderSlug(row.humanRef, row.orderId)}`}>{row.orderName}</Link>
                         {row.humanRef && (
                           <div className="muted" style={{ fontSize: 12 }}>
                             {orderNumber(row.humanRef)}

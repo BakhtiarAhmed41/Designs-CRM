@@ -10,7 +10,7 @@ import { listNotifications, markNotificationRead } from '@/lib/notifications';
 import { datesForPortalPreset, inDateRange, type PortalRangePreset } from '@/lib/dateRange';
 import { useAuth } from '@/context/AuthContext';
 import { freshOnOpen } from '@/lib/queryRefresh';
-import { money, quoteLifecycleChip, customerOrderChip, orderNumber } from '@/lib/format';
+import { money, quoteLifecycleChip, customerOrderChip, orderNumber, orderSlug } from '@/lib/format';
 import { serviceCategoryLabel } from '@/lib/serviceIcon';
 import { portalActivityAction, unreadSections } from '@/lib/portalNew';
 import type { Order } from '@/lib/types';
@@ -280,7 +280,7 @@ export function PortalDashboard() {
                         <tr
                           key={o.id}
                           className="click-row"
-                          onClick={() => navigate(`/portal/orders/${o.id}`)}
+                          onClick={() => navigate(`/portal/orders/${orderSlug(o.humanRef, o.id)}`)}
                         >
                           <td>
                             <div className="on">{o.name ?? o.serviceType ?? 'Order'}</div>
@@ -351,7 +351,7 @@ export function PortalDashboard() {
                         <tr
                           key={o.id}
                           className="click-row"
-                          onClick={() => navigate(`/portal/quotes/${o.id}`)}
+                          onClick={() => navigate(`/portal/quotes/${orderSlug(o.humanRef, o.id)}`)}
                         >
                           <td>
                             <div className="on">{o.name ?? 'Quote request'}</div>
@@ -381,7 +381,7 @@ export function PortalDashboard() {
               <EmptyState icon="ti-refresh" title="No open revisions" description="Requested changes will show up here." />
             )}
             {revisions.map((e) => (
-              <Link key={e.id} to={`/portal/orders/${e.orderId}`} className="orow">
+              <Link key={e.id} to={`/portal/orders/${orderSlug(e.orderRef, e.orderId)}`} className="orow">
                 <div className="othumb">
                   <i className="ti ti-refresh" />
                 </div>

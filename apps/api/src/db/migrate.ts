@@ -434,6 +434,14 @@ export async function runMigrations() {
     }
   }
 
+  await conn.query(
+    `UPDATE notifications
+        SET title = 'New quote request',
+            link = REPLACE(link, '/admin/orders/', '/admin/quotes/')
+      WHERE title = 'New order received'
+        AND body LIKE 'Client is waiting for quotation%'`,
+  );
+
   if (existsSync(migrationsDir)) {
     const applied = new Set(
       (

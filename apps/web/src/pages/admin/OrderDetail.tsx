@@ -48,6 +48,7 @@ import { AttachmentPreview, LocalFilePreview } from '@/components/FilePreview';
 import { FormPreferencesDisplay, hasFormPreferences } from '@/components/FormPreferencesDisplay';
 import { MessageAttachments } from '@/components/MessageAttachments';
 import { QuoteHistory } from '@/components/QuoteHistory';
+import { useCanonicalOrderUrl } from '@/lib/useCanonicalOrderUrl';
 import { ServiceAdminOrder } from '@/components/ServiceAdminOrder';
 import { serviceOrderKind } from '@/lib/embroideryQuote';
 import { isStaffCreatedOrder, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
@@ -318,6 +319,7 @@ export function AdminOrderDetail() {
   });
 
   const order = data?.order as AdminOrderFull | undefined;
+  useCanonicalOrderUrl('admin', 'orders', id, order?.humanRef);
   const invoicesQ = useQuery({
     queryKey: ['admin-invoices-order', id, order?.customerId],
     queryFn: () =>

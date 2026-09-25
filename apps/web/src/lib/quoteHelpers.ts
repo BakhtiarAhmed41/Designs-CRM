@@ -48,10 +48,10 @@ export function quoteHistoryLabel(
   all: QuoteWithLines[],
 ): string {
   if (q.createdByRole === 'CLIENT') return 'Customer counter';
-  const hadClientBefore = all.some(
-    (other) => other.createdByRole === 'CLIENT' && other.version < q.version,
+  const earlierStaffQuote = all.some(
+    (other) => other.createdByRole !== 'CLIENT' && other.version < q.version,
   );
-  return hadClientBefore ? 'Updated Quote' : 'Original Quote';
+  return earlierStaffQuote ? 'Revised Quote' : 'Original Quote';
 }
 
 export function lineTotal(l: QuotationLine) {

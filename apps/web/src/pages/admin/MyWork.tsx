@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { listMyWork } from '@/lib/team';
 import { freshOnOpen } from '@/lib/queryRefresh';
-import { dateShort, orderNumber } from '@/lib/format';
+import { dateShort, orderNumber, orderSlug } from '@/lib/format';
 import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
 import type { OrderStatus } from '@/lib/types';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -104,7 +104,7 @@ export function AdminMyWork() {
             </thead>
             <tbody>
               {paged.map((o) => (
-                <tr key={o.id} className="click-row" onClick={() => navigate(`/admin/orders/${o.id}`)}>
+                <tr key={o.id} className="click-row" onClick={() => navigate(`/admin/orders/${orderSlug(o.humanRef, o.id)}`)}>
                   <td>
                     <div className="cell-main">
                       <div className={`othumb ${serviceThumbClass(o.serviceType)}`}>

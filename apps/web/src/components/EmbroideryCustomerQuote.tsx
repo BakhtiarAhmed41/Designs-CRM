@@ -22,7 +22,7 @@ import {
 import { openLinkedChat } from '@/lib/messaging';
 import { acceptQuotation, myAttachmentUrl } from '@/lib/orders';
 import { applyOrderChange } from '@/lib/queryCache';
-import { dateShort, money, orderNumber } from '@/lib/format';
+import { dateShort, money, orderNumber, orderSlug } from '@/lib/format';
 import type { Order } from '@/lib/types';
 import '@/styles/embroidery-quote.css';
 
@@ -81,14 +81,14 @@ export function EmbroideryCustomerQuote({
         setPayBusy(true);
         try {
           const pay = await startMyOrderCheckout(res.order.id);
-          if (pay?.alreadyPaid) navigate(`/portal/orders/${res.order.id}`);
+          if (pay?.alreadyPaid) navigate(`/portal/orders/${orderSlug(res.order.humanRef, res.order.id)}`);
         } catch (e) {
           setError(getErrorMessage(e));
           setPayBusy(false);
         }
         return;
       }
-      navigate(`/portal/orders/${order.id}`);
+      navigate(`/portal/orders/${orderSlug(order.humanRef, order.id)}`);
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -417,10 +417,10 @@ export function EmbroideryCustomerQuote({
                 {history.map((quote) => (
                   <div key={quote.id} className="ecd-tl-row">
                     <div>
-                      <div style={{ fontWeight: 600 }}>{quoteHistoryLabel(quote, history)}</div>
-                      <div className="ecd-wait" style={{ marginTop: 4 }}>{dateShort(quote.createdAt)}</div>
+                      <div className="ecd-tl-name">{quoteHistoryLabel(quote, history)}</div>
+                      <div className="ecd-tl-sub">{dateShort(quote.createdAt)}</div>
                     </div>
-                    <div style={{ fontWeight: 600 }}>{money(quote.amountCents, quote.currency)}</div>
+                    <div className="ecd-tl-price">{money(quote.amountCents, quote.currency)}</div>
                   </div>
                 ))}
               </div>
