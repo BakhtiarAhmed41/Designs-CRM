@@ -27,7 +27,7 @@ WEB_ORIGIN=https://your-domain.com
 JWT_ACCESS_SECRET=<32+ random chars>
 JWT_REFRESH_SECRET=<32+ random chars>
 COOKIE_SECURE=true
-UPLOAD_DIR=/var/www/designs-crm/uploads
+UPLOAD_DIR=/var/lib/designs-crm/uploads
 STORAGE_URL_SECRET=<32+ random chars>
 VITE_API_BASE_URL=https://your-domain.com/api
 ```
@@ -75,6 +75,6 @@ pm2 restart designs-crm-api   # migrations run automatically on API start
 ```
 
 ## Notes
-- Uploaded files live on disk under `UPLOAD_DIR` (default `apps/api/uploads`). Back this directory up; it is git-ignored.
+- Uploaded files live on disk under `UPLOAD_DIR`. Keep that path outside `apps/api/dist` and `apps/api/publish` — the production build deletes both folders on every deploy. The default write folder is `apps/api/uploads`. Back it up; it is git-ignored.
 - Downloads use short-lived HMAC-signed URLs (`/api/files/download`), signed with `STORAGE_URL_SECRET` (falls back to `JWT_ACCESS_SECRET`).
 - With the SPA and API on the same domain via Nginx, auth cookies are first-party; keep `COOKIE_SECURE=true` under HTTPS.

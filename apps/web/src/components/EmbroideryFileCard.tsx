@@ -13,7 +13,8 @@ function useImageSrc(previewUrl: string | null | undefined, enabled: boolean) {
     }
     let cancelled = false;
     let blobUrl: string | null = null;
-    void fetch(resolveFileUrl(previewUrl), { credentials: 'include' })
+    const resolved = resolveFileUrl(previewUrl);
+    void fetch(resolved, { credentials: 'include' })
       .then(async (res) => {
         if (!res.ok) return null;
         const blob = await res.blob();

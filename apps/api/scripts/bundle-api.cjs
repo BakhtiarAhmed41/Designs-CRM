@@ -20,8 +20,19 @@ function copyDir(src, dest) {
 }
 
 function writeBundleDir(dir, bundledFile) {
+  // Customer images must survive a deploy. Older builds saved them inside
+  // dist/uploads or publish/uploads, and replacing those folders used to delete them.
+  const keptUploads = path.join(dir, 'uploads');
+  const uploadsBackup = path.join(apiRoot, `.uploads-keep-${path.basename(dir)}`);
+  if (fs.existsSync(keptUploads)) {
+    fs.rmSync(uploadsBackup, { recursive: true, force: true });
+    fs.renameSync(keptUploads, uploadsBackup);
+  }
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
+  if (fs.existsSync(uploadsBackup)) {
+    fs.renameSync(uploadsBackup, keptUploads);
+  }
   fs.copyFileSync(bundledFile, path.join(dir, 'main.js'));
   const assetsSrc = path.join(apiRoot, 'assets');
   if (fs.existsSync(assetsSrc)) {

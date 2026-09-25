@@ -112,7 +112,12 @@ export function ImageLightbox({
         src={src}
         alt={name}
         onClick={(e) => e.stopPropagation()}
-        onError={onClose}
+        onError={() => {
+          // #region agent log
+          fetch('http://127.0.0.1:7422/ingest/0d72200c-b460-4f6d-9776-9f9a8178c9c9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bd9c4e'},body:JSON.stringify({sessionId:'bd9c4e',hypothesisId:'C',location:'FilePreview.tsx:ImageLightbox',message:'preview image failed to render',data:{srcPath:(()=>{try{return new URL(src).pathname}catch{return 'relative'}})(),sameHost:(()=>{try{return new URL(src,window.location.href).host===window.location.host}catch{return false}})()},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
+          onClose();
+        }}
       />
       <button type="button" className="file-lightbox-x" onClick={onClose} aria-label="Close">
         ×

@@ -1,8 +1,8 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { createHmac, randomUUID } from 'crypto';
-import { createReadStream, existsSync } from 'fs';
+import { createReadStream, existsSync, readFileSync } from 'fs';
 import { mkdir, unlink, writeFile } from 'fs/promises';
-import { dirname, join, normalize, resolve, sep } from 'path';
+import { dirname, isAbsolute, join, normalize, resolve, sep } from 'path';
 import { getEnv } from '../config/env';
 
 function sanitizeFilename(name: string): string {
@@ -19,6 +19,20 @@ function signSecret(): string {
   return env.STORAGE_URL_SECRET || env.JWT_ACCESS_SECRET;
 }
 
+function packageName(dir: string): string | null {
+  try {
+    const pkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as { name?: string };
+    return pkg.name ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** True for folders the Hostinger bundle deletes on every build. */
+function isBuildOutput(dir: string): boolean {
+  return /(?:^|[\\/])(?:dist|publish|\.tsc-out)(?:[\\/]|$)/.test(dir);
+}
+
 /**
  * Local-disk file storage. Files live under UPLOAD_DIR keyed by a logical path.
  * Downloads use short-lived HMAC-signed URLs served by FilesController, keeping
@@ -26,28 +40,63 @@ function signSecret(): string {
  */
 @Injectable()
 export class LocalStorageService {
-  private candidateDirs(): string[] {
+  /**
+   * apps/api, whether this code is running from src/, dist/storage/, or the
+   * single-file bundle at dist/main.js or publish/main.js.
+   */
+  private apiPackageRoot(): string {
+    let dir = __dirname;
+    for (let i = 0; i < 6; i++) {
+      if (packageName(dir) === '@designs-crm/api') return dir;
+      const parent = dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+    return isBuildOutput(__dirname) ? resolve(__dirname, '..') : resolve(__dirname, '..', '..');
+  }
+
+  private configuredDir(): string | null {
     const configured = getEnv().UPLOAD_DIR;
-    if (configured.startsWith('/') || /^[A-Za-z]:[\\/]/.test(configured)) {
-      return [resolve(configured)];
-    }
-    return [
-      resolve(process.cwd(), configured),
-      resolve(process.cwd(), 'apps', 'api', configured),
-      // Compiled: dist/storage → apps/api/uploads
-      resolve(__dirname, '..', '..', configured),
+    if (isAbsolute(configured)) return resolve(configured);
+    return null;
+  }
+
+  /** Where new files are written. Never dist/ or publish/ — those are wiped on deploy. */
+  private writeDir(): string {
+    const absolute = this.configuredDir();
+    if (absolute && !isBuildOutput(absolute)) return absolute;
+    return resolve(this.apiPackageRoot(), 'uploads');
+  }
+
+  /** Every place an older build may have saved files, so existing images still open. */
+  private readDirs(): string[] {
+    const configured = getEnv().UPLOAD_DIR;
+    const root = this.apiPackageRoot();
+    const relative = isAbsolute(configured) ? null : configured;
+    const dirs = [
+      this.writeDir(),
+      this.configuredDir(),
+      relative ? resolve(root, relative) : null,
+      relative ? resolve(process.cwd(), relative) : null,
+      relative ? resolve(process.cwd(), 'apps', 'api', relative) : null,
+      relative ? resolve(root, '..', '..', relative) : null,
+      resolve(root, 'uploads'),
+      resolve(root, 'dist', 'uploads'),
+      resolve(root, 'publish', 'uploads'),
     ];
-  }
-
-  private baseDir(): string {
-    const candidates = this.candidateDirs();
-    for (const candidate of candidates) {
-      if (existsSync(candidate)) return candidate;
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const dir of dirs) {
+      if (!dir) continue;
+      const full = resolve(dir);
+      if (seen.has(full)) continue;
+      seen.add(full);
+      out.push(full);
     }
-    return candidates[candidates.length - 1];
+    return out;
   }
 
-  private absPath(key: string, base = this.baseDir()): string {
+  private absPath(key: string, base = this.writeDir()): string {
     const full = normalize(join(base, key));
     if (full !== base && !full.startsWith(base + sep)) {
       throw new InternalServerErrorException('Invalid storage key');
@@ -112,8 +161,7 @@ export class LocalStorageService {
   }
 
   resolveExisting(key: string): string {
-    const dirs = this.candidateDirs();
-    for (const base of dirs) {
+    for (const base of this.readDirs()) {
       if (!existsSync(base)) continue;
       try {
         const full = this.absPath(key, base);
@@ -131,7 +179,7 @@ export class LocalStorageService {
 
   async deleteObject(key: string): Promise<void> {
     try {
-      const full = this.absPath(key);
+      const full = this.resolveExisting(key);
       if (existsSync(full)) await unlink(full);
     } catch {
       /* ignore missing or unreadable files */

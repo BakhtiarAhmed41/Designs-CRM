@@ -46,6 +46,7 @@ node_modules
 # uploaded files (local storage)
 /uploads
 apps/api/uploads
+apps/api/.uploads-keep-*
 
 # local fix notes (not tracked)
 /fixes.csv
