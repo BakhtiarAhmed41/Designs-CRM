@@ -5,7 +5,7 @@ import { listMyFiles, type MyFile } from '@/lib/designs';
 import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
 import { myDeliveryFileUrl } from '@/lib/orders';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
-import { dateShort, deliveryMethodLabel } from '@/lib/format';
+import { dateShort, deliveryMethodLabel, orderNumber } from '@/lib/format';
 import { serviceCategoryLabel } from '@/lib/serviceIcon';
 import { DeliveryPreview } from '@/components/FilePreview';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -261,7 +261,7 @@ export function PortalFiles() {
                       <td>
                         <div className="on">{g.orderName ?? 'Order'}</div>
                       </td>
-                      <td>{g.humanRef ?? g.orderId.slice(0, 6)}</td>
+                      <td>{orderNumber(g.humanRef, g.orderId.slice(0, 6))}</td>
                       <td className="muted">{serviceCategoryLabel(g.serviceType)}</td>
                       <td>{g.files.length}</td>
                       <td>{deliveryMethodLabel(g.deliveredVia)}</td>

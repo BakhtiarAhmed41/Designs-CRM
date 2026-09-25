@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { listMyOrderSummary, listMyOrders, listQuoteDrafts } from '@/lib/orders';
-import { money, dateShort, quoteLifecycleChip } from '@/lib/format';
+import { money, dateShort, quoteLifecycleChip, orderNumber } from '@/lib/format';
 import { serviceCategoryLabel } from '@/lib/serviceIcon';
 import { isAdminRecounter, studioQuotation } from '@/lib/quoteHelpers';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
@@ -91,7 +91,7 @@ export function PortalQuotes() {
   }
 
   return (
-    <div>
+    <div className="portal-quotes-page">
       <PageHeader
         title="Quotes"
         subtitle="Review your quotes and approve when you’re ready to proceed."
@@ -208,7 +208,7 @@ export function PortalQuotes() {
                   <tr key={o.id} className="click-row" onClick={() => navigate(href)}>
                     <td>
                       <div className="on">{o.name ?? o.serviceType ?? 'Quote request'}</div>
-                      <div className="om">{o.humanRef ?? o.id.slice(0, 6)}</div>
+                      <div className="om">{orderNumber(o.humanRef, o.id.slice(0, 6))}</div>
                     </td>
                     <td className="muted">{serviceCategoryLabel(o.serviceType)}</td>
                     <td>{designCount || '—'}</td>

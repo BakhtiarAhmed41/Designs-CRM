@@ -10,7 +10,7 @@ import { listNotifications, markNotificationRead } from '@/lib/notifications';
 import { datesForPortalPreset, inDateRange, type PortalRangePreset } from '@/lib/dateRange';
 import { useAuth } from '@/context/AuthContext';
 import { freshOnOpen } from '@/lib/queryRefresh';
-import { money, quoteLifecycleChip, customerOrderChip } from '@/lib/format';
+import { money, quoteLifecycleChip, customerOrderChip, orderNumber } from '@/lib/format';
 import { serviceCategoryLabel } from '@/lib/serviceIcon';
 import { portalActivityAction, unreadSections } from '@/lib/portalNew';
 import type { Order } from '@/lib/types';
@@ -285,7 +285,7 @@ export function PortalDashboard() {
                           <td>
                             <div className="on">{o.name ?? o.serviceType ?? 'Order'}</div>
                           </td>
-                          <td className="muted">{o.humanRef ?? o.id.slice(0, 6)}</td>
+                          <td className="muted">{orderNumber(o.humanRef, o.id.slice(0, 6))}</td>
                           <td className="muted">{serviceCategoryLabel(o.serviceType)}</td>
                           <td>
                             <span className={chip.cls}>{chip.label}</span>
@@ -356,7 +356,7 @@ export function PortalDashboard() {
                           <td>
                             <div className="on">{o.name ?? 'Quote request'}</div>
                           </td>
-                          <td className="muted">{o.humanRef ?? o.id.slice(0, 6)}</td>
+                          <td className="muted">{orderNumber(o.humanRef, o.id.slice(0, 6))}</td>
                           <td className="muted">{serviceCategoryLabel(o.serviceType)}</td>
                           <td>
                             <span className={chip.cls}>{chip.label}</span>

@@ -9,7 +9,7 @@ import { SkeletonRows } from '@/components/ui/Skeleton';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { listAdminOrders } from '@/lib/orders';
 import { freshOnOpen } from '@/lib/queryRefresh';
-import { money, dateShort, lifecycleChip } from '@/lib/format';
+import { money, dateShort, lifecycleChip, orderNumber } from '@/lib/format';
 import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
 import type { Order, OrderStatus } from '@/lib/types';
 
@@ -138,8 +138,8 @@ export function AdminOrders() {
                           <i className={`ti ${serviceTi(o.serviceType)}`} />
                         </div>
                         <div>
-                          <div className="on">{o.name || o.humanRef || 'Order'}</div>
-                          <div className="om">{o.humanRef || o.id.slice(0, 8)}</div>
+                          <div className="on">{o.name || orderNumber(o.humanRef) || 'Order'}</div>
+                          <div className="om">{orderNumber(o.humanRef, o.id.slice(0, 8))}</div>
                         </div>
                       </div>
                     </td>

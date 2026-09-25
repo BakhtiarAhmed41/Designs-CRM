@@ -408,11 +408,11 @@ export async function runMigrations() {
   const [legacyRefs] = await conn.query<mysql.RowDataPacket[]>(
     `SELECT id FROM orders
       WHERE human_ref IS NULL
-         OR human_ref NOT REGEXP '^LVD-[0-9]{7}$'`,
+         OR human_ref NOT REGEXP '^[0-9]{10}$'`,
   );
   if (legacyRefs.length > 0) {
     // eslint-disable-next-line no-console
-    console.log(`Converting ${legacyRefs.length} quote/order numbers to LVD + 7 digits ...`);
+    console.log(`Converting ${legacyRefs.length} quote/order numbers to 10 digits ...`);
     const [allRefs] = await conn.query<mysql.RowDataPacket[]>(
       'SELECT human_ref FROM orders WHERE human_ref IS NOT NULL',
     );
@@ -422,13 +422,13 @@ export async function runMigrations() {
     for (const row of legacyRefs) {
       let next = '';
       for (let i = 0; i < 24; i += 1) {
-        const candidate = `LVD-${String(Math.floor(1_000_000 + Math.random() * 9_000_000))}`;
+        const candidate = String(1_000_000_000 + Math.floor(Math.random() * 9_000_000_000));
         if (!used.has(candidate)) {
           next = candidate;
           break;
         }
       }
-      if (!next) next = `LVD-${String(Date.now()).slice(-7)}`;
+      if (!next) next = String(Date.now()).slice(-10);
       used.add(next);
       await conn.query('UPDATE orders SET human_ref = ? WHERE id = ?', [next, row.id]);
     }

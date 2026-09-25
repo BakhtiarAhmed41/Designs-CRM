@@ -29,7 +29,7 @@ import {
   type ConversationStatus,
 } from '@/lib/messaging';
 import { HelpRequestBadge, InboxBulkBar, InboxStarButton } from '@/components/messaging/InboxTools';
-import { dateShort, money, statusChipClass, statusLabel } from '@/lib/format';
+import { dateShort, money, statusChipClass, statusLabel, orderNumber } from '@/lib/format';
 import { useDialog } from '@/components/ui/AppDialog';
 import { canFeature } from '@/lib/permissions';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
@@ -447,11 +447,11 @@ export function AdminCustomerMessages() {
                               startChat.mutate({
                                 chatType: 'ORDER',
                                 orderId: o.id,
-                                subject: o.humanRef ? `Order ${o.humanRef} Chat` : 'Order Chat',
+                                subject: o.humanRef ? `Order ${orderNumber(o.humanRef)} Chat` : 'Order Chat',
                               })
                             }
                           >
-                            <i className="ti ti-package" /> Order {o.humanRef || o.id.slice(0, 6)}
+                            <i className="ti ti-package" /> Order {orderNumber(o.humanRef, o.id.slice(0, 6))}
                           </button>
                         ))}
                         {!hideCustomerDetails &&
@@ -464,12 +464,12 @@ export function AdminCustomerMessages() {
                                   chatType: 'QUOTE',
                                   orderId: o.id,
                                   subject: o.humanRef
-                                    ? `Quotation ${o.humanRef} Chat`
+                                    ? `Quotation ${orderNumber(o.humanRef)} Chat`
                                     : 'Quotation Chat',
                                 })
                               }
                             >
-                              <i className="ti ti-file-invoice" /> Quote {o.humanRef || o.id.slice(0, 6)}
+                              <i className="ti ti-file-invoice" /> Quote {orderNumber(o.humanRef, o.id.slice(0, 6))}
                             </button>
                           ))}
                       </div>
@@ -629,7 +629,7 @@ export function AdminCustomerMessages() {
               {(contextQuery.data?.recentOrders ?? []).map((o) => (
                 <Link key={o.id} to={`/admin/orders/${o.id}`} className="msg-order-row">
                   <div>
-                    <b>{o.humanRef ? `Order ${o.humanRef}` : 'Order'}</b>
+                    <b>{o.humanRef ? `Order ${orderNumber(o.humanRef)}` : 'Order'}</b>
                     <div className="msg-order-date">{dateShort(o.createdAt)}</div>
                   </div>
                   <div className="msg-order-meta">

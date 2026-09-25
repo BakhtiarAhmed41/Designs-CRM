@@ -9,7 +9,9 @@ import {
 import { startMyOrderCheckout } from '@/lib/billing';
 import { openLinkedChat } from '@/lib/messaging';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
-import { dateShort, money, quoteLifecycleChip } from '@/lib/format';
+import { dateShort, money, quoteLifecycleChip, orderNumber } from '@/lib/format';
+import { isCuttingRequest, isEmbroideryRequest, isVectorRequest, serviceOrderKind } from '@/lib/embroideryQuote';
+import { ServiceCustomerOrder } from '@/components/ServiceCustomerOrder';
 import { isAdminRecounter, isStaffCreatedOrder, latestCounter, lineTotal, studioQuotation } from '@/lib/quoteHelpers';
 import type { Order } from '@/lib/types';
 import { applyOrderChange } from '@/lib/queryCache';
@@ -17,6 +19,7 @@ import { freshOnOpen } from '@/lib/queryRefresh';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { QuoteHistory } from '@/components/QuoteHistory';
+import { EmbroideryCustomerQuote } from '@/components/EmbroideryCustomerQuote';
 import { FormPreferencesDisplay } from '@/components/FormPreferencesDisplay';
 
 export function PortalQuoteDetail() {
@@ -98,7 +101,7 @@ export function PortalQuoteDetail() {
         orderId: id,
         chatType: 'QUOTE',
         subject: order?.humanRef
-          ? `Quotation ${order.humanRef} Chat`
+          ? `Quotation ${orderNumber(order.humanRef)} Chat`
           : 'Quotation Chat',
       }),
     onSuccess: (convo) => navigate(`/portal/messages?c=${convo.id}`),
@@ -161,6 +164,10 @@ export function PortalQuoteDetail() {
     );
   }
 
+  if (order.type === 'ORDER' && serviceOrderKind(order)) {
+    return <ServiceCustomerOrder order={order} />;
+  }
+
   if (order.type === 'ORDER') {
     return (
       <EmptyState
@@ -174,6 +181,18 @@ export function PortalQuoteDetail() {
         }
       />
     );
+  }
+
+  if (isEmbroideryRequest(order)) {
+    return <EmbroideryCustomerQuote order={order} />;
+  }
+
+  if (isCuttingRequest(order)) {
+    return <EmbroideryCustomerQuote order={order} kind="cutting" />;
+  }
+
+  if (isVectorRequest(order)) {
+    return <EmbroideryCustomerQuote order={order} kind="vector" />;
   }
 
   const canDecide = order.status === 'QUOTATION_PROVIDED';
@@ -194,10 +213,10 @@ export function PortalQuoteDetail() {
     <div className="qd-page">
       <PageHeader
         title={order.name ?? 'Quote request'}
-        subtitle={`${order.humanRef ?? order.id.slice(0, 6)} · ${dateShort(order.createdAt)}${isStaffCreatedOrder(order) ? ' · Created by the team' : ''}`}
+        subtitle={`${orderNumber(order.humanRef, order.id.slice(0, 6))} · ${dateShort(order.createdAt)}${isStaffCreatedOrder(order) ? ' · Created by the team' : ''}`}
         crumbs={[
           { label: 'Quotes', to: '/portal/quotes' },
-          { label: order.humanRef ?? 'Quote' },
+          { label: orderNumber(order.humanRef, 'Quote') },
         ]}
         actions={
           <div className="qd-hero-actions">

@@ -46,8 +46,8 @@ function isAdminRole(role: UserRole): boolean {
   );
 }
 
-function sevenDigitRef() {
-  return String(Math.floor(1_000_000 + Math.random() * 9_000_000));
+function tenDigitRef() {
+  return String(1_000_000_000 + Math.floor(Math.random() * 9_000_000_000));
 }
 
 function isImageFile(name?: string | null, mime?: string | null) {
@@ -861,14 +861,14 @@ export class OrdersService {
 
   private async nextHumanRef() {
     for (let i = 0; i < 12; i += 1) {
-      const ref = `LVD-${sevenDigitRef()}`;
+      const ref = tenDigitRef();
       const existing = await this.db.queryOne<{ id: string }>(
         'SELECT id FROM orders WHERE human_ref = ? LIMIT 1',
         [ref],
       );
       if (!existing) return ref;
     }
-    return `LVD-${String(Date.now()).slice(-7)}`;
+    return String(Date.now()).slice(-10);
   }
 
   private async recordDeliveryDownload(deliveryFileId: string) {

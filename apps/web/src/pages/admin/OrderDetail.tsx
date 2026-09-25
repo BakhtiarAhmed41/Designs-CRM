@@ -42,12 +42,14 @@ import {
 } from '@/lib/designs';
 import { useDialog } from '@/components/ui/AppDialog';
 import { apiFetch, downloadSignedFile, getErrorMessage, resolveFileUrl } from '@/lib/api';
-import { money, dateShort, lifecycleChip, isImageFile, sameFileName } from '@/lib/format';
+import { money, dateShort, lifecycleChip, isImageFile, sameFileName, orderNumber } from '@/lib/format';
 import { AdminCounterDecision } from '@/components/AdminCounterDecision';
 import { AttachmentPreview, LocalFilePreview } from '@/components/FilePreview';
 import { FormPreferencesDisplay, hasFormPreferences } from '@/components/FormPreferencesDisplay';
 import { MessageAttachments } from '@/components/MessageAttachments';
 import { QuoteHistory } from '@/components/QuoteHistory';
+import { ServiceAdminOrder } from '@/components/ServiceAdminOrder';
+import { serviceOrderKind } from '@/lib/embroideryQuote';
 import { isStaffCreatedOrder, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
 import type { Order, OrderStatus } from '@/lib/types';
 import { useAuth } from '@/context/AuthContext';
@@ -586,7 +588,7 @@ export function AdminOrderDetail() {
         customerId: order?.customerId ?? null,
         chatType: order?.type === 'QUOTE_REQUEST' ? 'QUOTE' : 'ORDER',
         subject: order?.humanRef
-          ? `${order?.type === 'QUOTE_REQUEST' ? 'Quotation' : 'Order'} ${order.humanRef} Chat`
+          ? `${order?.type === 'QUOTE_REQUEST' ? 'Quotation' : 'Order'} ${orderNumber(order.humanRef)} Chat`
           : `${order?.type === 'QUOTE_REQUEST' ? 'Quotation' : 'Order'} #${id.slice(0, 6)} Chat`,
       });
       return sendAdminMessage(created.conversation.id, body, attach);
@@ -614,7 +616,7 @@ export function AdminOrderDetail() {
         chatType: order?.type === 'QUOTE_REQUEST' ? 'QUOTE' : 'ORDER',
         label: 'HELP',
         subject: order?.humanRef
-          ? `Help with order #${order.humanRef}`
+          ? `Help with order ${orderNumber(order.humanRef)}`
           : 'Help request',
       });
       return created.conversation;
@@ -734,6 +736,7 @@ export function AdminOrderDetail() {
 
   if (isLoading) return <div className="empty-state"><div className="empty-state-title">Loading order…</div></div>;
   if (!order) return <div className="empty-state"><div className="empty-state-title">Order not found</div></div>;
+  if (serviceOrderKind(order)) return <ServiceAdminOrder order={order} />;
 
   const designs = order.designs ?? [];
   const requestedFormats = (() => {
@@ -806,11 +809,11 @@ export function AdminOrderDetail() {
             </span>
             <span className="crumb">
               <i className="ti ti-chevron-right" aria-hidden />
-              <span>#{order.humanRef ?? order.id.slice(0, 6)}</span>
+              <span>{orderNumber(order.humanRef, order.id.slice(0, 6))}</span>
             </span>
           </nav>
           <h1>
-            #{order.humanRef ?? order.id.slice(0, 6)} · {order.name ?? 'Order'}
+            {orderNumber(order.humanRef, order.id.slice(0, 6))} · {order.name ?? 'Order'}
           </h1>
           <div style={{ marginTop: 8 }}>
             <span className={orderChip.cls}>{orderChip.label}</span>
@@ -1935,7 +1938,7 @@ export function AdminOrderDetail() {
 
       {showRevision && (
         <RevisionModal
-          orderRef={order.humanRef ?? order.id.slice(0, 6)}
+          orderRef={orderNumber(order.humanRef, order.id.slice(0, 6))}
           defaultDesignerId={order.assignedDesignerId ?? ''}
           designers={designers}
           designs={designs}
@@ -1953,7 +1956,7 @@ export function AdminOrderDetail() {
       {showRefund && (
         <RefundModal
           orderId={id}
-          orderRef={order.humanRef ?? order.id.slice(0, 6)}
+          orderRef={orderNumber(order.humanRef, order.id.slice(0, 6))}
           priceCents={order.priceCents}
           onClose={() => setShowRefund(false)}
           onDone={() => {

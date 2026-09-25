@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="embed.css">
+<script>if(window.parent!==window)document.documentElement.classList.add('in-frame');</script>
 <style>
 :root{--accent:#1B1D22;--accent-soft:#F2F3F5;--accent-dark:#33373D;--ink:#1B1D22;--ink-soft:#2C2F35;--muted:#4B5563;--border:#C7C9CE;--border-soft:#D8D9DD;--bg:#FFFFFF;--page:#FFFFFF;--icon-bg:#F2F3F5;--warn-bg:#FCF3DF;--warn-ink:#8A5A0A;--warn-border:#F0DDA6;--ok-bg:#E7F5EC;--ok-ink:#2E7D4F;--ok-border:#BEE3CB;--stitch:rgba(27,29,34,.5)}
 *{box-sizing:border-box}
@@ -112,7 +114,7 @@ select option:checked,select option:hover{background:var(--accent-soft);color:va
 .segmented input:focus-visible+label{outline:2px solid var(--accent);outline-offset:2px}
 
 /* Design cards */
-.design-card{background:var(--bg);border:1px solid var(--border);border-radius:16px;margin-bottom:14px;overflow:visible}
+.design-card{background:var(--bg);border:1px solid var(--border);border-radius:16px;margin-bottom:14px;overflow:hidden}
 .design-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border-soft)}
 .dtitle{display:flex;align-items:center;gap:10px;font-size:12.5px;font-weight:500}
 .design-num{width:24px;height:24px;border-radius:8px;background:var(--accent-soft);color:var(--accent);font-size:11px;font-weight:600;display:grid;place-items:center}
@@ -120,12 +122,7 @@ select option:checked,select option:hover{background:var(--accent-soft);color:va
 .remove-design,.remove-size{background:none;border:none;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500}
 .remove-design svg,.remove-size svg{width:13px;height:13px}
 .remove-design:hover,.remove-size:hover{color:var(--accent)}
-.dropzone{position:relative;border:1.5px dashed var(--stitch);border-radius:12px;padding:20px 14px;text-align:center;cursor:pointer;background:var(--page);transition:border-color .12s ease,background .12s ease}
-.dz-badge{position:absolute;top:10px;left:10px;padding:3px 8px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.02em}
-.dropzone-art{border-color:#c9a4a8;background:#fff8f8}
-.dropzone-art .dz-badge{background:#f3e4e5;color:#7C1F2B}
-.dropzone-ref{border-color:#b7c0cc;background:#f7f9fc}
-.dropzone-ref .dz-badge{background:#e4e9f0;color:#3d4d63}
+.dropzone{border:1.5px dashed var(--stitch);border-radius:12px;padding:20px 14px;text-align:center;cursor:pointer;background:var(--page);transition:border-color .12s ease,background .12s ease}
 .dropzone:hover{border-color:var(--accent);background:var(--accent-soft)}
 .dz-ico{width:38px;height:38px;border-radius:50%;background:var(--bg);color:var(--accent);display:grid;place-items:center;margin:0 auto 9px}
 .dz-ico svg{width:18px;height:18px}
@@ -404,25 +401,38 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
 .form-actions{margin-top:14px;padding-top:12px}
 
 /* ---- Custom dropdown (replaces native <select> for Services) ---- */
-.csel{position:relative;z-index:2}
-.csel.is-open{z-index:80}
+.csel{position:relative}
 .csel-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--border);border-radius:10px;padding:9px 12px;font-size:12px;color:var(--ink);background:var(--bg);cursor:pointer;text-align:left;box-shadow:0 1px 2px rgba(27,29,34,.08)}
 .csel-trigger:hover{background:#F5F5F6;border-color:#C7C9CE}
 .csel-trigger svg{width:15px;height:15px;stroke:#6B7280;flex-shrink:0;transition:transform .12s ease}
 .csel.is-open .csel-trigger svg{transform:rotate(180deg)}
 .csel.is-open .csel-trigger{border-color:#C7C9CE;background:#F5F5F6}
-.csel-menu{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--bg);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 20px rgba(20,20,25,.12);padding:4px;z-index:40;display:none;max-height:min(320px,60vh);overflow:auto}
+.csel-menu{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--bg);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 20px rgba(20,20,25,.12);padding:4px;z-index:40;display:none;max-height:240px;overflow:auto}
 .csel.is-open .csel-menu{display:block}
 .csel-option{padding:8px 10px;font-size:12px;color:var(--ink);border-radius:7px;cursor:pointer}
 .csel-option:hover{background:#F0F0F1}
 .csel-option.is-selected{background:#F5F5F6;font-weight:600}
+.artwork{margin-bottom:10px}
+.artwork .field{margin-bottom:0}
 .topbar-inner{padding:10px 28px}
 .help{padding:14px}
 .rail{gap:10px}
 @media (max-width:640px){.layout{padding-top:18px;padding-bottom:28px}.step{padding-bottom:20px}}
+
+/* ---- Structure realignment with embroidery reference form: card header, type scale, format layout ---- */
+.dname-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
+.dname-label{display:flex;align-items:center;gap:8px;margin-bottom:0}
+.step-head h2{font-size:20px}
+#s-formats .step-head h2,#s-turn .step-head h2{font-size:18px}
+.flabel{font-size:13.5px}
+.dz-title{font-size:13.5px}
+.check-row{font-size:13.5px}
+.page-id h1{font-size:19px}
+.help h3{font-size:14.5px}
+.note-banner{font-size:12.5px}
+#otherFormatRow{grid-column:span 2}
+.format-grid>#otherFormatField{grid-column:1/-1}
 </style>
-<link rel="stylesheet" href="embed.css">
-<script>if(window.parent!==window)document.documentElement.classList.add('in-frame');</script>
 </head>
 <body>
 
@@ -503,25 +513,27 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
       <span class="step-num">2</span>
       <div class="step-head">
         <div>
-          <h2>Format Files</h2>
-          <p>Choose the file formats you need, or let us recommend the best options</p>
+          <h2>File Formats</h2>
+          <p>Choose the formats you need, or let us recommend the best options</p>
         </div>
       </div>
       <div class="format-grid" id="formatGrid">
-        <label class="format-chip"><input type="checkbox" name="format" value="PNG"><span>PNG</span></label>
+        <label class="format-chip"><input type="checkbox" name="format" value="AI"><span>AI</span></label>
+        <label class="format-chip"><input type="checkbox" name="format" value="PS"><span>PS</span></label>
+        <label class="format-chip"><input type="checkbox" name="format" value="SVG"><span>SVG</span></label>
         <label class="format-chip"><input type="checkbox" name="format" value="PDF"><span>PDF</span></label>
+        <label class="format-chip"><input type="checkbox" name="format" value="CDR"><span>CDR</span></label>
+        <label class="format-chip"><input type="checkbox" name="format" value="PNG"><span>PNG</span></label>
         <label class="format-chip"><input type="checkbox" name="format" value="JPEG"><span>JPEG</span></label>
         <label class="format-chip"><input type="checkbox" name="format" value="Proof Preview"><span>Proof Preview</span></label>
-        <label class="format-chip"><input type="checkbox" name="format" value="SVG"><span>SVG</span></label>
-        <label class="format-chip"><input type="checkbox" name="format" value="AI"><span>AI</span></label>
-        <label class="format-chip"><input type="checkbox" name="format" value="EPS"><span>EPS</span></label>
-        <label class="format-chip"><input type="checkbox" name="format" value="CDR"><span>CDR</span></label>
-        <div class="other-format-row">
-          <label class="check-row other-check"><input type="checkbox" id="otherFormatCheck">Need another format?</label>
-          <div class="format-other" id="otherFormatField" style="display:none;">
-            <input type="text" placeholder="Tell us the format you need">
-          </div>
+        <label class="check-row other-check" id="otherFormatRow"><input type="checkbox" id="otherFormatCheck">Need another format?</label>
+        <div class="format-other" id="otherFormatField" style="display:none;">
+          <input type="text" placeholder="Tell us the format you need">
         </div>
+      </div>
+      <div class="note-banner">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+        Production Sheet (PDF) and Design Preview (PNG) are always included.
       </div>
     </section>
 
@@ -535,7 +547,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
       </div>
       <div class="turn-grid">
         <label class="turn-option">
-          <input type="radio" name="turnaround" checked>
+          <input type="radio" name="turnaround" value="standard" checked>
           <div class="turn-inner">
             <div class="turn-top">
               <div class="turn-left"><span class="turn-radio"></span><span class="turn-name">Standard</span></div>
@@ -546,7 +558,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
           </div>
         </label>
         <label class="turn-option">
-          <input type="radio" name="turnaround">
+          <input type="radio" name="turnaround" value="urgent">
           <div class="turn-inner">
             <div class="turn-top">
               <div class="turn-left"><span class="turn-radio"></span><span class="turn-name">Rush</span></div>
@@ -574,7 +586,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
   <aside class="rail">
     <nav class="steps" aria-label="Form sections">
       <a class="on" href="#s-designs"><b>1</b>Designs</a>
-      <a href="#s-formats"><b>2</b>Format files</a>
+      <a href="#s-formats"><b>2</b>File Formats</a>
       <a href="#s-turn"><b>3</b>Turnaround Time</a>
     </nav>
 
@@ -608,20 +620,17 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
   function designCardTemplate(n){
     return `
       <div class="design-card" data-design-card>
-        <div class="design-head">
-          <div class="dtitle">
-            <span data-design-label>Design ${n}</span>
-          </div>
-          <button type="button" class="remove-design" data-remove-design style="${n === 1 ? 'display:none' : ''}">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
-            Remove design
-          </button>
-        </div>
         <div class="card-body">
           <div class="grid-2">
             <div class="field">
-              <label class="flabel">Project Name <span class="opt">(optional)</span></label>
-              <input type="text" placeholder="e.g. Tractor logo, military design">
+              <div class="dname-top">
+                <label class="flabel dname-label"><span class="design-num" data-design-num>${n}</span>Design Name</label>
+                <button type="button" class="remove-design" data-remove-design style="${n === 1 ? 'display:none' : ''}">
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
+                  Remove design
+                </button>
+              </div>
+              <input type="text" placeholder="e.g. Tractor logo, military design" data-design-name>
             </div>
             <div class="field">
               <label class="flabel">Services</label>
@@ -636,53 +645,52 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
             </div>
           </div>
 
-          <div class="drop-row">
-            <div class="field">
-              <label class="flabel">Artwork <span class="opt">(at least one file required)</span></label>
-              <div class="dropzone dropzone-art" data-dropzone>
-                <span class="dz-badge">Artwork</span>
-                <span class="dz-ico">${upIcon}</span>
-                <div class="dz-title">Upload your artwork</div>
-                <div class="dz-sub">PNG, JPG, PDF, AI, EPS or SVG</div>
-                <input type="file" multiple data-file-input>
+          <div class="artwork">
+            <div class="drop-row">
+              <div class="field">
+                <label class="flabel">Artwork <span class="opt">(at least one file required)</span></label>
+                <div class="dropzone" data-dropzone>
+                  <span class="dz-ico">${upIcon}</span>
+                  <div class="dz-title">Upload your artwork</div>
+                  <div class="dz-sub">PNG, JPG, PDF, AI, EPS or SVG — add as many files as you need</div>
+                  <input type="file" multiple data-file-input>
+                </div>
+                <div class="file-list" data-file-list></div>
               </div>
-              <div class="file-list file-list-art" data-file-list></div>
-            </div>
-            <div class="field">
-              <label class="flabel">Reference <span class="opt">(optional)</span></label>
-              <div class="dropzone dropzone-ref" data-dropzone-ref>
-                <span class="dz-badge">Reference</span>
-                <span class="dz-ico">${upIcon}</span>
-                <div class="dz-title">Add a reference</div>
-                <div class="dz-sub">Upload an example of the style or result you want</div>
-                <input type="file" multiple data-file-input-ref>
+              <div class="field">
+                <label class="flabel">Reference <span class="opt">(optional)</span></label>
+                <div class="dropzone" data-dropzone-ref>
+                  <span class="dz-ico">${upIcon}</span>
+                  <div class="dz-title">Add a reference</div>
+                  <div class="dz-sub">Upload an example of the style or result you want</div>
+                  <input type="file" multiple data-file-input-ref>
+                </div>
+                <div class="file-list" data-file-list-ref></div>
               </div>
-              <div class="file-list file-list-ref" data-file-list-ref></div>
             </div>
-          </div>
-
-          <div class="field notes">
-            <label class="flabel pref-title">Artwork Preferences</label>
-            <div class="pref-grid">
-              <div>
-                <label class="flabel">Background</label>
-                <div class="radio-group">
-                  <label class="radio-row"><input type="radio" name="bg-${n}" checked>Transparent</label>
-                  <label class="radio-row"><input type="radio" name="bg-${n}">Keep original</label>
-                  <label class="radio-row"><input type="radio" name="bg-${n}">Not sure</label>
+            <div class="field notes">
+              <label class="flabel pref-title">Artwork Preferences</label>
+              <div class="pref-grid">
+                <div>
+                  <label class="flabel">Background</label>
+                  <div class="radio-group">
+                    <label class="radio-row"><input type="radio" name="bg-${n}" checked>Transparent</label>
+                    <label class="radio-row"><input type="radio" name="bg-${n}">Keep original</label>
+                    <label class="radio-row"><input type="radio" name="bg-${n}">Not sure</label>
+                  </div>
+                </div>
+                <div>
+                  <label class="flabel">Color Mode</label>
+                  <div class="radio-group">
+                    <label class="radio-row"><input type="radio" name="cmode-${n}" checked>RGB</label>
+                    <label class="radio-row"><input type="radio" name="cmode-${n}">CMYK</label>
+                    <label class="radio-row"><input type="radio" name="cmode-${n}">Recommend for Me</label>
+                  </div>
                 </div>
               </div>
-              <div>
-                <label class="flabel">Color Mode</label>
-                <div class="radio-group">
-                  <label class="radio-row"><input type="radio" name="cmode-${n}" checked>RGB</label>
-                  <label class="radio-row"><input type="radio" name="cmode-${n}">CMYK</label>
-                  <label class="radio-row"><input type="radio" name="cmode-${n}">Recommend for Me</label>
-                </div>
-              </div>
+              <label class="check-row"><input type="checkbox" checked>Prepare at 300 DPI</label>
+              <p class="hint-text">Not sure? Leave the default options selected and our team will prepare the correct settings.</p>
             </div>
-            <label class="check-row"><input type="checkbox" checked>Prepare at 300 DPI</label>
-            <p class="hint-text">Not sure? Leave the default options selected and our team will prepare the correct settings.</p>
           </div>
 
           <div class="field notes">
@@ -751,7 +759,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
 
   function renumberDesigns(){
     designsContainer.querySelectorAll('[data-design-card]').forEach((card, i) => {
-      card.querySelector('[data-design-label]').textContent = `Design ${i + 1}`;
+      card.querySelector('[data-design-num]').textContent = i + 1;
     });
     const btns = designsContainer.querySelectorAll('[data-remove-design]');
     btns.forEach(b => { b.style.display = btns.length > 1 ? '' : 'none'; });
@@ -819,6 +827,14 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
   addEventListener('resize', updateSteps);
   updateSteps();
 
+  function designHasArtwork(card){
+    const input = card.querySelector('[data-file-input]');
+    if(!input) return false;
+    const bag = input._lvdFiles && input._lvdFiles.length
+      ? input._lvdFiles
+      : (input.files ? Array.from(input.files) : []);
+    return bag.length > 0;
+  }
   document.getElementById('cancelBtn').addEventListener('click', () => {
     parent.postMessage({ type: 'lvd-quote-cancel' }, '*');
   });
@@ -828,6 +844,17 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
   document.getElementById('submitBtn').addEventListener('click', () => {
     const btn = document.getElementById('submitBtn');
     if(btn.dataset.busy === '1') return;
+    const cards = [...document.querySelectorAll('[data-design-card]')];
+    const unnamed = cards.some(card => !card.querySelector('[data-design-name]').value.trim());
+    if(unnamed){
+      alert('Add a name for each design before submitting.');
+      return;
+    }
+    const missingArt = cards.some(card => !designHasArtwork(card));
+    if(missingArt){
+      alert('Upload at least one artwork file for each design.');
+      return;
+    }
     btn.dataset.busy = '1';
     btn.disabled = true;
     parent.postMessage({ type: 'lvd-quote-submit' }, '*');

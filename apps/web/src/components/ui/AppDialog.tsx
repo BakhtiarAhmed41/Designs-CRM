@@ -21,6 +21,7 @@ export type AlertOptions = {
   title: string;
   message?: string;
   confirmLabel?: string;
+  tone?: 'success';
 };
 
 export type PromptOptions = {
@@ -112,7 +113,8 @@ export function DialogProvider({ children }: { children: ReactNode }) {
 
   const api = { confirm, alert, prompt };
   const danger = dialog?.kind === 'confirm' && dialog.danger;
-  const icon = dialog?.kind === 'alert' ? 'ti-info-circle' : danger ? 'ti-trash' : 'ti-help';
+  const success = dialog?.kind === 'alert' && dialog.tone === 'success';
+  const icon = success ? 'ti-circle-check' : dialog?.kind === 'alert' ? 'ti-info-circle' : danger ? 'ti-trash' : 'ti-help';
 
   return (
     <DialogContext.Provider value={api}>
@@ -134,7 +136,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
             aria-labelledby={titleId}
             aria-describedby={dialog.message ? descId : undefined}
           >
-            <div className={`app-dialog-icon${danger ? ' danger' : ''}`}>
+            <div className={`app-dialog-icon${danger ? ' danger' : ''}${success ? ' success' : ''}`}>
               <i className={`ti ${icon}`} />
             </div>
             <div className="app-dialog-copy">

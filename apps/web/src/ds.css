@@ -972,6 +972,10 @@ form > .btn-primary {
   background: var(--tint-m);
   color: var(--maroon);
 }
+.app-dialog-icon.success {
+  background: #e7f5ec;
+  color: #2e7d4f;
+}
 .app-dialog-title {
   margin: 0;
   font-size: 16.5px;

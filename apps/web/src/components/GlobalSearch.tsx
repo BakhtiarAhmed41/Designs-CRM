@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { globalSearch } from '@/lib/messaging';
+import { orderNumber } from '@/lib/format';
 
 /**
  * Admin global search matching prototype `.searchbar` chrome.
@@ -84,7 +85,7 @@ export function GlobalSearch({
                   <div>
                     <div className="sd-t">{o.name || o.ref || 'Order'}</div>
                     <div className="sd-s">
-                      #{o.ref ?? o.id.slice(0, 6)} · {o.status}
+                      {orderNumber(o.ref, o.id.slice(0, 6))} · {o.status}
                     </div>
                   </div>
                 </div>

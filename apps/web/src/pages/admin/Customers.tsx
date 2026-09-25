@@ -15,7 +15,7 @@ import {
   type NetTerms,
 } from '@/lib/customers';
 import { getErrorMessage } from '@/lib/api';
-import { money, dateShort, statusChipClass, statusLabel } from '@/lib/format';
+import { money, dateShort, statusChipClass, statusLabel, orderNumber } from '@/lib/format';
 import type { OrderStatus } from '@/lib/types';
 import { useDialog } from '@/components/ui/AppDialog';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
@@ -456,7 +456,7 @@ function CustomerDetailModal({
                       <div className="cust-order-price">{money(o.priceCents, o.currency)}</div>
                     </div>
                     <div className="cust-order-meta">
-                      #{o.humanRef ?? o.id.slice(0, 6)} · {dateShort(o.createdAt)}
+                      {orderNumber(o.humanRef, o.id.slice(0, 6))} · {dateShort(o.createdAt)}
                     </div>
                     <span className={statusChipClass(o.status as OrderStatus)}>
                       {statusLabel(o.status as OrderStatus)}

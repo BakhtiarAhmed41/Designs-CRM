@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/context/AuthContext';
 import { listMyWork } from '@/lib/team';
 import { freshOnOpen } from '@/lib/queryRefresh';
-import { dateShort } from '@/lib/format';
+import { dateShort, orderNumber } from '@/lib/format';
 import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
 import type { OrderStatus } from '@/lib/types';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -112,7 +112,7 @@ export function AdminMyWork() {
                       </div>
                       <div>
                         <div className="on">{o.name ?? 'Order'}</div>
-                        <div className="om">{o.humanRef ?? o.id.slice(0, 6)}</div>
+                        <div className="om">{orderNumber(o.humanRef, o.id.slice(0, 6))}</div>
                       </div>
                     </div>
                   </td>

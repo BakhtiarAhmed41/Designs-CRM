@@ -221,7 +221,8 @@
       });
       var svcInp =
         card.querySelector('.grid-2 [data-csel-input]') ||
-        card.querySelector('[data-design-service]');
+        card.querySelector('[data-design-service]') ||
+        card.querySelector('select[data-service]');
       var artworkNames = [];
       var referenceNames = [];
       var fileNames = [];
@@ -629,6 +630,11 @@
     if (nameInp && draft.name) nameInp.value = draft.name;
     var svcInp = card.querySelector('.grid-2 [data-csel-input]');
     if (svcInp && draft.service) setCustomSelect(svcInp, draft.service);
+    var svcSel = card.querySelector('select[data-service]');
+    if (svcSel && draft.service) {
+      svcSel.value = draft.service;
+      if (svcSel._cselSync) svcSel._cselSync();
+    }
     var ta = card.querySelector('textarea');
     if (ta && draft.notes && !ta.value.trim()) ta.value = draft.notes;
     if (draft.background) {
@@ -673,6 +679,8 @@
         placeSel.value = s.placement;
         if (placeSel._cselSync) placeSel._cselSync();
       }
+      var keepBox = row.querySelector('.check-row input[type="checkbox"]');
+      if (keepBox && typeof s.keepProportional === 'boolean') keepBox.checked = s.keepProportional;
     });
     var inline = card.querySelectorAll('.size-inline input[type="text"]');
     var wh = (draft.sizes || []).find(function (s) { return s.w || s.h; });

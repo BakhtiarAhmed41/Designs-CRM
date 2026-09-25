@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { listAdminEdits, updateAdminEdit, type EditRequest, type EditStatus } from '@/lib/edits';
 import { listTeam } from '@/lib/team';
 import { getErrorMessage } from '@/lib/api';
-import { money, dateShort } from '@/lib/format';
+import { money, dateShort, orderNumber } from '@/lib/format';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -191,7 +191,7 @@ function EditRow({
       <div className="oinfo">
         <div className="on">{e.orderName ?? 'Revision'}</div>
         <div className="om">
-          <span>#{e.orderRef ?? e.orderId.slice(0, 6)}{designer}</span>
+          <span>{orderNumber(e.orderRef, e.orderId.slice(0, 6))}{designer}</span>
           <span className="item-date">{dateShort(e.createdAt)}</span>
         </div>
         {e.note ? (

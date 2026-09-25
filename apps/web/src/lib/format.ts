@@ -54,6 +54,15 @@ export function sameFileName(a?: string | null, b?: string | null) {
   return ba === bb || ba.endsWith(bb) || bb.endsWith(ba);
 }
 
+/** Quote and order numbers are 10 digits, shown as #1326379573. */
+export function orderNumber(ref?: string | null, fallback?: string | null): string {
+  const digits = (ref ?? '').replace(/\D/g, '');
+  if (digits.length === 10) return `#${digits}`;
+  if (!ref?.trim() && fallback) return fallback;
+  if (digits) return `#${digits}`;
+  return fallback ?? '';
+}
+
 export function money(cents: number | null | undefined, currency = 'USD'): string {
   if (cents == null) return '-';
   const amount = cents / 100;

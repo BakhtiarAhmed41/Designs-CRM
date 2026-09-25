@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="embed.css">
+<script>if(window.parent!==window)document.documentElement.classList.add('in-frame');</script>
 <style>
 :root{--accent:#1B1D22;--accent-soft:#F2F3F5;--accent-dark:#33373D;--ink:#1B1D22;--ink-soft:#2C2F35;--muted:#4B5563;--border:#C7C9CE;--border-soft:#D8D9DD;--bg:#FFFFFF;--page:#FFFFFF;--icon-bg:#F2F3F5;--warn-bg:#FCF3DF;--warn-ink:#8A5A0A;--warn-border:#F0DDA6;--ok-bg:#E7F5EC;--ok-ink:#2E7D4F;--ok-border:#BEE3CB;--stitch:rgba(27,29,34,.5)}
 *{box-sizing:border-box}
@@ -71,7 +73,7 @@ svg{stroke:currentColor}
 .help{background:var(--accent-soft);border-radius:16px;padding:18px}
 .help-icon{width:34px;height:34px;border-radius:10px;background:var(--bg);color:var(--accent);display:grid;place-items:center;margin-bottom:12px}
 .help-icon svg{width:16px;height:16px}
-.help h3{font-size:12.5px;font-weight:600;margin:0 0 6px}
+.help h3{font-size:14.5px;font-weight:600;margin:0 0 6px}
 .help p{font-size:11px;color:var(--ink-soft);line-height:1.55;margin:0 0 14px}
 .help .btn{width:100%;background:var(--bg);color:var(--accent);border-color:transparent}
 .help .btn:hover{border-color:var(--accent)}
@@ -84,13 +86,13 @@ svg{stroke:currentColor}
 .step:last-child::before{display:none}
 .step-num{position:absolute;left:0;top:0;width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;font-weight:600;font-size:11.5px;display:grid;place-items:center}
 .step-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:18px;min-height:32px}
-.step-head h2{font-size:17px;font-weight:600;letter-spacing:-.01em;margin:0 0 3px;line-height:1.3}
+.step-head h2{font-size:20px;font-weight:600;letter-spacing:-.01em;margin:0 0 3px;line-height:1.3}
 .step-head p{font-size:11.5px;color:var(--muted);margin:0;line-height:1.45}
 
 /* Fields */
 .field{margin-bottom:14px}
 .field:last-child{margin-bottom:0}
-.flabel{display:block;font-size:11px;font-weight:500;margin-bottom:6px;color:var(--ink)}
+.flabel{display:block;font-size:13.5px;font-weight:500;margin-bottom:6px;color:var(--ink)}
 .flabel .opt{font-weight:400;color:var(--muted)}
 input[type="text"],select,textarea{width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12px;color:var(--ink);background:var(--bg);outline:none;accent-color:var(--accent);transition:border-color .12s ease,box-shadow .12s ease}
 input[type="text"]:hover,select:hover,textarea:hover{border-color:var(--accent)}
@@ -101,7 +103,7 @@ select:hover{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://ww
 select option:checked,select option:hover{background:var(--accent-soft);color:var(--accent)}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .drop-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.check-row{display:flex;align-items:center;gap:9px;font-size:11.5px;color:var(--ink);cursor:pointer;user-select:none}
+.check-row{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--ink);cursor:pointer;user-select:none}
 .check-row input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;margin:0}
 
 /* Unit */
@@ -112,24 +114,19 @@ select option:checked,select option:hover{background:var(--accent-soft);color:va
 .segmented input:focus-visible+label{outline:2px solid var(--accent);outline-offset:2px}
 
 /* Design cards */
-.design-card{background:var(--bg);border:1px solid var(--border);border-radius:16px;margin-bottom:14px;overflow:visible}
+.design-card{background:var(--bg);border:1px solid var(--border);border-radius:16px;margin-bottom:14px;overflow:hidden}
 .design-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border-soft)}
-.dtitle{display:flex;align-items:center;gap:10px;font-size:12.5px;font-weight:500}
+.dtitle{display:flex;align-items:center;gap:10px;font-size:14.5px;font-weight:600}
 .design-num{width:24px;height:24px;border-radius:8px;background:var(--accent-soft);color:var(--accent);font-size:11px;font-weight:600;display:grid;place-items:center}
 .card-body{padding:18px}
 .remove-design,.remove-size{background:none;border:none;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500}
 .remove-design svg,.remove-size svg{width:13px;height:13px}
 .remove-design:hover,.remove-size:hover{color:var(--accent)}
-.dropzone{position:relative;border:1.5px dashed var(--stitch);border-radius:12px;padding:20px 14px;text-align:center;cursor:pointer;background:var(--page);transition:border-color .12s ease,background .12s ease}
-.dz-badge{position:absolute;top:10px;left:10px;padding:3px 8px;border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.02em}
-.dropzone-art{border-color:#c9a4a8;background:#fff8f8}
-.dropzone-art .dz-badge{background:#f3e4e5;color:#7C1F2B}
-.dropzone-ref{border-color:#b7c0cc;background:#f7f9fc}
-.dropzone-ref .dz-badge{background:#e4e9f0;color:#3d4d63}
+.dropzone{border:1.5px dashed var(--stitch);border-radius:12px;padding:20px 14px;text-align:center;cursor:pointer;background:var(--page);transition:border-color .12s ease,background .12s ease}
 .dropzone:hover{border-color:var(--accent);background:var(--accent-soft)}
 .dz-ico{width:38px;height:38px;border-radius:50%;background:var(--bg);color:var(--accent);display:grid;place-items:center;margin:0 auto 9px}
 .dz-ico svg{width:18px;height:18px}
-.dz-title{font-size:11.5px;font-weight:500;margin-bottom:2px}
+.dz-title{font-size:13.5px;font-weight:500;margin-bottom:2px}
 .dz-sub{font-size:10.5px;color:var(--muted);line-height:1.4}
 .dropzone input[type="file"]{display:none}
 .file-list{margin-top:8px;display:flex;flex-direction:column;gap:5px}
@@ -140,7 +137,7 @@ select option:checked,select option:hover{background:var(--accent-soft);color:va
 .file-chip button:hover{color:var(--accent)}
 .size-row{background:var(--page);border:1px solid var(--border-soft);border-radius:12px;padding:14px;margin-top:10px}
 .size-row-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
-.stag{font-size:11px;font-weight:500;color:var(--ink-soft)}
+.stag{font-size:13px;font-weight:500;color:var(--ink-soft)}
 .add-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;width:100%;background:var(--bg);border:1.5px dashed var(--stitch);color:var(--accent);font-weight:500;font-size:11px;padding:10px 16px;border-radius:10px;cursor:pointer;transition:border-color .12s ease,background .12s ease}
 .add-btn:hover{border-color:var(--accent);background:var(--accent-soft)}
 .add-btn svg{width:14px;height:14px}
@@ -205,7 +202,7 @@ select option:checked,select option:hover{background:var(--accent-soft);color:va
 .page-id{display:flex;align-items:center;gap:13px;min-width:0}
 .page-icon{width:40px;height:40px;border-radius:11px;background:#F2F3F5;color:#fff;display:grid;place-items:center;flex-shrink:0;overflow:hidden}
 .page-icon svg{width:19px;height:19px}
-.page-id h1{font-size:15.5px;font-weight:600;letter-spacing:-.01em;margin:0;line-height:1.3}
+.page-id h1{font-size:19px;font-weight:600;letter-spacing:-.01em;margin:0;line-height:1.3}
 .page-id p{margin:1px 0 0;font-size:11px;color:var(--muted);line-height:1.4}
 .page-id p a{color:var(--ink);font-weight:500;text-underline-offset:2px}
 .top-right{display:flex;align-items:center;gap:12px;flex-shrink:0}
@@ -241,7 +238,7 @@ input[type="text"]:focus,select:focus,textarea:focus{border-color:var(--ink);box
 @media (max-width:640px){.form-actions{gap:6px}.form-actions .btn{padding:0 10px;font-size:11px;flex-shrink:1;min-width:0}.form-actions .btn svg{display:none}}
 .unit-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 16px;border:1px solid var(--border);border-radius:12px;margin-bottom:16px}
 .unit-text{display:flex;flex-direction:column;gap:2px;min-width:0}
-.unit-row .flabel{margin:0;font-size:12px}
+.unit-row .flabel{margin:0;font-size:13.5px}
 .unit-row select{width:92px;flex-shrink:0}
 .unit-hint{font-size:11px;color:var(--muted)}
 .turn-grid{grid-template-columns:repeat(2,minmax(0,310px));gap:10px}
@@ -251,23 +248,23 @@ input[type="text"]:focus,select:focus,textarea:focus{border-color:var(--ink);box
 .turn-time{font-size:12.5px;margin:2px 0 0 25px}
 .turn-desc{font-size:10.5px;line-height:1.4;margin-left:25px}
 .badge{font-size:9.5px;padding:2px 8px}
-.note-banner{padding:9px 12px;font-size:10.5px;margin-top:10px;max-width:630px}
+.note-banner{padding:9px 12px;font-size:12.5px;margin-top:10px;max-width:630px}
 @media (max-width:640px){.turn-grid{grid-template-columns:1fr}}
 input:focus-visible,select:focus-visible,textarea:focus-visible{outline:none}
 #s-formats{padding-bottom:26px}
 #s-formats .step-head,#s-turn .step-head{margin-bottom:12px;min-height:0}
-#s-formats .step-head h2,#s-turn .step-head h2{font-size:15.5px}
+#s-formats .step-head h2,#s-turn .step-head h2{font-size:18px}
 #s-formats .step-head p,#s-turn .step-head p{font-size:11px}
-.format-grid{gap:6px}
+.format-grid{gap:5px}
 .format-chip span{min-width:54px;padding:7px 12px;font-size:11px;border-radius:8px}
-#s-formats .check-row{font-size:11px}
+#s-formats .check-row{font-size:13.5px}
 .form-actions{margin-top:28px}
 /* Compact sizing */
 .btn{height:36px}
 .btn-primary,.form-actions .btn{height:38px}
 input[type="text"],textarea{padding:8px 11px}
 select{padding-top:8px;padding-bottom:8px;padding-left:11px}
-.format-chip span{min-width:0;padding:6px 8px}
+.format-chip span{min-width:0;padding:5px 4px;font-size:10.5px}
 .nav-item{padding:7px 12px}
 .nav-item svg{width:16px;height:16px}
 .nav-label{padding:14px 12px 6px}
@@ -292,11 +289,11 @@ select{padding-top:8px;padding-bottom:8px;padding-left:11px}
 .unit-row{display:flex;flex-wrap:nowrap;justify-content:flex-start;align-items:stretch;gap:20px;width:fit-content;max-width:100%;padding:12px 16px;background:#FFFFFF;border:1px solid var(--border);border-radius:12px;margin-bottom:16px}
 .unit-item{flex-direction:column;align-items:flex-start;gap:6px}
 .unit-item+.unit-item{border-left:1px solid var(--border);padding-left:20px}
-.unit-row .flabel{font-size:11.5px;font-weight:500;color:var(--muted)}
+.unit-row .flabel{font-size:13.5px;font-weight:500;color:var(--muted)}
 .unit-row select{width:120px}
 .unit-row{flex-wrap:wrap;align-items:center;gap:12px 20px;padding:10px 14px}
 .unit-item{flex-direction:row;align-items:center;gap:10px}
-.unit-row .flabel{font-size:12px;font-weight:500;color:var(--ink-soft);white-space:nowrap}
+.unit-row .flabel{font-size:13.5px;font-weight:500;color:var(--ink-soft);white-space:nowrap}
 .unit-row select{width:76px}
 .unit-row,.unit-row select{background-color:#FFFFFF!important;box-shadow:none}
 /* Fill empty space: unit row stretches full width */
@@ -320,7 +317,7 @@ textarea{min-height:60px}
 .unit-row{margin-bottom:12px}
 /* Compact step 1 + inline format option */
 .format-grid{align-items:center}
-.other-check{margin-left:8px;font-size:12.5px;white-space:nowrap}
+.other-check{margin-left:4px;font-size:12.5px;white-space:nowrap}
 #otherFormatField{margin-top:0}
 .add-btn{width:auto;padding:7px 14px}
 .add-design-btn{padding:8px 16px}
@@ -352,7 +349,8 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
 .format-grid{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:8px;align-items:stretch}
 .format-chip{min-width:0}
 .format-chip span{width:100%;height:100%}
-.other-format-row{grid-column:1/-1;display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-top:2px}
+.other-format-row,#otherFormatRow{grid-column:span 2;display:flex;align-items:center;flex-wrap:nowrap;gap:8px;margin-top:2px}
+.format-grid>.note-banner,.format-grid>#otherFormatField{grid-column:1/-1}
 .other-check{min-height:32px;display:flex;align-items:center}
 .format-other input{height:32px;box-sizing:border-box;padding:4px 11px}
 .other-check{margin-left:0!important}
@@ -361,8 +359,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
 .note-banner{max-width:none}
 
 /* ---- Custom dropdown (replaces native <select> popups so hover is always light grey) ---- */
-.csel{position:relative;width:100%;z-index:2}
-.csel.is-open{z-index:80}
+.csel{position:relative;width:100%}
 .csel-native{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px}
 .csel-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--border);border-radius:10px;padding:8px 12px 8px 11px;font-size:12px;color:var(--ink);background:var(--bg);cursor:pointer;text-align:left;box-shadow:0 1px 2px rgba(27,29,34,.08)}
 .unit-row .csel{width:160px;max-width:160px;flex-shrink:0}
@@ -372,18 +369,30 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
 .csel-trigger svg{width:15px;height:15px;stroke:#6B7280;flex-shrink:0;transition:transform .12s ease}
 .csel.is-open .csel-trigger svg{transform:rotate(180deg)}
 .csel.is-open .csel-trigger{border-color:#C7C9CE;background:#F5F5F6}
-.csel-menu{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--bg);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 20px rgba(20,20,25,.12);padding:4px;z-index:40;display:none;max-height:min(320px,60vh);overflow:auto}
+.csel-menu{position:absolute;left:0;right:0;top:calc(100% + 4px);background:var(--bg);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 20px rgba(20,20,25,.12);padding:4px;z-index:40;display:none;max-height:240px;overflow:auto}
 .csel.is-open .csel-menu{display:block}
 .csel-option{padding:8px 10px;font-size:12px;color:var(--ink);border-radius:7px;cursor:pointer}
 .csel-option:hover{background:#F0F0F1}
 .csel-option.is-selected{background:#F5F5F6;font-weight:600}
 
-/* ---- Add Another Design: align to the right ---- */
+/* ---- Add More Designs: align to the right ---- */
 #designsContainer{display:flex;flex-direction:column}
 .add-design-btn{align-self:flex-end;width:auto}
+.artwork{margin-bottom:14px}
+.art-t{font-size:13px;font-weight:700}
+.artwork .field{margin-bottom:0}
+.size-section{margin-top:14px}
+.size-section .size-row:first-child{margin-top:6px}
+.size-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px}
+.size-foot .add-btn{width:fit-content;margin:0}
+.add-btn[data-add-size]{display:flex}
+.size-row .check-row{margin-top:0}
+.size-row{padding-bottom:12px;border:none;background:transparent;padding-left:0;padding-right:0}
+.size-row-head{margin-bottom:8px}
+.dname-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
+.dname-label{display:flex;align-items:center;gap:8px;margin-bottom:0}
+
 </style>
-<link rel="stylesheet" href="embed.css">
-<script>if(window.parent!==window)document.documentElement.classList.add('in-frame');</script>
 </head>
 <body>
 
@@ -487,13 +496,13 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
         <label class="format-chip"><input type="checkbox" name="format" value="JEF"><span>JEF</span></label>
         <label class="format-chip"><input type="checkbox" name="format" value="VP3"><span>VP3</span></label>
         <label class="format-chip"><input type="checkbox" name="format" value="XXX"><span>XXX</span></label>
-        <label class="format-chip"><input type="checkbox" name="format" value="PDF"><span>PDF</span></label>
-        <label class="format-chip"><input type="checkbox" name="format" value="PNG"><span>PNG</span></label>
-        <div class="other-format-row">
-          <label class="check-row other-check"><input type="checkbox" id="otherFormatCheck">Need another format?</label>
-          <div class="format-other" id="otherFormatField" style="display:none;">
-            <input type="text" placeholder="Tell us the format you need">
-          </div>
+        <label class="check-row other-check" id="otherFormatRow"><input type="checkbox" id="otherFormatCheck">Need another format?</label>
+        <div class="format-other" id="otherFormatField" style="display:none;">
+          <input type="text" placeholder="Tell us the format you need">
+        </div>
+        <div class="note-banner">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+          Production Sheet (PDF) and Design Preview (PNG) are always included.
         </div>
       </div>
     </section>
@@ -508,7 +517,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
       </div>
       <div class="turn-grid">
         <label class="turn-option">
-          <input type="radio" name="turnaround" checked>
+          <input type="radio" name="turnaround" value="standard" checked>
           <div class="turn-inner">
             <div class="turn-top">
               <div class="turn-left"><span class="turn-radio"></span><span class="turn-name">Standard</span></div>
@@ -519,7 +528,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
           </div>
         </label>
         <label class="turn-option">
-          <input type="radio" name="turnaround">
+          <input type="radio" name="turnaround" value="urgent">
           <div class="turn-inner">
             <div class="turn-top">
               <div class="turn-left"><span class="turn-radio"></span><span class="turn-name">Urgent</span></div>
@@ -600,56 +609,59 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
             <select>${placementOptions()}</select>
           </div>
         </div>
-        <label class="check-row"><input type="checkbox" checked>Keep proportional</label>
+        <div class="size-foot">
+          <label class="check-row"><input type="checkbox" checked>Keep proportional</label>
+        </div>
+      </div>`;
+  }
+
+  function artworkTemplate(){
+    return `
+      <div class="artwork" data-artwork>
+        <div class="drop-row">
+          <div class="field">
+            <label class="flabel">Artwork <span class="opt" data-req>(at least one file required)</span></label>
+            <div class="dropzone" data-dropzone>
+              <span class="dz-ico">${upIcon}</span>
+              <div class="dz-title">Upload your artwork</div>
+              <div class="dz-sub">Logo, photo, screenshot, or drawing. Click to browse.</div>
+              <input type="file" data-file-input>
+            </div>
+            <div class="file-list" data-file-list></div>
+          </div>
+          <div class="field">
+            <label class="flabel">Reference Images <span class="opt">(optional)</span></label>
+            <div class="dropzone" data-dropzone-ref>
+              <span class="dz-ico">${upIcon}</span>
+              <div class="dz-title">Upload reference images</div>
+              <div class="dz-sub">Add one or more photos showing how it should look</div>
+              <input type="file" multiple data-file-input-ref>
+            </div>
+            <div class="file-list" data-file-list-ref></div>
+          </div>
+        </div>
+        <div class="size-section">
+          <div data-size-container>${sizeRowTemplate(1)}</div>
+        </div>
       </div>`;
   }
 
   function designCardTemplate(n){
     return `
       <div class="design-card" data-design-card>
-        <div class="design-head">
-          <div class="dtitle">
-            <span data-design-label>Design ${n}</span>
-          </div>
-          <button type="button" class="remove-design" data-remove-design style="${n === 1 ? 'display:none' : ''}">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
-            Remove design
-          </button>
-        </div>
         <div class="card-body">
           <div class="field">
-            <label class="flabel">Design Name</label>
+            <div class="dname-top">
+              <label class="flabel dname-label"><span class="design-num" data-design-num>${n}</span>Design Name</label>
+              <button type="button" class="remove-design" data-remove-design style="${n === 1 ? 'display:none' : ''}">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
+                Remove design
+              </button>
+            </div>
             <input type="text" placeholder="e.g. Front logo, left chest" data-design-name>
           </div>
 
-          <div class="drop-row">
-            <div class="field">
-              <label class="flabel">Artwork <span class="opt">(at least one file required)</span></label>
-              <div class="dropzone dropzone-art" data-dropzone>
-                <span class="dz-badge">Artwork</span>
-                <span class="dz-ico">${upIcon}</span>
-                <div class="dz-title">Upload your artwork</div>
-                <div class="dz-sub">Logo, photo, screenshot, or drawing. Click to browse.</div>
-                <input type="file" multiple data-file-input>
-              </div>
-              <div class="file-list file-list-art" data-file-list></div>
-            </div>
-            <div class="field">
-              <label class="flabel">Reference Images <span class="opt">(optional)</span></label>
-              <div class="dropzone dropzone-ref" data-dropzone-ref>
-                <span class="dz-badge">Reference</span>
-                <span class="dz-ico">${upIcon}</span>
-                <div class="dz-title">Upload reference images</div>
-                <div class="dz-sub">Add one or more photos showing how it should look</div>
-                <input type="file" multiple data-file-input-ref>
-              </div>
-              <div class="file-list file-list-ref" data-file-list-ref></div>
-            </div>
-          </div>
-
-          <div data-size-container>${sizeRowTemplate(1)}</div>
-
-          <button type="button" class="add-btn" data-add-size>${plusIcon}Add Another Size</button>
+          <div data-artworks>${artworkTemplate()}</div>
 
           <div class="field notes">
             <label class="flabel">Anything else we should know? <span class="opt">(optional)</span></label>
@@ -769,22 +781,33 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
 
   function attachSizeHandlers(el){
     const sizeContainer = el.querySelector('[data-size-container]');
-    el.querySelector('[data-add-size]').addEventListener('click', () => {
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'add-btn';
+    addBtn.setAttribute('data-add-size', '');
+    addBtn.innerHTML = `${plusIcon}Add Size`;
+    function placeAddBtn(){
+      sizeContainer.lastElementChild.querySelector('.size-foot').appendChild(addBtn);
+    }
+    addBtn.addEventListener('click', () => {
       const count = sizeContainer.querySelectorAll('[data-size-row]').length + 1;
       sizeContainer.insertAdjacentHTML('beforeend', sizeRowTemplate(count));
       updateRemoveSizeVisibility(sizeContainer);
-      attachRemoveSizeHandlers(sizeContainer);
+      attachRemoveSizeHandlers(sizeContainer, placeAddBtn);
       enhanceSelectsIn(sizeContainer);
+      placeAddBtn();
     });
-    attachRemoveSizeHandlers(sizeContainer);
+    placeAddBtn();
+    attachRemoveSizeHandlers(sizeContainer, placeAddBtn);
   }
 
-  function attachRemoveSizeHandlers(c){
+  function attachRemoveSizeHandlers(c, placeAddBtn){
     c.querySelectorAll('[data-remove-size]').forEach(btn => {
       btn.onclick = () => {
         btn.closest('[data-size-row]').remove();
         renumberSizes(c);
         updateRemoveSizeVisibility(c);
+        if(placeAddBtn) placeAddBtn();
       };
     });
   }
@@ -800,7 +823,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
 
   function renumberDesigns(){
     designsContainer.querySelectorAll('[data-design-card]').forEach((card, i) => {
-      card.querySelector('[data-design-label]').textContent = `Design ${i + 1}`;
+      card.querySelector('[data-design-num]').textContent = i + 1;
     });
     const btns = designsContainer.querySelectorAll('[data-remove-design]');
     btns.forEach(b => { b.style.display = btns.length > 1 ? '' : 'none'; });
@@ -814,8 +837,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
     const card = wrapper.firstElementChild;
     const addBtn = document.getElementById('addDesignBtn');
     addBtn ? designsContainer.insertBefore(card, addBtn) : designsContainer.appendChild(card);
-    attachFileHandlers(card);
-    attachSizeHandlers(card);
+    card.querySelectorAll('[data-artwork]').forEach(a => { attachFileHandlers(a); attachSizeHandlers(a); });
     enhanceSelectsIn(card);
     card.querySelector('[data-remove-design]').addEventListener('click', () => { card.remove(); renumberDesigns(); });
     renumberDesigns();
@@ -827,7 +849,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
     btn.type = 'button';
     btn.id = 'addDesignBtn';
     btn.className = 'add-btn add-design-btn';
-    btn.innerHTML = `${plusIcon}Add Another Design`;
+    btn.innerHTML = `${plusIcon}Add More Designs`;
     btn.addEventListener('click', addDesign);
     designsContainer.appendChild(btn);
   }
@@ -876,6 +898,15 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
   addEventListener('resize', updateSteps);
   updateSteps();
 
+  function designHasArtwork(card){
+    const input = card.querySelector('[data-file-input]');
+    if(!input) return false;
+    const bag = input._lvdFiles && input._lvdFiles.length
+      ? input._lvdFiles
+      : (input.files ? Array.from(input.files) : []);
+    return bag.length > 0;
+  }
+
   document.getElementById('cancelBtn').addEventListener('click', () => {
     parent.postMessage({ type: 'lvd-quote-cancel' }, '*');
   });
@@ -885,6 +916,17 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
   document.getElementById('submitBtn').addEventListener('click', () => {
     const btn = document.getElementById('submitBtn');
     if(btn.dataset.busy === '1') return;
+    const cards = [...document.querySelectorAll('[data-design-card]')];
+    const unnamed = cards.some(card => !card.querySelector('[data-design-name]').value.trim());
+    if(unnamed){
+      alert('Add a name for each design before submitting.');
+      return;
+    }
+    const missingArt = cards.some(card => !designHasArtwork(card));
+    if(missingArt){
+      alert('Upload at least one artwork file for each design.');
+      return;
+    }
     btn.dataset.busy = '1';
     btn.disabled = true;
     parent.postMessage({ type: 'lvd-quote-submit' }, '*');

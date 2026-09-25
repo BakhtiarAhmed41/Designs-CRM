@@ -390,6 +390,10 @@ body {
   margin-inline: auto;
   min-width: 0;
 }
+.main:not(.main-messaging) > div.portal-quotes-page {
+  max-width: none;
+  margin-inline: 0;
+}
 .main:not(.main-messaging) > div.admin-inbox-page {
   display: grid;
   grid-template-columns: 228px minmax(0, 1fr);

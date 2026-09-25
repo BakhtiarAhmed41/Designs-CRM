@@ -7,7 +7,7 @@ import { listMyEdits, requestEdit } from '@/lib/edits';
 import { getMyCustomer } from '@/lib/customers';
 import { RevisionRequestForm } from '@/components/RevisionRequestForm';
 import { getErrorMessage } from '@/lib/api';
-import { money, dateShort, customerOrderChip, deliveryMethodLabel } from '@/lib/format';
+import { money, dateShort, customerOrderChip, deliveryMethodLabel, orderNumber } from '@/lib/format';
 import { serviceCategoryLabel, serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import { designStatusChipClass, designStatusLabel, type Design } from '@/lib/designs';
 import type { Order } from '@/lib/types';
@@ -482,7 +482,7 @@ export function PortalOrders() {
                           </div>
                           <div>
                             <div className="on">{o.name ?? o.serviceType ?? 'Order'}</div>
-                            <div className="om">{o.humanRef ?? o.id.slice(0, 6)}</div>
+                            <div className="om">{orderNumber(o.humanRef, o.id.slice(0, 6))}</div>
                           </div>
                         </div>
                       </td>

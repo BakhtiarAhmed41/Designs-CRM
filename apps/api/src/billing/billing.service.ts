@@ -30,6 +30,11 @@ function assertAuthUser(user: AuthUser | undefined): asserts user is AuthUser {
   if (!user) throw new ForbiddenException();
 }
 
+function displayOrderNumber(ref?: string | null) {
+  const digits = (ref ?? '').replace(/\D/g, '');
+  return digits.length === 10 ? `#${digits}` : ref?.trim() || '';
+}
+
 function isAdminRole(role: UserRole): boolean {
   return (
     role === UserRole.SUPER_ADMIN ||
@@ -678,7 +683,7 @@ export class BillingService {
     } catch {
       /* older databases may not have resolved_at */
     }
-    const ref = req.human_ref ?? req.order_name ?? req.order_id.slice(0, 6);
+    const ref = displayOrderNumber(req.human_ref) || req.order_name || req.order_id.slice(0, 6);
     if (req.client_user_id) {
       await this.notifications.createFor(req.client_user_id, {
         title: `${req.requested_format} file is ready`,
@@ -1847,7 +1852,7 @@ export class BillingService {
   ) {
     for (const o of orders) {
       const desc =
-        [o.human_ref, o.name].filter(Boolean).join(' · ') || 'Design order';
+        [displayOrderNumber(o.human_ref), o.name].filter(Boolean).join(' · ') || 'Design order';
       await this.db.execute(
         `INSERT INTO invoice_lines (id, invoice_id, order_id, description, amount_cents)
          VALUES (?, ?, ?, ?, ?)`,

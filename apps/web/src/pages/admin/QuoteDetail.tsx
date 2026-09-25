@@ -24,10 +24,12 @@ import { applyOrderChange, invalidateWorkCaches } from '@/lib/queryCache';
 import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
 import { getCustomer } from '@/lib/customers';
 import { getErrorMessage } from '@/lib/api';
-import { money, dateShort, quoteLifecycleChip, friendlyFileName } from '@/lib/format';
+import { money, dateShort, quoteLifecycleChip, friendlyFileName, orderNumber } from '@/lib/format';
+import { isCuttingRequest, isEmbroideryRequest, isVectorRequest } from '@/lib/embroideryQuote';
 import { isAdminRecounter, isStaffCreatedOrder, lineTotal, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
 import { useDialog } from '@/components/ui/AppDialog';
 import { AttachmentPreview, LocalFilePreview } from '@/components/FilePreview';
+import { EmbroideryAdminQuote } from '@/components/EmbroideryAdminQuote';
 import { FormPreferencesDisplay } from '@/components/FormPreferencesDisplay';
 import { MessageAttachments } from '@/components/MessageAttachments';
 import type { Order } from '@/lib/types';
@@ -160,7 +162,7 @@ export function AdminQuoteDetail() {
         customerId: order?.customerId ?? null,
         chatType: 'QUOTE',
         subject: order?.humanRef
-          ? `Quotation ${order.humanRef} Chat`
+          ? `Quotation ${orderNumber(order.humanRef)} Chat`
           : `Quotation Chat`,
       });
       qc.setQueryData(['admin-conversations-quote', id], (prev: unknown) => {
@@ -319,6 +321,18 @@ export function AdminQuoteDetail() {
     setRevising(true);
   }
 
+  if (isEmbroideryRequest(order)) {
+    return <EmbroideryAdminQuote order={order} customer={customerQ.data?.customer} />;
+  }
+
+  if (isCuttingRequest(order)) {
+    return <EmbroideryAdminQuote order={order} customer={customerQ.data?.customer} kind="cutting" />;
+  }
+
+  if (isVectorRequest(order)) {
+    return <EmbroideryAdminQuote order={order} customer={customerQ.data?.customer} kind="vector" />;
+  }
+
   return (
     <div>
       <div className="ph">
@@ -327,7 +341,7 @@ export function AdminQuoteDetail() {
             <span className="crumb"><Link to="/admin/quotes">Quotes</Link></span>
             <span className="crumb">
               <i className="ti ti-chevron-right" aria-hidden />
-              <span>Q-{order.humanRef ?? order.id.slice(0, 6)}</span>
+              <span>{orderNumber(order.humanRef, order.id.slice(0, 6))}</span>
             </span>
           </nav>
           <div>

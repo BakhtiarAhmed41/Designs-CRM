@@ -30,6 +30,9 @@ pnpm-debug.log*
 
 node_modules
 
+# local form prototypes (reference only, not tracked)
+/reference forms
+
 # design prototypes (reference only, not tracked)
 /Admin_Final_-V2.html
 /Customer_Portal_Final_-V2 (1).html

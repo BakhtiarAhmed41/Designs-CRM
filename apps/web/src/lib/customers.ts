@@ -34,6 +34,7 @@ export type CustomerRecentOrder = {
   priceCents: number | null;
   currency: string;
   createdAt: string;
+  quantity?: number;
 };
 
 export type CustomerDetail = Customer & {

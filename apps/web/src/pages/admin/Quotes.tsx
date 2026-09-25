@@ -11,7 +11,7 @@ import {
 import { getErrorMessage } from '@/lib/api';
 import { invalidateWorkCaches } from '@/lib/queryCache';
 import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
-import { money, dateShort, quoteLifecycleChip } from '@/lib/format';
+import { money, dateShort, quoteLifecycleChip, orderNumber } from '@/lib/format';
 import { isAdminRecounter, isStaffCreatedOrder } from '@/lib/quoteHelpers';
 import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
 import type { Order, OrderStatus } from '@/lib/types';
@@ -117,16 +117,16 @@ export function AdminQuotes() {
           orderId: order.id,
           chatType: 'QUOTE',
           subject: order.humanRef
-            ? `Quotation ${order.humanRef} Chat`
+            ? `Quotation ${orderNumber(order.humanRef)} Chat`
             : 'Quotation Chat',
         });
         convo = created.conversation;
       }
-      const quoteRef = order.humanRef ?? order.id.slice(0, 6);
+      const quoteRef = orderNumber(order.humanRef, order.id.slice(0, 6));
       const amount = order.priceCents != null ? money(order.priceCents) : 'your quote';
       return sendAdminMessage(
         convo.id,
-        `Just checking in. Did you have any questions about quote Q-${quoteRef} (${amount})? Happy to adjust if needed.`,
+        `Just checking in. Did you have any questions about quote ${quoteRef} (${amount})? Happy to adjust if needed.`,
       );
     },
     onSuccess: () => {
@@ -255,7 +255,7 @@ export function AdminQuotes() {
                         <div>
                           <div className="on">{o.name ?? 'Quote request'}</div>
                           <div className="om">
-                            Q-{o.humanRef ?? o.id.slice(0, 6)}
+                            {orderNumber(o.humanRef, o.id.slice(0, 6))}
                             {isStaffCreatedOrder(o) ? ' · Admin created' : ''}
                           </div>
                         </div>
@@ -302,7 +302,7 @@ export function AdminQuotes() {
                 <div className="om">
                   <span>
                     <i className="ti ti-hash" style={{ fontSize: 11 }} />
-                    Q-{o.humanRef ?? o.id.slice(0, 6)}
+                    {orderNumber(o.humanRef, o.id.slice(0, 6))}
                   </span>
                   <span>
                     Quoted {money(o.priceCents)} · sent {daysAgo(o.updatedAt)} days ago

@@ -8,7 +8,7 @@ import { datesForPreset, inDateRange, type RangePreset } from '@/lib/dateRange';
 import { listAdminEdits } from '@/lib/edits';
 import { listAdminOrders } from '@/lib/orders';
 import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
-import { money, dateShort, statusChipClass, statusLabel } from '@/lib/format';
+import { money, dateShort, statusChipClass, statusLabel, orderNumber } from '@/lib/format';
 import { serviceTi } from '@/lib/serviceIcon';
 import { canFeature } from '@/lib/permissions';
 import { useAuth } from '@/context/AuthContext';
@@ -216,7 +216,7 @@ export function AdminDashboard() {
                   <div className="oinfo">
                     <div className="on">{o.name ?? o.serviceType ?? 'Order'}</div>
                     <div className="om">
-                      <span>{o.humanRef ?? o.id.slice(0, 6)}</span>
+                      <span>{orderNumber(o.humanRef, o.id.slice(0, 6))}</span>
                       <span>{customerLabel(o)}</span>
                     </div>
                   </div>
@@ -242,7 +242,7 @@ export function AdminDashboard() {
                   <div className="oinfo">
                     <div className="on">{o.name ?? 'Quote request'}</div>
                     <div className="om">
-                      <span>Q-{o.humanRef ?? o.id.slice(0, 6)}</span>
+                      <span>{orderNumber(o.humanRef, o.id.slice(0, 6))}</span>
                       <span>{customerLabel(o)}</span>
                     </div>
                   </div>

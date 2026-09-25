@@ -160,8 +160,13 @@ export class CustomersService {
       price_cents: number | null;
       currency: string;
       created_at: Date;
+      qty: number | string | null;
     }>(
-      `SELECT id, human_ref, name, status, price_cents, currency, created_at
+      `SELECT id, human_ref, name, status, price_cents, currency, created_at,
+              GREATEST(
+                (SELECT COUNT(*) FROM order_designs d WHERE d.order_id = orders.id),
+                COALESCE(JSON_LENGTH(JSON_EXTRACT(preferences, '$.designs')), 0)
+              ) AS qty
          FROM orders WHERE customer_id = ? ORDER BY created_at DESC LIMIT 10`,
       [id],
     );
@@ -184,6 +189,7 @@ export class CustomersService {
         priceCents: o.price_cents,
         currency: o.currency,
         createdAt: o.created_at,
+        quantity: Number(o.qty ?? 0),
       })),
     };
   }

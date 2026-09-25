@@ -15,9 +15,11 @@ import { AttachmentPreview, DeliveryPreview } from '@/components/FilePreview';
 import { listMyEdits, requestEdit } from '@/lib/edits';
 import { RevisionRequestForm } from '@/components/RevisionRequestForm';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
-import { money, lifecycleChip, dateShort, paymentChip, isImageFile } from '@/lib/format';
+import { money, lifecycleChip, dateShort, paymentChip, isImageFile, orderNumber } from '@/lib/format';
 import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import { openLinkedChat } from '@/lib/messaging';
+import { serviceOrderKind } from '@/lib/embroideryQuote';
+import { ServiceCustomerOrder } from '@/components/ServiceCustomerOrder';
 import {
   designStatusChipClass,
   designStatusLabel,
@@ -118,8 +120,8 @@ export function PortalOrderDetail() {
         orderId: id,
         chatType: isQuote ? 'QUOTE' : 'ORDER',
         subject: isQuote
-          ? `Quotation ${order?.humanRef ?? ''} Chat`.trim()
-          : `Order ${order?.humanRef ?? ''} Chat`.trim(),
+          ? `Quotation ${orderNumber(order?.humanRef)} Chat`.trim()
+          : `Order ${orderNumber(order?.humanRef)} Chat`.trim(),
         label: isHelp ? 'HELP' : undefined,
       });
     },
@@ -225,6 +227,23 @@ export function PortalOrderDetail() {
 
   if (isLoading) return <EmptyState icon="ti-loader" title="Loading order…" />;
   const order = data?.order as PortalOrderFull | undefined;
+  if (order && serviceOrderKind(order)) {
+    return (
+      <>
+        {paidSuccess && (
+          <div className="alert-success" style={{ marginBottom: 14 }}>
+            <i className="ti ti-circle-check" /> Payment successful. Your order has been created.
+          </div>
+        )}
+        {paidReturn && order.paymentStatus !== 'PAID' && (
+          <div className="note" style={{ marginBottom: 14 }}>
+            <i className="ti ti-loader" /> Confirming payment with Stripe…
+          </div>
+        )}
+        <ServiceCustomerOrder order={order} />
+      </>
+    );
+  }
   if (!order) {
     return (
       <EmptyState
@@ -270,10 +289,10 @@ export function PortalOrderDetail() {
     <div>
       <PageHeader
         title={order.name ?? 'Order'}
-        subtitle={`Order ${order.humanRef ?? order.id.slice(0, 6)} · ${dateShort(order.createdAt)}`}
+        subtitle={`Order ${orderNumber(order.humanRef, order.id.slice(0, 6))} · ${dateShort(order.createdAt)}`}
         crumbs={[
           { label: 'Orders', to: '/portal/orders' },
-          { label: order.humanRef ?? 'Order' },
+          { label: orderNumber(order.humanRef, 'Order') },
         ]}
         actions={
           <>
