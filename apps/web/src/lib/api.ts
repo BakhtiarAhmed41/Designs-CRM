@@ -169,6 +169,21 @@ export async function apiFetchForm<T>(
   return parseOk<T>(res);
 }
 
+function triggerBrowserDownload(href: string, filename: string, revoke: boolean) {
+  const a = document.createElement('a');
+  a.href = href;
+  a.download = filename || 'download';
+  a.rel = 'noopener';
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  // Revoking or removing the link in the same turn cancels the download.
+  window.setTimeout(() => {
+    a.remove();
+    if (revoke) URL.revokeObjectURL(href);
+  }, 2000);
+}
+
 /** Download a file from a signed-url endpoint response `{ url }`. */
 export async function downloadSignedFile(
   signedUrlPath: string,
@@ -186,20 +201,25 @@ export async function downloadSignedFile(
     if (!blob.size || blob.type.includes('json') || blob.type.startsWith('text/')) {
       throw new ApiError(404, 'This file is no longer available.');
     }
-    const href = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = href;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(href);
+    const typed =
+      blob.type && blob.type !== 'application/octet-stream'
+        ? blob
+        : new Blob([await blob.arrayBuffer()], {
+            type: guessDownloadType(filename) || blob.type || 'application/octet-stream',
+          });
+    triggerBrowserDownload(URL.createObjectURL(typed), filename, true);
     return;
   }
-  const a = document.createElement('a');
-  a.href = abs;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+  triggerBrowserDownload(abs, filename, false);
+}
+
+function guessDownloadType(filename: string) {
+  const lower = filename.toLowerCase();
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+  if (lower.endsWith('.gif')) return 'image/gif';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  if (lower.endsWith('.pdf')) return 'application/pdf';
+  if (lower.endsWith('.svg')) return 'image/svg+xml';
+  return '';
 }

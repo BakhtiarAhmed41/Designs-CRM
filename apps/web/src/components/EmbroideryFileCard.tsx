@@ -1,45 +1,78 @@
 import { useEffect, useState } from 'react';
-import { downloadSignedFile, resolveFileUrl } from '@/lib/api';
+import { apiFetch, downloadSignedFile, resolveFileUrl } from '@/lib/api';
 import { ImageLightbox } from '@/components/FilePreview';
 import { isImageFile } from '@/lib/format';
 
-function useImageSrc(previewUrl: string | null | undefined, enabled: boolean) {
+async function imageBlobUrl(url: string): Promise<string | null> {
+  const res = await fetch(url, { credentials: 'include' });
+  if (!res.ok) return null;
+  const blob = await res.blob();
+  if (!blob.size || blob.type.includes('json') || blob.type.startsWith('text/')) return null;
+  const typed = blob.type.startsWith('image/')
+    ? blob
+    : new Blob([await blob.arrayBuffer()], { type: 'image/jpeg' });
+  return URL.createObjectURL(typed);
+}
+
+function useImageSrc(
+  previewUrl: string | null | undefined,
+  refreshPath: string | undefined,
+  enabled: boolean,
+) {
   const [src, setSrc] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!enabled || !previewUrl) {
+    if (!enabled || (!previewUrl && !refreshPath)) {
       setSrc(null);
       return;
     }
     let cancelled = false;
     let blobUrl: string | null = null;
-    const resolved = resolveFileUrl(previewUrl);
-    void fetch(resolved, { credentials: 'include' })
-      .then(async (res) => {
-        if (!res.ok) return null;
-        const blob = await res.blob();
-        if (!blob.size || blob.type.includes('json') || blob.type.startsWith('text/')) return null;
-        const typed = blob.type.startsWith('image/')
-          ? blob
-          : new Blob([await blob.arrayBuffer()], { type: 'image/jpeg' });
-        blobUrl = URL.createObjectURL(typed);
-        return blobUrl;
-      })
-      .then((url) => {
+
+    async function load() {
+      const urls: string[] = [];
+      if (previewUrl) urls.push(resolveFileUrl(previewUrl));
+      for (const url of urls) {
+        const next = await imageBlobUrl(url).catch(() => null);
         if (cancelled) {
-          if (url) URL.revokeObjectURL(url);
+          if (next) URL.revokeObjectURL(next);
           return;
         }
-        setSrc(url);
-      })
-      .catch(() => {
-        if (!cancelled) setSrc(null);
-      });
+        if (next) {
+          blobUrl = next;
+          setSrc(next);
+          return;
+        }
+      }
+      if (refreshPath) {
+        try {
+          const sep = refreshPath.includes('?') ? '&' : '?';
+          const fresh = await apiFetch<{ url: string }>(`${refreshPath}${sep}inline=1`);
+          if (fresh.url) {
+            const next = await imageBlobUrl(resolveFileUrl(fresh.url));
+            if (cancelled) {
+              if (next) URL.revokeObjectURL(next);
+              return;
+            }
+            if (next) {
+              blobUrl = next;
+              setSrc(next);
+              return;
+            }
+          }
+        } catch {
+          /* preview already failed */
+        }
+      }
+      if (!cancelled) setSrc(null);
+    }
+
+    void load();
     return () => {
       cancelled = true;
       if (blobUrl) URL.revokeObjectURL(blobUrl);
     };
-  }, [previewUrl, enabled]);
+  }, [previewUrl, refreshPath, enabled]);
 
   return src;
 }
@@ -62,12 +95,26 @@ export function EmbroideryFileCard({
   onError?: (message: string) => void;
 }) {
   const image = isImageFile(name, mimeType);
-  const src = useImageSrc(previewUrl, image);
+  const src = useImageSrc(previewUrl, signedUrlPath, image);
   const [open, setOpen] = useState(false);
   const swatch = variant === 'swatch';
   const refTag = /reference/i.test(label);
 
+  function downloadLoadedImage() {
+    if (!src) return false;
+    const a = document.createElement('a');
+    a.href = src;
+    a.download = name || 'download';
+    a.rel = 'noopener';
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    window.setTimeout(() => a.remove(), 0);
+    return true;
+  }
+
   async function download() {
+    if (downloadLoadedImage()) return;
     try {
       await downloadSignedFile(signedUrlPath, name, { stayOnPage: true });
     } catch (err) {

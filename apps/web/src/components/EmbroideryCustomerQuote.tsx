@@ -236,7 +236,7 @@ export function EmbroideryCustomerQuote({
               return (
                 <div key={`${design.name ?? 'design'}-${index}`} className="ecd-design">
                   <h3>
-                    <span className="ecd-num">{index + 1}</span>
+                    <span className="ecd-num">{index + 1}.</span>
                     {designOptionLabel(index, design.name)}
                   </h3>
                   <div className={hasRefs ? 'ecd-assets' : undefined}>

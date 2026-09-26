@@ -48,9 +48,9 @@ function writeBundleDir(dir, bundledFile) {
   );
 }
 
+// Do not delete dist/ or publish/ here. writeBundleDir keeps their uploads
+// folders, and wiping them first removes previously uploaded images.
 fs.rmSync(tscOut, { recursive: true, force: true });
-fs.rmSync(distDir, { recursive: true, force: true });
-fs.rmSync(publishDir, { recursive: true, force: true });
 fs.mkdirSync(tscOut, { recursive: true });
 
 const tscBin = require.resolve('typescript/bin/tsc');

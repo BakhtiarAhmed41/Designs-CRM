@@ -1,6 +1,6 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { createHmac, randomUUID } from 'crypto';
-import { createReadStream, existsSync, readFileSync } from 'fs';
+import { createReadStream, existsSync, readdirSync, readFileSync } from 'fs';
 import { mkdir, unlink, writeFile } from 'fs/promises';
 import { dirname, isAbsolute, join, normalize, resolve, sep } from 'path';
 import { getEnv } from '../config/env';
@@ -31,6 +31,26 @@ function packageName(dir: string): string | null {
 /** True for folders the Hostinger bundle deletes on every build. */
 function isBuildOutput(dir: string): boolean {
   return /(?:^|[\\/])(?:dist|publish|\.tsc-out)(?:[\\/]|$)/.test(dir);
+}
+
+function walkForFile(dir: string, needle: string, depth: number): string | null {
+  if (depth > 8 || !existsSync(dir)) return null;
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+  for (const entry of entries) {
+    if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
+    const full = join(dir, entry.name);
+    if (entry.isFile() && entry.name.toLowerCase() === needle) return full;
+    if (entry.isDirectory()) {
+      const nested = walkForFile(full, needle, depth + 1);
+      if (nested) return nested;
+    }
+  }
+  return null;
 }
 
 /**
@@ -72,17 +92,32 @@ export class LocalStorageService {
   private readDirs(): string[] {
     const configured = getEnv().UPLOAD_DIR;
     const root = this.apiPackageRoot();
-    const relative = isAbsolute(configured) ? null : configured;
+    const cwd = process.cwd();
+    // Keep searching the default "uploads" folders even when UPLOAD_DIR is absolute.
+    const relativeName = isAbsolute(configured) ? 'uploads' : configured;
     const dirs = [
       this.writeDir(),
       this.configuredDir(),
-      relative ? resolve(root, relative) : null,
-      relative ? resolve(process.cwd(), relative) : null,
-      relative ? resolve(process.cwd(), 'apps', 'api', relative) : null,
-      relative ? resolve(root, '..', '..', relative) : null,
       resolve(root, 'uploads'),
+      resolve(root, relativeName),
+      // Repo-root /uploads. The bundled API (__dirname = apps/api/dist) used to write here.
+      resolve(root, '..', 'uploads'),
+      resolve(root, '..', relativeName),
+      resolve(__dirname, '..', '..', 'uploads'),
+      resolve(__dirname, '..', '..', relativeName),
+      resolve(__dirname, '..', 'uploads'),
+      resolve(cwd, 'uploads'),
+      resolve(cwd, relativeName),
+      resolve(cwd, 'apps', 'api', 'uploads'),
+      resolve(cwd, 'apps', 'api', relativeName),
       resolve(root, 'dist', 'uploads'),
       resolve(root, 'publish', 'uploads'),
+      resolve(root, '.uploads-keep-dist'),
+      resolve(root, '.uploads-keep-publish'),
+      resolve(cwd, 'dist', 'uploads'),
+      resolve(cwd, 'publish', 'uploads'),
+      resolve(cwd, '.uploads-keep-dist'),
+      resolve(cwd, '.uploads-keep-publish'),
     ];
     const seen = new Set<string>();
     const out: string[] = [];
@@ -161,16 +196,50 @@ export class LocalStorageService {
   }
 
   resolveExisting(key: string): string {
+    const normalizedKey = key.replace(/\\/g, '/').replace(/^\/+/, '');
+    const variants = [normalizedKey];
+    if (normalizedKey.startsWith('uploads/')) {
+      variants.push(normalizedKey.slice('uploads/'.length));
+    }
+
+    if (isAbsolute(key)) {
+      const absolute = resolve(key);
+      const underKnown = this.readDirs().some((dir) => {
+        const root = resolve(dir);
+        return absolute === root || absolute.startsWith(root + sep);
+      });
+      const inUploads = /(?:^|[\\/])uploads(?:[\\/]|$)/i.test(absolute);
+      if (existsSync(absolute) && (underKnown || inUploads)) return absolute;
+    }
+
     for (const base of this.readDirs()) {
       if (!existsSync(base)) continue;
-      try {
-        const full = this.absPath(key, base);
-        if (existsSync(full)) return full;
-      } catch {
-        /* skip invalid key for this base */
+      for (const variant of variants) {
+        try {
+          const full = this.absPath(variant, base);
+          if (existsSync(full)) return full;
+        } catch {
+          /* skip invalid key for this base */
+        }
       }
     }
+
+    const baseName = normalizedKey.split('/').pop();
+    if (baseName && baseName.length > 8) {
+      const found = this.findByBasename(baseName);
+      if (found) return found;
+    }
     throw new InternalServerErrorException('File not found on disk');
+  }
+
+  /** Older builds sometimes stored the same file under a different folder prefix. */
+  private findByBasename(baseName: string): string | null {
+    const needle = baseName.toLowerCase();
+    for (const dir of this.readDirs()) {
+      const found = walkForFile(dir, needle, 0);
+      if (found) return found;
+    }
+    return null;
   }
 
   createStream(key: string) {

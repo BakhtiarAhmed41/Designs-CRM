@@ -614,6 +614,9 @@
 .ead-orders { display: none; margin-top: 10px; gap: 10px; }
 .ead-orders.open { display: flex; flex-direction: column; }
 .ead-banner {
+  width: fit-content;
+  max-width: 100%;
+  align-self: flex-start;
   margin-bottom: 12px;
   padding: 10px 12px;
   border-radius: 10px;
@@ -680,7 +683,6 @@
   border-radius: 8px;
 }
 .ecd-sec-h.is-toggle.open { margin-bottom: 10px; }
-.ecd-sec-h.is-toggle:hover { background: #f6f7f8; }
 .ecd-sec-h.is-toggle:focus-visible { outline: 2px solid var(--maroon); outline-offset: -2px; }
 .ecd-disclose {
   background: none;
@@ -705,6 +707,7 @@
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+.ecd-size-n::after { content: "."; }
 .ecd-body { margin-top: 8px; }
 .ecd-body.collapsed { display: none; }
 .ecd-group { padding: 10px 0; }
@@ -744,9 +747,10 @@
 .ecd-assets > div > .ecd-label:first-child,
 .ecd-design > div > .ecd-label:first-child { margin-top: 0; }
 .ecd-num {
-  width: 24px;
+  min-width: 24px;
   height: 24px;
-  border-radius: 50%;
+  padding: 0 5px;
+  border-radius: 999px;
   border: 1.5px solid var(--maroon);
   color: var(--maroon);
   font-size: 12px;

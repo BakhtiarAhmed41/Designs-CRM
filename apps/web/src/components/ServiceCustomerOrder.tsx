@@ -209,7 +209,7 @@ export function ServiceCustomerOrder({
                   const delivered = status === 'DELIVERED';
                   return (
                     <div key={row.key} className="sod-crow">
-                      <span className="sod-csize">Size {index + 1}</span>
+                      <span className="sod-csize">Size {index + 1}.</span>
                       <span className="sod-cname">{row.name}</span>
                       <span className={deliveryStatusClass(status)}>
                         {designStatusLabel(status ?? '', 'customer')}
@@ -287,7 +287,7 @@ export function ServiceCustomerOrder({
               return (
                 <div key={`${design.name ?? 'design'}-${index}`} className="ecd-design">
                   <h3>
-                    <span className="ecd-num">{index + 1}</span>
+                    <span className="ecd-num">{index + 1}.</span>
                     {designOptionLabel(index, design.name)}
                   </h3>
                   <div className={hasRefs ? 'ecd-assets' : undefined}>
