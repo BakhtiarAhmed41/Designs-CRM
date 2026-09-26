@@ -392,7 +392,18 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
 .dname-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
 .dname-label{display:flex;align-items:center;gap:8px;margin-bottom:0}
 
+/* Smaller format chips, with the extra-format field on the same row */
+#s-formats .format-grid{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+#s-formats .format-chip{flex:0 0 auto;min-width:0}
+#s-formats .format-chip span{width:auto;height:auto;min-width:40px;padding:3px 6px;font-size:11px;border-radius:8px}
+#s-formats .other-format-inline{display:flex;align-items:center;flex-wrap:nowrap;gap:6px;margin:0}
+#s-formats #otherFormatRow{grid-column:auto;margin:0;min-height:0}
+#s-formats #otherFormatField{grid-column:auto;margin:0;flex:0 0 auto}
+#s-formats .format-other input{width:104px;max-width:104px;height:26px;padding:2px 6px;font-size:12px}
+#s-formats .format-grid>.note-banner{flex:1 0 100%;width:100%;margin-top:8px}
+
 </style>
+<link rel="stylesheet" href="form-look.css">
 </head>
 <body>
 
@@ -496,9 +507,11 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
         <label class="format-chip"><input type="checkbox" name="format" value="JEF"><span>JEF</span></label>
         <label class="format-chip"><input type="checkbox" name="format" value="VP3"><span>VP3</span></label>
         <label class="format-chip"><input type="checkbox" name="format" value="XXX"><span>XXX</span></label>
-        <label class="check-row other-check" id="otherFormatRow"><input type="checkbox" id="otherFormatCheck">Need another format?</label>
-        <div class="format-other" id="otherFormatField" style="display:none;">
-          <input type="text" placeholder="Tell us the format you need">
+        <div class="other-format-inline">
+          <label class="check-row other-check" id="otherFormatRow"><input type="checkbox" id="otherFormatCheck">Need another format?</label>
+          <div class="format-other" id="otherFormatField" style="display:none;">
+            <input type="text" aria-label="Another format" autocomplete="off">
+          </div>
         </div>
         <div class="note-banner">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
@@ -652,7 +665,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
         <div class="card-body">
           <div class="field">
             <div class="dname-top">
-              <label class="flabel dname-label"><span class="design-num" data-design-num>${n}</span>Design Name</label>
+              <label class="flabel dname-label"><span class="design-num" data-design-num>${n}</span>Design Name <span class="opt">(optional)</span></label>
               <button type="button" class="remove-design" data-remove-design style="${n === 1 ? 'display:none' : ''}">
                 <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
                 Remove design
@@ -838,6 +851,9 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
     const addBtn = document.getElementById('addDesignBtn');
     addBtn ? designsContainer.insertBefore(card, addBtn) : designsContainer.appendChild(card);
     card.querySelectorAll('[data-artwork]').forEach(a => { attachFileHandlers(a); attachSizeHandlers(a); });
+    if(window.LVD_USUAL_NOTES){
+      card.querySelectorAll('textarea').forEach(ta => { ta.placeholder = window.LVD_USUAL_NOTES; });
+    }
     enhanceSelectsIn(card);
     card.querySelector('[data-remove-design]').addEventListener('click', () => { card.remove(); renumberDesigns(); });
     renumberDesigns();
@@ -917,11 +933,6 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
     const btn = document.getElementById('submitBtn');
     if(btn.dataset.busy === '1') return;
     const cards = [...document.querySelectorAll('[data-design-card]')];
-    const unnamed = cards.some(card => !card.querySelector('[data-design-name]').value.trim());
-    if(unnamed){
-      alert('Add a name for each design before submitting.');
-      return;
-    }
     const missingArt = cards.some(card => !designHasArtwork(card));
     if(missingArt){
       alert('Upload at least one artwork file for each design.');

@@ -332,14 +332,12 @@ select option:checked,select option:hover{background:var(--accent-soft);color:va
         <label class="format-chip"><input type="checkbox" name="format" value="DXF"><span>DXF</span></label>
         <label class="format-chip"><input type="checkbox" name="format" value="CDR"><span>CDR</span></label>
         <label class="format-chip"><input type="checkbox" name="format" value="EPS"><span>EPS</span></label>
+        <label class="format-chip"><input type="checkbox" name="format" value="Proof Preview"><span>Proof Preview</span></label>
+        <label class="format-chip"><input type="checkbox" name="format" value="PDF"><span>PDF</span></label>
         <label class="format-chip"><input type="checkbox" name="format" value="PNG"><span>PNG</span></label>
         <label class="check-row other-check" id="otherFormatRow"><input type="checkbox" id="otherFormatCheck">Need another format?</label>
         <div class="format-other" id="otherFormatField" style="display:none;">
           <input type="text" placeholder="Tell us the format you need">
-        </div>
-        <div class="note-banner">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
-          A proof preview is complimentary and included with every order.
         </div>
       </div>
     </section>
@@ -490,7 +488,7 @@ select option:checked,select option:hover{background:var(--accent-soft);color:va
 
           <div class="grid-2">
             <div class="field">
-              <label class="flabel dname-label"><span class="design-num" data-design-num>${n}</span>Design Name</label>
+              <label class="flabel dname-label"><span class="design-num" data-design-num>${n}</span>Design Name <span class="opt">(optional)</span></label>
               <input type="text" placeholder="e.g. Family name sign, tumbler" data-design-name>
             </div>
             <div class="field">
@@ -735,11 +733,6 @@ select option:checked,select option:hover{background:var(--accent-soft);color:va
     const btn = document.getElementById('submitBtn');
     if(btn.dataset.busy === '1') return;
     const cards = [...document.querySelectorAll('[data-design-card]')];
-    const unnamed = cards.some(card => !card.querySelector('[data-design-name]').value.trim());
-    if(unnamed){
-      alert('Add a name for each design before submitting.');
-      return;
-    }
     const missingService = cards.some(card => !card.querySelector('[data-service]').value);
     if(missingService){
       alert('Select a service for each design before submitting.');

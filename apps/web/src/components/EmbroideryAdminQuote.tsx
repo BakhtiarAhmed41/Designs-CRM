@@ -16,6 +16,7 @@ import {
   colorSelectedLabel,
   cuttingServiceLabel,
   designCountLabel,
+  customerDesignTitle,
   designNote,
   designOptionLabel,
   embroideryDesigns,
@@ -86,11 +87,13 @@ function companyName(preferences: unknown) {
 function blocksFromQuote(quote: QuoteWithLines | undefined, options: string[]): DesignBlock[] {
   const lines = quote?.lines ?? [];
   if (lines.length === 0) {
-    return [{ key: newKey(), designKey: options[0] ?? '', rows: [emptyRow()] }];
+    const keys = options.length ? options : [''];
+    return keys.map((designKey) => ({ key: newKey(), designKey, rows: [emptyRow()] }));
   }
   const blocks: DesignBlock[] = [];
   for (const line of lines) {
-    const designKey = parseDesignNote(line.note) ?? options[0] ?? '';
+    const stored = parseDesignNote(line.note);
+    const designKey = stored ? customerDesignTitle(stored) : (options[0] ?? '');
     let block = blocks.find((b) => b.designKey === designKey);
     if (!block) {
       block = { key: newKey(), designKey, rows: [] };
@@ -308,6 +311,13 @@ export function EmbroideryAdminQuote({
     }
   }
 
+  const nextQuoteVersion = (latest?.version ?? 0) + 1;
+  const sendLabel = sendQuote.isPending
+    ? 'Sending…'
+    : nextQuoteVersion > 1
+      ? `Send revised quote v${nextQuoteVersion}`
+      : 'Send Quote for Per-Design Approval';
+
   const pill =
     sentVersion > 0
       ? { text: `Quote Sent · v${sentVersion}`, ok: true }
@@ -321,7 +331,9 @@ export function EmbroideryAdminQuote({
     <div className="ead">
       <div className="ead-head">
         <div>
-          <h1>Embroidery Quote Request</h1>
+          <h1>
+            {vector ? 'Vector Quote Request' : cutting ? 'Cutting Quote Request' : 'Embroidery Quote Request'}
+          </h1>
           <p className="ead-meta">
             <span className={pill.ok ? 'ead-pill ok' : 'ead-pill'}>{pill.text}</span>
             <span>{dateStamp(order.createdAt)}</span>
@@ -329,7 +341,7 @@ export function EmbroideryAdminQuote({
         </div>
         <div className="ead-acts">
           <button type="button" className="ead-btn pri" disabled={messaging} onClick={() => void messageCustomer()}>
-            <i className="ti ti-message" /> {messaging ? 'Opening…' : 'Message Us'}
+            <i className="ti ti-message" /> {messaging ? 'Opening…' : 'Contact Customer'}
           </button>
           <button
             type="button"
@@ -389,7 +401,7 @@ export function EmbroideryAdminQuote({
                 <div key={`${design.name ?? 'design'}-${index}`}>
                   <div className="ead-dh" style={index > 0 ? { borderTop: '1px solid #e4e5e8' } : undefined}>
                     <h3>
-                      Design {index + 1} - {design.name?.trim() || 'Untitled design'}
+                      {designOptionLabel(index, design.name)}
                     </h3>
                     <button
                       type="button"
@@ -473,7 +485,10 @@ export function EmbroideryAdminQuote({
                           )}
                           {sizes.map((size, sizeIndex) => (
                             <tr key={`${size.detail ?? 'size'}-${sizeIndex}`}>
-                              <td>{sizeDetail(size)}</td>
+                              <td>
+                              <span className="ecd-size-n">{sizeIndex + 1}</span>
+                              {sizeDetail(size)}
+                            </td>
                               {!cutting && <td><span>{size.placement || '—'}</span></td>}
                               <td>
                                 {size.keepProportional === false ? (
@@ -690,7 +705,7 @@ export function EmbroideryAdminQuote({
                       onClick={() => sendQuote.mutate()}
                     >
                       <i className="ti ti-send" />
-                      {sendQuote.isPending ? 'Sending…' : 'Send Quote for Per-Design Approval'}
+                      {sendLabel}
                     </button>
                     <button
                       type="button"

@@ -497,7 +497,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
               {requestDesigns.map((design, index) => {
                 const files = designFiles[index] ?? { artwork: [], references: [] };
                 const sizes = (design.sizes ?? []).filter((size) => size.detail || size.placement || size.w || size.h);
-                const label = designOptionLabel(index, design.name).replace(' - ', ' · ');
+                const label = designOptionLabel(index, design.name);
                 const priced = groups.find((group) => group.title === label)?.rows ?? [];
                 return (
                   <div key={`${design.name ?? 'design'}-${index}`}>
@@ -573,7 +573,10 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
                           <tbody>
                             {sizes.map((size, sizeIndex) => (
                               <tr key={`${size.detail ?? 'size'}-${sizeIndex}`}>
-                                <td>{sizeDetail(size)}</td>
+                                <td>
+                                  <span className="ecd-size-n">{sizeIndex + 1}</span>
+                                  {sizeDetail(size)}
+                                </td>
                                 {!cutting && (
                                   <td>
                                     <span>{size.placement || '—'}</span>

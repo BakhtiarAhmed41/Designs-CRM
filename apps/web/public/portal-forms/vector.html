@@ -432,7 +432,12 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
 .note-banner{font-size:12.5px}
 #otherFormatRow{grid-column:span 2}
 .format-grid>#otherFormatField{grid-column:1/-1}
+.color-row{flex-wrap:nowrap;justify-content:flex-start;gap:8px 16px}
+.color-row .dpi-check{margin:0;font-size:11.5px;font-weight:500;white-space:nowrap}
+.size-field{margin-top:12px}
+.size-field input{width:100%}
 </style>
+<link rel="stylesheet" href="form-look.css">
 </head>
 <body>
 
@@ -519,7 +524,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
       </div>
       <div class="format-grid" id="formatGrid">
         <label class="format-chip"><input type="checkbox" name="format" value="AI"><span>AI</span></label>
-        <label class="format-chip"><input type="checkbox" name="format" value="PS"><span>PS</span></label>
+        <label class="format-chip"><input type="checkbox" name="format" value="EPS"><span>EPS</span></label>
         <label class="format-chip"><input type="checkbox" name="format" value="SVG"><span>SVG</span></label>
         <label class="format-chip"><input type="checkbox" name="format" value="PDF"><span>PDF</span></label>
         <label class="format-chip"><input type="checkbox" name="format" value="CDR"><span>CDR</span></label>
@@ -530,10 +535,6 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
         <div class="format-other" id="otherFormatField" style="display:none;">
           <input type="text" placeholder="Tell us the format you need">
         </div>
-      </div>
-      <div class="note-banner">
-        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
-        Production Sheet (PDF) and Design Preview (PNG) are always included.
       </div>
     </section>
 
@@ -609,7 +610,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
 </div>
 
 <script>
-  const services = ["Image to Vector","Logo Recreation","Color Separation","Print-Ready Setup","Other"];
+  const services = ["Image to Vector","Logo Recreation","Color Separation","Print-Ready Setup","3D STL / 3MF Files","Other"];
   const upIcon = '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>';
   const plusIcon = '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>';
 
@@ -624,7 +625,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
           <div class="grid-2">
             <div class="field">
               <div class="dname-top">
-                <label class="flabel dname-label"><span class="design-num" data-design-num>${n}</span>Design Name</label>
+                <label class="flabel dname-label"><span class="design-num" data-design-num>${n}</span>Design Name <span class="opt">(optional)</span></label>
                 <button type="button" class="remove-design" data-remove-design style="${n === 1 ? 'display:none' : ''}">
                   <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
                   Remove design
@@ -674,23 +675,26 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
                 <div>
                   <label class="flabel">Background</label>
                   <div class="radio-group">
-                    <label class="radio-row"><input type="radio" name="bg-${n}" checked>Transparent</label>
-                    <label class="radio-row"><input type="radio" name="bg-${n}">Keep original</label>
-                    <label class="radio-row"><input type="radio" name="bg-${n}">Not sure</label>
+                    <label class="radio-row"><input type="radio" name="bg-${n}" value="Transparent" checked>Transparent</label>
+                    <label class="radio-row"><input type="radio" name="bg-${n}" value="Keep original">Keep original</label>
                   </div>
                 </div>
                 <div>
                   <label class="flabel">Color Mode</label>
-                  <div class="radio-group">
-                    <label class="radio-row"><input type="radio" name="cmode-${n}" checked>RGB</label>
-                    <label class="radio-row"><input type="radio" name="cmode-${n}">CMYK</label>
-                    <label class="radio-row"><input type="radio" name="cmode-${n}">Recommend for Me</label>
+                  <div class="radio-group color-row">
+                    <label class="radio-row"><input type="radio" name="cmode-${n}" value="RGB" checked>RGB</label>
+                    <label class="radio-row"><input type="radio" name="cmode-${n}" value="CMYK">CMYK</label>
+                    <label class="check-row dpi-check"><input type="checkbox" checked>Prepare at 300 DPI</label>
                   </div>
                 </div>
               </div>
-              <label class="check-row"><input type="checkbox" checked>Prepare at 300 DPI</label>
               <p class="hint-text">Not sure? Leave the default options selected and our team will prepare the correct settings.</p>
             </div>
+          </div>
+
+          <div class="field size-field" data-size-row>
+            <label class="flabel">Size</label>
+            <input type="text" data-size-input placeholder="e.g. 12 in wide">
           </div>
 
           <div class="field notes">
@@ -845,11 +849,6 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
     const btn = document.getElementById('submitBtn');
     if(btn.dataset.busy === '1') return;
     const cards = [...document.querySelectorAll('[data-design-card]')];
-    const unnamed = cards.some(card => !card.querySelector('[data-design-name]').value.trim());
-    if(unnamed){
-      alert('Add a name for each design before submitting.');
-      return;
-    }
     const missingArt = cards.some(card => !designHasArtwork(card));
     if(missingArt){
       alert('Upload at least one artwork file for each design.');

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
+import { DesignNameTitle, DetailsSectionHead } from '@/components/DesignNameTitle';
 import { EmbroideryFileCard } from '@/components/EmbroideryFileCard';
 import { ImageLightbox } from '@/components/FilePreview';
 import { useTopbarLead } from '@/components/Shell';
@@ -169,8 +170,11 @@ export function ServiceCustomerOrder({
       )}
       {error && <ErrorBanner>{error}</ErrorBanner>}
       <div className="ecd-head">
-        <div>
-          <h1>{order.name?.trim() || 'Order'}</h1>
+        <div className="ecd-head-copy">
+          <DesignNameTitle
+            names={designs.map((design, index) => designOptionLabel(index, design.name))}
+            fallback={order.name?.trim() || 'Order'}
+          />
           <div className="ecd-meta">
             <span className={header.ok ? 'ecd-tag ok' : 'ecd-tag'}>{header.text}</span>
             <span className="ecd-sep" />
@@ -200,11 +204,12 @@ export function ServiceCustomerOrder({
             {groups.map((group) => (
               <div key={group.title} className="sod-cgroup">
                 <div className="sod-cgroup-name">{group.title}</div>
-                {group.rows.map((row) => {
+                {group.rows.map((row, index) => {
                   const status = row.design?.status;
                   const delivered = status === 'DELIVERED';
                   return (
                     <div key={row.key} className="sod-crow">
+                      <span className="sod-csize">Size {index + 1}</span>
                       <span className="sod-cname">{row.name}</span>
                       <span className={deliveryStatusClass(status)}>
                         {designStatusLabel(status ?? '', 'customer')}
@@ -228,17 +233,11 @@ export function ServiceCustomerOrder({
         </section>
 
         <section className="ecd-sec">
-          <div className={open.summary ? 'ecd-sec-h open' : 'ecd-sec-h'}>
-            <h2>Order summary</h2>
-            <button
-              type="button"
-              className="ecd-disclose"
-              aria-expanded={open.summary}
-              onClick={() => setOpen((prev) => ({ ...prev, summary: !prev.summary }))}
-            >
-              Details <i className="ti ti-chevron-down" />
-            </button>
-          </div>
+          <DetailsSectionHead
+            title="Order summary"
+            open={open.summary}
+            onToggle={() => setOpen((prev) => ({ ...prev, summary: !prev.summary }))}
+          />
           <div className={open.summary ? 'ecd-body' : 'ecd-body collapsed'}>
             {groups.map((group) => (
               <div key={group.title} className="sod-cgroup">
@@ -275,17 +274,11 @@ export function ServiceCustomerOrder({
         </section>
 
         <section className="ecd-sec">
-          <div className={open.request ? 'ecd-sec-h open' : 'ecd-sec-h'}>
-            <h2>Customer request</h2>
-            <button
-              type="button"
-              className="ecd-disclose"
-              aria-expanded={open.request}
-              onClick={() => setOpen((prev) => ({ ...prev, request: !prev.request }))}
-            >
-              Details <i className="ti ti-chevron-down" />
-            </button>
-          </div>
+          <DetailsSectionHead
+            title="Customer request"
+            open={open.request}
+            onToggle={() => setOpen((prev) => ({ ...prev, request: !prev.request }))}
+          />
           <div className={open.request ? 'ecd-body' : 'ecd-body collapsed'}>
             {designs.map((design, index) => {
               const files = designFiles[index] ?? { artwork: [], references: [] };
@@ -295,7 +288,7 @@ export function ServiceCustomerOrder({
                 <div key={`${design.name ?? 'design'}-${index}`} className="ecd-design">
                   <h3>
                     <span className="ecd-num">{index + 1}</span>
-                    {design.name?.trim() || `Design ${index + 1}`}
+                    {designOptionLabel(index, design.name)}
                   </h3>
                   <div className={hasRefs ? 'ecd-assets' : undefined}>
                     <div>
@@ -377,7 +370,10 @@ export function ServiceCustomerOrder({
                           <tbody>
                             {sizes.map((size, sizeIndex) => (
                               <tr key={`${size.detail ?? 'size'}-${sizeIndex}`}>
-                                <td>{sizeDetail(size)}</td>
+                                <td>
+                                  <span className="ecd-size-n">{sizeIndex + 1}</span>
+                                  {sizeDetail(size)}
+                                </td>
                                 {!cutting && <td>{size.placement || '—'}</td>}
                                 <td>
                                   <span className="ecd-prop">
@@ -416,17 +412,11 @@ export function ServiceCustomerOrder({
         </section>
 
         <section className="ecd-sec">
-          <div className={open.delivery ? 'ecd-sec-h open' : 'ecd-sec-h'}>
-            <h2>Delivery preferences</h2>
-            <button
-              type="button"
-              className="ecd-disclose"
-              aria-expanded={open.delivery}
-              onClick={() => setOpen((prev) => ({ ...prev, delivery: !prev.delivery }))}
-            >
-              Details <i className="ti ti-chevron-down" />
-            </button>
-          </div>
+          <DetailsSectionHead
+            title="Delivery preferences"
+            open={open.delivery}
+            onToggle={() => setOpen((prev) => ({ ...prev, delivery: !prev.delivery }))}
+          />
           <div className={open.delivery ? 'ecd-body' : 'ecd-body collapsed'}>
             <div className="ecd-pref">
               <div>
@@ -453,17 +443,11 @@ export function ServiceCustomerOrder({
         </section>
 
         <section className="ecd-sec">
-          <div className={open.history ? 'ecd-sec-h open' : 'ecd-sec-h'}>
-            <h2>Quote history</h2>
-            <button
-              type="button"
-              className="ecd-disclose"
-              aria-expanded={open.history}
-              onClick={() => setOpen((prev) => ({ ...prev, history: !prev.history }))}
-            >
-              Details <i className="ti ti-chevron-down" />
-            </button>
-          </div>
+          <DetailsSectionHead
+            title="Quote history"
+            open={open.history}
+            onToggle={() => setOpen((prev) => ({ ...prev, history: !prev.history }))}
+          />
           <div className={open.history ? 'ecd-body' : 'ecd-body collapsed'}>
             {history.length === 0 && <p className="ecd-wait">No quote has been sent yet.</p>}
             {history.length > 0 && (

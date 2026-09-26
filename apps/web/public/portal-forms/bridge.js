@@ -147,14 +147,18 @@
     });
     var otherCheck = document.getElementById('otherFormatCheck');
     var otherInp = document.querySelector('#otherFormatField input, #otherFormatText, #fmt-other-inp input, #fmt-other-text');
-    if (otherInp && otherInp.value.trim() && (!otherCheck || otherCheck.checked)) addFmt(otherInp.value);
+    if (otherInp && otherInp.value.trim() && (!otherCheck || otherCheck.checked)) {
+      otherInp.value.split(/[,;]+/).forEach(function (part) {
+        addFmt(part);
+      });
+    }
     return formats;
   }
 
   function radioValue(card, prefix) {
     var el = card.querySelector('input[type="radio"][name^="' + prefix + '"]:checked');
     if (!el) return '';
-    if (el.value) return el.value;
+    if (el.value && el.value !== 'on') return el.value;
     var row = el.closest('label');
     return row ? row.textContent.trim() : '';
   }
@@ -246,7 +250,7 @@
         });
       }
       designs.push({
-        name: nameInp ? nameInp.value.trim() : '',
+        name: displayDesignName(nameInp ? nameInp.value : '', designs.length),
         service: svcInp ? svcInp.value : '',
         placement: sizeRows[0] ? sizeRows[0].placement : '',
         size: size,
@@ -329,37 +333,51 @@
       .trim()
       .toUpperCase()
       .replace(/\s+/g, ' ');
-    if (s === 'JPEG') return 'JPG';
+    if (s === 'JPEG' || s === 'JPG') return 'JPG';
+    if (s === 'PS' || s === 'EPS') return 'EPS';
     if (s === 'OTHERS' || s === 'OTHER') return 'OTHER';
     if (s === 'PREVIEW IMAGE' || s === 'PROOF PREVIEW' || s === 'PREVIEW') return 'PREVIEW';
     return s;
   }
 
+  function pushFormat(list, seen, raw) {
+    String(raw || '')
+      .split(/[,;]+/)
+      .forEach(function (part) {
+        part = part.trim();
+        var key = fmtKey(part);
+        if (!part || !key || key === 'OTHER' || seen[key]) return;
+        seen[key] = true;
+        list.push(part);
+      });
+  }
+
   function formatsForService(prefs, svc) {
     if (!prefs) return [];
-    var list =
+    var list = [];
+    var seen = {};
+    var raw =
       svc === 'embroidery'
         ? prefs.embFormats || []
         : svc === 'laser'
           ? prefs.cncFormats || []
           : prefs.digFormats || [];
-    var extra = svc === 'embroidery' && prefs.embOther ? String(prefs.embOther) : '';
-    extra.split(/[,;]+/).forEach(function (part) {
-      part = part.trim();
-      if (part) list = list.concat([part]);
+    raw.forEach(function (item) {
+      pushFormat(list, seen, item);
     });
+    if (svc === 'embroidery' && prefs.embOther) pushFormat(list, seen, prefs.embOther);
     return list;
   }
 
   function applyFormats(formats) {
-    if (!formats || !formats.length) return;
     var wanted = {};
-    var extras = [];
-    formats.forEach(function (f) {
-      var key = fmtKey(f);
-      if (!key || key === 'OTHER') return;
-      wanted[key] = true;
-      extras.push(String(f).trim());
+    var ordered = [];
+    var seen = {};
+    (formats || []).forEach(function (f) {
+      pushFormat(ordered, seen, f);
+    });
+    ordered.forEach(function (f) {
+      wanted[fmtKey(f)] = true;
     });
 
     document.querySelectorAll('[data-fmt]').forEach(function (el) {
@@ -391,30 +409,21 @@
       if (key && key !== 'OTHER') knownOnPage[key] = true;
     });
 
-    var unknown = extras.filter(function (f) {
-      var key = fmtKey(f);
-      return key && key !== 'OTHER' && !knownOnPage[key];
-    });
-    var wantOther = unknown.length > 0 || formats.some(function (f) {
-      return fmtKey(f) === 'OTHER';
+    var unknown = ordered.filter(function (f) {
+      return !knownOnPage[fmtKey(f)];
     });
     var otherCb = document.querySelector('[data-fmt="Other"], [data-fmt="OTHER"], [data-fmt="Others"]');
-    if (otherCb) otherCb.checked = wantOther;
+    if (otherCb) otherCb.checked = unknown.length > 0;
     var otherChip = document.getElementById('fmt-other-chip');
-    if (otherChip && otherChip.classList.contains('fmt-chip')) setChipSelected(otherChip, wantOther);
+    if (otherChip && otherChip.classList.contains('fmt-chip')) setChipSelected(otherChip, unknown.length > 0);
     var otherInp = document.querySelector('#otherFormatField input, #otherFormatText, #fmt-other-inp input, #fmt-other-text');
     var otherWrap = document.getElementById('fmt-other-inp');
     var otherCheck = document.getElementById('otherFormatCheck');
     var otherField = document.getElementById('otherFormatField');
-    if (otherInp && unknown.length && !otherInp.value.trim()) {
-      otherInp.value = unknown.join(', ');
-      if (otherWrap) otherWrap.classList.add('show');
-      if (otherCheck) otherCheck.checked = true;
-      if (otherField) otherField.style.display = 'flex';
-    } else if (wantOther && otherCheck) {
-      otherCheck.checked = true;
-      if (otherField) otherField.style.display = 'flex';
-    }
+    if (otherInp) otherInp.value = unknown.join(', ');
+    if (otherWrap) otherWrap.classList.toggle('show', unknown.length > 0);
+    if (otherCheck) otherCheck.checked = unknown.length > 0;
+    if (otherField) otherField.style.display = unknown.length ? 'flex' : 'none';
   }
 
   function applyPlacement(placement) {
@@ -459,11 +468,16 @@
     if (prefs.placement) parts.push('Usual placement: ' + prefs.placement);
     if (prefs.hoops && prefs.hoops.length) parts.push('Usual hoop sizes: ' + prefs.hoops.join(', '));
     if (!parts.length) return;
-    var ta =
-      document.querySelector('[data-design-card] textarea') ||
-      document.querySelector('#mode-d .dcard textarea');
-    if (!ta || ta.value.trim()) return;
-    ta.value = parts.join('. ') + '.';
+    var text = parts.join('. ') + '.';
+    window.LVD_USUAL_NOTES = text;
+    document.querySelectorAll('[data-design-card] textarea, #mode-d .dcard textarea').forEach(function (ta) {
+      ta.placeholder = text;
+    });
+  }
+
+  function displayDesignName(raw, index) {
+    var name = String(raw || '').trim();
+    return name || 'Design ' + (index + 1);
   }
 
   window.LVD_APPLY_PREFS = function (prefs) {
@@ -485,9 +499,8 @@
     var size = collectSize(mode, body);
     var instructions = collectInstructions(body);
     var designNotes = designs
-      .map(function (d, i) {
+      .map(function (d) {
         var bits = [];
-        if (d.name) bits.push(d.name);
         if (d.service) bits.push(d.service);
         if (d.placement) bits.push(d.placement);
         if (d.size) bits.push(d.size);
@@ -496,7 +509,8 @@
         if (d.dpi300) bits.push('300 DPI');
         if (d.keepProportional) bits.push('Keep proportional');
         if (d.notes) bits.push(d.notes);
-        return bits.length ? 'Design ' + (i + 1) + ': ' + bits.join(' — ') : '';
+        if (!bits.length) return '';
+        return (d.name || 'Design') + ': ' + bits.join(' — ');
       })
       .filter(Boolean)
       .join('\n\n');
@@ -514,7 +528,15 @@
     }
     return {
       mode: mode,
-      designName: getDesignName() || 'Quote request',
+      designName:
+        designs
+          .map(function (d) {
+            return d.name;
+          })
+          .filter(Boolean)
+          .join(' / ') ||
+        getDesignName() ||
+        'Quote request',
       instructions: instructions,
       size: size,
       unit: unit,
@@ -624,10 +646,14 @@
     }
   }
 
-  function fillDesignCard(card, draft) {
+  function fillDesignCard(card, draft, index) {
     if (!card || !draft) return;
     var nameInp = cardNameInput(card);
-    if (nameInp && draft.name) nameInp.value = draft.name;
+    if (nameInp && draft.name) {
+      var typed = String(draft.name).trim();
+      var fallback = 'Design ' + ((typeof index === 'number' ? index : 0) + 1);
+      if (typed && typed !== fallback) nameInp.value = typed;
+    }
     var svcInp = card.querySelector('.grid-2 [data-csel-input]');
     if (svcInp && draft.service) setCustomSelect(svcInp, draft.service);
     var svcSel = card.querySelector('select[data-service]');
@@ -702,7 +728,7 @@
       ensureDesignCount(draft.designs.length);
       var cards = document.querySelectorAll('[data-design-card]');
       draft.designs.forEach(function (d, i) {
-        fillDesignCard(cards[i], d);
+        fillDesignCard(cards[i], d, i);
       });
     } else if (draft.designName) {
       var nameInp =

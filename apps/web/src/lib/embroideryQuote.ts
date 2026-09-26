@@ -108,10 +108,14 @@ function titlePreference(value?: string | null, fallback = '—') {
 }
 
 export function backgroundLabel(value?: string | null) {
+  const raw = value?.trim();
+  if (!raw || /^on$/i.test(raw)) return 'Transparent';
   return titlePreference(value, 'Transparent');
 }
 
 export function colorModeLabel(value?: string | null) {
+  const raw = value?.trim();
+  if (!raw || /^on$/i.test(raw)) return 'RGB';
   return titlePreference(value, 'RGB');
 }
 
@@ -141,12 +145,22 @@ export function turnaroundLabel(key?: string | null) {
 }
 
 export function designOptionLabel(index: number, name?: string | null) {
-  const title = name?.trim() || `Design ${index + 1}`;
-  return `Design ${index + 1} - ${title}`;
+  const title = name?.trim();
+  if (!title) return `Design ${index + 1}`;
+  const match = title.match(/^Design\s+\d+\s*[-–—·:]\s*(.+)$/i);
+  if (!match) return title;
+  const rest = match[1].trim();
+  if (!rest || /^design\s+\d+$/i.test(rest)) return `Design ${index + 1}`;
+  return rest;
 }
 
 export function customerDesignTitle(stored: string) {
-  return stored.replace(' - ', ' · ');
+  const normalized = stored.replace(' - ', ' · ');
+  const match = normalized.match(/^Design\s+(\d+)\s*·\s*(.+)$/i);
+  if (!match) return normalized;
+  const rest = match[2].trim();
+  if (!rest || /^design\s+\d+$/i.test(rest)) return `Design ${match[1]}`;
+  return rest;
 }
 
 export function designNote(label: string) {

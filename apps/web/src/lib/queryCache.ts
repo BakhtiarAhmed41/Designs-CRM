@@ -80,10 +80,19 @@ function patchLists(qc: QueryClient, order: Order) {
   }
 }
 
+function patchOrderDetails(qc: QueryClient, root: string, order: Order) {
+  qc.setQueriesData({ queryKey: [root] }, (prev: unknown) => {
+    if (!prev || typeof prev !== 'object' || !('order' in prev)) return prev;
+    const current = (prev as OrderEnvelope).order;
+    if (!current || current.id !== order.id) return prev;
+    return mergeOrder(prev, order);
+  });
+}
+
 /** Write the latest order into every open detail/list cache so buttons and chips update now. */
 export function cacheOrder(qc: QueryClient, order: Order) {
-  qc.setQueryData(['admin-order', order.id], (prev) => mergeOrder(prev, order));
-  qc.setQueryData(['my-order', order.id], (prev) => mergeOrder(prev, order));
+  patchOrderDetails(qc, 'admin-order', order);
+  patchOrderDetails(qc, 'my-order', order);
   patchLists(qc, order);
 }
 

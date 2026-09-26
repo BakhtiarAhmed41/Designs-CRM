@@ -24,7 +24,7 @@ export function orderDeliveryGroups(
   const pool = [...(order.designs ?? [])];
   const kept = lines.filter((line) => line.clientDecision !== 'DROPPED');
   const labels = embroideryDesigns(order.preferences, order.name).map((design, index) =>
-    designOptionLabel(index, design.name).replace(' - ', ' · '),
+    designOptionLabel(index, design.name),
   );
   const take = (name: string) => {
     const index = pool.findIndex((design) => design.name === name);

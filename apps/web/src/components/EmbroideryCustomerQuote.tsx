@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTopbarLead } from '@/components/Shell';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { DesignNameTitle, DetailsSectionHead } from '@/components/DesignNameTitle';
 import { EmbroideryFileCard } from '@/components/EmbroideryFileCard';
 import { startMyOrderCheckout } from '@/lib/billing';
 import { getErrorMessage } from '@/lib/api';
@@ -40,7 +41,7 @@ export function EmbroideryCustomerQuote({
   const prefs = asEmbroideryPrefs(order.preferences);
   const designs = embroideryDesigns(order.preferences, order.name);
   const designLabels = designs.map((design, index) =>
-    designOptionLabel(index, design.name).replace(' - ', ' · '),
+    designOptionLabel(index, design.name),
   );
   const attachments: EmbAttachment[] = (order.attachments ?? []).map((file) => ({
     id: file.id,
@@ -129,8 +130,11 @@ export function EmbroideryCustomerQuote({
   return (
     <div className="ecd">
       <div className="ecd-head">
-        <div>
-          <h1>{order.name || designs[0]?.name || 'Embroidery quote'}</h1>
+        <div className="ecd-head-copy">
+          <DesignNameTitle
+            names={designs.map((design, index) => designOptionLabel(index, design.name))}
+            fallback={order.name?.trim() || 'Embroidery quote'}
+          />
           <div className="ecd-meta">
             <span className={status.ok ? 'ecd-tag ok' : 'ecd-tag'}>{status.text}</span>
             <span className="ecd-sep" />
@@ -219,17 +223,11 @@ export function EmbroideryCustomerQuote({
         </section>
 
         <section className="ecd-sec">
-          <div className={open.request ? 'ecd-sec-h open' : 'ecd-sec-h'}>
-            <h2>Customer request</h2>
-            <button
-              type="button"
-              className="ecd-disclose"
-              aria-expanded={open.request}
-              onClick={() => setOpen((prev) => ({ ...prev, request: !prev.request }))}
-            >
-              Details <i className="ti ti-chevron-down" />
-            </button>
-          </div>
+          <DetailsSectionHead
+            title="Customer request"
+            open={open.request}
+            onToggle={() => setOpen((prev) => ({ ...prev, request: !prev.request }))}
+          />
           <div className={open.request ? 'ecd-body' : 'ecd-body collapsed'}>
             {designs.map((design, index) => {
               const files = designFiles[index] ?? { artwork: [], references: [] };
@@ -239,7 +237,7 @@ export function EmbroideryCustomerQuote({
                 <div key={`${design.name ?? 'design'}-${index}`} className="ecd-design">
                   <h3>
                     <span className="ecd-num">{index + 1}</span>
-                    {design.name?.trim() || `Design ${index + 1}`}
+                    {designOptionLabel(index, design.name)}
                   </h3>
                   <div className={hasRefs ? 'ecd-assets' : undefined}>
                     <div>
@@ -321,7 +319,10 @@ export function EmbroideryCustomerQuote({
                       <tbody>
                         {sizes.map((size, sizeIndex) => (
                           <tr key={`${size.detail ?? 'size'}-${sizeIndex}`}>
-                            <td>{sizeDetail(size)}</td>
+                            <td>
+                              <span className="ecd-size-n">{sizeIndex + 1}</span>
+                              {sizeDetail(size)}
+                            </td>
                             {!cutting && <td>{size.placement || '—'}</td>}
                             <td>
                               <span className="ecd-prop">
@@ -362,17 +363,11 @@ export function EmbroideryCustomerQuote({
         </section>
 
         <section className="ecd-sec">
-          <div className={open.delivery ? 'ecd-sec-h open' : 'ecd-sec-h'}>
-            <h2>Delivery preferences</h2>
-            <button
-              type="button"
-              className="ecd-disclose"
-              aria-expanded={open.delivery}
-              onClick={() => setOpen((prev) => ({ ...prev, delivery: !prev.delivery }))}
-            >
-              Details <i className="ti ti-chevron-down" />
-            </button>
-          </div>
+          <DetailsSectionHead
+            title="Delivery preferences"
+            open={open.delivery}
+            onToggle={() => setOpen((prev) => ({ ...prev, delivery: !prev.delivery }))}
+          />
           <div className={open.delivery ? 'ecd-body' : 'ecd-body collapsed'}>
             <div className="ecd-pref">
               <div>
@@ -399,17 +394,11 @@ export function EmbroideryCustomerQuote({
         </section>
 
         <section className="ecd-sec">
-          <div className={open.history ? 'ecd-sec-h open' : 'ecd-sec-h'}>
-            <h2>Quote history</h2>
-            <button
-              type="button"
-              className="ecd-disclose"
-              aria-expanded={open.history}
-              onClick={() => setOpen((prev) => ({ ...prev, history: !prev.history }))}
-            >
-              Details <i className="ti ti-chevron-down" />
-            </button>
-          </div>
+          <DetailsSectionHead
+            title="Quote history"
+            open={open.history}
+            onToggle={() => setOpen((prev) => ({ ...prev, history: !prev.history }))}
+          />
           <div className={open.history ? 'ecd-body' : 'ecd-body collapsed'}>
             {history.length === 0 && <p className="ecd-wait">No quote has been sent yet.</p>}
             {history.length > 0 && (
