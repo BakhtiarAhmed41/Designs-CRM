@@ -65,6 +65,12 @@ const AdminQuotes = lazy(() =>
 const AdminQuoteDetail = lazy(() =>
   import('@/pages/admin/QuoteDetail').then((m) => ({ default: m.AdminQuoteDetail })),
 );
+const AdminNewQuote = lazy(() =>
+  import('@/pages/admin/NewRequest').then((m) => ({ default: m.AdminNewQuote })),
+);
+const AdminNewOrder = lazy(() =>
+  import('@/pages/admin/NewRequest').then((m) => ({ default: m.AdminNewOrder })),
+);
 const AdminMessages = lazy(() =>
   import('@/pages/admin/Messages').then((m) => ({ default: m.AdminMessages })),
 );
@@ -227,6 +233,14 @@ export function App() {
             }
           />
           <Route
+            path="orders/new"
+            element={
+              <RequireFeature feature="orders">
+                <AdminNewOrder />
+              </RequireFeature>
+            }
+          />
+          <Route
             path="orders/:id"
             element={
               <RequireFeature feature="orders">
@@ -239,6 +253,14 @@ export function App() {
             element={
               <RequireFeature feature="quotes">
                 <AdminQuotes />
+              </RequireFeature>
+            }
+          />
+          <Route
+            path="quotes/new"
+            element={
+              <RequireFeature feature="quotes">
+                <AdminNewQuote />
               </RequireFeature>
             }
           />

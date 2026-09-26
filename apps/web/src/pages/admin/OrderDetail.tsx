@@ -51,7 +51,13 @@ import { QuoteHistory } from '@/components/QuoteHistory';
 import { useCanonicalOrderUrl } from '@/lib/useCanonicalOrderUrl';
 import { ServiceAdminOrder } from '@/components/ServiceAdminOrder';
 import { serviceOrderKind } from '@/lib/embroideryQuote';
-import { isStaffCreatedOrder, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
+import {
+  canPriceOrder,
+  isStaffCreatedOrder,
+  studioQuotation,
+  type QuoteWithLines,
+} from '@/lib/quoteHelpers';
+import { AdminOrderPricing } from '@/components/AdminOrderPricing';
 import type { Order, OrderStatus } from '@/lib/types';
 import { useAuth } from '@/context/AuthContext';
 import { canFeature, canSupport } from '@/lib/permissions';
@@ -1570,6 +1576,12 @@ export function AdminOrderDetail() {
         </div>
 
         <div>
+          {canPriceOrder(order) && (
+            <div style={{ marginBottom: 12 }}>
+              <AdminOrderPricing order={order} />
+            </div>
+          )}
+
           <div className="card">
             <div className="card-h">
               <span className="ct">

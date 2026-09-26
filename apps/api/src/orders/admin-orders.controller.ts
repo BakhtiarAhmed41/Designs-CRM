@@ -187,6 +187,8 @@ const quoteBuilderSchema = z.object({
     .min(1),
 });
 
+const orderPricingSchema = quoteBuilderSchema.omit({ comment: true });
+
 function parseBool(value: unknown, defaultValue: boolean): boolean {
   if (value === undefined || value === null || value === '') return defaultValue;
   if (typeof value === 'boolean') return value;
@@ -550,6 +552,17 @@ export class AdminOrdersController {
     const quotation = await this.orders.submitQuoteBuilder(user, id, data);
     const order = await this.orders.getAdminOrder(user, id);
     return { quotation, order };
+  }
+
+  @Post(':id/order-pricing')
+  async orderPricing(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    const data = orderPricingSchema.parse(body);
+    const order = await this.orders.setDirectOrderPricing(user, id, data);
+    return { order };
   }
 
   @Post(':id/attachments')

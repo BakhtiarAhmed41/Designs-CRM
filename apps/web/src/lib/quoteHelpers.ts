@@ -8,6 +8,26 @@ export function isStaffCreatedOrder(order?: { createdByRole?: UserRole | null } 
 
 export type QuoteWithLines = Quotation & { lines?: QuotationLine[] };
 
+type PricingOrder = {
+  type?: string | null;
+  status?: string | null;
+  paymentStatus?: string | null;
+  createdByRole?: UserRole | null;
+};
+
+/** A staff-created order sits as a draft until an admin enters the prices. */
+export function needsOrderPricing(order?: PricingOrder | null) {
+  return order?.type === 'ORDER' && order?.status === 'CREATED';
+}
+
+/** Prices stay editable until the customer has paid. */
+export function canPriceOrder(order?: PricingOrder | null) {
+  if (order?.type !== 'ORDER') return false;
+  if (order.paymentStatus === 'PAID' || order.paymentStatus === 'REFUNDED') return false;
+  if (needsOrderPricing(order)) return true;
+  return order.status === 'PENDING_PAYMENT' && isStaffCreatedOrder(order);
+}
+
 function byVersionDesc(a: QuoteWithLines, b: QuoteWithLines) {
   return b.version - a.version;
 }

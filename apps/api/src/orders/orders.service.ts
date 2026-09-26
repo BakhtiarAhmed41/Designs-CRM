@@ -37,12 +37,40 @@ function assertAuthUser(user: AuthUser | undefined): asserts user is AuthUser {
   if (!user) throw new ForbiddenException();
 }
 
+/**
+ * Staff-created work stays hidden from the customer until it is ready:
+ * unpriced orders (CREATED) and unpriced admin quotes (CREATED, or still
+ * WAITING_FOR_QUOTATION before a quote is sent).
+ */
+const HIDDEN_FROM_CUSTOMER_SQL = `
+  status != 'CREATED'
+  AND NOT (
+    type = 'QUOTE_REQUEST'
+    AND created_by_role IS NOT NULL
+    AND created_by_role != 'CLIENT'
+    AND status = 'WAITING_FOR_QUOTATION'
+  )
+`;
+
 function isAdminRole(role: UserRole): boolean {
   return (
     role === UserRole.SUPER_ADMIN ||
     role === UserRole.ADMIN ||
     role === UserRole.SUPPORT ||
     role === UserRole.DESIGNER
+  );
+}
+
+function isHiddenFromCustomer(row: {
+  type: OrderType;
+  status: OrderStatus;
+  created_by_role?: UserRole | null;
+}): boolean {
+  if (row.status === OrderStatus.CREATED) return true;
+  return (
+    row.type === OrderType.QUOTE_REQUEST &&
+    Boolean(row.created_by_role && isAdminRole(row.created_by_role)) &&
+    row.status === OrderStatus.WAITING_FOR_QUOTATION
   );
 }
 
@@ -1102,7 +1130,7 @@ export class OrdersService {
     },
   ) {
     assertAuthUser(user);
-    const where = ['client_user_id = ?'];
+    const where = ['client_user_id = ?', HIDDEN_FROM_CUSTOMER_SQL];
     const params: unknown[] = [user.id];
     if (filters?.quoteHistory) {
       where.push(
@@ -1210,7 +1238,9 @@ export class OrdersService {
   async myOrderSummary(user: AuthUser | undefined) {
     assertAuthUser(user);
     const rows = await this.db.query<{ status: string; type: string; n: number }>(
-      `SELECT status, type, COUNT(*) AS n FROM orders WHERE client_user_id = ? GROUP BY status, type`,
+      `SELECT status, type, COUNT(*) AS n FROM orders
+        WHERE client_user_id = ? AND ${HIDDEN_FROM_CUSTOMER_SQL}
+        GROUP BY status, type`,
       [user.id],
     );
     const done = new Set<string>([
@@ -1281,6 +1311,9 @@ export class OrdersService {
     const row = await this.getOrderRow(orderId);
     if (!row || row.client_user_id !== user.id)
       throw new NotFoundException('Order not found');
+    if (isHiddenFromCustomer(row)) {
+      throw new NotFoundException('Order not found');
+    }
     return this.assembleOrder(orderId, { releasedOnly: true });
   }
 
@@ -2033,11 +2066,18 @@ export class OrdersService {
         : typeof data.priceCents === 'number' && Number.isFinite(data.priceCents)
           ? Math.round(data.priceCents)
           : null;
+    const prefsDesigns = Array.isArray(
+      (data.preferences as { designs?: unknown[] } | null)?.designs,
+    )
+      ? (data.preferences as { designs: unknown[] }).designs.length
+      : 0;
+    const requestedDesigns =
+      typeof data.designCount === 'number' && data.designCount > 0
+        ? data.designCount
+        : prefsDesigns;
     const designCount =
-      pricedLines.length === 0 &&
-      typeof data.designCount === 'number' &&
-      data.designCount > 0
-        ? Math.min(Math.floor(data.designCount), 50)
+      pricedLines.length === 0 && requestedDesigns > 0
+        ? Math.min(Math.floor(requestedDesigns), 50)
         : 0;
 
     const billPerOrder = accountType !== AccountType.NET_MONTHLY;
@@ -2046,10 +2086,17 @@ export class OrdersService {
       data.turnaroundKey ?? prefs?.turnaround ?? null,
     );
     let status: OrderStatus;
-    if (data.type === OrderType.ORDER) {
-      status = OrderStatus.IN_PROGRESS;
+    if (data.type !== OrderType.ORDER) {
+      // Unpriced admin quotes stay internal until staff send the quote.
+      status = OrderStatus.CREATED;
+    } else if (priceCents == null) {
+      // Staff filled in the job but still have to enter prices, so the order
+      // stays a draft that the customer cannot see yet.
+      status = OrderStatus.CREATED;
+    } else if (priceCents > 0 && billPerOrder) {
+      status = OrderStatus.PENDING_PAYMENT;
     } else {
-      status = OrderStatus.WAITING_FOR_QUOTATION;
+      status = OrderStatus.IN_PROGRESS;
     }
 
     await this.db.execute(
@@ -2080,7 +2127,7 @@ export class OrdersService {
         null,
       ],
     );
-    if (data.type === OrderType.ORDER) {
+    if (data.type === OrderType.ORDER && priceCents != null) {
       await this.db.execute(
         'UPDATE orders SET approved_at = NOW() WHERE id = ?',
         [id],
@@ -3328,6 +3375,214 @@ export class OrdersService {
       ...this.quotationDto(row!),
       lines: await this.getQuotationLines(quotationId),
     };
+  }
+
+  /**
+   * Price a staff-created direct order. There is no customer decision step
+   * here: the lines are recorded as already approved and the order moves to
+   * awaiting payment so the customer just pays.
+   */
+  async setDirectOrderPricing(
+    user: AuthUser | undefined,
+    orderId: string,
+    input: {
+      lines: Array<{
+        name: string;
+        note?: string | null;
+        attachmentId?: string | null;
+        priceCents?: number | null;
+        sizes?: Array<{ label: string; priceCents: number }>;
+      }>;
+    },
+  ) {
+    this.assertAdmin(user);
+    const order = await this.getOrderRow(orderId);
+    if (!order) throw new NotFoundException('Order not found');
+    if (order.type !== OrderType.ORDER) {
+      throw new BadRequestException(
+        'Only orders are priced here. Quote requests use the quote builder.',
+      );
+    }
+    const priceable = new Set<string>([
+      OrderStatus.CREATED,
+      OrderStatus.PENDING_PAYMENT,
+      OrderStatus.IN_PROGRESS,
+    ]);
+    if (!priceable.has(order.status)) {
+      throw new BadRequestException(
+        `Prices cannot be changed while status is ${order.status}.`,
+      );
+    }
+    const paymentStatus = await this.billing.resolveOrderPaymentStatus(order);
+    if (paymentStatus === OrderPaymentStatus.PAID) {
+      throw new BadRequestException(
+        'This order is already paid. Use a paid revision or an add-on invoice to charge more.',
+      );
+    }
+    if (!input.lines || input.lines.length === 0) {
+      throw new BadRequestException('At least one line item is required');
+    }
+
+    let total = 0;
+    for (const line of input.lines) {
+      total += typeof line.priceCents === 'number' ? line.priceCents : 0;
+      for (const s of line.sizes ?? []) {
+        total += typeof s.priceCents === 'number' ? s.priceCents : 0;
+      }
+    }
+
+    const currency = order.currency || 'USD';
+    const customer = order.customer_id
+      ? await this.db.queryOne<{ account_type: AccountType }>(
+          'SELECT account_type FROM customers WHERE id = ? LIMIT 1',
+          [order.customer_id],
+        )
+      : null;
+    const billPerOrder = customer?.account_type !== AccountType.NET_MONTHLY;
+    const nextStatus =
+      total > 0 && billPerOrder
+        ? OrderStatus.PENDING_PAYMENT
+        : OrderStatus.IN_PROGRESS;
+    const firstPricing = order.status === OrderStatus.CREATED;
+
+    const quotationId = await this.db.withTransaction(async (tx) => {
+      const latest = await tx.queryOne<{ version: number }>(
+        'SELECT version FROM quotations WHERE order_id = ? ORDER BY version DESC LIMIT 1',
+        [orderId],
+      );
+      await tx.execute(
+        `UPDATE quotations SET status = ? WHERE order_id = ? AND status IN (?, ?)`,
+        [
+          QuotationStatus.SENT,
+          orderId,
+          QuotationStatus.PROPOSED,
+          QuotationStatus.APPROVED,
+        ],
+      );
+      const qId = randomUUID();
+      await tx.execute(
+        `INSERT INTO quotations
+           (id, order_id, version, status, created_by_role, created_by_id, amount_cents, currency, comment)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          qId,
+          orderId,
+          (latest?.version ?? 0) + 1,
+          QuotationStatus.APPROVED,
+          user.role,
+          user.id,
+          total,
+          currency,
+          'Priced by admin on a staff-created order',
+        ],
+      );
+
+      let lineSort = 0;
+      for (const line of input.lines) {
+        const lineId = randomUUID();
+        await tx.execute(
+          `INSERT INTO quotation_lines
+             (id, quotation_id, name, note, attachment_id, price_cents, sort_order, client_decision)
+           VALUES (?, ?, ?, ?, ?, ?, ?, 'KEPT')`,
+          [
+            lineId,
+            qId,
+            line.name.trim(),
+            line.note?.trim() || null,
+            line.attachmentId?.trim() || null,
+            typeof line.priceCents === 'number' ? line.priceCents : null,
+            lineSort++,
+          ],
+        );
+        let sizeSort = 0;
+        for (const s of line.sizes ?? []) {
+          await tx.execute(
+            `INSERT INTO quotation_line_sizes
+               (id, line_id, label, price_cents, sort_order)
+             VALUES (?, ?, ?, ?, ?)`,
+            [randomUUID(), lineId, s.label.trim(), s.priceCents ?? 0, sizeSort++],
+          );
+        }
+      }
+
+      await tx.execute(
+        `UPDATE orders
+            SET status = ?, price_cents = ?, approved_at = COALESCE(approved_at, NOW()),
+                rejection_reason = NULL, rejected_at = NULL
+          WHERE id = ?`,
+        [nextStatus, total, orderId],
+      );
+
+      if (order.customer_id) {
+        const existing = await tx.queryOne<{ id: string }>(
+          `SELECT id FROM conversations
+            WHERE customer_id = ? AND order_id = ?
+              AND chat_type IN ('QUOTE', 'ORDER')
+            ORDER BY created_at DESC LIMIT 1`,
+          [order.customer_id, orderId],
+        );
+        if (!existing) {
+          const prior = await tx.queryOne<{ n: number }>(
+            'SELECT COUNT(*) AS n FROM conversations WHERE customer_id = ?',
+            [order.customer_id],
+          );
+          await tx.execute(
+            `INSERT INTO conversations
+               (id, customer_id, order_id, chat_type, status, subject, source, last_message_at)
+             VALUES (?, ?, ?, 'ORDER', 'OPEN', ?, 'PORTAL', NOW())`,
+            [
+              randomUUID(),
+              order.customer_id,
+              orderId,
+              `Conversation #${Number(prior?.n ?? 0) + 1}`,
+            ],
+          );
+        }
+      }
+
+      return qId;
+    });
+
+    const lines = await this.getQuotationLines(quotationId);
+    await this.ensureDesignsFromQuotationLines(orderId, lines);
+
+    if (total > 0 && billPerOrder && order.customer_id) {
+      await this.billing.billPayPerOrderQuote({
+        customerId: order.customer_id,
+        orderId,
+        amountCents: total,
+        coversText: order.name,
+        notify: false,
+      });
+    }
+
+    const awaitingPayment = nextStatus === OrderStatus.PENDING_PAYMENT;
+    if (order.client_user_id) {
+      await this.notifications.createFor(order.client_user_id, {
+        title: awaitingPayment
+          ? firstPricing
+            ? 'New order ready to pay'
+            : 'Order price updated'
+          : 'Your order has started',
+        body: awaitingPayment
+          ? `Pay to start work - ${order.name ?? ''}`
+          : `We started work on ${order.name ?? ''}`,
+        link: `/portal/orders/${orderId}`,
+      });
+    }
+    if (awaitingPayment) {
+      const email = await this.customerEmailForOrder(order);
+      if (email) {
+        void this.mail.sendOrderReadyToPay(
+          email,
+          order.name ?? 'your order',
+          orderId,
+          `${currency === 'USD' ? '$' : `${currency} `}${(total / 100).toFixed(2)}`,
+        );
+      }
+    }
+
+    return this.assembleOrder(orderId);
   }
 
   // --- my files ------------------------------------------------------------

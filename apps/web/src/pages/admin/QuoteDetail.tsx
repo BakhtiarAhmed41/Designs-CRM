@@ -573,6 +573,11 @@ export function AdminQuoteDetail() {
                 </span>
               </div>
               <div className="card-b">
+                {!revising && isStaffCreatedOrder(order) && (
+                  <p className="muted" style={{ margin: '0 0 10px', fontSize: 12.5 }}>
+                    The customer sees this quote after you send it. They can accept it like a normal quote.
+                  </p>
+                )}
                 <div
                   style={{
                     fontSize: 11,

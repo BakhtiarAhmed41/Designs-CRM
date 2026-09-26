@@ -35,7 +35,14 @@ import {
   updateOrderNotes,
 } from '@/lib/orders';
 import { invalidateWorkCaches } from '@/lib/queryCache';
-import { quoteHistoryLabel, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
+import {
+  canPriceOrder,
+  needsOrderPricing,
+  quoteHistoryLabel,
+  studioQuotation,
+  type QuoteWithLines,
+} from '@/lib/quoteHelpers';
+import { AdminOrderPricing } from '@/components/AdminOrderPricing';
 import { deliveryCounts, orderDeliveryGroups, type DeliveryRow } from '@/lib/serviceOrderView';
 import { assignOrder, listTeam, unassignOrder } from '@/lib/team';
 import type { Order } from '@/lib/types';
@@ -98,6 +105,8 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
   const quoted = lines.length || counts.total;
   const paid = order.paymentStatus === 'PAID';
   const amountPaid = paid ? order.priceCents : 0;
+  const unpriced = needsOrderPricing(order);
+  const showPricing = canPriceOrder(order);
   const quoteNo = orderNumber(order.humanRef, order.id.slice(0, 6));
   const attachments: EmbAttachment[] = (order.attachments ?? []).map((file) => ({
     id: file.id,
@@ -317,7 +326,13 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
           <h1>{order.name?.trim() || 'Order'}</h1>
           <div className="ead-meta">
             <span className={counts.allDelivered ? 'ead-pill ok' : 'ead-pill'}>
-              {counts.allDelivered ? 'Delivered' : 'In process'}
+              {unpriced
+                ? 'Needs your price'
+                : order.status === 'PENDING_PAYMENT'
+                  ? 'Awaiting payment'
+                  : counts.allDelivered
+                    ? 'Delivered'
+                    : 'In process'}
             </span>
             <span>Placed {dateShort(order.createdAt)}</span>
           </div>
@@ -343,9 +358,11 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
               <i className="ti ti-message" /> Help Request
             </button>
           )}
-          <button type="button" className="ead-btn" onClick={() => setRevisionOpen(true)}>
-            <i className="ti ti-pencil" /> Create revision
-          </button>
+          {!unpriced && (
+            <button type="button" className="ead-btn" onClick={() => setRevisionOpen(true)}>
+              <i className="ti ti-pencil" /> Create revision
+            </button>
+          )}
           <button
             type="button"
             className="ead-btn icon"
@@ -377,7 +394,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
         <div>
           <dt>Approved items</dt>
           <dd>
-            {accepted} of {quoted} accepted
+            {unpriced ? 'Waiting for prices' : `${accepted} of ${quoted} accepted`}
           </dd>
         </div>
         <div>
@@ -396,7 +413,13 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
               </span>
             </div>
             <div className="ead-b">
-              {groups.length === 0 && <div className="ead-he-sub">No priced items on this order yet.</div>}
+              {groups.length === 0 && (
+                <div className="ead-he-sub">
+                  {unpriced
+                    ? 'Enter the order prices to add the items for this order.'
+                    : 'No priced items on this order yet.'}
+                </div>
+              )}
               {groups.map((group, groupIndex) => (
                 <div key={group.title} className="sod-group" style={groupIndex === 0 ? { marginTop: 0 } : undefined}>
                   <h3>{group.title}</h3>
@@ -651,7 +674,13 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
               </span>
             </div>
             <div className="ead-b">
-              {history.length === 0 && <div className="ead-he-sub">No quote has been sent yet.</div>}
+              {history.length === 0 && (
+                <div className="ead-he-sub">
+                  {unpriced
+                    ? 'Prices appear here after you save them.'
+                    : 'No quote has been sent yet.'}
+                </div>
+              )}
               {history.map((quote) => {
                 const acceptedPaid = quote.status === 'APPROVED' && paid;
                 return (
@@ -675,6 +704,8 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
         </div>
 
         <aside className="ead-rail">
+          {showPricing && <AdminOrderPricing order={order} />}
+
           <section className="ead-card">
             <div className="ead-card-h"><h2>Designer</h2></div>
             <div className="ead-b">

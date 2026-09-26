@@ -187,6 +187,26 @@ export class MailService {
     });
   }
 
+  async sendOrderReadyToPay(
+    to: string,
+    orderName: string,
+    orderId: string,
+    amountLabel: string,
+  ) {
+    const link = `${webBase()}/portal/orders/${orderId}`;
+    return this.sendMail({
+      to,
+      subject: `Your order is ready to pay: ${orderName}`,
+      text: `We set up ${orderName} for you (${amountLabel}). Pay in your portal and we will start work:\n\n${link}`,
+      html: wrapHtml(
+        'Your order is ready to pay',
+        `<p>We set up <strong>${orderName}</strong> for you (${amountLabel}).</p>
+         <p>Pay in your portal and we will start work right away.</p>
+         <p><a href="${link}">Open order</a></p>`,
+      ),
+    });
+  }
+
   async sendPreviewReady(to: string, orderName: string, orderId: string) {
     const link = `${webBase()}/portal/orders/${orderId}`;
     return this.sendMail({

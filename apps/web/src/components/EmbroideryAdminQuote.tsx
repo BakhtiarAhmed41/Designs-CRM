@@ -31,6 +31,7 @@ import {
 } from '@/lib/embroideryQuote';
 import { createAdminConversation, listAdminConversations } from '@/lib/messaging';
 import {
+  adminAcceptQuotation,
   adminAttachmentUrl,
   adminRejectOrder,
   approveCounter,
@@ -39,7 +40,7 @@ import {
 } from '@/lib/orders';
 import { applyOrderChange, invalidateWorkCaches } from '@/lib/queryCache';
 import { canSupport } from '@/lib/permissions';
-import { studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
+import { isStaffCreatedOrder, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
 import type { Order } from '@/lib/types';
 import '@/styles/embroidery-quote.css';
 
@@ -257,6 +258,15 @@ export function EmbroideryAdminQuote({
     onError: (e) => setError(getErrorMessage(e)),
   });
 
+  const approveForCustomer = useMutation({
+    mutationFn: () => adminAcceptQuotation(order.id),
+    onSuccess: (res) => {
+      void applyOrderChange(qc, res.order);
+      navigate(`/admin/orders/${orderSlug(res.order.humanRef, res.order.id)}`);
+    },
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
   const counterApprove = useMutation({
     mutationFn: () => approveCounter(order.id),
     onSuccess: (res) => {
@@ -332,7 +342,11 @@ export function EmbroideryAdminQuote({
       <div className="ead-head">
         <div>
           <h1>
-            {vector ? 'Vector Quote Request' : cutting ? 'Cutting Quote Request' : 'Embroidery Quote Request'}
+            {vector
+              ? 'Vector Quote Request'
+              : cutting
+                ? 'Cutting Quote Request'
+                : 'Embroidery Quote Request'}
           </h1>
           <p className="ead-meta">
             <span className={pill.ok ? 'ead-pill ok' : 'ead-pill'}>{pill.text}</span>
@@ -547,10 +561,10 @@ export function EmbroideryAdminQuote({
         </div>
 
         <aside className="ead-rail">
-          <section className="ead-card">
+          <section className="ead-card" style={sentVersion === 0 ? { borderColor: 'var(--navy)' } : undefined}>
             <div className="ead-card-h">
               <span className="ead-ic"><i className="ti ti-currency-dollar" /></span>
-              <h2>Generate Quote</h2>
+              <h2>{sentVersion > 0 ? 'Update quote' : 'Enter quote prices'}</h2>
             </div>
             <div className="ead-b">
               {awaitingCounter ? (
@@ -569,6 +583,13 @@ export function EmbroideryAdminQuote({
                 />
               ) : (
                 <>
+                  {sentVersion === 0 && (
+                    <p className="ead-he-sub" style={{ marginTop: 0 }}>
+                      {isStaffCreatedOrder(order)
+                        ? 'The customer sees this quote after you send it. They can accept it like a normal quote.'
+                        : 'Price the request, then send it so the customer can accept.'}
+                    </p>
+                  )}
                   <div className="ead-kicker">Quote Designs</div>
                   {blocks.map((block) => (
                     <div key={block.key} className="ead-ql">
@@ -707,6 +728,28 @@ export function EmbroideryAdminQuote({
                       <i className="ti ti-send" />
                       {sendLabel}
                     </button>
+                    {sentVersion > 0 && isStaffCreatedOrder(order) && (
+                      <button
+                        type="button"
+                        className="ead-btn blk"
+                        disabled={approveForCustomer.isPending}
+                        onClick={() => {
+                          void dialog
+                            .confirm({
+                              title: 'Approve for the customer?',
+                              message:
+                                'You created this quote, so you can accept it on their behalf. It becomes an order and they get an invoice to pay.',
+                              confirmLabel: 'Approve quote',
+                            })
+                            .then((ok) => {
+                              if (ok) approveForCustomer.mutate();
+                            });
+                        }}
+                      >
+                        <i className="ti ti-check" />{' '}
+                        {approveForCustomer.isPending ? 'Approving…' : 'Approve for customer'}
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="ead-btn blk"

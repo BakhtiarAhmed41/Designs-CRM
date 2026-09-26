@@ -78,7 +78,12 @@ export function ServiceCustomerOrder({
       ? { text: 'Awaiting payment', ok: false }
       : { text: 'In process', ok: false };
 
-  const [open, setOpen] = useState({ summary: false, request: false, delivery: false, history: false });
+  const [open, setOpen] = useState({
+    summary: awaiting,
+    request: false,
+    delivery: false,
+    history: false,
+  });
   const [filesFor, setFilesFor] = useState<DeliveryRow | null>(null);
   const [preview, setPreview] = useState<{ src: string; name: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -87,12 +92,14 @@ export function ServiceCustomerOrder({
   const topbarLead = useMemo(
     () => (
       <nav className="ecd-crumb" aria-label="Breadcrumb">
-        <Link to="/portal/quotes">Quotes</Link>
+        <Link to={order.type === 'ORDER' ? '/portal/orders' : '/portal/quotes'}>
+          {order.type === 'ORDER' ? 'Orders' : 'Quotes'}
+        </Link>
         <span aria-hidden="true">/</span>
         <b>{quoteNo}</b>
       </nav>
     ),
-    [quoteNo],
+    [order.type, quoteNo],
   );
   useTopbarLead(topbarLead);
 
@@ -188,7 +195,12 @@ export function ServiceCustomerOrder({
           </div>
         </div>
         <div className="ecd-acts">
-          <button type="button" className="ecd-btn pri" disabled={chat.isPending} onClick={() => chat.mutate()}>
+          {awaiting && !paid && (
+            <button type="button" className="ecd-btn pri" disabled={payBusy} onClick={() => void pay()}>
+              <i className="ti ti-credit-card" /> {payBusy ? 'Opening checkout…' : 'Pay now'}
+            </button>
+          )}
+          <button type="button" className="ecd-btn" disabled={chat.isPending} onClick={() => chat.mutate()}>
             <i className="ti ti-message" /> {chat.isPending ? 'Opening…' : 'Start Chat'}
           </button>
         </div>

@@ -934,7 +934,11 @@
 
     document.querySelectorAll('.form-hint').forEach(function (el) {
       var original = rememberDefault(el, 'data-default-label');
-      el.textContent = isAdmin ? 'Next you will add prices and files.' : original;
+      el.textContent = isAdmin
+        ? isOrder
+          ? 'Next you will enter the order prices. The customer pays before work starts.'
+          : 'Next you will price it and send the quote to the customer.'
+        : original;
     });
 
     document.querySelectorAll('.ct').forEach(function (el) {

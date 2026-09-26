@@ -166,7 +166,10 @@ export function lifecycleChip(
 
   switch (status) {
     case 'CREATED':
-      return { cls: 'chip c-new', label: 'Draft' };
+      return {
+        cls: isAdmin ? 'chip c-quote' : 'chip c-new',
+        label: isAdmin ? 'Needs your price' : 'Draft',
+      };
     case 'WAITING_FOR_QUOTATION':
       return {
         cls: 'chip c-quote',

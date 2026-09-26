@@ -545,6 +545,7 @@ export class BillingService {
     orderId: string;
     amountCents: number;
     coversText?: string | null;
+    notify?: boolean;
   }) {
     if (!Number.isInteger(data.amountCents) || data.amountCents <= 0) return;
     const customer = await this.getCustomerRow(data.customerId);
@@ -586,11 +587,13 @@ export class BillingService {
         ],
       );
       invoice = await this.getInvoiceRow(id);
-      await this.notifyCustomerUser(data.customerId, {
-        title: 'Invoice ready',
-        body: 'Your quote was accepted. Please pay to start the order.',
-        link: '/portal/invoices',
-      });
+      if (data.notify !== false) {
+        await this.notifyCustomerUser(data.customerId, {
+          title: 'Invoice ready',
+          body: 'Your quote was accepted. Please pay to start the order.',
+          link: `/portal/orders/${data.orderId}`,
+        });
+      }
     }
 
     if (invoice && invoice.status === InvoiceStatus.AWAITING) {

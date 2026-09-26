@@ -143,6 +143,17 @@ export function submitQuoteBuilder(
   );
 }
 
+/** Prices a staff-created order. No customer approval step, they just pay. */
+export function setOrderPricing(
+  orderId: string,
+  data: { lines: QuoteBuilderLineInput[] },
+) {
+  return apiFetch<{ order: Order }>(`/admin/orders/${orderId}/order-pricing`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
 export function listMyFiles() {
   return apiFetch<{ files: MyFile[] }>('/orders/my-files');
 }

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { adminRejectOrder, listAdminOrders } from '@/lib/orders';
-import { GenerateOrderModal } from '@/components/GenerateOrderModal';
 import {
   createAdminConversation,
   listAdminConversations,
@@ -32,7 +31,7 @@ function daysAgo(iso: string) {
   return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
 }
 
-const NEEDS: OrderStatus[] = ['WAITING_FOR_QUOTATION'];
+const NEEDS: OrderStatus[] = ['CREATED', 'WAITING_FOR_QUOTATION'];
 const SENT: OrderStatus[] = ['QUOTATION_PROVIDED'];
 const DECLINED: OrderStatus[] = [
   'CLIENT_REJECTED_QUOTATION',
@@ -51,7 +50,6 @@ export function AdminQuotes() {
   const [page, setPage] = useState(1);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [genOpen, setGenOpen] = useState(false);
 
   useEffect(() => {
     if (!toast) return;
@@ -157,7 +155,11 @@ export function AdminQuotes() {
         title="Quotes"
         subtitle="Needs pricing, sent, urgent, and declined in one pipeline."
         actions={
-          <button type="button" className="btn btn-primary" onClick={() => setGenOpen(true)}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => navigate('/admin/quotes/new')}
+          >
             <i className="ti ti-file-dollar" /> Generate quote
           </button>
         }
@@ -184,7 +186,7 @@ export function AdminQuotes() {
           { value: 'WAITING_FOR_ADMIN_QUOTATION_APPROVAL', label: 'Counter pending' },
           { value: 'CLIENT_REJECTED_QUOTATION', label: 'Declined by customer' },
           { value: 'REJECTED', label: 'Declined by staff' },
-          { value: 'CREATED', label: 'Draft' },
+          { value: 'CREATED', label: 'Needs pricing' },
           { value: 'CANCELLED', label: 'Expired' },
         ]}
         dateFrom={dateFrom}
@@ -346,11 +348,6 @@ export function AdminQuotes() {
           <i className="ti ti-circle-check" /> {toast}
         </div>
       )}
-      <GenerateOrderModal
-        open={genOpen}
-        onClose={() => setGenOpen(false)}
-        defaultMode="QUOTE_REQUEST"
-      />
     </div>
   );
 }

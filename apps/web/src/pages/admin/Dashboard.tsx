@@ -1,8 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { DateRangeBar } from '@/components/ui/DateRangeBar';
-import { GenerateOrderModal } from '@/components/GenerateOrderModal';
 import { getDashboardStats } from '@/lib/dashboard';
 import { datesForPreset, inDateRange, type RangePreset } from '@/lib/dateRange';
 import { listAdminEdits } from '@/lib/edits';
@@ -27,8 +26,7 @@ function customerLabel(o: Order) {
 export function AdminDashboard() {
   const { user } = useAuth();
   const can = (key: FeatureKey) => canFeature(user?.permissions, key, user?.role);
-  const [genOpen, setGenOpen] = useState(false);
-  const [genMode, setGenMode] = useState<'ORDER' | 'QUOTE_REQUEST'>('ORDER');
+  const navigate = useNavigate();
   const [preset, setPreset] = useState<RangePreset>('thisMonth');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
@@ -63,7 +61,11 @@ export function AdminDashboard() {
     queryFn: () =>
       listAdminOrders({
         type: 'QUOTE_REQUEST',
-        statuses: ['WAITING_FOR_QUOTATION', 'WAITING_FOR_ADMIN_QUOTATION_APPROVAL'],
+        statuses: [
+          'CREATED',
+          'WAITING_FOR_QUOTATION',
+          'WAITING_FOR_ADMIN_QUOTATION_APPROVAL',
+        ],
         page: 1,
         pageSize: 8,
         dateFrom: dates.from,
@@ -125,10 +127,7 @@ export function AdminDashboard() {
               <button
                 type="button"
                 className="btn btn-ghost"
-                onClick={() => {
-                  setGenMode('QUOTE_REQUEST');
-                  setGenOpen(true);
-                }}
+                onClick={() => navigate('/admin/quotes/new')}
               >
                 <i className="ti ti-file-dollar" /> Generate quote
               </button>
@@ -137,10 +136,7 @@ export function AdminDashboard() {
               <button
                 type="button"
                 className="btn btn-primary"
-                onClick={() => {
-                  setGenMode('ORDER');
-                  setGenOpen(true);
-                }}
+                onClick={() => navigate('/admin/orders/new')}
               >
                 <i className="ti ti-plus" /> Generate order
               </button>
@@ -286,11 +282,6 @@ export function AdminDashboard() {
         </div>
       )}
 
-      <GenerateOrderModal
-        open={genOpen}
-        onClose={() => setGenOpen(false)}
-        defaultMode={genMode}
-      />
     </div>
   );
 }

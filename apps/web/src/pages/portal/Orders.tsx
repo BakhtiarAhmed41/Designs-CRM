@@ -495,7 +495,7 @@ export function PortalOrders() {
                       <td className="muted">{dateShort(o.createdAt)}</td>
                       <td className="num">
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
-                          {o.status === 'PENDING_PAYMENT' && isNetMonthly && (
+                          {o.status === 'PENDING_PAYMENT' && !isNetMonthly && (
                             <button
                               type="button"
                               className="btn btn-primary btn-sm"

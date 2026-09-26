@@ -82,7 +82,7 @@ export function PortalOrderDetail() {
     queryKey: ['portal-customer-me'],
     queryFn: getMyCustomer,
   });
-  const showOrderPay = meCustomer?.customer?.accountType === 'NET_MONTHLY';
+  const showOrderPay = meCustomer?.customer?.accountType !== 'NET_MONTHLY';
 
   const editsQ = useQuery({
     queryKey: ['my-order-edits', id],

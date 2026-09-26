@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { GenerateOrderModal } from '@/components/GenerateOrderModal';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonRows } from '@/components/ui/Skeleton';
@@ -10,12 +9,13 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { listAdminOrders } from '@/lib/orders';
 import { freshOnOpen } from '@/lib/queryRefresh';
 import { money, dateShort, lifecycleChip, orderNumber, orderSlug } from '@/lib/format';
+import { isStaffCreatedOrder } from '@/lib/quoteHelpers';
 import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
 import type { Order, OrderStatus } from '@/lib/types';
 
 const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
   { value: '', label: 'All statuses' },
-  { value: 'CREATED', label: 'New / draft' },
+  { value: 'CREATED', label: 'Needs pricing' },
   { value: 'WAITING_FOR_QUOTATION', label: 'Waiting quotation' },
   { value: 'PENDING_PAYMENT', label: 'Pending payment' },
   { value: 'IN_PROGRESS', label: 'In progress' },
@@ -43,7 +43,6 @@ export function AdminOrders() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
-  const [genOpen, setGenOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-orders', q, status, dateFrom, dateTo, page],
@@ -68,8 +67,12 @@ export function AdminOrders() {
         title="Orders"
         subtitle="Find a job in seconds. Search, filter, then open the workspace."
         actions={
-          <button type="button" className="btn btn-primary" onClick={() => setGenOpen(true)}>
-            <i className="ti ti-plus" /> Create order
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => navigate('/admin/orders/new')}
+          >
+            <i className="ti ti-plus" /> Generate order
           </button>
         }
       />
@@ -107,8 +110,12 @@ export function AdminOrders() {
             title="No orders match"
             description="Adjust search or filters, or create a new order."
             action={
-              <button type="button" className="btn btn-primary btn-sm" onClick={() => setGenOpen(true)}>
-                Create order
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => navigate('/admin/orders/new')}
+              >
+                Generate order
               </button>
             }
           />
@@ -139,7 +146,10 @@ export function AdminOrders() {
                         </div>
                         <div>
                           <div className="on">{o.name || orderNumber(o.humanRef) || 'Order'}</div>
-                          <div className="om">{orderNumber(o.humanRef, o.id.slice(0, 8))}</div>
+                          <div className="om">
+                            {orderNumber(o.humanRef, o.id.slice(0, 8))}
+                            {isStaffCreatedOrder(o) ? ' · Admin created' : ''}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -164,7 +174,6 @@ export function AdminOrders() {
         onPage={setPage}
       />
 
-      <GenerateOrderModal open={genOpen} onClose={() => setGenOpen(false)} defaultMode="ORDER" />
     </div>
   );
 }
