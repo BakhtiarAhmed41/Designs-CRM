@@ -106,6 +106,9 @@ select option:checked,select option:hover{background:var(--accent-soft);color:va
 .drop-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .check-row{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--ink);cursor:pointer;user-select:none}
 .check-row input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;margin:0}
+.other-check{gap:6px;justify-content:flex-start}
+.other-check input[type="checkbox"]{appearance:none;-webkit-appearance:none;width:14px;height:14px;min-width:14px;margin:0;padding:0;flex:0 0 14px;border:1.5px solid var(--ink);border-radius:3px;background:#fff center/10px 10px no-repeat;accent-color:transparent}
+.other-check input[type="checkbox"]:checked{background-color:var(--ink);border-color:var(--ink);background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path d='M2.4 6.2 4.7 8.5 9.6 3.4' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>")}
 
 /* Design cards */
 .design-card{background:var(--bg);border:1px solid var(--border);border-radius:16px;margin-bottom:14px;overflow:hidden}
@@ -170,7 +173,7 @@ select option:checked,select option:hover{background:var(--accent-soft);color:va
 .badge.priority{color:var(--warn-ink);background:var(--warn-bg);border-color:var(--warn-border)}
 .turn-time{font-size:16px;font-weight:600;letter-spacing:-.01em;margin:4px 0 0 25px}
 .turn-desc{font-size:11px;color:var(--muted);margin-left:25px;line-height:1.5}
-.note-banner{display:flex;gap:9px;align-items:flex-start;background:var(--warn-bg);color:var(--warn-ink);border-radius:10px;padding:12px 14px;font-size:11px;line-height:1.5;margin-top:8px;margin-bottom:0}
+.note-banner{display:flex;gap:9px;align-items:flex-start;width:fit-content;max-width:100%;background:var(--warn-bg);color:var(--warn-ink);border-radius:10px;padding:12px 14px;font-size:11px;line-height:1.5;margin-top:8px;margin-bottom:0}
 .note-banner svg{width:14px;height:14px;color:var(--warn-ink);flex-shrink:0;margin-top:1px}
 
 .form-actions{margin-top:20px;padding-top:16px;border-top:1px solid var(--border);display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-end;gap:10px}

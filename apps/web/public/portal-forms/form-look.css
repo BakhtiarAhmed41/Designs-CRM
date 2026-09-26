@@ -139,6 +139,29 @@ textarea {
 .radio-row input {
   accent-color: var(--accent);
 }
+.other-check {
+  gap: 6px;
+  justify-content: flex-start;
+}
+.other-check input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  min-width: 14px;
+  margin: 0;
+  padding: 0;
+  flex: 0 0 14px;
+  border: 1.5px solid var(--ink);
+  border-radius: 3px;
+  background: #fff center / 10px 10px no-repeat;
+  accent-color: transparent;
+}
+.other-check input[type="checkbox"]:checked {
+  background-color: var(--ink);
+  border-color: var(--ink);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path d='M2.4 6.2 4.7 8.5 9.6 3.4' fill='none' stroke='white' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+}
 
 .dropzone {
   border-color: var(--stitch);
@@ -231,7 +254,12 @@ textarea {
   border-color: var(--warn-border);
 }
 
-.note-banner {
+.note-banner,
+#s-formats .format-grid > .note-banner {
+  width: fit-content;
+  max-width: 100%;
+  flex: 0 0 auto;
+  justify-self: start;
   background: #f7ecec;
   color: #7c1f2b;
   font-size: 11px;
