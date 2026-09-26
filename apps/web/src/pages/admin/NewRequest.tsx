@@ -471,7 +471,7 @@ export function AdminNewRequest({ mode }: { mode: Mode }) {
         <div>
           {!service && (
             <>
-              <div className="card" style={{ marginBottom: 14 }}>
+              <div className={`card${listOpen ? ' card-over' : ''}`} style={{ marginBottom: 14 }}>
                 <div className="card-h">
                   <span className="ct">
                     <i className="ti ti-user" /> Step 1 · Pick the customer
