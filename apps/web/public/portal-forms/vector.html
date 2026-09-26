@@ -391,11 +391,10 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
 .step-head{margin-bottom:10px}
 .form-actions{margin-top:20px;padding-top:16px}
 .pref-title{font-weight:400;color:var(--ink-soft)}
-.pref-grid{grid-template-columns:1fr 1fr;column-gap:0;row-gap:10px}
-.pref-grid>div:first-child{padding-right:24px}
-.pref-grid>div+div{border-left:1px solid var(--border);padding-left:24px}
-.radio-group{width:100%;justify-content:space-between;gap:8px 12px}
-@media (max-width:760px){.pref-grid{grid-template-columns:1fr}.pref-grid>div:first-child{padding-right:0}.pref-grid>div+div{border-left:none;padding-left:0}.radio-group{justify-content:flex-start}}
+.pref-grid{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:14px 32px}
+.pref-grid>div{padding:0;border:0}
+.radio-group{width:auto;justify-content:flex-start;gap:8px 16px}
+@media (max-width:760px){.pref-grid{flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:12px}}
 .note-banner{margin-top:10px}
 .step:last-of-type .note-banner{margin-bottom:0}
 .form-actions{margin-top:14px;padding-top:12px}
@@ -432,8 +431,8 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
 .note-banner{font-size:12.5px}
 #otherFormatRow{grid-column:span 2}
 .format-grid>#otherFormatField{grid-column:1/-1}
-.color-row{flex-wrap:nowrap;justify-content:flex-start;gap:8px 16px}
-.color-row .dpi-check{margin:0;font-size:11.5px;font-weight:500;white-space:nowrap}
+.pref-dpi{align-self:flex-end}
+.pref-dpi .dpi-check{margin:0;font-size:11.5px;font-weight:500;white-space:nowrap}
 .size-field{margin-top:12px}
 .size-field input{width:100%}
 </style>
@@ -676,20 +675,22 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
             <div class="field notes">
               <label class="flabel pref-title">Artwork Preferences</label>
               <div class="pref-grid">
-                <div>
+                <div class="pref-section">
                   <label class="flabel">Background</label>
                   <div class="radio-group">
                     <label class="radio-row"><input type="radio" name="bg-${n}" value="Transparent" checked>Transparent</label>
                     <label class="radio-row"><input type="radio" name="bg-${n}" value="Keep original">Keep original</label>
                   </div>
                 </div>
-                <div>
+                <div class="pref-section">
                   <label class="flabel">Color Mode</label>
-                  <div class="radio-group color-row">
+                  <div class="radio-group">
                     <label class="radio-row"><input type="radio" name="cmode-${n}" value="RGB" checked>RGB</label>
                     <label class="radio-row"><input type="radio" name="cmode-${n}" value="CMYK">CMYK</label>
-                    <label class="check-row dpi-check"><input type="checkbox" checked>Prepare at 300 DPI</label>
                   </div>
+                </div>
+                <div class="pref-section pref-dpi">
+                  <label class="check-row dpi-check"><input type="checkbox" checked>Prepare at 300 DPI</label>
                 </div>
               </div>
               <p class="hint-text">Not sure? Leave the default options selected and our team will prepare the correct settings.</p>
