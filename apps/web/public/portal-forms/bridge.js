@@ -366,6 +366,8 @@
       pushFormat(list, seen, item);
     });
     if (svc === 'embroidery' && prefs.embOther) pushFormat(list, seen, prefs.embOther);
+    if (svc === 'laser' && prefs.cncOther) pushFormat(list, seen, prefs.cncOther);
+    if (svc !== 'embroidery' && svc !== 'laser' && prefs.digOther) pushFormat(list, seen, prefs.digOther);
     return list;
   }
 

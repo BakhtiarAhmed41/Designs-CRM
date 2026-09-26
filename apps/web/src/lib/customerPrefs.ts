@@ -6,6 +6,8 @@ export type CustomerFilePrefs = {
   cncFormats: string[];
   placement?: string;
   embOther?: string;
+  digOther?: string;
+  cncOther?: string;
 };
 
 const SERVICE_TO_QUOTE: Record<string, string> = {
@@ -42,6 +44,8 @@ export function asCustomerFilePrefs(raw: unknown): CustomerFilePrefs | null {
     cncFormats: asStringList(p.cncFormats),
     placement: typeof p.placement === 'string' ? p.placement.trim() : '',
     embOther: typeof p.embOther === 'string' ? p.embOther.trim() : '',
+    digOther: typeof p.digOther === 'string' ? p.digOther.trim() : '',
+    cncOther: typeof p.cncOther === 'string' ? p.cncOther.trim() : '',
   };
 }
 
@@ -79,8 +83,8 @@ export function formatsForQuoteService(prefs: unknown, quoteKey: string) {
   const p = asCustomerFilePrefs(prefs);
   if (!p) return [];
   if (quoteKey === 'embroidery') return cleanFormats(p.embFormats, p.embOther);
-  if (quoteKey === 'laser') return cleanFormats(p.cncFormats);
-  return cleanFormats(p.digFormats);
+  if (quoteKey === 'laser') return cleanFormats(p.cncFormats, p.cncOther);
+  return cleanFormats(p.digFormats, p.digOther);
 }
 
 export function quoteFormatsFromPrefs(

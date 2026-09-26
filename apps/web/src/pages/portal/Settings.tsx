@@ -11,12 +11,13 @@ import { PageHeader } from '@/components/ui/PageHeader';
 
 type Prefs = {
   services: string[];
-  hoops: string[];
   embFormats: string[];
   digFormats: string[];
   cncFormats: string[];
   placement?: string;
   embOther?: string;
+  digOther?: string;
+  cncOther?: string;
 };
 
 const SERVICE_CHIPS = [
@@ -25,18 +26,34 @@ const SERVICE_CHIPS = [
   { id: 'cnc', label: 'Cutting & Engraving Files', icon: 'ti-router' },
 ];
 
-const EMB_FORMATS = ['DST', 'PES', 'EXP', 'XXX', 'PDF', 'PNG', 'JEF', 'HUS', 'SEW', 'VP3', 'Others'];
-const DIG_FORMATS = ['SVG', 'PNG', 'EPS', 'AI', 'PDF', 'JPG', 'CDR', 'PSD', 'Others'];
-const CNC_FORMATS = ['DXF', 'SVG', 'PDF', 'EPS', 'AI', 'Preview image', 'Others'];
-const HOOP_OPTIONS = ['4x4', '5x7', '6x10', '7x12', '8x8', '8x12', 'Cap frame 2.5x6'];
+/** Same choices as the embroidery / vector / cutting quote forms. */
+const EMB_FORMATS = ['DST', 'PES', 'EXP', 'HUS', 'SEW', 'JEF', 'VP3', 'XXX', 'Others'];
+const DIG_FORMATS = ['AI', 'EPS', 'SVG', 'PDF', 'CDR', 'PNG', 'JPEG', 'Proof Preview', 'Others'];
+const CNC_FORMATS = ['AI', 'SVG', 'DXF', 'CDR', 'EPS', 'Proof Preview', 'PDF', 'PNG', 'Others'];
+const PLACEMENTS = ['Hat', 'Cap', 'Visor', 'Jacket/Fleece', 'Polo', 'Bag', 'Other'];
 
 const DEFAULT_PREFS: Prefs = {
   services: ['emb'],
-  hoops: ['4x4', '5x7'],
   embFormats: ['DST', 'PES'],
-  digFormats: ['SVG', 'PNG'],
-  cncFormats: ['DXF', 'SVG'],
+  digFormats: ['AI', 'SVG'],
+  cncFormats: ['AI', 'SVG'],
 };
+
+function aliasFormat(value: string) {
+  const key = value.trim().toUpperCase();
+  if (key === 'JPG') return 'JPEG';
+  if (key === 'PREVIEW IMAGE' || key === 'PREVIEW') return 'Proof Preview';
+  return value.trim();
+}
+
+function splitKnownFormats(raw: string[] | undefined, known: string[], fallback: string[]) {
+  const source = (raw ?? fallback).map(aliasFormat);
+  const knownSet = new Set(known);
+  const extras = source.filter((f) => f && !knownSet.has(f) && f.toLowerCase() !== 'others');
+  const next = source.filter((f) => knownSet.has(f));
+  if (extras.length > 0 && !next.includes('Others')) next.push('Others');
+  return { next, extras };
+}
 
 function CheckPill({
   label,
@@ -72,11 +89,11 @@ export function PortalSettings() {
   const [ready, setReady] = useState(false);
   const [headingColor, setHeadingColor] = useState('#222222');
   const [backgroundColor, setBackgroundColor] = useState('#ffffff');
-  const [placement, setPlacement] = useState('Left chest');
+  const [placement, setPlacement] = useState('');
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
   const [embOther, setEmbOther] = useState('');
-  const [addingHoop, setAddingHoop] = useState(false);
-  const [hoopCustom, setHoopCustom] = useState('');
+  const [digOther, setDigOther] = useState('');
+  const [cncOther, setCncOther] = useState('');
   const [lookMsg, setLookMsg] = useState<string | null>(null);
   const [lookError, setLookError] = useState<string | null>(null);
   const [lookBusy, setLookBusy] = useState(false);
@@ -95,20 +112,21 @@ export function PortalSettings() {
 
     const apiPrefs = data.customer?.preferences as Partial<Prefs> | null | undefined;
     if (apiPrefs && typeof apiPrefs === 'object') {
-      const knownEmb = new Set(EMB_FORMATS);
-      const rawEmb = apiPrefs.embFormats ?? DEFAULT_PREFS.embFormats;
-      const customEmb = rawEmb.filter((f) => !knownEmb.has(f));
-      const nextEmb = rawEmb.filter((f) => knownEmb.has(f));
-      if (customEmb.length > 0 && !nextEmb.includes('Others')) nextEmb.push('Others');
+      const emb = splitKnownFormats(apiPrefs.embFormats, EMB_FORMATS, DEFAULT_PREFS.embFormats);
+      const dig = splitKnownFormats(apiPrefs.digFormats, DIG_FORMATS, DEFAULT_PREFS.digFormats);
+      const cnc = splitKnownFormats(apiPrefs.cncFormats, CNC_FORMATS, DEFAULT_PREFS.cncFormats);
       setPrefs({
         services: apiPrefs.services ?? DEFAULT_PREFS.services,
-        hoops: apiPrefs.hoops ?? DEFAULT_PREFS.hoops,
-        embFormats: nextEmb,
-        digFormats: apiPrefs.digFormats ?? DEFAULT_PREFS.digFormats,
-        cncFormats: apiPrefs.cncFormats ?? DEFAULT_PREFS.cncFormats,
+        embFormats: emb.next,
+        digFormats: dig.next,
+        cncFormats: cnc.next,
       });
-      setEmbOther(apiPrefs.embOther?.trim() || customEmb.join(', '));
-      if (apiPrefs.placement) setPlacement(apiPrefs.placement);
+      setEmbOther(apiPrefs.embOther?.trim() || emb.extras.join(', '));
+      setDigOther(apiPrefs.digOther?.trim() || dig.extras.join(', '));
+      setCncOther(apiPrefs.cncOther?.trim() || cnc.extras.join(', '));
+      if (apiPrefs.placement && PLACEMENTS.includes(apiPrefs.placement)) {
+        setPlacement(apiPrefs.placement);
+      }
     }
   }, [data, isSuccess, isError]);
 
@@ -118,17 +136,23 @@ export function PortalSettings() {
       : {};
   }
 
+  function extraFormats(selected: string[], raw: string) {
+    if (!selected.includes('Others')) return [];
+    return raw
+      .split(/[,;]+/)
+      .map((s) => s.trim())
+      .filter((s) => s && s.toLowerCase() !== 'others' && !selected.includes(s));
+  }
+
   function filePrefsPayload() {
-    const extras = prefs.embFormats.includes('Others')
-      ? embOther
-          .split(/[,;]+/)
-          .map((s) => s.trim())
-          .filter((s) => s && s.toLowerCase() !== 'others' && !prefs.embFormats.includes(s))
-      : [];
     return {
-      ...prefs,
-      embFormats: [...prefs.embFormats, ...extras],
+      services: prefs.services,
+      embFormats: [...prefs.embFormats, ...extraFormats(prefs.embFormats, embOther)],
+      digFormats: [...prefs.digFormats, ...extraFormats(prefs.digFormats, digOther)],
+      cncFormats: [...prefs.cncFormats, ...extraFormats(prefs.cncFormats, cncOther)],
       embOther: prefs.embFormats.includes('Others') ? embOther.trim() : '',
+      digOther: prefs.digFormats.includes('Others') ? digOther.trim() : '',
+      cncOther: prefs.cncFormats.includes('Others') ? cncOther.trim() : '',
       placement,
     };
   }
@@ -192,22 +216,6 @@ export function PortalSettings() {
     });
   }
 
-  function addHoop() {
-    const next = hoopCustom.trim().replace(/\s+/g, ' ').slice(0, 40);
-    if (!next) {
-      setAddingHoop(false);
-      return;
-    }
-    const exists = prefs.hoops.some((h) => h.toLowerCase() === next.toLowerCase());
-    if (!exists) setPrefs((p) => ({ ...p, hoops: [...p.hoops, next] }));
-    setHoopCustom('');
-    setAddingHoop(false);
-  }
-
-  const customHoops = prefs.hoops.filter(
-    (h) => !HOOP_OPTIONS.some((o) => o.toLowerCase() === h.toLowerCase()),
-  );
-
   return (
     <div className="profile-elegant">
       <PageHeader
@@ -248,53 +256,14 @@ export function PortalSettings() {
 
         <div className="profile-block">
           <h3 className="profile-block-title">Embroidery preferences</h3>
-          <label className="pref-section-label">Hoop sizes</label>
-          <div className="profile-checks" style={{ marginBottom: 14 }}>
-            {HOOP_OPTIONS.map((h) => (
-              <CheckPill
-                key={h}
-                label={h}
-                on={prefs.hoops.some((x) => x.toLowerCase() === h.toLowerCase())}
-                onToggle={() => toggleList('hoops', h)}
-              />
-            ))}
-            {customHoops.map((h) => (
-              <CheckPill key={h} label={h} on onToggle={() => toggleList('hoops', h)} />
-            ))}
-            {addingHoop ? (
-              <div className="profile-other" style={{ marginTop: 0, maxWidth: 220 }}>
-                <input
-                  value={hoopCustom}
-                  onChange={(e) => setHoopCustom(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      addHoop();
-                    }
-                    if (e.key === 'Escape') {
-                      setAddingHoop(false);
-                      setHoopCustom('');
-                    }
-                  }}
-                  placeholder="e.g. 10x12"
-                  aria-label="Custom hoop size"
-                  maxLength={40}
-                  autoFocus
-                  onBlur={() => addHoop()}
-                />
-              </div>
-            ) : (
-              <CheckPill label="Add hoop size" on={false} add onToggle={() => setAddingHoop(true)} />
-            )}
-          </div>
           <label className="pref-section-label">Usual placement</label>
           <div className="profile-checks" style={{ marginBottom: 14 }}>
-            {['Left chest', 'Cap front', 'Full back'].map((opt) => (
+            {PLACEMENTS.map((opt) => (
               <CheckPill
                 key={opt}
                 label={opt}
                 on={placement === opt}
-                onToggle={() => setPlacement(opt)}
+                onToggle={() => setPlacement(placement === opt ? '' : opt)}
               />
             ))}
           </div>
@@ -317,7 +286,7 @@ export function PortalSettings() {
                 placeholder="Need another format? e.g. EMB, TAP"
                 aria-label="Other embroidery formats"
               />
-              <p className="profile-hint">You can add more than one. Separate them with a comma.</p>
+              <p className="profile-hint">You can add more than one. Separate them with a comma. PDF and PNG previews are always included.</p>
             </div>
           )}
         </div>
@@ -334,6 +303,17 @@ export function PortalSettings() {
               />
             ))}
           </div>
+          {prefs.digFormats.includes('Others') && (
+            <div className="profile-other">
+              <input
+                value={digOther}
+                onChange={(e) => setDigOther(e.target.value)}
+                placeholder="Need another format?"
+                aria-label="Other vector formats"
+              />
+              <p className="profile-hint">You can add more than one. Separate them with a comma.</p>
+            </div>
+          )}
         </div>
 
         <div className="profile-block">
@@ -348,8 +328,16 @@ export function PortalSettings() {
               />
             ))}
           </div>
-          {prefs.cncFormats.includes('Preview image') && (
-            <p className="profile-hint">A PNG or JPG proof for easy viewing.</p>
+          {prefs.cncFormats.includes('Others') && (
+            <div className="profile-other">
+              <input
+                value={cncOther}
+                onChange={(e) => setCncOther(e.target.value)}
+                placeholder="Need another format?"
+                aria-label="Other cutting formats"
+              />
+              <p className="profile-hint">You can add more than one. Separate them with a comma.</p>
+            </div>
           )}
         </div>
 
