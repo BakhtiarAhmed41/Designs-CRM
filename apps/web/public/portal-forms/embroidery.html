@@ -393,7 +393,9 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
 .dname-label{display:flex;align-items:center;gap:8px;margin-bottom:0}
 
 /* Smaller format chips, with the extra-format field on the same row */
-#s-formats .format-grid{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+#s-formats .format-grid{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px}
+#s-formats .format-chips{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0}
+#s-formats .other-format-inline{margin-left:auto}
 #s-formats .format-chip{flex:0 0 auto;min-width:0}
 #s-formats .format-chip span{width:auto;height:auto;min-width:40px;padding:3px 6px;font-size:11px;border-radius:8px}
 #s-formats .other-format-inline{display:flex;align-items:center;flex-wrap:nowrap;gap:6px;margin:0}
@@ -500,6 +502,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
         </div>
       </div>
       <div class="format-grid" id="formatGrid">
+        <div class="format-chips">
         <label class="format-chip"><input type="checkbox" name="format" value="DST"><span>DST</span></label>
         <label class="format-chip"><input type="checkbox" name="format" value="PES"><span>PES</span></label>
         <label class="format-chip"><input type="checkbox" name="format" value="EXP"><span>EXP</span></label>
@@ -508,6 +511,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
         <label class="format-chip"><input type="checkbox" name="format" value="JEF"><span>JEF</span></label>
         <label class="format-chip"><input type="checkbox" name="format" value="VP3"><span>VP3</span></label>
         <label class="format-chip"><input type="checkbox" name="format" value="XXX"><span>XXX</span></label>
+        </div>
         <div class="other-format-inline">
           <label class="check-row other-check" id="otherFormatRow"><input type="checkbox" id="otherFormatCheck">Need another format?</label>
           <div class="format-other" id="otherFormatField" style="display:none;">

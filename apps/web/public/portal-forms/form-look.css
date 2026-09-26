@@ -142,18 +142,25 @@ textarea {
 .other-check {
   gap: 6px;
   justify-content: flex-start;
+  align-items: center;
 }
 .other-check input[type="checkbox"] {
   appearance: none;
   -webkit-appearance: none;
-  width: 14px;
-  height: 14px;
-  min-width: 14px;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  max-width: 16px;
+  min-height: 16px;
+  max-height: 16px;
+  aspect-ratio: 1 / 1;
   margin: 0;
   padding: 0;
-  flex: 0 0 14px;
+  flex: 0 0 16px;
+  align-self: center;
   border: 1.5px solid var(--ink);
-  border-radius: 3px;
+  border-radius: 2px;
   background: #fff center / 10px 10px no-repeat;
   accent-color: transparent;
 }
@@ -255,6 +262,27 @@ textarea {
 }
 
 .note-banner,
+#s-formats .format-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+#s-formats .format-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+#s-formats .other-format-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
 #s-formats .format-grid > .note-banner {
   width: fit-content;
   max-width: 100%;

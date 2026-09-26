@@ -523,6 +523,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
         </div>
       </div>
       <div class="format-grid" id="formatGrid">
+        <div class="format-chips">
         <label class="format-chip"><input type="checkbox" name="format" value="AI"><span>AI</span></label>
         <label class="format-chip"><input type="checkbox" name="format" value="EPS"><span>EPS</span></label>
         <label class="format-chip"><input type="checkbox" name="format" value="SVG"><span>SVG</span></label>
@@ -531,9 +532,12 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
         <label class="format-chip"><input type="checkbox" name="format" value="PNG"><span>PNG</span></label>
         <label class="format-chip"><input type="checkbox" name="format" value="JPEG"><span>JPEG</span></label>
         <label class="format-chip"><input type="checkbox" name="format" value="Proof Preview"><span>Proof Preview</span></label>
+        </div>
+        <div class="other-format-inline">
         <label class="check-row other-check" id="otherFormatRow"><input type="checkbox" id="otherFormatCheck">Need another format?</label>
         <div class="format-other" id="otherFormatField" style="display:none;">
           <input type="text" placeholder="Tell us the format you need">
+        </div>
         </div>
       </div>
     </section>
