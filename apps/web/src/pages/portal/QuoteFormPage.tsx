@@ -272,8 +272,8 @@ export function QuoteFormPage() {
         </div>
         {service && (
           <RequestQuoteMenu className="change-service" beforePick={confirmChangeService}>
-            <i className="ti ti-arrow-left" />
             Change service
+            <i className="ti ti-switch-horizontal" />
           </RequestQuoteMenu>
         )}
       </div>
@@ -293,8 +293,8 @@ export function QuoteFormPage() {
         </div>
         {service && (
           <RequestQuoteMenu className="change-service" beforePick={confirmChangeService}>
-            <i className="ti ti-arrow-left" />
             Change service
+            <i className="ti ti-switch-horizontal" />
           </RequestQuoteMenu>
         )}
         <button type="button" className="close-form" onClick={() => void closePage()} aria-label="Close quote form">
