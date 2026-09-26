@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getErrorMessage } from '@/lib/api';
 import { getCustomer, listCustomers, type Customer } from '@/lib/customers';
@@ -80,6 +80,36 @@ const COPY: Record<Mode, { title: string; blurb: string; nextStep: string; listP
   },
 };
 
+function customerInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
+function accountTypeLabel(type: Customer['accountType']) {
+  return type === 'NET_MONTHLY' ? 'Net monthly' : 'Pay per order';
+}
+
+function customerContact(c: Pick<Customer, 'email' | 'phone'>) {
+  return [c.email, c.phone].filter(Boolean).join(' · ') || 'No contact on file';
+}
+
+function highlightMatch(text: string, term: string) {
+  if (!term.trim()) return text;
+  const lower = text.toLowerCase();
+  const needle = term.trim().toLowerCase();
+  const at = lower.indexOf(needle);
+  if (at < 0) return text;
+  return (
+    <>
+      {text.slice(0, at)}
+      <mark>{text.slice(at, at + needle.length)}</mark>
+      {text.slice(at + needle.length)}
+    </>
+  );
+}
+
 function fallbackCollected(): Collected {
   return {
     mode: 'd',
@@ -105,11 +135,13 @@ export function AdminNewRequest({ mode }: { mode: Mode }) {
   const { colors: themeColors } = useTheme();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const pickRef = useRef<HTMLDivElement>(null);
+  const pickInputRef = useRef<HTMLInputElement>(null);
   const dirtyRef = useRef(false);
 
   const [customerId, setCustomerId] = useState<string | null>(params.get('customerId'));
   const [customerSearch, setCustomerSearch] = useState('');
   const [listOpen, setListOpen] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(0);
   const [customerPrefs, setCustomerPrefs] = useState<Record<string, unknown> | null>(null);
   const [customerLabel, setCustomerLabel] = useState('');
   const [hasPortalLogin, setHasPortalLogin] = useState(true);
@@ -149,7 +181,6 @@ export function AdminNewRequest({ mode }: { mode: Mode }) {
         );
         const name = res.customer?.name?.trim() || 'Customer';
         setCustomerLabel(name);
-        setCustomerSearch((prev) => prev || name);
         setHasPortalLogin(Boolean(res.customer?.userId));
       })
       .catch(() => {
@@ -168,16 +199,26 @@ export function AdminNewRequest({ mode }: { mode: Mode }) {
 
   const filteredCustomers = useMemo(() => {
     const term = customerSearch.trim().toLowerCase();
-    if (!term) return customers.slice(0, 40);
-    return customers
-      .filter(
-        (c) =>
-          c.name.toLowerCase().includes(term) ||
-          (c.email ?? '').toLowerCase().includes(term) ||
-          (c.phone ?? '').includes(term),
-      )
-      .slice(0, 40);
+    const list = !term
+      ? customers
+      : customers.filter(
+          (c) =>
+            c.name.toLowerCase().includes(term) ||
+            (c.email ?? '').toLowerCase().includes(term) ||
+            (c.phone ?? '').includes(term),
+        );
+    return list.slice(0, 40);
   }, [customers, customerSearch]);
+
+  useEffect(() => {
+    setActiveIdx(0);
+  }, [customerSearch, listOpen]);
+
+  useEffect(() => {
+    if (!listOpen) return;
+    const el = pickRef.current?.querySelector<HTMLElement>(`[data-cust-idx="${activeIdx}"]`);
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [activeIdx, listOpen]);
 
   const confirmLoseForm = useCallback(
     async (title: string, confirmLabel: string) => {
@@ -207,9 +248,55 @@ export function AdminNewRequest({ mode }: { mode: Mode }) {
   function pickCustomer(c: Customer) {
     setCustomerId(c.id);
     setCustomerLabel(c.name);
-    setCustomerSearch(c.name);
+    setCustomerSearch('');
+    setHasPortalLogin(Boolean(c.userId));
     setListOpen(false);
     setError(null);
+  }
+
+  function openCustomerPicker() {
+    setCustomerSearch('');
+    setListOpen(true);
+    window.setTimeout(() => pickInputRef.current?.focus(), 0);
+  }
+
+  function clearCustomer() {
+    setCustomerId(null);
+    setCustomerLabel('');
+    setCustomerSearch('');
+    setCustomerPrefs(null);
+    setHasPortalLogin(true);
+    setListOpen(true);
+    setError(null);
+    window.setTimeout(() => pickInputRef.current?.focus(), 0);
+  }
+
+  function onPickerKeyDown(e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      setListOpen(false);
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!listOpen) {
+        setListOpen(true);
+        return;
+      }
+      setActiveIdx((i) => Math.min(i + 1, Math.max(filteredCustomers.length - 1, 0)));
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIdx((i) => Math.max(i - 1, 0));
+      return;
+    }
+    if (e.key === 'Enter' && listOpen) {
+      const next = filteredCustomers[activeIdx];
+      if (!next) return;
+      e.preventDefault();
+      pickCustomer(next);
+    }
   }
 
   const changeCustomer = useCallback(async () => {
@@ -392,43 +479,130 @@ export function AdminNewRequest({ mode }: { mode: Mode }) {
                 </div>
                 <div className="card-b">
                   <div className="ff">
-                    <label>Customer (required)</label>
-                    <div ref={pickRef} className="gen-pick">
-                      <input
-                        placeholder="Search customers by name, email, phone…"
-                        autoComplete="off"
-                        value={customerSearch}
-                        onChange={(e) => {
-                          setCustomerSearch(e.target.value);
-                          setCustomerId(null);
-                          setListOpen(true);
-                        }}
-                        onFocus={() => setListOpen(true)}
-                      />
-                      {listOpen && (
-                        <div className="search-drop gen-search-drop open">
-                          {customersQ.isLoading && <div className="sd-empty">Loading customers…</div>}
-                          {!customersQ.isLoading && filteredCustomers.length === 0 && (
-                            <div className="sd-empty">No matches.</div>
-                          )}
-                          {filteredCustomers.map((c) => (
-                            <div key={c.id} className="sd-item" onClick={() => pickCustomer(c)}>
-                              <div>
-                                <div className="sd-t">{c.name}</div>
-                                <div className="sd-s">{c.email || c.phone || 'No contact'}</div>
-                              </div>
+                    <label htmlFor="customer-picker">Customer</label>
+                    <div ref={pickRef} className="cust-pick">
+                      {customerId && !listOpen ? (
+                        <div className="cust-pick-card">
+                          <span className={`cust-av${selected?.accountType === 'NET_MONTHLY' ? ' m' : ''}`}>
+                            {customerInitials(selected?.name || customerLabel || 'C')}
+                          </span>
+                          <div className="cust-pick-copy">
+                            <div className="cust-pick-name">{selected?.name || customerLabel || 'Customer'}</div>
+                            <div className="cust-pick-meta">
+                              {selected ? customerContact(selected) : 'Customer selected'}
                             </div>
+                            <div className="cust-pick-tags">
+                              {selected && (
+                                <span className={selected.accountType === 'NET_MONTHLY' ? 'chip c-quote' : 'chip c-new'}>
+                                  {accountTypeLabel(selected.accountType)}
+                                </span>
+                              )}
+                              {!hasPortalLogin && <span className="chip c-wait">No portal login</span>}
+                            </div>
+                          </div>
+                          <div className="cust-pick-actions">
+                            <button type="button" className="btn btn-ghost btn-sm" onClick={openCustomerPicker}>
+                              Change
+                            </button>
+                            <button
+                              type="button"
+                              className="cust-pick-x"
+                              aria-label="Clear customer"
+                              onClick={clearCustomer}
+                            >
+                              <i className="ti ti-x" />
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className={`cust-pick-field${listOpen ? ' is-open' : ''}`}>
+                          <i className="ti ti-search" aria-hidden />
+                          <input
+                            id="customer-picker"
+                            ref={pickInputRef}
+                            placeholder="Search name, email, or phone…"
+                            autoComplete="off"
+                            role="combobox"
+                            aria-expanded={listOpen}
+                            aria-controls="customer-picker-list"
+                            aria-autocomplete="list"
+                            value={customerSearch}
+                            onChange={(e) => {
+                              setCustomerSearch(e.target.value);
+                              setListOpen(true);
+                            }}
+                            onFocus={() => setListOpen(true)}
+                            onKeyDown={onPickerKeyDown}
+                          />
+                          {customerSearch && (
+                            <button
+                              type="button"
+                              className="cust-pick-x"
+                              aria-label="Clear search"
+                              onClick={() => {
+                                setCustomerSearch('');
+                                pickInputRef.current?.focus();
+                              }}
+                            >
+                              <i className="ti ti-x" />
+                            </button>
+                          )}
+                          <i className={`ti ti-chevron-${listOpen ? 'up' : 'down'}`} aria-hidden />
+                        </div>
+                      )}
+                      {listOpen && (
+                        <div id="customer-picker-list" className="cust-pick-drop" role="listbox">
+                          {customersQ.isLoading && <div className="cust-pick-empty">Loading customers…</div>}
+                          {customersQ.isError && (
+                            <div className="cust-pick-empty">Could not load customers. Try again.</div>
+                          )}
+                          {!customersQ.isLoading && !customersQ.isError && filteredCustomers.length === 0 && (
+                            <div className="cust-pick-empty">
+                              No matches{customerSearch.trim() ? ` for “${customerSearch.trim()}”` : ''}.
+                              <Link to="/admin/customers">Create a customer</Link>
+                            </div>
+                          )}
+                          {filteredCustomers.map((c, idx) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              role="option"
+                              aria-selected={c.id === customerId || idx === activeIdx}
+                              data-cust-idx={idx}
+                              className={`cust-pick-item${idx === activeIdx ? ' is-on' : ''}${c.id === customerId ? ' is-picked' : ''}`}
+                              onMouseEnter={() => setActiveIdx(idx)}
+                              onClick={() => pickCustomer(c)}
+                            >
+                              <span className={`cust-av${c.accountType === 'NET_MONTHLY' ? ' m' : ''}`}>
+                                {customerInitials(c.name)}
+                              </span>
+                              <span className="cust-pick-copy">
+                                <span className="cust-pick-name">{highlightMatch(c.name, customerSearch)}</span>
+                                <span className="cust-pick-meta">
+                                  {highlightMatch(customerContact(c), customerSearch)}
+                                </span>
+                              </span>
+                              <span className="cust-pick-side">
+                                <span className={c.accountType === 'NET_MONTHLY' ? 'chip c-quote' : 'chip c-new'}>
+                                  {accountTypeLabel(c.accountType)}
+                                </span>
+                                {!c.userId && <span className="cust-pick-warn">No login</span>}
+                                {c.id === customerId && <i className="ti ti-check" />}
+                              </span>
+                            </button>
                           ))}
+                          {filteredCustomers.length > 0 && customers.length > filteredCustomers.length && (
+                            <div className="cust-pick-foot">
+                              Showing {filteredCustomers.length} of {customers.length}. Type to narrow.
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
-                    {customerId ? (
-                      <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 6 }}>
-                        {selected?.email || selected?.phone || 'Customer selected'}
-                      </div>
-                    ) : (
-                      <div style={{ fontSize: 12, color: 'var(--ink)', marginTop: 6 }}>
-                        Select an existing customer. Create them under Customers first if needed.
+                    {!customerId && (
+                      <div className="cust-pick-hint">
+                        Select an existing customer.{' '}
+                        <Link to="/admin/customers">Add one first</Link> if they are not in the list.
                       </div>
                     )}
                   </div>

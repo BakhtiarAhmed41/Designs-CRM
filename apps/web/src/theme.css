@@ -2884,6 +2884,213 @@ button.primary i,
   font-weight: 700;
   vertical-align: middle;
 }
+.cust-pick { position: relative; }
+.cust-pick-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 4px 10px 4px 12px;
+  border: 1px solid var(--form-border, var(--line));
+  border-radius: 12px;
+  background: var(--form-bg, #fff);
+}
+.cust-pick-field.is-open,
+.cust-pick-field:focus-within {
+  border-color: var(--form-focus, var(--navy));
+  box-shadow: var(--focus);
+}
+.cust-pick-field > .ti-search,
+.cust-pick-field > .ti-chevron-down,
+.cust-pick-field > .ti-chevron-up {
+  color: var(--faint);
+  font-size: 17px;
+  flex-shrink: 0;
+}
+.cust-pick-field input,
+.ff .cust-pick-field input {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  border: 0 !important;
+  box-shadow: none !important;
+  min-height: 34px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+}
+.cust-pick-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 12px 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--tint, #f6f8fb);
+}
+.cust-av {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--tint);
+  color: var(--navy);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+.cust-av.m {
+  background: var(--tint-m, #fdf6f6);
+  color: var(--maroon);
+}
+.cust-pick-copy {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cust-pick-name {
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cust-pick-meta {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cust-pick-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.cust-pick-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.cust-pick-x {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--faint);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+}
+.cust-pick-x:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--ink);
+}
+.cust-pick-drop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--card, #fff);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.14);
+  z-index: 80;
+}
+.cust-pick-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.cust-pick-item + .cust-pick-item {
+  border-top: 0.5px solid var(--line);
+}
+.cust-pick-item.is-on,
+.cust-pick-item:hover {
+  background: var(--tint, #f6f8fb);
+}
+.cust-pick-item.is-picked .cust-pick-name {
+  color: var(--navy);
+}
+.cust-pick-item mark {
+  background: rgba(20, 63, 101, 0.12);
+  color: inherit;
+  font-weight: 700;
+  padding: 0 1px;
+  border-radius: 3px;
+}
+.cust-pick-side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.cust-pick-side .ti-check {
+  color: var(--navy);
+  font-size: 16px;
+}
+.cust-pick-warn {
+  font-size: 11px;
+  font-weight: 650;
+  color: #8a6a16;
+  white-space: nowrap;
+}
+.cust-pick-empty {
+  padding: 16px 14px;
+  font-size: 13px;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cust-pick-empty a,
+.cust-pick-hint a {
+  color: var(--navy);
+  font-weight: 650;
+}
+.cust-pick-foot {
+  padding: 8px 12px 10px;
+  font-size: 11px;
+  color: var(--faint);
+  border-top: 0.5px solid var(--line);
+}
+.cust-pick-hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+@media (max-width: 640px) {
+  .cust-pick-card {
+    flex-wrap: wrap;
+  }
+  .cust-pick-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .cust-pick-side .chip {
+    display: none;
+  }
+}
 .quote-layout { display: grid; grid-template-columns: minmax(0,1fr) 210px; gap: 14px; align-items: start; }
 .quote-layout-form { grid-template-columns: 1fr; }
 .quote-frame { width: 100%; min-height: 0; border: 0; }
