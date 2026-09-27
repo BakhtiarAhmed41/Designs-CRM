@@ -105,6 +105,7 @@ export type DeliveryFile = {
   downloadedAt?: string | null;
   downloadCount?: number;
   previewUrl?: string | null;
+  isBundle?: boolean;
 };
 
 export type Delivery = {

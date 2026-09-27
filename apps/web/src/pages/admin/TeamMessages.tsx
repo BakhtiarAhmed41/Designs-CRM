@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MessageComposer } from '@/components/messaging/MessageComposer';
 import { MessageAttachments } from '@/components/MessageAttachments';
+import { ImageLightbox } from '@/components/FilePreview';
 import { useDialog } from '@/components/ui/AppDialog';
 import { useAuth } from '@/context/AuthContext';
 import { getErrorMessage, resolveFileUrl } from '@/lib/api';
@@ -52,6 +53,7 @@ export function AdminTeamMessages() {
   const groupMode = searchParams.get('group') === '1' || (!peerId && searchParams.get('group') !== '0');
   const [q, setQ] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{ src: string; name: string } | null>(null);
 
   const canSend =
     canFeature(user?.permissions, 'messages_team_send', user?.role) ||
@@ -418,17 +420,18 @@ export function AdminTeamMessages() {
           <div className="msg-right-title">Shared files</div>
           {sharedFiles.map((f) =>
             isImageFile(f.originalName, f.mimeType) ? (
-              <a
+              <button
                 key={f.id}
-                href={resolveFileUrl(f.url)}
-                target="_blank"
-                rel="noreferrer"
+                type="button"
                 className="msg-file-preview"
-                style={{ textDecoration: 'none', color: 'inherit', marginBottom: 8 }}
+                style={{ marginBottom: 8 }}
+                onClick={() =>
+                  setPreview({ src: resolveFileUrl(f.url), name: f.originalName })
+                }
               >
                 <img src={resolveFileUrl(f.url)} alt={f.originalName} />
                 <span>{f.originalName}</span>
-              </a>
+              </button>
             ) : (
               <a
                 key={f.id}
@@ -446,6 +449,9 @@ export function AdminTeamMessages() {
           {sharedFiles.length === 0 && <div className="muted">No files yet</div>}
         </div>
       </aside>
+      {preview && (
+        <ImageLightbox src={preview.src} name={preview.name} onClose={() => setPreview(null)} />
+      )}
     </div>
   );
 }

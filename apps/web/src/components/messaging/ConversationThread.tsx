@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { ImageLightbox } from '@/components/FilePreview';
 import { resolveFileUrl } from '@/lib/api';
 import { isImageFile } from '@/lib/format';
 import type { Message } from '@/lib/messaging';
@@ -28,6 +29,7 @@ export function ConversationThread({
   typing = false,
 }: Props) {
   const bodyRef = useRef<HTMLDivElement>(null);
+  const [preview, setPreview] = useState<{ src: string; name: string } | null>(null);
 
   useEffect(() => {
     const el = bodyRef.current;
@@ -52,16 +54,15 @@ export function ConversationThread({
                   const image = isImageFile(a.originalName, a.mimeType);
                   if (image) {
                     return (
-                      <a
+                      <button
                         key={a.id}
+                        type="button"
                         className="msg-file-preview"
-                        href={href}
-                        target="_blank"
-                        rel="noreferrer"
+                        onClick={() => setPreview({ src: href, name: a.originalName })}
                       >
                         <img src={href} alt={a.originalName} />
                         <span>{a.originalName}</span>
-                      </a>
+                      </button>
                     );
                   }
                   return (
@@ -85,6 +86,9 @@ export function ConversationThread({
         <div className="msg-typing" aria-live="polite">
           typing...
         </div>
+      )}
+      {preview && (
+        <ImageLightbox src={preview.src} name={preview.name} onClose={() => setPreview(null)} />
       )}
     </div>
   );

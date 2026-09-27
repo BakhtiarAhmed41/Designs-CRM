@@ -309,6 +309,9 @@ export function customerOrderChip(o: {
   if (o.status === 'COMPLETED' || o.status === 'CLOSED') {
     return { cls: 'portal-chip c-delivered', label: 'Delivered' };
   }
+  if (o.partiallyDelivered) {
+    return { cls: 'portal-chip c-review', label: 'Partially delivered' };
+  }
   if (o.status === 'REVISION_REQUESTED') {
     return { cls: 'portal-chip c-revision', label: 'Revision Requested' };
   }
@@ -318,8 +321,46 @@ export function customerOrderChip(o: {
   return { cls: 'portal-chip c-progress', label: 'In Progress' };
 }
 
+export function mergeDeliveredVia(
+  vias: Array<string | null | undefined>,
+): 'PORTAL' | 'EMAIL' | 'BOTH' | null {
+  const set = new Set(vias.filter(Boolean));
+  const emailed = set.has('EMAIL') || set.has('BOTH');
+  const portal = set.has('PORTAL') || set.has('BOTH');
+  if (emailed && portal) return 'BOTH';
+  if (emailed) return 'EMAIL';
+  if (portal) return 'PORTAL';
+  return null;
+}
+
+export function deliveredViaFromFlags(
+  hasPortalFiles: boolean,
+  emailed: boolean,
+): 'PORTAL' | 'EMAIL' | 'BOTH' {
+  if (emailed && hasPortalFiles) return 'BOTH';
+  if (emailed) return 'EMAIL';
+  return 'PORTAL';
+}
+
+export function orderDeliveredVia(order: {
+  deliveredVia?: string | null;
+  deliveries?: Array<{
+    deliveredVia?: string | null;
+    releasedAt?: string | null;
+    kind?: string | null;
+  }>;
+}): string | null {
+  const fromDeliveries = mergeDeliveredVia(
+    (order.deliveries ?? [])
+      .filter((d) => d.releasedAt && d.kind !== 'PREVIEW')
+      .map((d) => d.deliveredVia),
+  );
+  return fromDeliveries ?? order.deliveredVia ?? null;
+}
+
 export function deliveryMethodLabel(via?: string | null): string {
-  if (via === 'EMAIL') return 'Sent by email';
-  if (via === 'PORTAL') return 'Available here';
+  if (via === 'BOTH') return 'Files delivered by email and on portal';
+  if (via === 'EMAIL') return 'Files delivered by email';
+  if (via === 'PORTAL') return 'Files delivered on portal';
   return 'Not delivered';
 }

@@ -82,7 +82,9 @@ export type MyFile = {
   previewUrl?: string | null;
   canDownload?: boolean;
   downloadedAt?: string | null;
-  downloadCount?: number;
+          downloadCount?: number;
+  isBundle?: boolean;
+  emailNotice?: boolean;
 };
 
 export type QuoteBuilderLineInput = {

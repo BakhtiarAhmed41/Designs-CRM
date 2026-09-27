@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { ImageLightbox } from '@/components/FilePreview';
 import { resolveFileUrl } from '@/lib/api';
 import { isImageFile } from '@/lib/format';
 import type { MessageAttachment } from '@/lib/messaging';
@@ -7,6 +9,7 @@ export function MessageAttachments({
 }: {
   attachments?: MessageAttachment[] | null;
 }) {
+  const [preview, setPreview] = useState<{ src: string; name: string } | null>(null);
   if (!attachments?.length) return null;
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
@@ -15,17 +18,15 @@ export function MessageAttachments({
         const image = isImageFile(a.originalName, a.mimeType);
         if (image) {
           return (
-            <a
+            <button
               key={a.id}
-              href={href}
-              target="_blank"
-              rel="noreferrer"
+              type="button"
               className="msg-file-preview"
-              style={{ textDecoration: 'none', color: 'inherit' }}
+              onClick={() => setPreview({ src: href, name: a.originalName })}
             >
               <img src={href} alt={a.originalName} />
               <span>{a.originalName}</span>
-            </a>
+            </button>
           );
         }
         return (
@@ -42,6 +43,9 @@ export function MessageAttachments({
           </a>
         );
       })}
+      {preview && (
+        <ImageLightbox src={preview.src} name={preview.name} onClose={() => setPreview(null)} />
+      )}
     </div>
   );
 }

@@ -160,6 +160,7 @@ export function EmbroideryCustomerQuote({
         <section className="ecd-sec">
           <div className="ecd-sec-h">
             <h2>Order summary</h2>
+            <p className="ecd-sec-desc">Quoted prices and payment details</p>
           </div>
           {lines.length === 0 && (
             <p className="ecd-wait">
@@ -225,6 +226,11 @@ export function EmbroideryCustomerQuote({
         <section className="ecd-sec">
           <DetailsSectionHead
             title="Customer request"
+            description={
+              vector
+                ? 'Artwork, instructions and specifications'
+                : 'Artwork, instructions and requested sizes'
+            }
             open={open.request}
             onToggle={() => setOpen((prev) => ({ ...prev, request: !prev.request }))}
           />
@@ -365,6 +371,7 @@ export function EmbroideryCustomerQuote({
         <section className="ecd-sec">
           <DetailsSectionHead
             title="Delivery preferences"
+            description="Formats and delivery choices"
             open={open.delivery}
             onToggle={() => setOpen((prev) => ({ ...prev, delivery: !prev.delivery }))}
           />
@@ -396,6 +403,7 @@ export function EmbroideryCustomerQuote({
         <section className="ecd-sec">
           <DetailsSectionHead
             title="Quote history"
+            description="Previous quotes and price revisions"
             open={open.history}
             onToggle={() => setOpen((prev) => ({ ...prev, history: !prev.history }))}
           />

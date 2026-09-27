@@ -22,7 +22,15 @@ import {
   turnaroundLabel,
   type EmbAttachment,
 } from '@/lib/embroideryQuote';
-import { dateShort, isImageFile, money, orderNumber, orderSlug } from '@/lib/format';
+import {
+  dateShort,
+  deliveryMethodLabel,
+  isImageFile,
+  money,
+  orderDeliveredVia,
+  orderNumber,
+  orderSlug,
+} from '@/lib/format';
 import { openLinkedChat } from '@/lib/messaging';
 import { myAttachmentUrl, myDeliveryFilePreviewUrl, myDeliveryFileUrl } from '@/lib/orders';
 import { isStaffCreatedOrder, quoteHistoryLabel, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
@@ -72,11 +80,17 @@ export function ServiceCustomerOrder({
   const claimed = new Set<string>();
   const designFiles = designs.map((design) => filesForDesign(design, attachments, claimed));
   const history = [...quotations].sort((a, b) => a.version - b.version);
+  const via = orderDeliveredVia(order);
+  const bundleFiles = (order.deliveries ?? []).flatMap((batch) =>
+    batch.files.filter((file) => file.isBundle),
+  );
   const header = counts.allDelivered
-    ? { text: 'Delivered', ok: true }
+    ? { text: via ? deliveryMethodLabel(via) : 'Delivered', ok: true }
     : awaiting
       ? { text: 'Awaiting payment', ok: false }
-      : { text: 'In process', ok: false };
+      : counts.delivered > 0 && counts.delivered < counts.total
+        ? { text: 'Partially delivered', ok: false }
+        : { text: 'In process', ok: false };
 
   const [open, setOpen] = useState({
     summary: awaiting,
@@ -211,6 +225,7 @@ export function ServiceCustomerOrder({
           <div className="ecd-sec-h">
             <h2>Order delivery</h2>
           </div>
+          {via && <p className="sod-via">{deliveryMethodLabel(via)}</p>}
           <div className="ecd-body">
             {groups.length === 0 && <p className="ecd-wait">No items on this order yet.</p>}
             {groups.map((group) => (
@@ -247,6 +262,7 @@ export function ServiceCustomerOrder({
         <section className="ecd-sec">
           <DetailsSectionHead
             title="Order summary"
+            description="Price, payment and order details"
             open={open.summary}
             onToggle={() => setOpen((prev) => ({ ...prev, summary: !prev.summary }))}
           />
@@ -288,6 +304,11 @@ export function ServiceCustomerOrder({
         <section className="ecd-sec">
           <DetailsSectionHead
             title="Customer request"
+            description={
+              vector
+                ? 'Artwork, instructions and specifications'
+                : 'Artwork, instructions and requested sizes'
+            }
             open={open.request}
             onToggle={() => setOpen((prev) => ({ ...prev, request: !prev.request }))}
           />
@@ -426,6 +447,7 @@ export function ServiceCustomerOrder({
         <section className="ecd-sec">
           <DetailsSectionHead
             title="Delivery preferences"
+            description="Formats and delivery choices"
             open={open.delivery}
             onToggle={() => setOpen((prev) => ({ ...prev, delivery: !prev.delivery }))}
           />
@@ -457,6 +479,7 @@ export function ServiceCustomerOrder({
         <section className="ecd-sec">
           <DetailsSectionHead
             title="Quote history"
+            description="Previous quotes and price revisions"
             open={open.history}
             onToggle={() => setOpen((prev) => ({ ...prev, history: !prev.history }))}
           />
@@ -491,9 +514,21 @@ export function ServiceCustomerOrder({
                 <i className="ti ti-x" />
               </button>
             </div>
-            <p>Preview or download the files delivered for this item.</p>
+            <p>
+              {via === 'EMAIL'
+                ? 'These files were delivered by email.'
+                : via === 'BOTH'
+                  ? 'Preview or download the portal files. Final files were also sent by email.'
+                  : 'Preview or download the files delivered for this item.'}
+            </p>
             <div className="sod-flist">
-              {deliveredFiles(filesFor).length === 0 && <div>No files are available yet.</div>}
+              {deliveredFiles(filesFor).length === 0 && bundleFiles.length === 0 && (
+                <div>
+                  {via === 'EMAIL'
+                    ? 'These files were delivered by email.'
+                    : 'No files are available yet.'}
+                </div>
+              )}
               {deliveredFiles(filesFor).map((file) => (
                 <div key={file.id} className="sod-file">
                   <span>{file.originalName}</span>
@@ -511,6 +546,22 @@ export function ServiceCustomerOrder({
                       type="button"
                       className="sod-eye"
                       title="Download"
+                      aria-label={`Download ${file.originalName}`}
+                      onClick={() => void downloadSignedFile(myDeliveryFileUrl(order.id, file.id), file.originalName)}
+                    >
+                      <i className="ti ti-download" />
+                    </button>
+                  </span>
+                </div>
+              ))}
+              {bundleFiles.map((file) => (
+                <div key={file.id} className="sod-file">
+                  <span>{file.originalName} (all designs)</span>
+                  <span className="sod-file-acts">
+                    <button
+                      type="button"
+                      className="sod-eye"
+                      title="Download zip"
                       aria-label={`Download ${file.originalName}`}
                       onClick={() => void downloadSignedFile(myDeliveryFileUrl(order.id, file.id), file.originalName)}
                     >

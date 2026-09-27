@@ -169,6 +169,24 @@ export async function apiFetchForm<T>(
   return parseOk<T>(res);
 }
 
+export async function downloadFileFromUrl(url: string, filename: string) {
+  if (url.startsWith('blob:')) {
+    triggerBrowserDownload(url, filename, false);
+    return;
+  }
+  try {
+    const res = await fetch(url, { credentials: 'include' });
+    if (!res.ok) throw new Error('unavailable');
+    const blob = await res.blob();
+    if (!blob.size || blob.type.includes('json') || blob.type.startsWith('text/')) {
+      throw new Error('unavailable');
+    }
+    triggerBrowserDownload(URL.createObjectURL(blob), filename, true);
+  } catch {
+    triggerBrowserDownload(url, filename, false);
+  }
+}
+
 function triggerBrowserDownload(href: string, filename: string, revoke: boolean) {
   const a = document.createElement('a');
   a.href = href;

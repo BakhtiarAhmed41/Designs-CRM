@@ -5,7 +5,7 @@ import { listMyFiles, type MyFile } from '@/lib/designs';
 import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
 import { myDeliveryFileUrl } from '@/lib/orders';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
-import { dateShort, deliveryMethodLabel, orderNumber, orderSlug } from '@/lib/format';
+import { dateShort, deliveryMethodLabel, mergeDeliveredVia, orderNumber, orderSlug } from '@/lib/format';
 import { serviceCategoryLabel } from '@/lib/serviceIcon';
 import { DeliveryPreview } from '@/components/FilePreview';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -81,8 +81,10 @@ export function PortalFiles() {
     for (const f of data?.files ?? []) {
       const key = `${f.orderId}-${dayKey(f.deliveredAt)}`;
       const g = byKey.get(key);
-      if (g) g.files.push(f);
-      else {
+      if (g) {
+        g.files.push(f);
+        g.deliveredVia = mergeDeliveredVia([g.deliveredVia, f.deliveredVia]);
+      } else {
         byKey.set(key, {
           key,
           orderId: f.orderId,
@@ -113,8 +115,8 @@ export function PortalFiles() {
       if (month !== 'all' && monthKey(g.deliveredAt) !== month) return false;
       if (dateFrom && day < dateFrom) return false;
       if (dateTo && day > dateTo) return false;
-      if (method === 'portal' && g.deliveredVia !== 'PORTAL') return false;
-      if (method === 'email' && g.deliveredVia !== 'EMAIL') return false;
+      if (method === 'portal' && g.deliveredVia !== 'PORTAL' && g.deliveredVia !== 'BOTH') return false;
+      if (method === 'email' && g.deliveredVia !== 'EMAIL' && g.deliveredVia !== 'BOTH') return false;
       if (!term) return true;
       return (
         (g.orderName ?? '').toLowerCase().includes(term) ||
@@ -208,8 +210,8 @@ export function PortalFiles() {
           aria-label="Delivery method"
         >
           <option value="all">All delivery methods</option>
-          <option value="portal">Available here</option>
-          <option value="email">Sent by email</option>
+          <option value="portal">Files delivered on portal</option>
+          <option value="email">Files delivered by email</option>
         </select>
       </div>
 
@@ -240,8 +242,8 @@ export function PortalFiles() {
               <thead>
                 <tr>
                   <th>Date</th>
-                  <th>Project / Design</th>
                   <th>Order No.</th>
+                  <th>Project / Design</th>
                   <th>Category</th>
                   <th>Files</th>
                   <th>Delivery Method</th>
@@ -250,7 +252,9 @@ export function PortalFiles() {
               </thead>
               {paged.map((g) => {
                 const open = openKey === g.key;
-                const emailed = g.deliveredVia === 'EMAIL';
+                const emailed = g.deliveredVia === 'EMAIL' || g.deliveredVia === 'BOTH';
+                const onPortal = g.deliveredVia === 'PORTAL' || g.deliveredVia === 'BOTH';
+                const listed = g.files.filter((f) => !f.emailNotice);
                 return (
                   <tbody key={g.key} className={`file-order${open ? ' is-open' : ''}`}>
                     <tr
@@ -258,12 +262,12 @@ export function PortalFiles() {
                       onClick={() => setOpenKey(open ? null : g.key)}
                     >
                       <td className="muted">{dateShort(g.deliveredAt)}</td>
+                      <td>{orderNumber(g.humanRef, g.orderId.slice(0, 6))}</td>
                       <td>
                         <div className="on">{g.orderName ?? 'Order'}</div>
                       </td>
-                      <td>{orderNumber(g.humanRef, g.orderId.slice(0, 6))}</td>
                       <td className="muted">{serviceCategoryLabel(g.serviceType)}</td>
-                      <td>{g.files.length}</td>
+                      <td>{listed.length || (emailed ? 'Email' : 0)}</td>
                       <td>{deliveryMethodLabel(g.deliveredVia)}</td>
                       <td>
                         <i className={`ti ${open ? 'ti-chevron-up' : 'ti-chevron-down'}`} />
@@ -272,29 +276,31 @@ export function PortalFiles() {
                     {open && (
                       <tr className="expand-row file-order-files">
                         <td colSpan={7}>
-                            {emailed ? (
+                            {emailed && (
                               <div className="file-email-note">
                                 <p>
-                                  <i className="ti ti-mail" /> Final files sent by email
+                                  <i className="ti ti-mail" /> {deliveryMethodLabel(g.deliveredVia)}
                                 </p>
                                 <p>
-                                  {g.files.length} file{g.files.length === 1 ? '' : 's'} were sent to{' '}
-                                  {maskEmail(g.deliveryEmail)}.
+                                  {g.deliveredVia === 'BOTH'
+                                    ? `Final files were also sent to ${maskEmail(g.deliveryEmail)}.`
+                                    : `Final files were sent to ${maskEmail(g.deliveryEmail)}.`}
                                 </p>
                                 <Link to={`/portal/orders/${orderSlug(g.humanRef, g.orderId)}`} className="btn btn-ghost btn-sm">
                                   View order
                                 </Link>
                               </div>
-                            ) : (
+                            )}
+                            {onPortal && listed.length > 0 && (
                               <div className="file-split">
-                                {g.files.some((f) => f.kind === 'PREVIEW') && (
+                                {listed.some((f) => f.kind === 'PREVIEW') && (
                                   <div className="file-split-block">
                                     <div className="od-files-label">Order preview</div>
                                     <p className="muted od-files-hint">
                                       View only. These cannot be downloaded.
                                     </p>
                                     <div className="od-files">
-                                      {g.files
+                                      {listed
                                         .filter((f) => f.kind === 'PREVIEW')
                                         .map((f) => (
                                           <DeliveryPreview
@@ -310,7 +316,7 @@ export function PortalFiles() {
                                     </div>
                                   </div>
                                 )}
-                                {g.files.some((f) => f.kind !== 'PREVIEW') && (
+                                {listed.some((f) => f.kind !== 'PREVIEW') && (
                                   <table className="itable file-inner">
                                     <thead>
                                       <tr>
@@ -321,7 +327,7 @@ export function PortalFiles() {
                                       </tr>
                                     </thead>
                                     <tbody>
-                                      {g.files
+                                      {listed
                                         .filter((f) => f.kind !== 'PREVIEW')
                                         .map((f) => (
                                           <tr key={f.fileId}>
@@ -337,6 +343,7 @@ export function PortalFiles() {
                                             </td>
                                             <td>
                                               {f.originalName}
+                                              {f.isBundle ? ' (all designs)' : ''}
                                               {(f.downloadCount ?? 0) === 0 && (
                                                 <span className="file-new">NEW</span>
                                               )}
@@ -371,6 +378,11 @@ export function PortalFiles() {
                                     </tbody>
                                   </table>
                                 )}
+                              </div>
+                            )}
+                            {!emailed && !onPortal && (
+                              <div className="file-email-note">
+                                <p>{deliveryMethodLabel(g.deliveredVia)}</p>
                               </div>
                             )}
                           </td>

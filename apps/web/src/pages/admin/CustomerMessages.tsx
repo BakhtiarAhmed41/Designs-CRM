@@ -9,6 +9,7 @@ import { whenVisible } from '@/lib/queryRefresh';
 import {
   bulkAdminConversations,
   conversationTitle,
+  conversationRefLabel,
   conversationWorkLine,
   helpRequestTitle,
   isHelpRequest,
@@ -703,8 +704,9 @@ export function AdminCustomerMessages() {
           />
         )}
         {conversations.map((c) => {
-          const work = conversationWorkLine(c);
           const name = inboxTitle(c, hideCustomerDetails);
+          const refLabel = conversationRefLabel(c);
+          const help = isHelpRequest(c);
           return (
             <div
               key={c.id}
@@ -740,16 +742,20 @@ export function AdminCustomerMessages() {
                   initials(name)
                 )}
               </div>
-              <div className="oinfo">
-                <div className="on inbox-title-row">
-                  <span>{name}</span>
-                  {isHelpRequest(c) && <HelpRequestBadge />}
-                </div>
-                <div className={`inbox-sub${work ? ' has-work' : ''}`}>
-                  {work && <span className="inbox-work">{work}</span>}
+              <div className="oinfo inbox-main">
+                <span className="on">{name}</span>
+                <div className="inbox-center">
                   <span className="inbox-snippet">
                     {c.lastMessagePreview || 'No messages yet'}
                   </span>
+                  {(help || (refLabel && !hideCustomerDetails)) && (
+                    <div className="inbox-center-sub">
+                      {help && <HelpRequestBadge />}
+                      {refLabel && !hideCustomerDetails && (
+                        <span className="inbox-order">{refLabel}</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="inbox-meta">

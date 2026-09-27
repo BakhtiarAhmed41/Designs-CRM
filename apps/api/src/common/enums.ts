@@ -124,6 +124,7 @@ export type QuotationStatus = (typeof QuotationStatus)[keyof typeof QuotationSta
 export const DeliveredVia = {
   PORTAL: 'PORTAL',
   EMAIL: 'EMAIL',
+  BOTH: 'BOTH',
 } as const;
 export type DeliveredVia = (typeof DeliveredVia)[keyof typeof DeliveredVia];
 

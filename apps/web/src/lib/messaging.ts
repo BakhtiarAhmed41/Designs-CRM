@@ -383,6 +383,17 @@ export function conversationWorkLine(c: {
   return kind;
 }
 
+/** Inbox subtitle: Quote/Order number only, no design names. */
+export function conversationRefLabel(c: {
+  chatType?: ChatType;
+  orderRef?: string | null;
+}) {
+  const ref = c.orderRef?.trim();
+  if (!ref) return null;
+  if (c.chatType === 'QUOTE') return `Quote ${ref}`;
+  return `Order ${ref}`;
+}
+
 // --- admin ----------------------------------------------------------------
 export function listAdminConversations(params?: {
   label?: string;

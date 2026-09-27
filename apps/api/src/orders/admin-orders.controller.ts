@@ -11,7 +11,7 @@ import {
   UseInterceptors,
   UploadedFiles,
 } from '@nestjs/common';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { z } from 'zod';
 import type { AuthUser } from '../auth/auth.types';
@@ -409,15 +409,22 @@ export class AdminOrdersController {
 
   @Post(':id/deliveries')
   @UseInterceptors(
-    FilesInterceptor('files', 20, {
-      storage: memoryStorage(),
-      limits: { fileSize: 50 * 1024 * 1024 }, // allow larger deliverables
-    }),
+    FileFieldsInterceptor(
+      [
+        { name: 'files', maxCount: 10 },
+        { name: 'zip', maxCount: 1 },
+      ],
+      {
+        storage: memoryStorage(),
+        limits: { fileSize: 80 * 1024 * 1024 },
+      },
+    ),
   )
   async deliver(
     @CurrentUser() user: AuthUser | undefined,
     @Param('id') id: string,
-    @UploadedFiles() files: Express.Multer.File[],
+    @UploadedFiles()
+    uploaded: { files?: Express.Multer.File[]; zip?: Express.Multer.File[] },
     @Body() body: Record<string, string>,
   ) {
     let designIds: string[] | undefined;
@@ -434,11 +441,15 @@ export class AdminOrdersController {
           .filter(Boolean);
       }
     }
-    return this.orders.deliverOrder(user, id, files, {
+    const via = body?.deliveredVia;
+    return this.orders.deliverOrder(user, id, uploaded?.files ?? [], {
       deliveredVia:
-        body?.deliveredVia === DeliveredVia.EMAIL
+        via === DeliveredVia.EMAIL
           ? DeliveredVia.EMAIL
-          : DeliveredVia.PORTAL,
+          : via === DeliveredVia.BOTH
+            ? DeliveredVia.BOTH
+            : DeliveredVia.PORTAL,
+      zip: uploaded?.zip?.[0],
       designIds,
       notifyEmail: parseBool(body?.notifyEmail, true),
       notifySms: parseBool(body?.notifySms, true),

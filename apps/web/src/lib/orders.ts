@@ -282,7 +282,8 @@ export function deliverOrder(
   orderId: string,
   files: File[],
   options?: {
-    deliveredVia?: 'PORTAL' | 'EMAIL';
+    deliveredVia?: 'PORTAL' | 'EMAIL' | 'BOTH';
+    zip?: File;
     designIds?: string[];
     notifyEmail?: boolean;
     notifySms?: boolean;
@@ -293,6 +294,7 @@ export function deliverOrder(
 ) {
   const form = new FormData();
   files.forEach((f) => form.append('files', f));
+  if (options?.zip) form.append('zip', options.zip);
   if (options?.deliveredVia) form.append('deliveredVia', options.deliveredVia);
   if (options?.designIds) form.append('designIds', JSON.stringify(options.designIds));
   if (options?.notifyEmail !== undefined)

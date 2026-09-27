@@ -611,6 +611,72 @@ export class OrdersService {
     );
   }
 
+  private mergeDeliveredVia(vias: Array<string | null | undefined>): DeliveredVia | null {
+    const set = new Set(vias.filter(Boolean));
+    const emailed = set.has(DeliveredVia.EMAIL) || set.has(DeliveredVia.BOTH);
+    const portal = set.has(DeliveredVia.PORTAL) || set.has(DeliveredVia.BOTH);
+    if (emailed && portal) return DeliveredVia.BOTH;
+    if (emailed) return DeliveredVia.EMAIL;
+    if (portal) return DeliveredVia.PORTAL;
+    return null;
+  }
+
+  private resolveDeliveredVia(
+    requested: DeliveredVia | undefined,
+    hasPortalFiles: boolean,
+  ): DeliveredVia {
+    const emailed =
+      requested === DeliveredVia.EMAIL || requested === DeliveredVia.BOTH;
+    if (emailed && hasPortalFiles) return DeliveredVia.BOTH;
+    if (emailed) return DeliveredVia.EMAIL;
+    return DeliveredVia.PORTAL;
+  }
+
+  private isZipUpload(file: Express.Multer.File) {
+    const name = file.originalname.toLowerCase();
+    const mime = (file.mimetype || '').toLowerCase();
+    return (
+      name.endsWith('.zip') ||
+      mime === 'application/zip' ||
+      mime === 'application/x-zip-compressed' ||
+      mime === 'application/x-zip'
+    );
+  }
+
+  private async insertDeliveryFile(input: {
+    deliveryId: string;
+    designId: string | null;
+    file: Express.Multer.File;
+    key: string;
+    isBundle?: boolean;
+  }) {
+    const values = [
+      randomUUID(),
+      input.deliveryId,
+      input.designId,
+      input.isBundle ? 'ZIP' : formatLabelFromName(input.file.originalname),
+      input.file.originalname,
+      input.file.mimetype || null,
+      typeof input.file.size === 'number' ? input.file.size : null,
+      input.key,
+    ];
+    try {
+      await this.db.execute(
+        `INSERT INTO delivery_files
+           (id, delivery_id, design_id, format_label, original_name, mime_type, byte_size, storage_key, is_bundle)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [...values, input.isBundle ? 1 : 0],
+      );
+    } catch {
+      await this.db.execute(
+        `INSERT INTO delivery_files
+           (id, delivery_id, design_id, format_label, original_name, mime_type, byte_size, storage_key)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        values,
+      );
+    }
+  }
+
   private async clearDesignDeliveryFiles(
     orderId: string,
     designIds: string[],
@@ -625,6 +691,39 @@ export class OrdersService {
         WHERE df.design_id IN (${this.sqlIn(designIds)})${kindFilter}`,
       kind ? [...designIds, kind] : designIds,
     );
+    if (files.length === 0) return;
+    await this.db.execute(
+      `DELETE FROM delivery_files WHERE id IN (${this.sqlIn(files.map((f) => f.id))})`,
+      files.map((f) => f.id),
+    );
+    const deliveryIds = [...new Set(files.map((f) => f.delivery_id))];
+    for (const deliveryId of deliveryIds) {
+      const leftover = await this.db.queryOne<{ n: number | string }>(
+        'SELECT COUNT(*) AS n FROM delivery_files WHERE delivery_id = ?',
+        [deliveryId],
+      );
+      if (Number(leftover?.n ?? 0) === 0) {
+        await this.db.execute('DELETE FROM deliveries WHERE id = ? AND order_id = ?', [
+          deliveryId,
+          orderId,
+        ]);
+      }
+    }
+  }
+
+  private async clearBundleFiles(orderId: string) {
+    let files: Array<{ id: string; delivery_id: string }> = [];
+    try {
+      files = await this.db.query<{ id: string; delivery_id: string }>(
+        `SELECT df.id, df.delivery_id
+           FROM delivery_files df
+           JOIN deliveries d ON d.id = df.delivery_id
+          WHERE d.order_id = ? AND df.is_bundle = 1`,
+        [orderId],
+      );
+    } catch {
+      return;
+    }
     if (files.length === 0) return;
     await this.db.execute(
       `DELETE FROM delivery_files WHERE id IN (${this.sqlIn(files.map((f) => f.id))})`,
@@ -816,6 +915,7 @@ export class OrdersService {
         downloadedAt: Date | null;
         downloadCount: number;
         previewUrl: string | null;
+        isBundle: boolean;
       }>
     >();
     const deliveryIds = deliveries.map((d) => d.id);
@@ -832,12 +932,13 @@ export class OrdersService {
         created_at: Date;
         downloaded_at?: Date | null;
         download_count?: number | null;
+        is_bundle?: number | null;
       };
       let files: FileRow[] = [];
       try {
         files = await this.db.query<FileRow>(
           `SELECT id, delivery_id, design_id, original_name, mime_type, byte_size, format_label, storage_key, created_at,
-                  downloaded_at, download_count
+                  downloaded_at, download_count, is_bundle
              FROM delivery_files
             WHERE delivery_id IN (${this.sqlIn(deliveryIds)})
             ORDER BY created_at ASC`,
@@ -873,6 +974,7 @@ export class OrdersService {
           downloadedAt: f.downloaded_at ?? null,
           downloadCount: Number(f.download_count ?? 0),
           previewUrl,
+          isBundle: Boolean(f.is_bundle),
         });
         filesByDelivery.set(f.delivery_id, list);
       }
@@ -1066,6 +1168,11 @@ export class OrdersService {
       deliveries: opts?.releasedOnly
         ? deliveries.filter((d) => d.releasedAt)
         : deliveries,
+      deliveredVia: this.mergeDeliveredVia(
+        deliveries
+          .filter((d) => d.releasedAt && d.kind !== DeliveryKind.PREVIEW)
+          .map((d) => d.deliveredVia),
+      ),
     };
   }
 
@@ -1291,17 +1398,32 @@ export class OrdersService {
          FROM deliveries d
          JOIN orders o ON o.id = d.order_id
          LEFT JOIN users u ON u.id = o.client_user_id
-         INNER JOIN (
-           SELECT order_id, MAX(version) AS v
-             FROM deliveries
-            WHERE released_at IS NOT NULL AND order_id IN (${this.sqlIn(orderIds)})
-            GROUP BY order_id
-         ) latest ON latest.order_id = d.order_id AND latest.v = d.version
-        WHERE d.released_at IS NOT NULL`,
+        WHERE d.released_at IS NOT NULL
+          AND (d.kind IS NULL OR d.kind = 'FINAL')
+          AND d.order_id IN (${this.sqlIn(orderIds)})`,
       orderIds,
     );
+    const vias = new Map<string, string[]>();
     for (const r of rows) {
-      map.set(r.order_id, { via: r.delivered_via, email: r.email });
+      const list = vias.get(r.order_id) ?? [];
+      list.push(r.delivered_via);
+      vias.set(r.order_id, list);
+      if (!map.has(r.order_id)) {
+        map.set(r.order_id, { via: r.delivered_via, email: r.email });
+      } else {
+        map.set(r.order_id, {
+          via: map.get(r.order_id)!.via,
+          email: map.get(r.order_id)!.email ?? r.email,
+        });
+      }
+    }
+    for (const [orderId, list] of vias) {
+      const current = map.get(orderId);
+      if (!current) continue;
+      map.set(orderId, {
+        via: this.mergeDeliveredVia(list) ?? current.via,
+        email: current.email,
+      });
     }
     return map;
   }
@@ -2669,6 +2791,7 @@ export class OrdersService {
     files: Express.Multer.File[],
     options?: {
       deliveredVia?: DeliveredVia;
+      zip?: Express.Multer.File;
       designIds?: string[];
       notifyEmail?: boolean;
       notifySms?: boolean;
@@ -2689,7 +2812,11 @@ export class OrdersService {
         'You cannot publish directly to the customer. Send for approval instead.',
       );
     }
-    const incoming = files ?? [];
+    const incoming = (files ?? []).filter((f) => !this.isZipUpload(f));
+    if (options?.zip && !this.isZipUpload(options.zip)) {
+      throw new BadRequestException('The all-designs package must be a .zip file');
+    }
+    const zipFile = options?.zip ?? (files ?? []).find((f) => this.isZipUpload(f)) ?? null;
 
     const order = await this.getOrderRow(orderId);
     if (!order) throw new NotFoundException('Order not found');
@@ -2727,14 +2854,20 @@ export class OrdersService {
         'Preview files must be images (PNG, JPG, or WebP)',
       );
     }
-    if (incoming.length === 0 && existing.length === 0) {
-      throw new BadRequestException('Upload finished files first');
+    const hasPortalFiles = incoming.length > 0 || Boolean(zipFile);
+    const emailed =
+      options?.deliveredVia === DeliveredVia.EMAIL ||
+      options?.deliveredVia === DeliveredVia.BOTH;
+    if (!hasPortalFiles && !emailed && existing.length === 0) {
+      throw new BadRequestException(
+        'Upload finished files first, or mark the order as delivered by email',
+      );
+    }
+    if (zipFile && isPreview) {
+      throw new BadRequestException('Zip packages can only be attached to final files');
     }
 
-    const deliveredVia =
-      options?.deliveredVia === DeliveredVia.EMAIL
-        ? DeliveredVia.EMAIL
-        : DeliveredVia.PORTAL;
+    const deliveredVia = this.resolveDeliveredVia(options?.deliveredVia, hasPortalFiles);
     const designIds = (options?.designIds ?? []).filter(Boolean);
     const notifyEmail = options?.notifyEmail !== false;
     const notifySms = options?.notifySms !== false;
@@ -2745,6 +2878,9 @@ export class OrdersService {
         designIds,
         isPreview ? DeliveryKind.PREVIEW : DeliveryKind.FINAL,
       );
+    }
+    if (zipFile && !isPreview) {
+      await this.clearBundleFiles(orderId);
     }
 
     if (release && !isPreview) {
@@ -2773,8 +2909,10 @@ export class OrdersService {
 
     let deliveryId: string | null = null;
     let nextVersion = existing[0]?.version ?? 0;
+    const recordDelivery =
+      hasPortalFiles || (emailed && release && !isPreview);
 
-    if (incoming.length > 0) {
+    if (recordDelivery) {
       const latest = await this.db.queryOne<{ version: number }>(
         'SELECT version FROM deliveries WHERE order_id = ? ORDER BY version DESC LIMIT 1',
         [orderId],
@@ -2810,21 +2948,31 @@ export class OrdersService {
         });
         const designId =
           designIds.length > 0 ? designIds[i % designIds.length] : null;
-        await this.db.execute(
-          `INSERT INTO delivery_files
-             (id, delivery_id, design_id, format_label, original_name, mime_type, byte_size, storage_key)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            randomUUID(),
-            deliveryId,
-            designId,
-            formatLabelFromName(f.originalname),
-            f.originalname,
-            f.mimetype || null,
-            typeof f.size === 'number' ? f.size : null,
-            key,
-          ],
+        await this.insertDeliveryFile({
+          deliveryId,
+          designId,
+          file: f,
+          key,
+        });
+      }
+
+      if (zipFile) {
+        const key = this.storage.newObjectKey(
+          ['orders', orderId, 'deliveries', String(nextVersion)],
+          zipFile.originalname,
         );
+        await this.storage.uploadObject({
+          key,
+          body: zipFile.buffer,
+          contentType: zipFile.mimetype || 'application/zip',
+        });
+        await this.insertDeliveryFile({
+          deliveryId,
+          designId: null,
+          file: zipFile,
+          key,
+          isBundle: true,
+        });
       }
     }
 
@@ -2859,7 +3007,7 @@ export class OrdersService {
     const alreadyReleased = existing.some(
       (d) => Boolean(d.releasedAt) && d.kind !== DeliveryKind.PREVIEW,
     );
-    const isNewUpload = incoming.length > 0;
+    const isNewUpload = incoming.length > 0 || Boolean(zipFile);
     const submittedIds = new Set(
       (await this.getDeliveries(orderId)).flatMap((d) =>
         d.files.map((f) => f.designId).filter((x): x is string => !!x),
@@ -2919,24 +3067,48 @@ export class OrdersService {
       ]);
     }
 
+    const emailOnly = deliveredVia === DeliveredVia.EMAIL && !hasPortalFiles;
     const shouldNotify =
-      release && (notifyEmail || notifySms) && (isNewUpload || !alreadyReleased);
+      release &&
+      (isNewUpload || !alreadyReleased || emailOnly) &&
+      (notifyEmail || notifySms || emailOnly);
+    const orderLabel = order.name ?? 'your order';
+    const readyTitle =
+      deliveredVia === DeliveredVia.EMAIL
+        ? 'Files delivered by email'
+        : deliveredVia === DeliveredVia.BOTH
+          ? 'Files delivered by email and on portal'
+          : 'Your files are ready';
+    const readyBody =
+      deliveredVia === DeliveredVia.EMAIL
+        ? `Your files for ${orderLabel} were delivered by email.`
+        : deliveredVia === DeliveredVia.BOTH
+          ? partial
+            ? `Some files for ${orderLabel} were delivered by email and are on the portal.`
+            : `Your files for ${orderLabel} were delivered by email and are on the portal.`
+          : partial
+            ? `Some files for ${orderLabel} are ready to download.`
+            : `Your files for ${orderLabel} are ready to download.`;
     if (shouldNotify && order.client_user_id) {
       await this.notifications.createFor(order.client_user_id, {
-        title: isPreview ? 'Design preview ready' : 'Your files are ready',
+        title: isPreview ? 'Design preview ready' : readyTitle,
         body: isPreview
           ? order.type === OrderType.QUOTE_REQUEST
             ? 'A preview for Quote request is ready for your approval.'
             : 'Review the design to approve or request changes.'
-          : partial
-            ? `Some files for ${order.name ?? 'your order'} are ready to download.`
-            : `Your files for ${order.name ?? 'your order'} are ready to download.`,
-        link: isPreview
-          ? `/portal/orders/${orderId}`
-          : `/portal/files?order=${orderId}`,
+          : readyBody,
+        link:
+          isPreview || deliveredVia === DeliveredVia.EMAIL
+            ? `/portal/orders/${orderId}`
+            : `/portal/files?order=${orderId}`,
       });
     }
-    if (release && notifyEmail && (isNewUpload || !alreadyReleased)) {
+    if (
+      release &&
+      notifyEmail &&
+      hasPortalFiles &&
+      (isNewUpload || !alreadyReleased)
+    ) {
       const email = await this.customerEmailForOrder(order);
       const fileNames = (await this.getDeliveries(orderId)).flatMap((d) =>
         d.files.map((f) => f.originalName),
@@ -2961,9 +3133,7 @@ export class OrdersService {
 
     const deliveries = await this.getDeliveries(orderId);
     return {
-      order: this.orderDto((await this.getOrderRow(orderId))!, {
-        partiallyDelivered: this.designPartialDelivery(designs),
-      }),
+      order: await this.assembleOrder(orderId),
       delivery: deliveryId
         ? deliveries.find((d) => d.id === deliveryId)
         : deliveries[0],
@@ -3589,7 +3759,7 @@ export class OrdersService {
 
   async listMyFiles(user: AuthUser | undefined) {
     assertAuthUser(user);
-    const rows = await this.db.query<{
+    type FileListRow = {
       file_id: string;
       original_name: string;
       mime_type: string | null;
@@ -3607,21 +3777,83 @@ export class OrdersService {
       storage_key: string;
       downloaded_at: Date | null;
       download_count: number | null;
-    }>(
-      `SELECT df.id AS file_id, df.original_name, df.mime_type, df.format_label, df.byte_size,
-              df.created_at AS delivered_at, df.storage_key,
-              df.downloaded_at, df.download_count,
-              o.id AS order_id, o.name AS order_name, o.human_ref, o.service_type,
-              d.delivered_via, d.kind, d.preview_status, u.email
-         FROM delivery_files df
-         JOIN deliveries d ON d.id = df.delivery_id
-         JOIN orders o ON o.id = d.order_id
-         LEFT JOIN users u ON u.id = o.client_user_id
-        WHERE o.client_user_id = ? AND d.released_at IS NOT NULL
-        ORDER BY df.created_at DESC`,
-      [user.id],
+      is_bundle?: number | null;
+    };
+    let rows: FileListRow[] = [];
+    try {
+      rows = await this.db.query<FileListRow>(
+        `SELECT df.id AS file_id, df.original_name, df.mime_type, df.format_label, df.byte_size,
+                df.created_at AS delivered_at, df.storage_key,
+                df.downloaded_at, df.download_count, df.is_bundle,
+                o.id AS order_id, o.name AS order_name, o.human_ref, o.service_type,
+                d.delivered_via, d.kind, d.preview_status, u.email
+           FROM delivery_files df
+           JOIN deliveries d ON d.id = df.delivery_id
+           JOIN orders o ON o.id = d.order_id
+           LEFT JOIN users u ON u.id = o.client_user_id
+          WHERE o.client_user_id = ? AND d.released_at IS NOT NULL
+          ORDER BY df.created_at DESC`,
+        [user.id],
+      );
+    } catch {
+      rows = await this.db.query<FileListRow>(
+        `SELECT df.id AS file_id, df.original_name, df.mime_type, df.format_label, df.byte_size,
+                df.created_at AS delivered_at, df.storage_key,
+                df.downloaded_at, df.download_count,
+                o.id AS order_id, o.name AS order_name, o.human_ref, o.service_type,
+                d.delivered_via, d.kind, d.preview_status, u.email
+           FROM delivery_files df
+           JOIN deliveries d ON d.id = df.delivery_id
+           JOIN orders o ON o.id = d.order_id
+           LEFT JOIN users u ON u.id = o.client_user_id
+          WHERE o.client_user_id = ? AND d.released_at IS NOT NULL
+          ORDER BY df.created_at DESC`,
+        [user.id],
+      );
+    }
+    type EmailOnlyRow = {
+      id: string;
+      delivered_at: Date;
+      delivered_via: string;
+      order_id: string;
+      order_name: string | null;
+      human_ref: string | null;
+      service_type: string | null;
+      email: string | null;
+    };
+    let emailOnly: EmailOnlyRow[] = [];
+    try {
+      emailOnly = await this.db.query<EmailOnlyRow>(
+        `SELECT d.id, COALESCE(d.released_at, d.created_at) AS delivered_at, d.delivered_via,
+                o.id AS order_id, o.name AS order_name, o.human_ref, o.service_type, u.email
+           FROM deliveries d
+           JOIN orders o ON o.id = d.order_id
+           LEFT JOIN users u ON u.id = o.client_user_id
+          WHERE o.client_user_id = ?
+            AND d.released_at IS NOT NULL
+            AND (d.kind IS NULL OR d.kind <> 'PREVIEW')
+            AND d.delivered_via IN ('EMAIL', 'BOTH')
+            AND NOT EXISTS (
+              SELECT 1 FROM delivery_files df WHERE df.delivery_id = d.id
+            )`,
+        [user.id],
+      );
+    } catch {
+      emailOnly = [];
+    }
+    const vias = new Map<string, string[]>();
+    const pushVia = (orderId: string, via: string | null, kind: string | null) => {
+      if (kind === DeliveryKind.PREVIEW) return;
+      const list = vias.get(orderId) ?? [];
+      list.push(via ?? '');
+      vias.set(orderId, list);
+    };
+    for (const r of rows) pushVia(r.order_id, r.delivered_via, r.kind);
+    for (const r of emailOnly) pushVia(r.order_id, r.delivered_via, null);
+    const ordersWithFiles = new Set(
+      rows.filter((r) => r.kind !== DeliveryKind.PREVIEW).map((r) => r.order_id),
     );
-    return Promise.all(
+    const files = await Promise.all(
       rows.map(async (r) => {
         const isPreview = r.kind === DeliveryKind.PREVIEW;
         const canPreview = isImageFile(r.original_name, r.mime_type);
@@ -3642,7 +3874,7 @@ export class OrdersService {
           formatLabel: r.format_label,
           byteSize: r.byte_size,
           deliveredAt: r.delivered_at,
-          deliveredVia: r.delivered_via,
+          deliveredVia: this.mergeDeliveredVia(vias.get(r.order_id) ?? []) ?? r.delivered_via,
           deliveryEmail: r.email,
           kind: isPreview ? DeliveryKind.PREVIEW : DeliveryKind.FINAL,
           previewStatus: r.preview_status,
@@ -3650,9 +3882,37 @@ export class OrdersService {
           canDownload: !isPreview,
           downloadedAt: r.downloaded_at,
           downloadCount: Number(r.download_count ?? 0),
+          isBundle: Boolean(r.is_bundle),
+          emailNotice: false,
         };
       }),
     );
+    for (const r of emailOnly) {
+      if (ordersWithFiles.has(r.order_id)) continue;
+      files.push({
+        orderId: r.order_id,
+        orderName: r.order_name,
+        humanRef: r.human_ref,
+        serviceType: r.service_type,
+        fileId: `email-${r.id}`,
+        originalName: 'Delivered by email',
+        mimeType: null,
+        formatLabel: null,
+        byteSize: null,
+        deliveredAt: r.delivered_at,
+        deliveredVia: this.mergeDeliveredVia(vias.get(r.order_id) ?? []) ?? r.delivered_via,
+        deliveryEmail: r.email,
+        kind: DeliveryKind.FINAL,
+        previewStatus: null,
+        previewUrl: null,
+        canDownload: false,
+        downloadedAt: null,
+        downloadCount: 0,
+        isBundle: false,
+        emailNotice: true,
+      });
+    }
+    return files;
   }
 
   async saveQuoteDraft(

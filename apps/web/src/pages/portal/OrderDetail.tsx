@@ -15,7 +15,17 @@ import { AttachmentPreview, DeliveryPreview } from '@/components/FilePreview';
 import { listMyEdits, requestEdit } from '@/lib/edits';
 import { RevisionRequestForm } from '@/components/RevisionRequestForm';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
-import { money, lifecycleChip, dateShort, paymentChip, isImageFile, orderNumber, orderSlug } from '@/lib/format';
+import {
+  money,
+  lifecycleChip,
+  dateShort,
+  deliveryMethodLabel,
+  orderDeliveredVia,
+  paymentChip,
+  isImageFile,
+  orderNumber,
+  orderSlug,
+} from '@/lib/format';
 import { serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import { openLinkedChat } from '@/lib/messaging';
 import { useCanonicalOrderUrl } from '@/lib/useCanonicalOrderUrl';
@@ -776,6 +786,12 @@ export function PortalOrderDetail() {
                 <span className={payChip.cls}>{payChip.label}</span>
               </span>
             </div>
+            {orderDeliveredVia(order) && (
+              <div className="od-line">
+                <span className="l">Delivery</span>
+                <span className="v">{deliveryMethodLabel(orderDeliveredVia(order))}</span>
+              </div>
+            )}
             {order.status === 'PENDING_PAYMENT' && showOrderPay && (
               <div style={{ padding: '0 16px 14px' }}>
                 <button

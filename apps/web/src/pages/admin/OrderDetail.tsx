@@ -42,7 +42,15 @@ import {
 } from '@/lib/designs';
 import { useDialog } from '@/components/ui/AppDialog';
 import { apiFetch, downloadSignedFile, getErrorMessage, resolveFileUrl } from '@/lib/api';
-import { money, dateShort, lifecycleChip, isImageFile, sameFileName, orderNumber } from '@/lib/format';
+import {
+  money,
+  dateShort,
+  deliveredViaFromFlags,
+  lifecycleChip,
+  isImageFile,
+  sameFileName,
+  orderNumber,
+} from '@/lib/format';
 import { AdminCounterDecision } from '@/components/AdminCounterDecision';
 import { AttachmentPreview, LocalFilePreview } from '@/components/FilePreview';
 import { FormPreferencesDisplay, hasFormPreferences } from '@/components/FormPreferencesDisplay';
@@ -278,6 +286,8 @@ export function AdminOrderDetail() {
   const [notifyPortal, setNotifyPortal] = useState(true);
   const [publishFor, setPublishFor] = useState<Design | null>(null);
   const [publishFiles, setPublishFiles] = useState<File[]>([]);
+  const [publishZip, setPublishZip] = useState<File | null>(null);
+  const [deliveredOnEmail, setDeliveredOnEmail] = useState(false);
   const [publishSaved, setPublishSaved] = useState(false);
   const [formatFiles, setFormatFiles] = useState<Record<string, File[]>>({});
   const [formatPrices, setFormatPrices] = useState<Record<string, string>>({});
@@ -382,19 +392,27 @@ export function AdminOrderDetail() {
       release: boolean;
       designIds?: string[];
       upload?: File[];
+      zip?: File | null;
+      emailed?: boolean;
       kind?: 'FINAL' | 'PREVIEW';
-    }) =>
-      deliverOrder(id, opts.upload ?? [], {
-        deliveredVia: 'PORTAL',
+    }) => {
+      const files = opts.upload ?? [];
+      const hasPortal = files.length > 0 || Boolean(opts.zip);
+      return deliverOrder(id, files, {
+        deliveredVia: deliveredViaFromFlags(hasPortal, Boolean(opts.emailed)),
+        zip: opts.zip ?? undefined,
         designIds: opts.designIds,
-        notifyEmail: opts.release && notifyPortal,
+        notifyEmail: opts.release && notifyPortal && hasPortal,
         notifySms: opts.release && notifyPortal,
         complete: false,
         release: opts.release,
         kind: opts.kind,
-      }),
+      });
+    },
     onSuccess: (res, opts) => {
       setPublishFiles([]);
+      setPublishZip(null);
+      setDeliveredOnEmail(false);
       setPublishFor(null);
       setPublishSaved(false);
       if (opts.designIds?.[0]) {
@@ -404,6 +422,18 @@ export function AdminOrderDetail() {
         setToast('Preview sent. The customer can view it but cannot download it.');
       } else if (!opts.release) {
         setToast('Sent to admin for approval. The customer cannot see these files yet.');
+      } else if (opts.emailed && (opts.upload?.length ?? 0) === 0 && !opts.zip) {
+        setToast(
+          res.partial
+            ? 'Marked as delivered by email. Other designs are still in progress.'
+            : 'Marked as delivered by email.',
+        );
+      } else if (opts.emailed) {
+        setToast(
+          res.partial
+            ? 'Files are on the portal and marked as delivered by email. Other designs are still in progress.'
+            : 'Files are on the portal and marked as delivered by email.',
+        );
       } else if (res.partial) {
         setToast('This design was sent to the customer. Other designs are still in progress.');
       } else {
@@ -1165,6 +1195,8 @@ export function AdminOrderDetail() {
                         onClick={() => {
                           setPublishFor(d);
                           setPublishFiles([]);
+                          setPublishZip(null);
+                          setDeliveredOnEmail(false);
                           setPublishSaved(false);
                           if (locked) {
                             setEditingIds((prev) =>
@@ -1799,6 +1831,8 @@ export function AdminOrderDetail() {
             if (deliver.isPending) return;
             setPublishFor(null);
             setPublishFiles([]);
+            setPublishZip(null);
+            setDeliveredOnEmail(false);
             setPublishSaved(false);
           }}
         >
@@ -1811,6 +1845,8 @@ export function AdminOrderDetail() {
                 onClick={() => {
                   setPublishFor(null);
                   setPublishFiles([]);
+                  setPublishZip(null);
+                  setDeliveredOnEmail(false);
                   setPublishSaved(false);
                 }}
                 aria-label="Close"
@@ -1874,6 +1910,41 @@ export function AdminOrderDetail() {
                   />
                 </div>
               )}
+              <div>
+                <p className="muted" style={{ margin: '0 0 8px' }}>
+                  Optional zip of all designs in this order
+                </p>
+                <label className="odf up">
+                  <i className="ti ti-file-zip" /> {publishZip ? publishZip.name : 'Choose zip'}
+                  <input
+                    type="file"
+                    accept=".zip,application/zip,application/x-zip-compressed"
+                    hidden
+                    onChange={(e) => {
+                      setPublishZip(e.target.files?.[0] ?? null);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+                {publishZip && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    style={{ marginLeft: 8 }}
+                    onClick={() => setPublishZip(null)}
+                  >
+                    Remove zip
+                  </button>
+                )}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 14, cursor: 'pointer', fontSize: 13.5, fontWeight: 600 }}>
+                  <input
+                    type="checkbox"
+                    checked={deliveredOnEmail}
+                    onChange={(e) => setDeliveredOnEmail(e.target.checked)}
+                  />
+                  Delivered on email
+                </label>
+              </div>
               <div className="publish-modal-actions">
                 <button
                   type="button"
@@ -1882,6 +1953,8 @@ export function AdminOrderDetail() {
                   onClick={() => {
                     setPublishFor(null);
                     setPublishFiles([]);
+                    setPublishZip(null);
+                    setDeliveredOnEmail(false);
                     setPublishSaved(false);
                   }}
                 >
@@ -1931,12 +2004,18 @@ export function AdminOrderDetail() {
                     <button
                       type="button"
                       className="btn btn-primary btn-sm"
-                      disabled={deliver.isPending || !publishSaved || publishFiles.length === 0}
+                      disabled={
+                        deliver.isPending ||
+                        (publishFiles.length === 0 && !publishZip && !deliveredOnEmail) ||
+                        (publishFiles.length > 0 && !publishSaved)
+                      }
                       onClick={() =>
                         deliver.mutate({
                           release: true,
                           designIds: [publishFor.id],
                           upload: publishFiles,
+                          zip: publishZip,
+                          emailed: deliveredOnEmail,
                         })
                       }
                     >

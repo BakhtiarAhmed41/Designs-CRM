@@ -404,6 +404,25 @@ export async function runMigrations() {
          ENUM('PENDING','APPROVED','CHANGES_REQUESTED') NULL`,
     );
   }
+  if (!(await columnExists('delivery_files', 'is_bundle'))) {
+    // eslint-disable-next-line no-console
+    console.log('Adding delivery_files.is_bundle column ...');
+    await conn.query(
+      'ALTER TABLE delivery_files ADD COLUMN is_bundle TINYINT(1) NOT NULL DEFAULT 0',
+    );
+  }
+  const [viaCol] = await conn.query<mysql.RowDataPacket[]>(
+    `SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'deliveries' AND COLUMN_NAME = 'delivered_via'`,
+    [env.DB_NAME],
+  );
+  if (!String(viaCol[0]?.COLUMN_TYPE ?? '').includes('BOTH')) {
+    // eslint-disable-next-line no-console
+    console.log('Updating deliveries.delivered_via enum ...');
+    await conn.query(
+      "ALTER TABLE deliveries MODIFY COLUMN delivered_via ENUM('PORTAL','EMAIL','BOTH') NOT NULL DEFAULT 'PORTAL'",
+    );
+  }
 
   const [legacyRefs] = await conn.query<mysql.RowDataPacket[]>(
     `SELECT id FROM orders

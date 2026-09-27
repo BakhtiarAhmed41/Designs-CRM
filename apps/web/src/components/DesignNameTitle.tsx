@@ -57,10 +57,12 @@ export function DesignNameTitle({ names, fallback }: { names: string[]; fallback
 
 export function DetailsSectionHead({
   title,
+  description,
   open,
   onToggle,
 }: {
   title: string;
+  description?: string;
   open: boolean;
   onToggle: () => void;
 }) {
@@ -79,8 +81,9 @@ export function DetailsSectionHead({
       }}
     >
       <h2>{title}</h2>
-      <span className="ecd-disclose">
-        Details <i className="ti ti-chevron-down" />
+      {description ? <p className="ecd-sec-desc">{description}</p> : null}
+      <span className="ecd-disclose" aria-hidden="true">
+        <i className={open ? 'ti ti-minus' : 'ti ti-plus'} />
       </span>
     </div>
   );

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { apiFetch, downloadSignedFile, resolveFileUrl } from '@/lib/api';
+import { createPortal } from 'react-dom';
+import { apiFetch, downloadFileFromUrl, downloadSignedFile, resolveFileUrl } from '@/lib/api';
 import { isImageFile } from '@/lib/format';
 import { myDeliveryFilePreviewUrl } from '@/lib/orders';
 
@@ -106,23 +107,37 @@ export function ImageLightbox({
   name: string;
   onClose: () => void;
 }) {
-  return (
-    <div className="file-lightbox" onClick={onClose} role="dialog" aria-label={name}>
-      <img
-        src={src}
-        alt={name}
-        onClick={(e) => e.stopPropagation()}
-        onError={() => {
-          // #region agent log
-          fetch('http://127.0.0.1:7422/ingest/0d72200c-b460-4f6d-9776-9f9a8178c9c9',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'bd9c4e'},body:JSON.stringify({sessionId:'bd9c4e',hypothesisId:'C',location:'FilePreview.tsx:ImageLightbox',message:'preview image failed to render',data:{srcPath:(()=>{try{return new URL(src).pathname}catch{return 'relative'}})(),sameHost:(()=>{try{return new URL(src,window.location.href).host===window.location.host}catch{return false}})()},timestamp:Date.now()})}).catch(()=>{});
-          // #endregion
-          onClose();
-        }}
-      />
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [onClose]);
+
+  return createPortal(
+    <div className="file-lightbox" onClick={onClose} role="dialog" aria-modal="true" aria-label={name}>
+      <div className="file-lightbox-stage" onClick={(event) => event.stopPropagation()}>
+        <img src={src} alt={name} onError={onClose} />
+        <button
+          type="button"
+          className="file-lightbox-dl"
+          aria-label={`Download ${name}`}
+          onClick={() => void downloadFileFromUrl(src, name)}
+        >
+          <i className="ti ti-download" />
+        </button>
+      </div>
       <button type="button" className="file-lightbox-x" onClick={onClose} aria-label="Close">
         ×
       </button>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
