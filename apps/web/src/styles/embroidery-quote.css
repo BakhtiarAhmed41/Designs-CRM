@@ -1115,35 +1115,43 @@
   font-size: 15px;
 }
 .cop-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 175px 230px;
+  display: flex;
   align-items: center;
-  gap: 15px;
-  padding: 15px 22px;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 52px;
+  padding: 10px 18px;
   border-bottom: 1px solid var(--line);
 }
 .cop-block .cop-row:last-child { border-bottom: 0; }
-.cop-name { font-weight: 600; font-size: 13px; }
+.cop-name { font-weight: 600; font-size: 13px; min-width: 0; }
 .cop-name span { font-weight: 400; color: var(--muted); margin-left: 10px; font-size: 12.5px; }
-.cop-state { font-size: 12px; font-weight: 600; text-align: right; }
+.cop-side { display: flex; align-items: center; gap: 14px; flex: none; }
+.cop-state { font-size: 12px; font-weight: 600; white-space: nowrap; }
 .cop-state.ready { color: var(--ok); }
 .cop-state.wait { color: var(--warn); }
-.cop-actions { display: flex; justify-content: flex-end; gap: 8px; align-items: center; }
-.cop-btn {
-  font: inherit;
-  font-weight: 600;
-  font-size: 12px;
+.cop-actions { display: flex; align-items: center; gap: 8px; }
+.ecd .cop-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 10px;
   border: 1px solid var(--line2);
+  border-radius: 6px;
   background: #fff;
   color: var(--ink);
-  padding: 6px 10px;
-  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
 }
-.cop-btn:hover { background: #f7ecec; border-color: #f7ecec; }
-.cop-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-.cop-btn.main { background: var(--maroon); color: #fff; border-color: var(--maroon); }
-.cop-btn.main:hover { background: var(--maroon-d); border-color: var(--maroon-d); }
+.ecd .cop-btn:hover { background: #f7ecec; border-color: #f7ecec; }
+.ecd .cop-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.ecd .cop-btn.main { background: #7c1f2b; color: #fff; border-color: #7c1f2b; }
+.ecd .cop-btn.main:hover { background: #611722; border-color: #611722; }
 .cop-note {
   margin: 6px 0 26px;
   border: 1.5px solid var(--line2);
@@ -1156,8 +1164,7 @@
 .cop-note strong, .cop-note a { color: var(--ink); }
 
 @media (max-width: 800px) {
-  .cop-row { grid-template-columns: 1fr; }
-  .cop-state { text-align: left; }
-  .cop-actions { justify-content: flex-start; }
+  .cop-row, .cop-side { flex-wrap: wrap; }
+  .cop-side { margin-left: 0; }
   .cop-head { padding: 16px; }
 }

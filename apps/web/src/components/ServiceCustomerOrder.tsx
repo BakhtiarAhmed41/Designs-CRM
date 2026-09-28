@@ -305,24 +305,26 @@ export function ServiceCustomerOrder({
                     Size {index + 1}
                     {caption && <span>{caption}</span>}
                   </div>
-                  <div className={status.ready ? 'cop-state ready' : 'cop-state wait'}>
-                    {status.ready ? '✓ ' : '● '}
-                    {status.text}
-                  </div>
-                  <div className="cop-actions">
-                    {delivered && (
-                      <button type="button" className="cop-btn main" onClick={() => setFilesFor(row)}>
-                        View & download
+                  <div className="cop-side">
+                    <div className={status.ready ? 'cop-state ready' : 'cop-state wait'}>
+                      {status.ready ? '✓ ' : '● '}
+                      {status.text}
+                    </div>
+                    <div className="cop-actions">
+                      {delivered && (
+                        <button type="button" className="cop-btn main" onClick={() => setFilesFor(row)}>
+                          View & download
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="cop-btn"
+                        disabled={chat.isPending}
+                        onClick={() => chat.mutate()}
+                      >
+                        {chat.isPending ? 'Opening…' : 'Request help'}
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      className="cop-btn"
-                      disabled={chat.isPending}
-                      onClick={() => chat.mutate()}
-                    >
-                      {chat.isPending ? 'Opening…' : 'Request help'}
-                    </button>
+                    </div>
                   </div>
                 </div>
               );
