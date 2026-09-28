@@ -311,7 +311,7 @@ export function ServiceCustomerOrder({
                   </div>
                   <div className="cop-actions">
                     {delivered && (
-                      <button type="button" className="cop-btn main" onClick={() => setFilesFor(row)}>
+                      <button type="button" className="cop-btn cop-download" onClick={() => setFilesFor(row)}>
                         View & download
                       </button>
                     )}
