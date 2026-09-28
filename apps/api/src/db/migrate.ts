@@ -221,6 +221,13 @@ export async function runMigrations() {
     await conn.query('ALTER TABLE edit_requests ADD COLUMN design_ids JSON NULL');
   }
 
+  if (!(await columnExists('edit_requests', 'invoice_id'))) {
+    console.log('Adding edit_requests.invoice_id column ...');
+    await conn.query(
+      'ALTER TABLE edit_requests ADD COLUMN invoice_id CHAR(36) NULL',
+    );
+  }
+
   if (!(await columnExists('payments', 'stripe_checkout_session_id'))) {
     console.log('Adding payments.stripe_checkout_session_id column ...');
     await conn.query(

@@ -6,7 +6,15 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import type { AuthUser } from '../auth/auth.types';
-import { EditKind, EditStatus, OrderStatus, UserRole } from '../common/enums';
+import { BillingService } from '../billing/billing.service';
+import {
+  DesignStatus,
+  EditKind,
+  EditStatus,
+  InvoiceStatus,
+  OrderStatus,
+  UserRole,
+} from '../common/enums';
 import { normalizePage, pageResult } from '../common/pagination';
 import { DbService } from '../db/db.service';
 
@@ -46,6 +54,7 @@ type EditRow = {
   design_id: string | null;
   design_ids: unknown;
   revision_order_id: string | null;
+  invoice_id: string | null;
   note: string;
   kind: EditKind;
   price_cents: number | null;
@@ -78,6 +87,7 @@ type EditJoinRow = EditRow & {
   order_name: string | null;
   order_currency: string | null;
   revision_ref: string | null;
+  invoice_status: string | null;
   designer_initials: string | null;
   designer_first: string | null;
 };
@@ -96,7 +106,10 @@ type ActivityRow = {
 
 @Injectable()
 export class EditsService {
-  constructor(private db: DbService) {}
+  constructor(
+    private db: DbService,
+    private billing: BillingService,
+  ) {}
 
   // --- mapping helpers -----------------------------------------------------
 
@@ -108,6 +121,8 @@ export class EditsService {
       designId: designIds[0] ?? e.design_id,
       designIds,
       revisionOrderId: e.revision_order_id,
+      invoiceId: e.invoice_id,
+      invoiceStatus: e.invoice_status ?? null,
       note: e.note,
       kind: e.kind,
       priceCents: e.price_cents,
@@ -163,11 +178,13 @@ export class EditsService {
     const row = await this.db.queryOne<EditJoinRow>(
       `SELECT e.*, o.human_ref AS order_ref, o.name AS order_name, o.currency AS order_currency,
               ro.human_ref AS revision_ref,
+              inv.status AS invoice_status,
               d.initials AS designer_initials, d.first_name AS designer_first
          FROM edit_requests e
          JOIN orders o ON o.id = e.order_id
          LEFT JOIN orders ro ON ro.id = e.revision_order_id
          LEFT JOIN users d ON d.id = e.assigned_designer_id
+         LEFT JOIN invoices inv ON inv.id = e.invoice_id
         WHERE e.id = ? LIMIT 1`,
       [id],
     );
@@ -192,6 +209,128 @@ export class EditsService {
     if (designs.length === 1) return [designs[0].id];
     if (designs.length === 0) return [];
     throw new BadRequestException('Pick which designs need a revision');
+  }
+
+  /** Put the revised designs back in progress without removing files already delivered. */
+  private async reopenDesigns(orderId: string, designIds: string[]) {
+    const ids =
+      designIds.length > 0
+        ? designIds
+        : (
+            await this.db.query<{ id: string }>(
+              'SELECT id FROM order_designs WHERE order_id = ?',
+              [orderId],
+            )
+          ).map((row) => row.id);
+    if (ids.length === 0) return;
+    await this.db.execute(
+      `UPDATE order_designs SET status = ?
+        WHERE order_id = ? AND id IN (${ids.map(() => '?').join(', ')})`,
+      [DesignStatus.IN_PROGRESS, orderId, ...ids],
+    );
+  }
+
+  /** After a revision closes, the order is delivered again only when every design is delivered. */
+  private async settleOrderAfterRevision(orderId: string) {
+    const open = await this.db.queryOne<{ id: string }>(
+      'SELECT id FROM edit_requests WHERE order_id = ? AND status = ? LIMIT 1',
+      [orderId, EditStatus.PENDING],
+    );
+    if (open) {
+      await this.db.execute(
+        'UPDATE orders SET status = ?, completed_at = NULL WHERE id = ?',
+        [OrderStatus.REVISION_REQUESTED, orderId],
+      );
+      return;
+    }
+    const designs = await this.db.query<{ status: string }>(
+      'SELECT status FROM order_designs WHERE order_id = ?',
+      [orderId],
+    );
+    const allDelivered =
+      designs.length > 0 && designs.every((row) => row.status === DesignStatus.DELIVERED);
+    if (allDelivered) {
+      await this.db.execute(
+        'UPDATE orders SET status = ?, completed_at = COALESCE(completed_at, NOW()) WHERE id = ?',
+        [OrderStatus.COMPLETED, orderId],
+      );
+      return;
+    }
+    await this.db.execute(
+      'UPDATE orders SET status = ?, completed_at = NULL WHERE id = ?',
+      [OrderStatus.IN_PROGRESS, orderId],
+    );
+  }
+
+  private async ensureRevisionInvoice(
+    user: AuthUser,
+    order: OrderRow,
+    editId: string,
+    priceCents: number,
+    note: string,
+  ) {
+    if (!order.customer_id) {
+      throw new BadRequestException('Link a customer before charging for a revision');
+    }
+    if (!Number.isInteger(priceCents) || priceCents <= 0) {
+      throw new BadRequestException('Enter a price for a paid revision');
+    }
+    const current = await this.db.queryOne<{ invoice_id: string | null }>(
+      'SELECT invoice_id FROM edit_requests WHERE id = ? LIMIT 1',
+      [editId],
+    );
+    const covers = `Revision for ${order.name ?? order.human_ref ?? 'order'}${note ? `: ${note.slice(0, 120)}` : ''}`;
+    if (current?.invoice_id) {
+      await this.db.execute(
+        `UPDATE invoices SET amount_cents = ?, covers_text = ?
+          WHERE id = ? AND status = ?`,
+        [priceCents, covers, current.invoice_id, InvoiceStatus.AWAITING],
+      );
+      return;
+    }
+    const invoice = await this.billing.createAddonInvoice(user, {
+      customerId: order.customer_id,
+      orderId: order.id,
+      amountCents: priceCents,
+      coversText: covers,
+    });
+    await this.db.execute('UPDATE edit_requests SET invoice_id = ? WHERE id = ?', [
+      invoice.id,
+      editId,
+    ]);
+  }
+
+  private async releaseUnpaidRevisionInvoice(editId: string) {
+    const current = await this.db.queryOne<{ invoice_id: string | null }>(
+      'SELECT invoice_id FROM edit_requests WHERE id = ? LIMIT 1',
+      [editId],
+    );
+    if (!current?.invoice_id) return;
+    await this.db.execute(
+      'UPDATE invoices SET status = ? WHERE id = ? AND status = ?',
+      [InvoiceStatus.CANCELLED, current.invoice_id, InvoiceStatus.AWAITING],
+    );
+  }
+
+  private async applyRevisionWork(
+    user: AuthUser,
+    order: OrderRow,
+    editId: string,
+    designIds: string[],
+    kind: EditKind,
+    priceCents: number | null,
+    note: string,
+  ) {
+    await this.db.execute(
+      'UPDATE orders SET status = ?, completed_at = NULL WHERE id = ?',
+      [OrderStatus.REVISION_REQUESTED, order.id],
+    );
+    await this.reopenDesigns(order.id, designIds);
+    if (kind === EditKind.PAID) {
+      await this.ensureRevisionInvoice(user, order, editId, priceCents ?? 0, note);
+    } else {
+      await this.releaseUnpaidRevisionInvoice(editId);
+    }
   }
 
   async createEdit(
@@ -219,6 +358,12 @@ export class EditsService {
           ? input.priceCents
           : 0
         : null;
+    if (kind === EditKind.PAID && (priceCents ?? 0) <= 0) {
+      throw new BadRequestException('Enter a price for a paid revision');
+    }
+    if (kind === EditKind.PAID && !order.customer_id) {
+      throw new BadRequestException('Link a customer before charging for a revision');
+    }
     const requested = [
       ...(input.designIds ?? []),
       ...(input.designId ? [input.designId] : []),
@@ -248,16 +393,13 @@ export class EditsService {
           openEdit.id,
         ],
       );
-      await this.db.execute('UPDATE orders SET status = ? WHERE id = ?', [
-        OrderStatus.REVISION_REQUESTED,
-        orderId,
-      ]);
       await this.writeLog(this.db, {
         orderId,
         actorId: user.id,
         event: 'edit_requested',
         meta: { editId: openEdit.id, kind, note, designIds, source: 'staff' },
       });
+      await this.applyRevisionWork(user, order, openEdit.id, designIds, kind, priceCents, note);
       return this.loadEdit(openEdit.id);
     }
 
@@ -309,6 +451,7 @@ export class EditsService {
       return id;
     });
 
+    await this.applyRevisionWork(user, order, editId, designIds, kind, priceCents, note);
     return this.loadEdit(editId);
   }
   async listEdits(
@@ -352,6 +495,7 @@ export class EditsService {
          LEFT JOIN customers c ON c.id = o.customer_id
          LEFT JOIN orders ro ON ro.id = e.revision_order_id
          LEFT JOIN users d ON d.id = e.assigned_designer_id
+         LEFT JOIN invoices inv ON inv.id = e.invoice_id
          ${whereSql}`;
     const countRow = await this.db.queryOne<{ n: number }>(
       `SELECT COUNT(*) AS n ${fromSql}`,
@@ -360,6 +504,7 @@ export class EditsService {
     const rows = await this.db.query<EditJoinRow>(
       `SELECT e.*, o.human_ref AS order_ref, o.name AS order_name, o.currency AS order_currency,
               ro.human_ref AS revision_ref,
+              inv.status AS invoice_status,
               d.initials AS designer_initials, d.first_name AS designer_first
          ${fromSql}
          ORDER BY e.created_at DESC
@@ -421,6 +566,14 @@ export class EditsService {
         event: 'edit_done',
         meta: { editId },
       });
+      await this.settleOrderAfterRevision(edit.order_id);
+    } else if (input.status === EditStatus.PENDING) {
+      const ids = parseDesignIds(edit.design_ids, edit.design_id);
+      await this.reopenDesigns(edit.order_id, ids);
+      await this.db.execute(
+        'UPDATE orders SET status = ?, completed_at = NULL WHERE id = ?',
+        [OrderStatus.REVISION_REQUESTED, edit.order_id],
+      );
     }
 
     return this.loadEdit(editId);
@@ -496,16 +649,17 @@ export class EditsService {
         'UPDATE edit_requests SET note = ?, design_id = ?, design_ids = ? WHERE id = ?',
         [note, designIds[0] ?? null, JSON.stringify(designIds), openEdit.id],
       );
-      await this.db.execute('UPDATE orders SET status = ? WHERE id = ?', [
-        OrderStatus.REVISION_REQUESTED,
-        orderId,
-      ]);
       await this.writeLog(this.db, {
         orderId,
         actorId: user.id,
         event: 'edit_requested',
         meta: { editId: openEdit.id, kind: EditKind.FREE, source: 'client', note, designIds },
       });
+      await this.reopenDesigns(orderId, designIds);
+      await this.db.execute(
+        'UPDATE orders SET status = ?, completed_at = NULL WHERE id = ?',
+        [OrderStatus.REVISION_REQUESTED, orderId],
+      );
       return this.loadEdit(openEdit.id);
     }
 
@@ -542,6 +696,12 @@ export class EditsService {
       return id;
     });
 
+    await this.reopenDesigns(orderId, designIds);
+    await this.db.execute(
+      'UPDATE orders SET status = ?, completed_at = NULL WHERE id = ?',
+      [OrderStatus.REVISION_REQUESTED, orderId],
+    );
+
     const staffRows = await this.db.query<{ id: string }>(
       "SELECT id FROM users WHERE role IN ('SUPER_ADMIN','ADMIN','SUPPORT')",
     );
@@ -571,11 +731,13 @@ export class EditsService {
     const rows = await this.db.query<EditJoinRow>(
       `SELECT e.*, o.human_ref AS order_ref, o.name AS order_name, o.currency AS order_currency,
               ro.human_ref AS revision_ref,
+              inv.status AS invoice_status,
               d.initials AS designer_initials, d.first_name AS designer_first
          FROM edit_requests e
          JOIN orders o ON o.id = e.order_id
          LEFT JOIN orders ro ON ro.id = e.revision_order_id
          LEFT JOIN users d ON d.id = e.assigned_designer_id
+         LEFT JOIN invoices inv ON inv.id = e.invoice_id
         WHERE o.client_user_id = ?
         ORDER BY e.created_at DESC`,
       [user.id],
@@ -591,11 +753,13 @@ export class EditsService {
     const rows = await this.db.query<EditJoinRow>(
       `SELECT e.*, o.human_ref AS order_ref, o.name AS order_name, o.currency AS order_currency,
               ro.human_ref AS revision_ref,
+              inv.status AS invoice_status,
               d.initials AS designer_initials, d.first_name AS designer_first
          FROM edit_requests e
          JOIN orders o ON o.id = e.order_id
          LEFT JOIN orders ro ON ro.id = e.revision_order_id
          LEFT JOIN users d ON d.id = e.assigned_designer_id
+         LEFT JOIN invoices inv ON inv.id = e.invoice_id
         WHERE e.order_id = ?
         ORDER BY e.created_at DESC`,
       [orderId],
@@ -610,11 +774,13 @@ export class EditsService {
     const rows = await this.db.query<EditJoinRow>(
       `SELECT e.*, o.human_ref AS order_ref, o.name AS order_name, o.currency AS order_currency,
               ro.human_ref AS revision_ref,
+              inv.status AS invoice_status,
               d.initials AS designer_initials, d.first_name AS designer_first
          FROM edit_requests e
          JOIN orders o ON o.id = e.order_id
          LEFT JOIN orders ro ON ro.id = e.revision_order_id
          LEFT JOIN users d ON d.id = e.assigned_designer_id
+         LEFT JOIN invoices inv ON inv.id = e.invoice_id
         WHERE e.order_id = ?
         ORDER BY e.created_at DESC`,
       [orderId],

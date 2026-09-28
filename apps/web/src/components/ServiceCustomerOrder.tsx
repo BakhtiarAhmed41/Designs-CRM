@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { DetailsSectionHead } from '@/components/DesignNameTitle';
 import { EmbroideryFileCard } from '@/components/EmbroideryFileCard';
 import { ImageLightbox } from '@/components/FilePreview';
 import { useTopbarLead } from '@/components/Shell';
 import { ErrorBanner } from '@/components/ui/EmptyState';
 import { apiFetch, downloadSignedFile, getErrorMessage, resolveFileUrl } from '@/lib/api';
-import { startMyOrderCheckout } from '@/lib/billing';
+import { startMyInvoiceCheckout, startMyOrderCheckout } from '@/lib/billing';
 import type { Design } from '@/lib/designs';
 import {
   asEmbroideryPrefs,
@@ -31,9 +31,11 @@ import {
   orderNumber,
   orderSlug,
 } from '@/lib/format';
+import { listMyEdits, type EditRequest } from '@/lib/edits';
 import { openLinkedChat } from '@/lib/messaging';
 import { myAttachmentUrl, myDeliveryFilePreviewUrl, myDeliveryFileUrl } from '@/lib/orders';
 import { isStaffCreatedOrder, quoteHistoryLabel, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
+import { freshOnOpen } from '@/lib/queryRefresh';
 import { deliveryCounts, orderDeliveryGroups, type DeliveryRow } from '@/lib/serviceOrderView';
 import type { Order } from '@/lib/types';
 import '@/styles/embroidery-quote.css';
@@ -136,13 +138,6 @@ export function ServiceCustomerOrder({
   const serviceLabel = portalServiceLabel(kind);
   const designCount = groups.length || designs.length;
   const percent = counts.total > 0 ? Math.round((counts.delivered / counts.total) * 100) : 0;
-  const header = counts.allDelivered
-    ? { text: 'Delivered', ok: true }
-    : awaiting
-      ? { text: 'Awaiting payment', ok: false }
-      : counts.delivered > 0 && counts.delivered < counts.total
-        ? { text: 'Partially delivered', ok: false }
-        : { text: 'In progress', ok: false };
 
   const [open, setOpen] = useState({
     summary: awaiting,
@@ -169,6 +164,36 @@ export function ServiceCustomerOrder({
   );
   useTopbarLead(topbarLead);
 
+  const editsQ = useQuery({
+    queryKey: ['my-order-edits', order.id],
+    queryFn: () => listMyEdits(order.id),
+    ...freshOnOpen,
+  });
+  const revision =
+    (editsQ.data?.edits ?? []).find((edit) => edit.status === 'PENDING') ??
+    editsQ.data?.edits?.[0];
+  const openRevision = revision?.status === 'PENDING' ? revision : undefined;
+  const revisionIds = openRevision?.designIds?.length
+    ? openRevision.designIds
+    : openRevision?.designId
+      ? [openRevision.designId]
+      : [];
+  const rowInRevision = (row: DeliveryRow) => {
+    if (!openRevision) return false;
+    if (!row.design) return revisionIds.length === 0;
+    if (revisionIds.length === 0) return true;
+    return revisionIds.includes(row.design.id);
+  };
+  const header = openRevision
+    ? { text: 'Revision requested', ok: false }
+    : counts.allDelivered
+      ? { text: 'Delivered', ok: true }
+      : awaiting
+        ? { text: 'Awaiting payment', ok: false }
+        : counts.delivered > 0 && counts.delivered < counts.total
+          ? { text: 'Partially delivered', ok: false }
+          : { text: 'In progress', ok: false };
+
   const chat = useMutation({
     mutationFn: () =>
       openLinkedChat({
@@ -185,6 +210,25 @@ export function ServiceCustomerOrder({
     (order.deliveries ?? []).flatMap((batch) =>
       batch.files.filter((file) => file.designId && file.designId === row.design?.id),
     );
+
+  async function payRevision(edit: EditRequest) {
+    if (!edit.invoiceId) return;
+    setPayBusy(true);
+    setError(null);
+    try {
+      const res = await startMyInvoiceCheckout(
+        edit.invoiceId,
+        `/portal/orders/${orderSlug(order.humanRef, order.id)}`,
+      );
+      if (res?.alreadyPaid) {
+        window.location.assign(`/portal/orders/${orderSlug(order.humanRef, order.id)}`);
+      }
+    } catch (e) {
+      setError(getErrorMessage(e));
+    } finally {
+      setPayBusy(false);
+    }
+  }
 
   async function pay() {
     setPayBusy(true);
@@ -290,15 +334,53 @@ export function ServiceCustomerOrder({
       </section>
 
       <h2 className="cop-title">Designs & files</h2>
+      {revision && (
+        <section className="cop-revision" aria-label="Revision">
+          <div className="cop-revision-top">
+            <strong>
+              {revision.status === 'DONE' ? 'Revision delivered' : 'Revision requested'}
+            </strong>
+            {revision.kind === 'PAID' ? (
+              <b>{money(revision.priceCents, order.currency)}</b>
+            ) : (
+              <span>Free revision</span>
+            )}
+          </div>
+          {revision.note && <p>{revision.note}</p>}
+          {revision.kind === 'PAID' && (
+            <div className="cop-revision-pay">
+              {revision.invoiceStatus === 'PAID' ? (
+                <span className="ecd-tag ok">
+                  <i className="ti ti-check" /> Paid
+                </span>
+              ) : revision.invoiceId ? (
+                <button
+                  type="button"
+                  className="ecd-btn pri"
+                  disabled={payBusy}
+                  onClick={() => void payRevision(revision)}
+                >
+                  <i className="ti ti-credit-card" /> {payBusy ? 'Opening checkout…' : 'Pay now'}
+                </button>
+              ) : (
+                <span className="cop-revision-note">Payment is being prepared.</span>
+              )}
+            </div>
+          )}
+        </section>
+      )}
       <div className="cop-designs">
         {groups.length === 0 && <p className="ecd-wait">No items on this order yet.</p>}
         {groups.map((group) => (
           <div key={group.title} className="cop-block">
             <div className="cop-dhead">{group.title}</div>
             {group.rows.map((row, index) => {
-              const status = rowStatus(order, row);
+              const inRevision = rowInRevision(row);
+              const status = inRevision
+                ? { text: 'Revision requested', ready: false }
+                : rowStatus(order, row);
               const caption = rowCaption(group.title, index, row.name, group.rows.length, designs);
-              const delivered = row.design?.status === 'DELIVERED';
+              const hasFiles = deliveredFiles(row).length > 0 || row.design?.status === 'DELIVERED';
               return (
                 <div key={row.key} className="cop-row">
                   <div className="cop-name">
@@ -310,7 +392,7 @@ export function ServiceCustomerOrder({
                     {status.text}
                   </div>
                   <div className="cop-actions">
-                    {delivered && (
+                    {hasFiles && (
                       <button type="button" className="cop-btn cop-download" onClick={() => setFilesFor(row)}>
                         View & download
                       </button>

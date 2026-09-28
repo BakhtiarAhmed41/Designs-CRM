@@ -1100,6 +1100,29 @@
 .cop-bar span { display: block; height: 100%; border-radius: 10px; background: var(--maroon); }
 .cop-pay { margin-top: 16px; }
 .cop-title { font-size: 17px; font-weight: 600; margin: 0 0 12px; }
+.cop-revision {
+  border: 1.5px solid #c7c9ce;
+  border-radius: 11px;
+  background: #fff;
+  padding: 16px 22px;
+  margin: 0 0 12px;
+}
+.cop-revision-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cop-revision-top strong { font-size: 15px; }
+.cop-revision-top b { font-size: 15px; }
+.cop-revision-top span { color: var(--muted); font-size: 13px; font-weight: 600; }
+.cop-revision p {
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+  font-size: 14px;
+}
+.cop-revision-pay { margin-top: 12px; display: flex; align-items: center; gap: 10px; }
+.cop-revision-note { color: var(--muted); font-size: 13px; }
 .cop-designs {
   border: 1.5px solid #c7c9ce;
   border-radius: 11px;

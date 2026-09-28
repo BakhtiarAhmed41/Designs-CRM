@@ -3300,7 +3300,10 @@ export class OrdersService {
       const leavingDelivered = design.status === DesignStatus.DELIVERED;
       const markingAwaiting = input.status === DesignStatus.WAITING;
       if (leavingDelivered || markingAwaiting) {
-        await this.clearDesignDeliveryFiles(orderId, [designId]);
+        const revisionOpen = await this.hasOpenRevision(orderId);
+        if (!revisionOpen) {
+          await this.clearDesignDeliveryFiles(orderId, [designId]);
+        }
         const remaining = await this.getDesigns(orderId);
         const allDelivered =
           remaining.length > 0 &&
@@ -3308,7 +3311,10 @@ export class OrdersService {
         if (!allDelivered) {
           await this.db.execute(
             'UPDATE orders SET status = ?, completed_at = NULL WHERE id = ?',
-            [OrderStatus.IN_PROGRESS, orderId],
+            [
+              revisionOpen ? OrderStatus.REVISION_REQUESTED : OrderStatus.IN_PROGRESS,
+              orderId,
+            ],
           );
         }
       }

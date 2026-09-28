@@ -9,10 +9,13 @@ export type EditRequest = {
   designId: string | null;
   designIds?: string[];
   revisionOrderId: string | null;
+  invoiceId?: string | null;
+  invoiceStatus?: string | null;
   note: string;
   kind: EditKind;
   priceCents: number | null;
   status: EditStatus;
+  currency?: string | null;
   assignedDesignerId: string | null;
   requestedById: string | null;
   createdAt: string;

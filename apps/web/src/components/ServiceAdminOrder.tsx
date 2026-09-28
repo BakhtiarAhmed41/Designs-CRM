@@ -271,16 +271,24 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
   });
 
   const revision = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const dollars = Number(revisionPrice);
-      const priceCents =
-        revisionKind === 'PAID' && Number.isFinite(dollars)
-          ? Math.round(dollars * 100)
-          : null;
+      if (revisionKind === 'PAID' && (!Number.isFinite(dollars) || dollars <= 0)) {
+        throw new Error('Enter a price for a paid revision');
+      }
+      const priceCents = revisionKind === 'PAID' ? Math.round(dollars * 100) : null;
+      const rows = groups.flatMap((group) => group.rows);
+      const existing = rows
+        .map((row) => row.design?.id)
+        .filter((id): id is string => Boolean(id));
+      const designIds = existing.length
+        ? existing
+        : await Promise.all(rows.map((row) => ensureDesign(row)));
       return createAdminEdit(order.id, {
         note: revisionNote.trim(),
         kind: revisionKind,
         priceCents,
+        designIds,
         assignedDesignerId: assignRevision ? designerId || order.assignedDesignerId : null,
       });
     },
@@ -293,7 +301,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
       refresh();
       await dialog.alert({
         title: 'Revision created',
-        message: 'The order stays open. The customer keeps the current files until you publish the new ones.',
+        message: 'This order is now revision requested. The customer keeps the current files until you publish the new ones. Publishing them marks the order delivered again.',
         confirmLabel: 'Done',
         tone: 'success',
       });
@@ -346,6 +354,95 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
     }
   }
 
+  const edits = editsQ.data?.edits ?? [];
+  const openRevision = edits.find((edit) => edit.status === 'PENDING');
+  const revisionIds = openRevision?.designIds?.length
+    ? openRevision.designIds
+    : openRevision?.designId
+      ? [openRevision.designId]
+      : [];
+  const rowInRevision = (row: DeliveryRow) => {
+    if (!openRevision) return false;
+    if (!row.design) return revisionIds.length === 0;
+    if (revisionIds.length === 0) return true;
+    return revisionIds.includes(row.design.id);
+  };
+  const phaseFor = (row: DeliveryRow) => {
+    const status = row.design?.status;
+    if (rowInRevision(row) && (!status || status === 'DELIVERED')) return 'progress' as const;
+    return linePhase(status);
+  };
+  const revisionRequested =
+    order.status === 'REVISION_REQUESTED' || Boolean(openRevision);
+  const headerLabel = unpriced
+    ? 'Needs your price'
+    : order.status === 'PENDING_PAYMENT'
+      ? 'Awaiting payment'
+      : revisionRequested
+        ? 'Revision requested'
+        : counts.allDelivered
+          ? 'Delivered'
+          : counts.delivered > 0 && counts.delivered < counts.total
+            ? 'Partially delivered'
+            : 'In process';
+
+  function openPublish(row: DeliveryRow) {
+    setUploadFor(row);
+    setPendingFiles([]);
+    setPendingZip(null);
+    setDeliveredOnEmail(false);
+  }
+
+  function lineActions(row: DeliveryRow) {
+    const phase = phaseFor(row);
+    const view = deliveredFiles(row).length > 0 ? (
+      <button
+        type="button"
+        className="sod-eye"
+        title="View delivered files"
+        onClick={() => setFilesFor(row)}
+      >
+        <i className="ti ti-eye" />
+      </button>
+    ) : null;
+    if (phase === 'progress') {
+      return (
+        <>
+          <span className="sod-status">In progress</span>
+          <button
+            type="button"
+            className="ead-btn sm"
+            disabled={markReady.isPending}
+            onClick={() => markReady.mutate(row)}
+          >
+            Mark ready
+          </button>
+          <button type="button" className="ead-btn sm pri" onClick={() => openPublish(row)}>
+            Attach & publish
+          </button>
+          {view}
+        </>
+      );
+    }
+    if (phase === 'ready') {
+      return (
+        <>
+          <span className="sod-status ready">Ready</span>
+          <button type="button" className="ead-btn sm pri" onClick={() => openPublish(row)}>
+            Attach & publish
+          </button>
+          {view}
+        </>
+      );
+    }
+    return (
+      <>
+        <span className="sod-status ready">Delivered</span>
+        {view}
+      </>
+    );
+  }
+
   return (
     <div className="ead">
       {error && <ErrorBanner>{error}</ErrorBanner>}
@@ -353,16 +450,8 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
         <div>
           <h1>{order.name?.trim() || 'Order'}</h1>
           <div className="ead-meta">
-            <span className={counts.allDelivered ? 'ead-pill ok' : 'ead-pill'}>
-              {unpriced
-                ? 'Needs your price'
-                : order.status === 'PENDING_PAYMENT'
-                  ? 'Awaiting payment'
-                  : counts.allDelivered
-                    ? 'Delivered'
-                    : counts.delivered > 0 && counts.delivered < counts.total
-                      ? 'Partially delivered'
-                      : 'In process'}
+            <span className={headerLabel === 'Delivered' ? 'ead-pill ok' : 'ead-pill'}>
+              {headerLabel}
             </span>
             <span>Placed {dateShort(order.createdAt)}</span>
           </div>
@@ -454,95 +543,55 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
               {groups.map((group, groupIndex) => (
                 <div key={group.title} className="sod-group" style={groupIndex === 0 ? { marginTop: 0 } : undefined}>
                   <h3>{group.title}</h3>
-                  {group.rows.map((row) => {
-                    const phase = linePhase(row.design?.status);
-                    return (
-                      <div key={row.key} className="sod-line">
-                        <b>{row.name}</b>
-                        <div className="sod-acts">
-                          {phase === 'progress' && (
-                            <>
-                              <span className="sod-status">In progress</span>
-                              <button
-                                type="button"
-                                className="ead-btn sm"
-                                disabled={markReady.isPending}
-                                onClick={() => markReady.mutate(row)}
-                              >
-                                Mark ready
-                              </button>
-                              <button
-                                type="button"
-                                className="ead-btn sm pri"
-                                onClick={() => {
-                                  setUploadFor(row);
-                                  setPendingFiles([]);
-                                  setPendingZip(null);
-                                  setDeliveredOnEmail(false);
-                                }}
-                              >
-                                Attach & publish
-                              </button>
-                            </>
-                          )}
-                          {phase === 'ready' && (
-                            <>
-                              <span className="sod-status ready">Ready</span>
-                              <button
-                                type="button"
-                                className="ead-btn sm pri"
-                                onClick={() => {
-                                  setUploadFor(row);
-                                  setPendingFiles([]);
-                                  setPendingZip(null);
-                                  setDeliveredOnEmail(false);
-                                }}
-                              >
-                                Attach & publish
-                              </button>
-                            </>
-                          )}
-                          {phase === 'delivered' && (
-                            <>
-                              <span className="sod-status ready">Delivered</span>
-                              <button
-                                type="button"
-                                className="sod-eye"
-                                title="View delivered files"
-                                onClick={() => setFilesFor(row)}
-                              >
-                                <i className="ti ti-eye" />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  {group.rows.map((row) => (
+                    <div key={row.key} className="sod-line">
+                      <b>{row.name}</b>
+                      <div className="sod-acts">{lineActions(row)}</div>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
           </section>
 
-          {(editsQ.data?.edits.length ?? 0) > 0 && (
+          {edits.length > 0 && (
             <section className="ead-card">
               <div className="ead-card-h">
                 <span className="ead-ic"><i className="ti ti-refresh" /></span>
                 <h2>Customer revision</h2>
               </div>
               <div className="ead-b">
-                {editsQ.data?.edits.map((edit) => (
-                  <div key={edit.id} className="ead-he">
-                    <div className="ead-he-top">
-                      <span>{edit.kind === 'PAID' ? 'Paid revision' : 'Free revision'}</span>
-                      <b>{edit.kind === 'PAID' ? money(edit.priceCents, order.currency) : 'No charge'}</b>
-                      <span className="ead-he-sub" style={{ marginTop: 0 }}>
-                        {edit.status === 'DONE' ? 'Done' : 'Open'}
-                      </span>
+                {edits.map((edit) => {
+                  const covered =
+                    edit.status === 'PENDING'
+                      ? groups.flatMap((group) => group.rows).filter((row) => rowInRevision(row))
+                      : [];
+                  const paid = edit.kind === 'PAID' && (edit.priceCents ?? 0) > 0;
+                  return (
+                    <div key={edit.id} className="ead-he">
+                      <div className="ead-he-top">
+                        <span>{paid ? 'Paid revision' : 'Free revision'}</span>
+                        {paid && <b>{money(edit.priceCents, order.currency)}</b>}
+                        <span className="ead-he-sub" style={{ marginTop: 0 }}>
+                          {edit.status === 'DONE'
+                            ? 'Delivered'
+                            : edit.invoiceStatus === 'PAID'
+                              ? 'Revision requested · Paid'
+                              : paid
+                                ? 'Revision requested · Unpaid'
+                                : 'Revision requested'}
+                        </span>
+                      </div>
+                      <div className="ead-he-sub">{edit.note}</div>
+                      {covered.map((row) => (
+                        <div key={row.key} className="sod-line">
+                          <b>{row.name}</b>
+                          <div className="sod-acts">{lineActions(row)}</div>
+                        </div>
+                      ))}
                     </div>
-                    <div className="ead-he-sub">{edit.note}</div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
           )}
@@ -1077,7 +1126,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
             </div>
             {revisionKind === 'PAID' && (
               <>
-                <div className="sod-label">Revision price. Payment link goes out first.</div>
+                <div className="sod-label">Revision price. The customer pays this from the order.</div>
                 <input
                   className="ead-field"
                   type="number"
@@ -1101,7 +1150,11 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
               type="button"
               className="ead-btn pri"
               style={{ width: '100%' }}
-              disabled={revision.isPending || !revisionNote.trim()}
+              disabled={
+                revision.isPending ||
+                !revisionNote.trim() ||
+                (revisionKind === 'PAID' && !(Number(revisionPrice) > 0))
+              }
               onClick={() => revision.mutate()}
             >
               <i className="ti ti-refresh" /> {revision.isPending ? 'Creating…' : 'Create revision'}
