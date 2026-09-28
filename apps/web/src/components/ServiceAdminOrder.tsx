@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EmbroideryFileCard } from '@/components/EmbroideryFileCard';
@@ -132,6 +132,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
   const [error, setError] = useState<string | null>(null);
   const [uploadFor, setUploadFor] = useState<DeliveryRow | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const suppressPublishClick = useRef(false);
   const [pendingZip, setPendingZip] = useState<File | null>(null);
   const [deliveredOnEmail, setDeliveredOnEmail] = useState(false);
   const [filesFor, setFilesFor] = useState<DeliveryRow | null>(null);
@@ -329,6 +330,16 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
     (order.deliveries ?? []).flatMap((batch) =>
       batch.files.filter((file) => file.designId && file.designId === row.design?.id),
     );
+  const hasReleasedFiles = (row: DeliveryRow) => {
+    const designId = row.design?.id;
+    if (!designId) return false;
+    return (order.deliveries ?? []).some(
+      (batch) =>
+        Boolean(batch.releasedAt) &&
+        batch.kind !== 'PREVIEW' &&
+        batch.files.some((file) => file.designId === designId && !file.isBundle),
+    );
+  };
   const bundleFiles = (order.deliveries ?? []).flatMap((batch) =>
     batch.files.filter((file) => file.isBundle),
   );
@@ -386,6 +397,22 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
             ? 'Partially delivered'
             : 'In process';
 
+  function openFilePicker(inputId: string) {
+    const input = document.getElementById(inputId);
+    if (!(input instanceof HTMLInputElement)) return;
+    suppressPublishClick.current = true;
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      window.setTimeout(() => {
+        suppressPublishClick.current = false;
+      }, 400);
+    };
+    window.addEventListener('focus', release, { once: true });
+    input.click();
+  }
+
   function openPublish(row: DeliveryRow) {
     setUploadFor(row);
     setPendingFiles([]);
@@ -393,8 +420,11 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
     setDeliveredOnEmail(false);
   }
 
-  function lineActions(row: DeliveryRow) {
-    const phase = phaseFor(row);
+  function lineActions(row: DeliveryRow, source: 'order' | 'revision' = 'order') {
+    const phase =
+      source === 'order' && rowInRevision(row) && hasReleasedFiles(row)
+        ? ('delivered' as const)
+        : phaseFor(row);
     const view = deliveredFiles(row).length > 0 ? (
       <button
         type="button"
@@ -528,7 +558,12 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
             <div className="ead-card-h">
               <h2>Order delivery</h2>
               <span className="ead-sub">
-                {counts.delivered} of {counts.total} items approved
+                {groups.flatMap((group) => group.rows).filter((row) =>
+                  rowInRevision(row) && hasReleasedFiles(row)
+                    ? true
+                    : row.design?.status === 'DELIVERED',
+                ).length}{' '}
+                of {counts.total} items approved
                 {via ? ` · ${deliveryMethodLabel(via)}` : ''}
               </span>
             </div>
@@ -586,7 +621,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
                       {covered.map((row) => (
                         <div key={row.key} className="sod-line">
                           <b>{row.name}</b>
-                          <div className="sod-acts">{lineActions(row)}</div>
+                          <div className="sod-acts">{lineActions(row, 'revision')}</div>
                         </div>
                       ))}
                     </div>
@@ -942,7 +977,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
               <b>Customer usually needs: </b>
               {(prefs?.formats ?? []).join(', ') || 'the requested formats'}
             </p>
-            <button type="button" className="sod-drop" onClick={() => document.getElementById('sod-files')?.click()}>
+            <button type="button" className="sod-drop" onClick={() => openFilePicker('sod-files')}>
               <i className="ti ti-upload" /> Choose files
             </button>
             <input
@@ -964,7 +999,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
             <div className="ead-he-sub">{pendingFiles.length} of 10 files attached</div>
             <div className="sod-label">All designs zip (optional)</div>
             <p>Upload one zip that contains every design in this order.</p>
-            <button type="button" className="sod-drop sod-drop-sm" onClick={() => document.getElementById('sod-zip')?.click()}>
+            <button type="button" className="sod-drop sod-drop-sm" onClick={() => openFilePicker('sod-zip')}>
               <i className="ti ti-file-zip" /> {pendingZip ? pendingZip.name : 'Choose zip'}
             </button>
             <input
@@ -1010,14 +1045,15 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
                   publish.isPending ||
                   (pendingFiles.length === 0 && !pendingZip && !deliveredOnEmail)
                 }
-                onClick={() =>
+                onClick={() => {
+                  if (suppressPublishClick.current) return;
                   publish.mutate({
                     row: uploadFor,
                     files: pendingFiles,
                     zip: pendingZip,
                     emailed: deliveredOnEmail,
-                  })
-                }
+                  });
+                }}
               >
                 {publish.isPending ? 'Publishing…' : 'Publish files'}
               </button>

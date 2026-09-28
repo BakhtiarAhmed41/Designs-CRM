@@ -334,41 +334,6 @@ export function ServiceCustomerOrder({
       </section>
 
       <h2 className="cop-title">Designs & files</h2>
-      {revision && (
-        <section className="cop-revision" aria-label="Revision">
-          <div className="cop-revision-top">
-            <strong>
-              {revision.status === 'DONE' ? 'Revision delivered' : 'Revision requested'}
-            </strong>
-            {revision.kind === 'PAID' ? (
-              <b>{money(revision.priceCents, order.currency)}</b>
-            ) : (
-              <span>Free revision</span>
-            )}
-          </div>
-          {revision.note && <p>{revision.note}</p>}
-          {revision.kind === 'PAID' && (
-            <div className="cop-revision-pay">
-              {revision.invoiceStatus === 'PAID' ? (
-                <span className="ecd-tag ok">
-                  <i className="ti ti-check" /> Paid
-                </span>
-              ) : revision.invoiceId ? (
-                <button
-                  type="button"
-                  className="ecd-btn pri"
-                  disabled={payBusy}
-                  onClick={() => void payRevision(revision)}
-                >
-                  <i className="ti ti-credit-card" /> {payBusy ? 'Opening checkout…' : 'Pay now'}
-                </button>
-              ) : (
-                <span className="cop-revision-note">Payment is being prepared.</span>
-              )}
-            </div>
-          )}
-        </section>
-      )}
       <div className="cop-designs">
         {groups.length === 0 && <p className="ecd-wait">No items on this order yet.</p>}
         {groups.map((group) => (
@@ -427,6 +392,42 @@ export function ServiceCustomerOrder({
           </li>
         </ul>
       </section>
+
+      {revision && (
+        <section className="cop-revision" aria-label="Revision">
+          <div className="cop-revision-top">
+            <strong>
+              {revision.status === 'DONE' ? 'Revision delivered' : 'Revision requested'}
+            </strong>
+            {revision.kind === 'PAID' ? (
+              <b>{money(revision.priceCents, order.currency)}</b>
+            ) : (
+              <span>Free revision</span>
+            )}
+          </div>
+          {revision.note && <p>{revision.note}</p>}
+          {revision.kind === 'PAID' && (
+            <div className="cop-revision-pay">
+              {revision.invoiceStatus === 'PAID' ? (
+                <span className="ecd-tag ok">
+                  <i className="ti ti-check" /> Paid
+                </span>
+              ) : revision.invoiceId ? (
+                <button
+                  type="button"
+                  className="ecd-btn pri"
+                  disabled={payBusy}
+                  onClick={() => void payRevision(revision)}
+                >
+                  <i className="ti ti-credit-card" /> {payBusy ? 'Opening checkout…' : 'Pay now'}
+                </button>
+              ) : (
+                <span className="cop-revision-note">Payment is being prepared.</span>
+              )}
+            </div>
+          )}
+        </section>
+      )}
 
       <div className="ecd-sheet">
         <section className="ecd-sec">
