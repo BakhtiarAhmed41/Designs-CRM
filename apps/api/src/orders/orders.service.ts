@@ -579,19 +579,28 @@ export class OrdersService {
     return Boolean(row);
   }
 
-  private async closeRevisionDesigns(orderId: string, publishedDesignIds: string[]) {
+  private async closeRevisionDesigns(
+    orderId: string,
+    publishedDesignIds: string[],
+    editId?: string | null,
+  ) {
     if (publishedDesignIds.length === 0) return;
-    const open = await this.db.queryOne<{
+    const opens = await this.db.query<{
       id: string;
       design_id: string | null;
       design_ids: unknown;
     }>(
       `SELECT id, design_id, design_ids FROM edit_requests
         WHERE order_id = ? AND status = ?
-        ORDER BY created_at ASC
-        LIMIT 1`,
+        ORDER BY created_at ASC`,
       [orderId, EditStatus.PENDING],
     );
+    const open = editId
+      ? opens.find((row) => row.id === editId)
+      : opens.find((row) => {
+          const ids = this.parseRevisionDesignIds(row.design_ids, row.design_id);
+          return ids.some((id) => publishedDesignIds.includes(id));
+        });
     if (!open) return;
     let current = this.parseRevisionDesignIds(open.design_ids, open.design_id);
     if (current.length === 0) {
@@ -600,8 +609,8 @@ export class OrdersService {
     const remaining = current.filter((id) => !publishedDesignIds.includes(id));
     if (remaining.length === 0) {
       await this.db.execute(
-        'UPDATE edit_requests SET status = ?, design_ids = ?, resolved_at = NOW() WHERE id = ?',
-        [EditStatus.DONE, JSON.stringify([]), open.id],
+        'UPDATE edit_requests SET status = ?, design_id = ?, design_ids = ?, resolved_at = NOW() WHERE id = ?',
+        [EditStatus.DONE, current[0] ?? null, JSON.stringify(current), open.id],
       );
       return;
     }
@@ -897,8 +906,9 @@ export class OrdersService {
       released_at: Date | null;
       kind: string | null;
       preview_status: string | null;
+      edit_id: string | null;
     }>(
-      `SELECT id, order_id, version, delivered_via, created_at, released_at, kind, preview_status
+      `SELECT id, order_id, version, delivered_via, created_at, released_at, kind, preview_status, edit_id
          FROM deliveries WHERE order_id = ? ORDER BY version DESC`,
       [orderId],
     );
@@ -990,6 +1000,7 @@ export class OrdersService {
         ? DeliveryKind.PREVIEW
         : DeliveryKind.FINAL) as DeliveryKind,
       previewStatus: (d.preview_status ?? null) as PreviewStatus | null,
+      editId: d.edit_id ?? null,
       files: filesByDelivery.get(d.id) ?? [],
     }));
   }
@@ -2798,6 +2809,7 @@ export class OrdersService {
       complete?: boolean;
       release?: boolean;
       kind?: DeliveryKind;
+      editId?: string | null;
     },
   ) {
     this.assertAdmin(user);
@@ -2921,8 +2933,8 @@ export class OrdersService {
       deliveryId = randomUUID();
       await this.db.execute(
         `INSERT INTO deliveries
-           (id, order_id, version, delivered_via, created_by_admin_id, released_at, kind, preview_status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+           (id, order_id, version, delivered_via, created_by_admin_id, released_at, kind, preview_status, edit_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           deliveryId,
           orderId,
@@ -2932,6 +2944,7 @@ export class OrdersService {
           release ? new Date() : null,
           isPreview ? DeliveryKind.PREVIEW : DeliveryKind.FINAL,
           isPreview ? PreviewStatus.PENDING : null,
+          options?.editId ?? null,
         ],
       );
 
@@ -3017,11 +3030,12 @@ export class OrdersService {
       designs.length === 0 || designs.every((d) => submittedIds.has(d.id));
 
     if (release && !isPreview && designIds.length > 0) {
-      await this.closeRevisionDesigns(orderId, designIds);
+      await this.closeRevisionDesigns(orderId, designIds, options?.editId);
     } else if (release && !isPreview && allDelivered) {
       await this.closeRevisionDesigns(
         orderId,
         designs.map((d) => d.id),
+        options?.editId,
       );
     }
 

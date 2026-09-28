@@ -169,22 +169,14 @@ export function ServiceCustomerOrder({
     queryFn: () => listMyEdits(order.id),
     ...freshOnOpen,
   });
-  const revision =
-    (editsQ.data?.edits ?? []).find((edit) => edit.status === 'PENDING') ??
-    editsQ.data?.edits?.[0];
-  const openRevision = revision?.status === 'PENDING' ? revision : undefined;
-  const revisionIds = openRevision?.designIds?.length
-    ? openRevision.designIds
-    : openRevision?.designId
-      ? [openRevision.designId]
-      : [];
-  const rowInRevision = (row: DeliveryRow) => {
-    if (!openRevision) return false;
-    if (!row.design) return revisionIds.length === 0;
-    if (revisionIds.length === 0) return true;
-    return revisionIds.includes(row.design.id);
-  };
-  const header = openRevision
+  const revisions = editsQ.data?.edits ?? [];
+  const openRevisions = revisions.filter((edit) => edit.status === 'PENDING');
+  const rowInRevision = (row: DeliveryRow) =>
+    openRevisions.some((edit) => {
+      const ids = edit.designIds?.length ? edit.designIds : edit.designId ? [edit.designId] : [];
+      return Boolean(row.design && ids.includes(row.design.id));
+    });
+  const header = openRevisions.length > 0
     ? { text: 'Revision requested', ok: false }
     : counts.allDelivered
       ? { text: 'Delivered', ok: true }
@@ -393,41 +385,52 @@ export function ServiceCustomerOrder({
         </ul>
       </section>
 
-      {revision && (
-        <section className="cop-revision" aria-label="Revision">
-          <div className="cop-revision-top">
-            <strong>
-              {revision.status === 'DONE' ? 'Revision delivered' : 'Revision requested'}
-            </strong>
-            {revision.kind === 'PAID' ? (
-              <b>{money(revision.priceCents, order.currency)}</b>
-            ) : (
-              <span>Free revision</span>
-            )}
-          </div>
-          {revision.note && <p>{revision.note}</p>}
-          {revision.kind === 'PAID' && (
-            <div className="cop-revision-pay">
-              {revision.invoiceStatus === 'PAID' ? (
-                <span className="ecd-tag ok">
-                  <i className="ti ti-check" /> Paid
-                </span>
-              ) : revision.invoiceId ? (
-                <button
-                  type="button"
-                  className="ecd-btn pri"
-                  disabled={payBusy}
-                  onClick={() => void payRevision(revision)}
-                >
-                  <i className="ti ti-credit-card" /> {payBusy ? 'Opening checkout…' : 'Pay now'}
-                </button>
+      {revisions.map((revision) => {
+        const ids = revision.designIds?.length
+          ? revision.designIds
+          : revision.designId
+            ? [revision.designId]
+            : [];
+        const names = groups
+          .flatMap((group) => group.rows)
+          .filter((row) => row.design && ids.includes(row.design.id))
+          .map((row) => row.name);
+        return (
+          <section key={revision.id} className="cop-revision" aria-label="Revision">
+            <div className="cop-revision-top">
+              <strong>
+                {revision.status === 'DONE' ? 'Revision delivered' : 'Revision requested'}
+              </strong>
+              {revision.kind === 'PAID' ? (
+                <b>{money(revision.priceCents, order.currency)}</b>
               ) : (
-                <span className="cop-revision-note">Payment is being prepared.</span>
+                <span>Free revision</span>
               )}
             </div>
-          )}
-        </section>
-      )}
+            {revision.note && <p>{revision.note}</p>}
+            {names.length > 0 && <p>{names.join(', ')}</p>}
+            {revision.kind === 'PAID' && (
+              <div className="cop-revision-pay">
+                <span>Pay by card</span>
+                {revision.invoiceStatus === 'PAID' ? (
+                  <span className="ecd-tag ok">
+                    <i className="ti ti-check" /> Paid
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    className="ecd-btn pri"
+                    disabled={payBusy || !revision.invoiceId}
+                    onClick={() => void payRevision(revision)}
+                  >
+                    <i className="ti ti-credit-card" /> {payBusy ? 'Opening checkout…' : 'Pay now'}
+                  </button>
+                )}
+              </div>
+            )}
+          </section>
+        );
+      })}
 
       <div className="ecd-sheet">
         <section className="ecd-sec">

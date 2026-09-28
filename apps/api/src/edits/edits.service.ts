@@ -263,7 +263,6 @@ export class EditsService {
   }
 
   private async ensureRevisionInvoice(
-    user: AuthUser,
     order: OrderRow,
     editId: string,
     priceCents: number,
@@ -288,7 +287,7 @@ export class EditsService {
       );
       return;
     }
-    const invoice = await this.billing.createAddonInvoice(user, {
+    const invoice = await this.billing.createRevisionInvoice({
       customerId: order.customer_id,
       orderId: order.id,
       amountCents: priceCents,
@@ -312,8 +311,21 @@ export class EditsService {
     );
   }
 
+  private async backfillPaidInvoices(rows: EditJoinRow[]) {
+    let changed = false;
+    for (const row of rows) {
+      if (row.kind !== EditKind.PAID || row.invoice_id) continue;
+      const priceCents = Number(row.price_cents);
+      if (row.status !== EditStatus.PENDING || !Number.isInteger(priceCents) || priceCents <= 0) continue;
+      const order = await this.getOrderRow(row.order_id);
+      if (!order) continue;
+      await this.ensureRevisionInvoice(order, row.id, priceCents, row.note);
+      changed = true;
+    }
+    return changed;
+  }
+
   private async applyRevisionWork(
-    user: AuthUser,
     order: OrderRow,
     editId: string,
     designIds: string[],
@@ -327,7 +339,7 @@ export class EditsService {
     );
     await this.reopenDesigns(order.id, designIds);
     if (kind === EditKind.PAID) {
-      await this.ensureRevisionInvoice(user, order, editId, priceCents ?? 0, note);
+      await this.ensureRevisionInvoice(order, editId, priceCents ?? 0, note);
     } else {
       await this.releaseUnpaidRevisionInvoice(editId);
     }
@@ -369,39 +381,6 @@ export class EditsService {
       ...(input.designId ? [input.designId] : []),
     ];
     const designIds = await this.resolveDesignIds(orderId, requested);
-
-    const openEdit = await this.db.queryOne<{ id: string }>(
-      `SELECT id FROM edit_requests
-        WHERE order_id = ? AND status = ?
-        ORDER BY created_at ASC
-        LIMIT 1`,
-      [orderId, EditStatus.PENDING],
-    );
-    if (openEdit) {
-      await this.db.execute(
-        `UPDATE edit_requests
-            SET note = ?, kind = ?, price_cents = ?, design_id = ?, design_ids = ?,
-                assigned_designer_id = COALESCE(?, assigned_designer_id)
-          WHERE id = ?`,
-        [
-          note,
-          kind,
-          priceCents,
-          designIds[0] ?? null,
-          JSON.stringify(designIds),
-          input.assignedDesignerId ?? null,
-          openEdit.id,
-        ],
-      );
-      await this.writeLog(this.db, {
-        orderId,
-        actorId: user.id,
-        event: 'edit_requested',
-        meta: { editId: openEdit.id, kind, note, designIds, source: 'staff' },
-      });
-      await this.applyRevisionWork(user, order, openEdit.id, designIds, kind, priceCents, note);
-      return this.loadEdit(openEdit.id);
-    }
 
     const editId = await this.db.withTransaction(async (tx) => {
       const id = randomUUID();
@@ -451,7 +430,7 @@ export class EditsService {
       return id;
     });
 
-    await this.applyRevisionWork(user, order, editId, designIds, kind, priceCents, note);
+    await this.applyRevisionWork(order, editId, designIds, kind, priceCents, note);
     return this.loadEdit(editId);
   }
   async listEdits(
@@ -726,9 +705,8 @@ export class EditsService {
     return this.loadEdit(editId);
   }
 
-  async listMyAllEdits(user: AuthUser | undefined) {
-    assertAuthUser(user);
-    const rows = await this.db.query<EditJoinRow>(
+  private queryEdits(whereSql: string, params: unknown[]) {
+    return this.db.query<EditJoinRow>(
       `SELECT e.*, o.human_ref AS order_ref, o.name AS order_name, o.currency AS order_currency,
               ro.human_ref AS revision_ref,
               inv.status AS invoice_status,
@@ -738,11 +716,23 @@ export class EditsService {
          LEFT JOIN orders ro ON ro.id = e.revision_order_id
          LEFT JOIN users d ON d.id = e.assigned_designer_id
          LEFT JOIN invoices inv ON inv.id = e.invoice_id
-        WHERE o.client_user_id = ?
+        WHERE ${whereSql}
         ORDER BY e.created_at DESC`,
-      [user.id],
+      params,
     );
+  }
+
+  private async editsWithInvoices(whereSql: string, params: unknown[]) {
+    let rows = await this.queryEdits(whereSql, params);
+    if (await this.backfillPaidInvoices(rows)) {
+      rows = await this.queryEdits(whereSql, params);
+    }
     return rows.map((r) => this.editDto(r));
+  }
+
+  async listMyAllEdits(user: AuthUser | undefined) {
+    assertAuthUser(user);
+    return this.editsWithInvoices('o.client_user_id = ?', [user.id]);
   }
 
   async listMyEdits(user: AuthUser | undefined, orderId: string) {
@@ -750,41 +740,13 @@ export class EditsService {
     const order = await this.getOrderRow(orderId);
     if (!order || order.client_user_id !== user.id)
       throw new NotFoundException('Order not found');
-    const rows = await this.db.query<EditJoinRow>(
-      `SELECT e.*, o.human_ref AS order_ref, o.name AS order_name, o.currency AS order_currency,
-              ro.human_ref AS revision_ref,
-              inv.status AS invoice_status,
-              d.initials AS designer_initials, d.first_name AS designer_first
-         FROM edit_requests e
-         JOIN orders o ON o.id = e.order_id
-         LEFT JOIN orders ro ON ro.id = e.revision_order_id
-         LEFT JOIN users d ON d.id = e.assigned_designer_id
-         LEFT JOIN invoices inv ON inv.id = e.invoice_id
-        WHERE e.order_id = ?
-        ORDER BY e.created_at DESC`,
-      [orderId],
-    );
-    return rows.map((r) => this.editDto(r));
+    return this.editsWithInvoices('e.order_id = ?', [orderId]);
   }
 
   async listEditsForOrder(user: AuthUser | undefined, orderId: string) {
     this.assertStaff(user);
     const order = await this.getOrderRow(orderId);
     if (!order) throw new NotFoundException('Order not found');
-    const rows = await this.db.query<EditJoinRow>(
-      `SELECT e.*, o.human_ref AS order_ref, o.name AS order_name, o.currency AS order_currency,
-              ro.human_ref AS revision_ref,
-              inv.status AS invoice_status,
-              d.initials AS designer_initials, d.first_name AS designer_first
-         FROM edit_requests e
-         JOIN orders o ON o.id = e.order_id
-         LEFT JOIN orders ro ON ro.id = e.revision_order_id
-         LEFT JOIN users d ON d.id = e.assigned_designer_id
-         LEFT JOIN invoices inv ON inv.id = e.invoice_id
-        WHERE e.order_id = ?
-        ORDER BY e.created_at DESC`,
-      [orderId],
-    );
-    return rows.map((r) => this.editDto(r));
+    return this.editsWithInvoices('e.order_id = ?', [orderId]);
   }
 }

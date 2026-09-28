@@ -117,6 +117,7 @@ export type Delivery = {
   releasedAt?: string | null;
   kind?: DeliveryKind;
   previewStatus?: PreviewStatus | null;
+  editId?: string | null;
   files: DeliveryFile[];
 };
 

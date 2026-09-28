@@ -601,6 +601,47 @@ export class BillingService {
     }
   }
 
+  /** Paid revision bill. Does not require an admin session. */
+  async createRevisionInvoice(data: {
+    customerId: string;
+    orderId: string;
+    amountCents: number;
+    coversText: string;
+  }) {
+    const customer = await this.getCustomerRow(data.customerId);
+    if (!customer) throw new NotFoundException('Customer not found');
+    if (!Number.isInteger(data.amountCents) || data.amountCents <= 0)
+      throw new BadRequestException('amountCents must be a positive integer');
+    const order = await this.db.queryOne<{ currency: string | null }>(
+      'SELECT currency FROM orders WHERE id = ? LIMIT 1',
+      [data.orderId],
+    );
+    if (!order) throw new NotFoundException('Order not found');
+
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO invoices
+         (id, customer_id, order_id, kind, amount_cents, currency, covers_text, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        data.customerId,
+        data.orderId,
+        InvoiceKind.ADD_ON,
+        data.amountCents,
+        order.currency || 'USD',
+        data.coversText.trim(),
+        InvoiceStatus.AWAITING,
+      ],
+    );
+    await this.notifyCustomerUser(data.customerId, {
+      title: 'Revision payment',
+      body: data.coversText.trim(),
+      link: `/portal/orders/${data.orderId}`,
+    });
+    return { id };
+  }
+
   /** Extra format / add-on bill. Never reuse the original job invoice. */
   async createAddonInvoice(
     user: AuthUser | undefined,

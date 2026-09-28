@@ -135,9 +135,11 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
   const suppressPublishClick = useRef(false);
   const [pendingZip, setPendingZip] = useState<File | null>(null);
   const [deliveredOnEmail, setDeliveredOnEmail] = useState(false);
-  const [filesFor, setFilesFor] = useState<DeliveryRow | null>(null);
+  const [filesFor, setFilesFor] = useState<{ row: DeliveryRow; editId: string | null } | null>(null);
+  const [uploadEditId, setUploadEditId] = useState<string | null>(null);
   const [preview, setPreview] = useState<{ src: string; name: string } | null>(null);
   const [revisionOpen, setRevisionOpen] = useState(false);
+  const [revisionDesignIds, setRevisionDesignIds] = useState<string[]>([]);
   const [revisionNote, setRevisionNote] = useState('');
   const [revisionKind, setRevisionKind] = useState<EditKind>('FREE');
   const [revisionPrice, setRevisionPrice] = useState('');
@@ -226,10 +228,12 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
         notifyEmail: hasPortal,
         release: true,
         kind: 'FINAL',
+        editId: uploadEditId,
       });
     },
     onSuccess: () => {
       setUploadFor(null);
+      setUploadEditId(null);
       setPendingFiles([]);
       setPendingZip(null);
       setDeliveredOnEmail(false);
@@ -279,12 +283,13 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
       }
       const priceCents = revisionKind === 'PAID' ? Math.round(dollars * 100) : null;
       const rows = groups.flatMap((group) => group.rows);
-      const existing = rows
-        .map((row) => row.design?.id)
-        .filter((id): id is string => Boolean(id));
-      const designIds = existing.length
-        ? existing
-        : await Promise.all(rows.map((row) => ensureDesign(row)));
+      const chosen =
+        rows.length > 1 ? rows.filter((row) => revisionDesignIds.includes(row.key)) : rows;
+      if (rows.length > 1 && chosen.length === 0) {
+        throw new Error('Pick which item this revision is for.');
+      }
+      const designIds: string[] = [];
+      for (const row of chosen) designIds.push(await ensureDesign(row));
       return createAdminEdit(order.id, {
         note: revisionNote.trim(),
         kind: revisionKind,
@@ -298,6 +303,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
       setRevisionNote('');
       setRevisionPrice('');
       setRevisionKind('FREE');
+      setRevisionDesignIds([]);
       setAssignRevision(false);
       refresh();
       await dialog.alert({
@@ -340,10 +346,6 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
         batch.files.some((file) => file.designId === designId && !file.isBundle),
     );
   };
-  const bundleFiles = (order.deliveries ?? []).flatMap((batch) =>
-    batch.files.filter((file) => file.isBundle),
-  );
-
   async function previewFile(file: { id: string; originalName: string; mimeType?: string | null }) {
     setError(null);
     const image = isImageFile(file.originalName, file.mimeType);
@@ -366,25 +368,44 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
   }
 
   const edits = editsQ.data?.edits ?? [];
-  const openRevision = edits.find((edit) => edit.status === 'PENDING');
-  const revisionIds = openRevision?.designIds?.length
-    ? openRevision.designIds
-    : openRevision?.designId
-      ? [openRevision.designId]
-      : [];
-  const rowInRevision = (row: DeliveryRow) => {
-    if (!openRevision) return false;
-    if (!row.design) return revisionIds.length === 0;
-    if (revisionIds.length === 0) return true;
-    return revisionIds.includes(row.design.id);
+  const revisionOwnerId = (batch: { editId?: string | null; createdAt?: string }) => {
+    if (batch.editId) return batch.editId;
+    const at = batch.createdAt ? new Date(batch.createdAt).getTime() : 0;
+    let owner: string | null = null;
+    for (const edit of edits) {
+      if (at >= new Date(edit.createdAt).getTime() - 2000) owner = edit.id;
+    }
+    return owner;
   };
+  const scopedDeliveryFiles = (row: DeliveryRow, editId: string | null) => {
+    const designId = row.design?.id;
+    return (order.deliveries ?? []).flatMap((batch) => {
+      const owner = revisionOwnerId(batch);
+      if (editId ? owner !== editId : Boolean(owner)) return [];
+      return batch.files.filter((file) => !file.isBundle && file.designId === designId);
+    });
+  };
+  const scopedBundleFiles = (editId: string | null) =>
+    (order.deliveries ?? []).flatMap((batch) => {
+      const owner = revisionOwnerId(batch);
+      if (editId ? owner !== editId : Boolean(owner)) return [];
+      return batch.files.filter((file) => file.isBundle);
+    });
+  const editDesignIds = (edit: { designIds?: string[]; designId?: string | null }) =>
+    edit.designIds?.length ? edit.designIds : edit.designId ? [edit.designId] : [];
+  const rowInRevision = (row: DeliveryRow) =>
+    edits.some(
+      (edit) =>
+        edit.status === 'PENDING' &&
+        Boolean(row.design && editDesignIds(edit).includes(row.design.id)),
+    );
   const phaseFor = (row: DeliveryRow) => {
     const status = row.design?.status;
     if (rowInRevision(row) && (!status || status === 'DELIVERED')) return 'progress' as const;
     return linePhase(status);
   };
   const revisionRequested =
-    order.status === 'REVISION_REQUESTED' || Boolean(openRevision);
+    order.status === 'REVISION_REQUESTED' || edits.some((edit) => edit.status === 'PENDING');
   const headerLabel = unpriced
     ? 'Needs your price'
     : order.status === 'PENDING_PAYMENT'
@@ -413,14 +434,15 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
     input.click();
   }
 
-  function openPublish(row: DeliveryRow) {
+  function openPublish(row: DeliveryRow, editId: string | null = null) {
+    setUploadEditId(editId);
     setUploadFor(row);
     setPendingFiles([]);
     setPendingZip(null);
     setDeliveredOnEmail(false);
   }
 
-  function lineActions(row: DeliveryRow, source: 'order' | 'revision' = 'order') {
+  function lineActions(row: DeliveryRow, source: 'order' | 'revision' = 'order', revisionId: string | null = null) {
     const phase =
       source === 'order' && rowInRevision(row) && hasReleasedFiles(row)
         ? ('delivered' as const)
@@ -430,7 +452,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
         type="button"
         className="sod-eye"
         title="View delivered files"
-        onClick={() => setFilesFor(row)}
+        onClick={() => setFilesFor({ row, editId: null })}
       >
         <i className="ti ti-eye" />
       </button>
@@ -447,7 +469,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
           >
             Mark ready
           </button>
-          <button type="button" className="ead-btn sm pri" onClick={() => openPublish(row)}>
+          <button type="button" className="ead-btn sm pri" onClick={() => openPublish(row, source === 'revision' ? revisionId : null)}>
             Attach & publish
           </button>
           {view}
@@ -458,7 +480,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
       return (
         <>
           <span className="sod-status ready">Ready</span>
-          <button type="button" className="ead-btn sm pri" onClick={() => openPublish(row)}>
+          <button type="button" className="ead-btn sm pri" onClick={() => openPublish(row, source === 'revision' ? revisionId : null)}>
             Attach & publish
           </button>
           {view}
@@ -508,7 +530,15 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
             </button>
           )}
           {!unpriced && (
-            <button type="button" className="ead-btn" onClick={() => setRevisionOpen(true)}>
+            <button
+              type="button"
+              className="ead-btn"
+              onClick={() => {
+                const rows = groups.flatMap((group) => group.rows);
+                setRevisionDesignIds(rows.length === 1 ? [rows[0].key] : []);
+                setRevisionOpen(true);
+              }}
+            >
               <i className="ti ti-pencil" /> Create revision
             </button>
           )}
@@ -597,10 +627,11 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
               </div>
               <div className="ead-b">
                 {edits.map((edit) => {
-                  const covered =
-                    edit.status === 'PENDING'
-                      ? groups.flatMap((group) => group.rows).filter((row) => rowInRevision(row))
-                      : [];
+                  const ids = editDesignIds(edit);
+                  const allRows = groups.flatMap((group) => group.rows);
+                  const covered = allRows.filter((row) =>
+                    Boolean(row.design && ids.includes(row.design.id)),
+                  );
                   const paid = edit.kind === 'PAID' && (edit.priceCents ?? 0) > 0;
                   return (
                     <div key={edit.id} className="ead-he">
@@ -608,20 +639,35 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
                         <span>{paid ? 'Paid revision' : 'Free revision'}</span>
                         {paid && <b>{money(edit.priceCents, order.currency)}</b>}
                         <span className="ead-he-sub" style={{ marginTop: 0 }}>
-                          {edit.status === 'DONE'
-                            ? 'Delivered'
-                            : edit.invoiceStatus === 'PAID'
-                              ? 'Revision requested · Paid'
-                              : paid
-                                ? 'Revision requested · Unpaid'
-                                : 'Revision requested'}
+                          {edit.status === 'DONE' ? 'Delivered' : 'Revision requested'}
                         </span>
+                        {paid && (
+                          <span className={edit.invoiceStatus === 'PAID' ? 'ead-pill ok' : 'ead-pill'}>
+                            {edit.invoiceStatus === 'PAID' ? 'Paid by card' : 'Pay by card'}
+                          </span>
+                        )}
                       </div>
                       <div className="ead-he-sub">{edit.note}</div>
                       {covered.map((row) => (
                         <div key={row.key} className="sod-line">
                           <b>{row.name}</b>
-                          <div className="sod-acts">{lineActions(row, 'revision')}</div>
+                          <div className="sod-acts">
+                            {edit.status === 'DONE' ? (
+                              <>
+                                <span className="sod-status ready">Delivered</span>
+                                <button
+                                  type="button"
+                                  className="sod-eye"
+                                  title="View revision files"
+                                  onClick={() => setFilesFor({ row, editId: edit.id })}
+                                >
+                                  <i className="ti ti-eye" />
+                                </button>
+                              </>
+                            ) : (
+                              lineActions(row, 'revision', edit.id)
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1066,17 +1112,22 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
         <div className="sod-ov" role="presentation" onClick={() => setFilesFor(null)}>
           <div className="sod-mo" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className="sod-mo-h">
-              <h3>Delivered files</h3>
+              <h3>{filesFor.editId ? 'Revision files' : 'Delivered files'}</h3>
               <button type="button" onClick={() => setFilesFor(null)} aria-label="Close">
                 <i className="ti ti-x" />
               </button>
             </div>
-            <p>Preview or download any of the delivered files below.</p>
+            <p>
+              {filesFor.editId
+                ? 'These files belong to this revision.'
+                : 'Preview or download the original delivered files.'}
+            </p>
             <div className="sod-flist">
-              {deliveredFiles(filesFor).length === 0 && bundleFiles.length === 0 && (
+              {scopedDeliveryFiles(filesFor.row, filesFor.editId).length === 0 &&
+                scopedBundleFiles(filesFor.editId).length === 0 && (
                 <div>No files published for this item yet.</div>
               )}
-              {deliveredFiles(filesFor).map((file) => (
+              {scopedDeliveryFiles(filesFor.row, filesFor.editId).map((file) => (
                 <div key={file.id} className="sod-file">
                   <span>{file.originalName}</span>
                   <span className="sod-file-acts">
@@ -1101,7 +1152,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
                   </span>
                 </div>
               ))}
-              {bundleFiles.map((file) => (
+              {scopedBundleFiles(filesFor.editId).map((file) => (
                 <div key={file.id} className="sod-file">
                   <span>{file.originalName} (all designs)</span>
                   <span className="sod-file-acts">
@@ -1137,6 +1188,27 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
             <div className="sod-info">
               Stays on this order. The customer keeps the old files until you publish new ones.
             </div>
+            {groups.flatMap((group) => group.rows).length > 1 && (
+              <>
+                <div className="sod-label">Which item</div>
+                {groups.flatMap((group) => group.rows).map((row) => (
+                  <label key={row.key} className="sod-check">
+                    <input
+                      type="checkbox"
+                      checked={revisionDesignIds.includes(row.key)}
+                      onChange={() =>
+                        setRevisionDesignIds((prev) =>
+                          prev.includes(row.key)
+                            ? prev.filter((key) => key !== row.key)
+                            : [...prev, row.key],
+                        )
+                      }
+                    />
+                    {row.name}
+                  </label>
+                ))}
+              </>
+            )}
             <div className="sod-label">What needs to change</div>
             <textarea
               className="ead-field"
@@ -1162,7 +1234,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
             </div>
             {revisionKind === 'PAID' && (
               <>
-                <div className="sod-label">Revision price. The customer pays this from the order.</div>
+                <div className="sod-label">Revision price. The customer pays by card from the order.</div>
                 <input
                   className="ead-field"
                   type="number"
@@ -1189,7 +1261,8 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
               disabled={
                 revision.isPending ||
                 !revisionNote.trim() ||
-                (revisionKind === 'PAID' && !(Number(revisionPrice) > 0))
+                (revisionKind === 'PAID' && !(Number(revisionPrice) > 0)) ||
+                (groups.flatMap((group) => group.rows).length > 1 && revisionDesignIds.length === 0)
               }
               onClick={() => revision.mutate()}
             >

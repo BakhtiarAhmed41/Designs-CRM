@@ -403,6 +403,11 @@ export async function runMigrations() {
       "ALTER TABLE deliveries ADD COLUMN kind ENUM('FINAL','PREVIEW') NOT NULL DEFAULT 'FINAL'",
     );
   }
+  if (!(await columnExists('deliveries', 'edit_id'))) {
+    console.log('Adding deliveries.edit_id column ...');
+    await conn.query('ALTER TABLE deliveries ADD COLUMN edit_id CHAR(36) NULL');
+  }
+
   if (!(await columnExists('deliveries', 'preview_status'))) {
     // eslint-disable-next-line no-console
     console.log('Adding deliveries.preview_status column ...');

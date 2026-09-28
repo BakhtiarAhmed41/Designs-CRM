@@ -458,6 +458,7 @@ export class AdminOrdersController {
       kind: body?.kind === DeliveryKind.PREVIEW
         ? DeliveryKind.PREVIEW
         : DeliveryKind.FINAL,
+      editId: body?.editId?.trim() || null,
     });
   }
 
