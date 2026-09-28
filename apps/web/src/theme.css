@@ -2754,7 +2754,28 @@ button.primary i,
 .file-month { margin: 22px 0 4px; font-size: 16px; }
 .file-day { margin: 18px 0 8px; font-size: 14px; }
 .files-count { margin: 0 0 10px; color: var(--dash-muted); font-size: 13px; }
-.file-email-note { margin: 0; padding: 12px 16px 16px; color: var(--dash-muted); font-size: 13px; }
+.file-email-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 10px;
+  padding: 10px 14px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  font-size: 13px;
+}
+.file-email-note p { margin: 0; }
+.file-email-link {
+  color: var(--maroon);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.file-email-link:hover { text-decoration: underline; }
 .quote-page { max-width: 1450px; margin: 0 auto; width: 100%; }
 .main:not(.main-messaging) > div.quote-page {
   max-width: 1450px;

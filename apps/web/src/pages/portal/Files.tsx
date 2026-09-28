@@ -21,16 +21,8 @@ type Group = {
   serviceType: string | null;
   deliveredAt: string;
   deliveredVia: string | null;
-  deliveryEmail: string | null;
   files: MyFile[];
 };
-
-function maskEmail(email?: string | null) {
-  if (!email || !email.includes('@')) return 'your email';
-  const [user, domain] = email.split('@');
-  const keep = user.slice(0, 2);
-  return `${keep}***@${domain}`;
-}
 
 function dayKey(iso: string) {
   const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -93,7 +85,6 @@ export function PortalFiles() {
           serviceType: f.serviceType ?? null,
           deliveredAt: f.deliveredAt,
           deliveredVia: f.deliveredVia ?? null,
-          deliveryEmail: f.deliveryEmail ?? null,
           files: [f],
         });
       }
@@ -279,14 +270,11 @@ export function PortalFiles() {
                             {emailed && (
                               <div className="file-email-note">
                                 <p>
-                                  <i className="ti ti-mail" /> {deliveryMethodLabel(g.deliveredVia)}
-                                </p>
-                                <p>
                                   {g.deliveredVia === 'BOTH'
-                                    ? `Final files were also sent to ${maskEmail(g.deliveryEmail)}.`
-                                    : `Final files were sent to ${maskEmail(g.deliveryEmail)}.`}
+                                    ? 'On the portal and also sent by email.'
+                                    : 'Sent by email.'}
                                 </p>
-                                <Link to={`/portal/orders/${orderSlug(g.humanRef, g.orderId)}`} className="btn btn-ghost btn-sm">
+                                <Link to={`/portal/orders/${orderSlug(g.humanRef, g.orderId)}`} className="file-email-link">
                                   View order
                                 </Link>
                               </div>
