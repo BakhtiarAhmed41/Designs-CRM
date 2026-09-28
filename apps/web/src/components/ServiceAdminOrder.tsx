@@ -643,33 +643,45 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
                         </span>
                         {paid && (
                           <span className={edit.invoiceStatus === 'PAID' ? 'ead-pill ok' : 'ead-pill'}>
-                            {edit.invoiceStatus === 'PAID' ? 'Paid by card' : 'Pay by card'}
+                            {edit.invoiceStatus === 'PAID' ? 'Paid' : 'Unpaid'}
                           </span>
+                        )}
+                        {edit.status === 'DONE' && covered.length === 1 && (
+                          <button
+                            type="button"
+                            className="sod-eye"
+                            title="View revision files"
+                            onClick={() => setFilesFor({ row: covered[0], editId: edit.id })}
+                          >
+                            <i className="ti ti-eye" />
+                          </button>
                         )}
                       </div>
                       <div className="ead-he-sub">{edit.note}</div>
-                      {covered.map((row) => (
-                        <div key={row.key} className="sod-line">
-                          <b>{row.name}</b>
-                          <div className="sod-acts">
-                            {edit.status === 'DONE' ? (
-                              <>
-                                <span className="sod-status ready">Delivered</span>
-                                <button
-                                  type="button"
-                                  className="sod-eye"
-                                  title="View revision files"
-                                  onClick={() => setFilesFor({ row, editId: edit.id })}
-                                >
-                                  <i className="ti ti-eye" />
-                                </button>
-                              </>
-                            ) : (
-                              lineActions(row, 'revision', edit.id)
-                            )}
+                      {edit.status === 'DONE' &&
+                        covered.length > 1 &&
+                        covered.map((row) => (
+                          <div key={row.key} className="sod-line">
+                            <b>{row.name}</b>
+                            <div className="sod-acts">
+                              <button
+                                type="button"
+                                className="sod-eye"
+                                title="View revision files"
+                                onClick={() => setFilesFor({ row, editId: edit.id })}
+                              >
+                                <i className="ti ti-eye" />
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      {edit.status !== 'DONE' &&
+                        covered.map((row) => (
+                          <div key={row.key} className="sod-line">
+                            {covered.length > 1 && <b>{row.name}</b>}
+                            <div className="sod-acts">{lineActions(row, 'revision', edit.id)}</div>
+                          </div>
+                        ))}
                     </div>
                   );
                 })}

@@ -385,17 +385,7 @@ export function ServiceCustomerOrder({
         </ul>
       </section>
 
-      {revisions.map((revision) => {
-        const ids = revision.designIds?.length
-          ? revision.designIds
-          : revision.designId
-            ? [revision.designId]
-            : [];
-        const names = groups
-          .flatMap((group) => group.rows)
-          .filter((row) => row.design && ids.includes(row.design.id))
-          .map((row) => row.name);
-        return (
+      {revisions.map((revision) => (
           <section key={revision.id} className="cop-revision" aria-label="Revision">
             <div className="cop-revision-top">
               <strong>
@@ -408,29 +398,29 @@ export function ServiceCustomerOrder({
               )}
             </div>
             {revision.note && <p>{revision.note}</p>}
-            {names.length > 0 && <p>{names.join(', ')}</p>}
             {revision.kind === 'PAID' && (
               <div className="cop-revision-pay">
-                <span>Pay by card</span>
                 {revision.invoiceStatus === 'PAID' ? (
                   <span className="ecd-tag ok">
                     <i className="ti ti-check" /> Paid
                   </span>
                 ) : (
-                  <button
-                    type="button"
-                    className="ecd-btn pri"
-                    disabled={payBusy || !revision.invoiceId}
-                    onClick={() => void payRevision(revision)}
-                  >
-                    <i className="ti ti-credit-card" /> {payBusy ? 'Opening checkout…' : 'Pay now'}
-                  </button>
+                  <>
+                    <span>Unpaid</span>
+                    <button
+                      type="button"
+                      className="ecd-btn pri"
+                      disabled={payBusy || !revision.invoiceId}
+                      onClick={() => void payRevision(revision)}
+                    >
+                      <i className="ti ti-credit-card" /> {payBusy ? 'Opening checkout…' : 'Pay now'}
+                    </button>
+                  </>
                 )}
               </div>
             )}
           </section>
-        );
-      })}
+      ))}
 
       <div className="ecd-sheet">
         <section className="ecd-sec">
