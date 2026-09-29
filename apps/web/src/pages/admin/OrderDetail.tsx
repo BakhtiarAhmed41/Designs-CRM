@@ -827,6 +827,7 @@ export function AdminOrderDetail() {
   const orderChip = lifecycleChip(order.status, 'admin', {
     partiallyAccepted: order.partiallyAccepted,
     partiallyDelivered: order.partiallyDelivered,
+    revisionPartial: order.revisionPartial,
   });
   const messages = threadQ.data?.conversation.messages ?? [];
   const activity = activityQ.data?.activity ?? [];

@@ -158,6 +158,7 @@ export function lifecycleChip(
   opts?: {
     partiallyAccepted?: boolean;
     partiallyDelivered?: boolean;
+    revisionPartial?: boolean;
     paymentStatus?: string | null;
   },
 ): StatusChip {
@@ -199,6 +200,12 @@ export function lifecycleChip(
     case 'IN_PROGRESS':
     case 'READY_TO_SEND':
     case 'REVISION_REQUESTED':
+      if (status === 'REVISION_REQUESTED') {
+        if (opts?.revisionPartial) {
+          return { cls: 'chip c-prog', label: 'Partially delivered' };
+        }
+        return { cls: 'chip c-wait', label: 'Revision requested' };
+      }
       if (opts?.partiallyDelivered) {
         return { cls: 'chip c-prog', label: 'Partially delivered' };
       }
@@ -206,9 +213,6 @@ export function lifecycleChip(
         return { cls: 'chip c-done', label: 'Partially accepted' };
       }
       if (status === 'READY_TO_SEND') return { cls: 'chip c-prog', label: 'Ready to send' };
-      if (status === 'REVISION_REQUESTED') {
-        return { cls: 'chip c-wait', label: 'Revision requested' };
-      }
       return {
         cls: 'chip c-done',
         label: isCustomer
@@ -301,19 +305,56 @@ export function isQuoteExpired(createdAt?: string | null) {
   return Date.now() - d.getTime() > 30 * 24 * 60 * 60 * 1000;
 }
 
+type RevisionEdit = {
+  status: string;
+  createdAt: string;
+  resolvedAt?: string | null;
+  designIds?: string[];
+  designId?: string | null;
+};
+
+function revisionDesignIds(edit: RevisionEdit) {
+  if (edit.designIds && edit.designIds.length > 0) return edit.designIds;
+  return edit.designId ? [edit.designId] : [];
+}
+
+/** Open revision with none, some, or all of its designs delivered again. */
+export function revisionDeliveryState(
+  edits: RevisionEdit[],
+  designStatus: (id: string) => string | null | undefined,
+): 'revision' | 'partial' | null {
+  const pending = edits.filter((edit) => edit.status === 'PENDING');
+  if (pending.length === 0) return null;
+  const cycleStart = Math.min(...pending.map((edit) => new Date(edit.createdAt).getTime()));
+  const relevant = edits.filter((edit) => {
+    if (edit.status === 'PENDING') return true;
+    if (edit.status !== 'DONE' || !edit.resolvedAt) return false;
+    return new Date(edit.resolvedAt).getTime() >= cycleStart;
+  });
+  const ids = [...new Set(relevant.flatMap(revisionDesignIds))];
+  if (ids.length === 0) return 'revision';
+  const delivered = ids.filter((id) => designStatus(id) === 'DELIVERED').length;
+  if (delivered > 0 && delivered < ids.length) return 'partial';
+  return 'revision';
+}
+
 export function customerOrderChip(o: {
   status: OrderStatus | string;
   partiallyDelivered?: boolean;
+  revisionPartial?: boolean;
 }): StatusChip {
   if (o.status === 'CANCELLED') return { cls: 'portal-chip c-cancelled', label: 'Cancelled' };
   if (o.status === 'COMPLETED' || o.status === 'CLOSED') {
     return { cls: 'portal-chip c-delivered', label: 'Delivered' };
   }
+  if (o.status === 'REVISION_REQUESTED') {
+    if (o.revisionPartial) {
+      return { cls: 'portal-chip c-review', label: 'Partially delivered' };
+    }
+    return { cls: 'portal-chip c-revision', label: 'Revision Requested' };
+  }
   if (o.partiallyDelivered) {
     return { cls: 'portal-chip c-review', label: 'Partially delivered' };
-  }
-  if (o.status === 'REVISION_REQUESTED') {
-    return { cls: 'portal-chip c-revision', label: 'Revision Requested' };
   }
   if (o.status === 'READY_TO_SEND') {
     return { cls: 'portal-chip c-review', label: 'Ready for Review' };
@@ -363,4 +404,33 @@ export function deliveryMethodLabel(via?: string | null): string {
   if (via === 'EMAIL') return 'Files delivered by email';
   if (via === 'PORTAL') return 'Files delivered on portal';
   return 'Not delivered';
+}
+
+/** Per-design status after files are published. */
+export function designDeliveredLabel(
+  deliveries: Array<{
+    deliveredVia?: string | null;
+    releasedAt?: string | null;
+    kind?: string | null;
+    files?: Array<{ designId?: string | null; originalName?: string; isBundle?: boolean }>;
+  }> | null | undefined,
+  designId: string | null | undefined,
+): string {
+  const batches = (deliveries ?? []).filter(
+    (batch) => batch.releasedAt && batch.kind !== 'PREVIEW',
+  );
+  const linked = designId
+    ? batches.filter((batch) =>
+        (batch.files ?? []).some(
+          (file) =>
+            file.designId === designId &&
+            !/^delivered by email$/i.test(file.originalName ?? ''),
+        ),
+      )
+    : [];
+  const via = mergeDeliveredVia(linked.map((batch) => batch.deliveredVia));
+  if (via === 'BOTH') return 'Delivered on portal & emailed';
+  if (via === 'EMAIL') return 'Delivered by email';
+  if (via === 'PORTAL') return 'Delivered on portal';
+  return 'Delivered by email';
 }

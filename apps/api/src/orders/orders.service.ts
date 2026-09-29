@@ -404,15 +404,23 @@ export class OrdersService {
   }
 
   private async listExtrasFor(orderIds: string[]) {
-    const [designCounts, attachments, quotations, partials, partialDeliveries] =
+    const [designCounts, attachments, quotations, partials, partialDeliveries, revisionPartials] =
       await Promise.all([
         this.designCountsFor(orderIds),
         this.attachmentsFor(orderIds),
         this.quotationsFor(orderIds),
         this.partialFlagsFor(orderIds),
         this.partialDeliveryFlagsFor(orderIds),
+        this.revisionPartialFlagsFor(orderIds),
       ]);
-    return { designCounts, attachments, quotations, partials, partialDeliveries };
+    return {
+      designCounts,
+      attachments,
+      quotations,
+      partials,
+      partialDeliveries,
+      revisionPartials,
+    };
   }
 
   private async partialDeliveryFlagsFor(orderIds: string[]) {
@@ -427,6 +435,90 @@ export class OrdersService {
       [...orderIds, DesignStatus.DELIVERED, DesignStatus.DELIVERED],
     );
     for (const r of rows) set.add(r.order_id);
+    return set;
+  }
+
+  /** True when some, but not all, designs in the open revision have been delivered again. */
+  private revisionPartialFrom(
+    edits: Array<{
+      status: string;
+      created_at: Date | string;
+      resolved_at: Date | string | null;
+      design_id: string | null;
+      design_ids: unknown;
+    }>,
+    designs: Array<{ id: string; status: string }>,
+  ) {
+    const pending = edits.filter((edit) => edit.status === EditStatus.PENDING);
+    if (pending.length === 0) return false;
+    const cycleStart = Math.min(
+      ...pending.map((edit) => new Date(edit.created_at).getTime()),
+    );
+    const relevant = edits.filter((edit) => {
+      if (edit.status === EditStatus.PENDING) return true;
+      if (edit.status !== EditStatus.DONE || !edit.resolved_at) return false;
+      return new Date(edit.resolved_at).getTime() >= cycleStart;
+    });
+    const ids = new Set<string>();
+    for (const edit of relevant) {
+      for (const id of this.parseRevisionDesignIds(edit.design_ids, edit.design_id)) {
+        ids.add(id);
+      }
+    }
+    if (ids.size === 0) return false;
+    const statusOf = new Map(designs.map((design) => [design.id, design.status]));
+    let delivered = 0;
+    for (const id of ids) {
+      if (statusOf.get(id) === DesignStatus.DELIVERED) delivered += 1;
+    }
+    return delivered > 0 && delivered < ids.size;
+  }
+
+  private async revisionPartialFlagsFor(orderIds: string[]) {
+    const set = new Set<string>();
+    if (orderIds.length === 0) return set;
+    const [edits, designs] = await Promise.all([
+      this.db.query<{
+        order_id: string;
+        status: string;
+        created_at: Date;
+        resolved_at: Date | null;
+        design_id: string | null;
+        design_ids: unknown;
+      }>(
+        `SELECT order_id, status, created_at, resolved_at, design_id, design_ids
+           FROM edit_requests
+          WHERE order_id IN (${this.sqlIn(orderIds)})`,
+        orderIds,
+      ),
+      this.db.query<{ id: string; order_id: string; status: string }>(
+        `SELECT id, order_id, status FROM order_designs
+          WHERE order_id IN (${this.sqlIn(orderIds)})`,
+        orderIds,
+      ),
+    ]);
+    const editsByOrder = new Map<string, typeof edits>();
+    for (const edit of edits) {
+      const list = editsByOrder.get(edit.order_id) ?? [];
+      list.push(edit);
+      editsByOrder.set(edit.order_id, list);
+    }
+    const designsByOrder = new Map<string, Array<{ id: string; status: string }>>();
+    for (const design of designs) {
+      const list = designsByOrder.get(design.order_id) ?? [];
+      list.push(design);
+      designsByOrder.set(design.order_id, list);
+    }
+    for (const orderId of orderIds) {
+      if (
+        this.revisionPartialFrom(
+          editsByOrder.get(orderId) ?? [],
+          designsByOrder.get(orderId) ?? [],
+        )
+      ) {
+        set.add(orderId);
+      }
+    }
     return set;
   }
 
@@ -603,21 +695,23 @@ export class OrdersService {
         });
     if (!open) return;
     let current = this.parseRevisionDesignIds(open.design_ids, open.design_id);
+    const designs = await this.getDesigns(orderId);
     if (current.length === 0) {
-      current = (await this.getDesigns(orderId)).map((d) => d.id);
+      current = designs.map((d) => d.id);
     }
-    const remaining = current.filter((id) => !publishedDesignIds.includes(id));
+    const delivered = new Set(
+      designs
+        .filter((design) => design.status === DesignStatus.DELIVERED)
+        .map((design) => design.id),
+    );
+    for (const id of publishedDesignIds) delivered.add(id);
+    const remaining = current.filter((id) => !delivered.has(id));
     if (remaining.length === 0) {
       await this.db.execute(
         'UPDATE edit_requests SET status = ?, design_id = ?, design_ids = ?, resolved_at = NOW() WHERE id = ?',
         [EditStatus.DONE, current[0] ?? null, JSON.stringify(current), open.id],
       );
-      return;
     }
-    await this.db.execute(
-      'UPDATE edit_requests SET design_id = ?, design_ids = ? WHERE id = ?',
-      [remaining[0] ?? null, JSON.stringify(remaining), open.id],
-    );
   }
 
   private mergeDeliveredVia(vias: Array<string | null | undefined>): DeliveredVia | null {
@@ -758,6 +852,7 @@ export class OrdersService {
     extras?: {
       partiallyAccepted?: boolean;
       partiallyDelivered?: boolean;
+      revisionPartial?: boolean;
       paymentStatus?: OrderPaymentStatus;
     },
   ) {
@@ -795,6 +890,7 @@ export class OrdersService {
       updatedAt: o.updated_at,
       partiallyAccepted: extras?.partiallyAccepted ?? false,
       partiallyDelivered: extras?.partiallyDelivered ?? false,
+      revisionPartial: extras?.revisionPartial ?? false,
       paymentStatus: extras?.paymentStatus,
     };
   }
@@ -1158,7 +1254,7 @@ export class OrdersService {
   private async assembleOrder(id: string, opts?: { releasedOnly?: boolean }) {
     const row = await this.getOrderRow(id);
     if (!row) throw new NotFoundException('Order not found');
-    const [partiallyAccepted, deliveries, designs, attachments, quotations, paymentStatus] =
+    const [partiallyAccepted, deliveries, designs, attachments, quotations, paymentStatus, revisionEdits] =
       await Promise.all([
         this.orderPartialFlag(id),
         this.getDeliveries(id),
@@ -1166,11 +1262,23 @@ export class OrdersService {
         this.getAttachments(id),
         this.getQuotations(id),
         this.billing.resolveOrderPaymentStatus(row),
+        this.db.query<{
+          status: string;
+          created_at: Date;
+          resolved_at: Date | null;
+          design_id: string | null;
+          design_ids: unknown;
+        }>(
+          `SELECT status, created_at, resolved_at, design_id, design_ids
+             FROM edit_requests WHERE order_id = ?`,
+          [id],
+        ),
       ]);
     return {
       ...this.orderDto(row, {
         partiallyAccepted,
         partiallyDelivered: this.designPartialDelivery(designs),
+        revisionPartial: this.revisionPartialFrom(revisionEdits, designs),
         paymentStatus,
       }),
       designs,
@@ -1338,6 +1446,7 @@ export class OrdersService {
           partiallyAccepted: extras.partials.has(r.id),
           partiallyDelivered: extras.partialDeliveries.has(r.id),
         }),
+        revisionPartial: extras.revisionPartials.has(r.id),
         designCount: extras.designCounts.get(r.id) || lineCount,
         deliveredVia: delivery?.via ?? null,
         deliveryEmail: delivery?.email ?? null,
@@ -1370,15 +1479,33 @@ export class OrdersService {
     let awaitingQuote = 0;
     let beingPriced = 0;
     let activeOrders = 0;
+    let pendingPayment = 0;
     for (const r of rows) {
       const n = Number(r.n);
       if (r.status === OrderStatus.QUOTATION_PROVIDED) awaitingQuote += n;
       if (r.status === OrderStatus.WAITING_FOR_QUOTATION) beingPriced += n;
+      if (r.type === OrderType.ORDER && r.status === OrderStatus.PENDING_PAYMENT) {
+        pendingPayment += n;
+      }
       if (r.type === OrderType.ORDER && !done.has(r.status)) {
         activeOrders += n;
       }
     }
-    return { awaitingQuote, beingPriced, activeOrders };
+    const infoNeeded = await this.db.queryOne<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM orders
+        WHERE client_user_id = ? AND ${HIDDEN_FROM_CUSTOMER_SQL}
+          AND needs_customer_info = 1
+          AND type = 'QUOTE_REQUEST'
+          AND status <> ?`,
+      [user.id, OrderStatus.QUOTATION_PROVIDED],
+    );
+    return {
+      awaitingQuote,
+      beingPriced,
+      activeOrders,
+      pendingPayment,
+      infoNeeded: Number(infoNeeded?.n ?? 0),
+    };
   }
 
   async setNeedsCustomerInfo(
@@ -1934,6 +2061,8 @@ export class OrdersService {
       updatedOlderThanDays?: number;
       clientId?: string;
       type?: OrderType;
+      quotePipeline?: boolean;
+      approvedOnly?: boolean;
       q?: string;
       dateFrom?: string | null;
       dateTo?: string | null;
@@ -1964,7 +2093,20 @@ export class OrdersService {
       where.push('o.client_user_id = ?');
       params.push(filters.clientId);
     }
-    if (filters.type) {
+    const convertedQuote = `(o.type = 'ORDER' AND EXISTS (
+      SELECT 1 FROM quotations q
+       WHERE q.order_id = o.id
+         AND (q.comment IS NULL OR q.comment <> 'Created by admin as an approved order')
+    ))`;
+    if (filters.quotePipeline) {
+      if (filters.approvedOnly) {
+        where.push(convertedQuote);
+      } else if (filters.status || (filters.statuses && filters.statuses.length > 0)) {
+        where.push(`o.type = 'QUOTE_REQUEST'`);
+      } else {
+        where.push(`(o.type = 'QUOTE_REQUEST' OR ${convertedQuote})`);
+      }
+    } else if (filters.type) {
       where.push('o.type = ?');
       params.push(filters.type);
     }
@@ -2020,6 +2162,7 @@ export class OrdersService {
         ...this.orderDto(r, {
           partiallyAccepted: extras.partials.has(r.id),
           partiallyDelivered: extras.partialDeliveries.has(r.id),
+          revisionPartial: extras.revisionPartials.has(r.id),
         }),
         customerName: r.customer_name,
         client: r.client_user_id
@@ -2469,9 +2612,21 @@ export class OrdersService {
     }
     const designs = await this.getDesigns(orderId);
     const paymentStatus = await this.billing.resolveOrderPaymentStatus(row);
+    const revisionEdits = await this.db.query<{
+      status: string;
+      created_at: Date;
+      resolved_at: Date | null;
+      design_id: string | null;
+      design_ids: unknown;
+    }>(
+      `SELECT status, created_at, resolved_at, design_id, design_ids
+         FROM edit_requests WHERE order_id = ?`,
+      [orderId],
+    );
     const assembled = {
       ...this.orderDto(row, {
         partiallyDelivered: this.designPartialDelivery(designs),
+        revisionPartial: this.revisionPartialFrom(revisionEdits, designs),
         paymentStatus,
       }),
       client: client
@@ -2981,7 +3136,7 @@ export class OrdersService {
         });
         await this.insertDeliveryFile({
           deliveryId,
-          designId: null,
+          designId: designIds.length === 1 ? designIds[0] : null,
           file: zipFile,
           key,
           isBundle: true,

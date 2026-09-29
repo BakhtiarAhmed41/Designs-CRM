@@ -1,17 +1,19 @@
 export function InboxBulkBar({
   selectedCount,
   totalCount,
+  allSelected: allSelectedProp,
   onToggleAll,
   onDelete,
   deleting,
 }: {
   selectedCount: number;
   totalCount: number;
+  allSelected?: boolean;
   onToggleAll: () => void;
   onDelete: () => void;
   deleting?: boolean;
 }) {
-  const allSelected = totalCount > 0 && selectedCount === totalCount;
+  const allSelected = allSelectedProp ?? (totalCount > 0 && selectedCount === totalCount);
   return (
     <div className="inbox-bulk">
       <label className="inbox-check">

@@ -12,6 +12,7 @@ export type Invoice = {
   customerId: string;
   customerName: string | null;
   orderId: string | null;
+  linkedOrderIds?: string[];
   orderRef?: string | null;
   serviceType?: string | null;
   kind: InvoiceKind;

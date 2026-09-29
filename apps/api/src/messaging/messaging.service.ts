@@ -672,7 +672,7 @@ export class MessagingService {
       `SELECT id, human_ref, status, price_cents, created_at
          FROM orders
         WHERE customer_id = ? AND type = 'ORDER'
-        ORDER BY created_at DESC LIMIT 8`,
+        ORDER BY created_at DESC LIMIT 15`,
       [customerId],
     );
 

@@ -58,9 +58,13 @@ export function listMyOrders(params?: {
 }
 
 export function listMyOrderSummary() {
-  return apiFetch<{ awaitingQuote: number; beingPriced: number; activeOrders?: number }>(
-    '/orders/summary',
-  );
+  return apiFetch<{
+    awaitingQuote: number;
+    beingPriced: number;
+    activeOrders?: number;
+    pendingPayment?: number;
+    infoNeeded?: number;
+  }>('/orders/summary');
 }
 
 export function getMyOrder(id: string) {
@@ -117,6 +121,7 @@ export function listAdminOrders(params?: {
   updatedOlderThanDays?: number;
   clientId?: string;
   type?: string;
+  quotePipeline?: boolean;
   q?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -131,6 +136,7 @@ export function listAdminOrders(params?: {
     q.set('updatedOlderThanDays', String(params.updatedOlderThanDays));
   if (params?.clientId) q.set('clientId', params.clientId);
   if (params?.type) q.set('type', params.type);
+  if (params?.quotePipeline) q.set('quotePipeline', '1');
   if (params?.q) q.set('q', params.q);
   if (params?.dateFrom) q.set('dateFrom', params.dateFrom);
   if (params?.dateTo) q.set('dateTo', params.dateTo);

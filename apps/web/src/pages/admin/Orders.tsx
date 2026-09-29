@@ -136,6 +136,7 @@ export function AdminOrders() {
                 const chip = lifecycleChip(o.status as OrderStatus, 'admin', {
                   partiallyAccepted: o.partiallyAccepted,
                   partiallyDelivered: o.partiallyDelivered,
+                  revisionPartial: o.revisionPartial,
                 });
                 return (
                   <tr key={o.id} className="click-row" onClick={() => navigate(`/admin/orders/${orderSlug(o.humanRef, o.id)}`)}>

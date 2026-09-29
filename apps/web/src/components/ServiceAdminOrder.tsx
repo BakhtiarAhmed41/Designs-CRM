@@ -10,7 +10,13 @@ import { apiFetch, downloadSignedFile, getErrorMessage, resolveFileUrl } from '@
 import { refundOrder } from '@/lib/billing';
 import type { RefundTo } from '@/lib/billing';
 import { createDesign, updateDesign, type Design, type DesignStatus } from '@/lib/designs';
-import { createAdminEdit, getOrderActivity, listAdminOrderEdits, type EditKind } from '@/lib/edits';
+import {
+  createAdminEdit,
+  deleteAdminEdit,
+  getOrderActivity,
+  listAdminOrderEdits,
+  type EditKind,
+} from '@/lib/edits';
 import {
   asEmbroideryPrefs,
   backgroundLabel,
@@ -29,10 +35,12 @@ import {
   dateShort,
   deliveredViaFromFlags,
   deliveryMethodLabel,
+  designDeliveredLabel,
   isImageFile,
   money,
   orderDeliveredVia,
   orderNumber,
+  revisionDeliveryState,
 } from '@/lib/format';
 import { createAdminConversation } from '@/lib/messaging';
 import {
@@ -316,6 +324,20 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
     onError: (e) => setError(getErrorMessage(e)),
   });
 
+  const removeRevision = useMutation({
+    mutationFn: (id: string) => deleteAdminEdit(id),
+    onSuccess: async () => {
+      refresh();
+      await dialog.alert({
+        title: 'Revision deleted',
+        message: 'That revision request was removed. The order status follows the designs that are still open.',
+        confirmLabel: 'Done',
+        tone: 'success',
+      });
+    },
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
   const refund = useMutation({
     mutationFn: () => {
       const cents = Math.round(Number(refundAmount) * 100);
@@ -401,15 +423,21 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
     );
   const phaseFor = (row: DeliveryRow) => {
     const status = row.design?.status;
-    if (rowInRevision(row) && (!status || status === 'DELIVERED')) return 'progress' as const;
+    if (rowInRevision(row) && status !== 'DELIVERED') return 'progress' as const;
     return linePhase(status);
   };
+  const revisionState = revisionDeliveryState(edits, (id) => {
+    const row = groups.flatMap((group) => group.rows).find((item) => item.design?.id === id);
+    return row?.design?.status;
+  });
   const revisionRequested =
     order.status === 'REVISION_REQUESTED' || edits.some((edit) => edit.status === 'PENDING');
   const headerLabel = unpriced
     ? 'Needs your price'
     : order.status === 'PENDING_PAYMENT'
       ? 'Awaiting payment'
+      : revisionState === 'partial'
+        ? 'Partially delivered'
       : revisionRequested
         ? 'Revision requested'
         : counts.allDelivered
@@ -489,7 +517,9 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
     }
     return (
       <>
-        <span className="sod-status ready">Delivered</span>
+        <span className="sod-status ready">
+          {designDeliveredLabel(order.deliveries, row.design?.id)}
+        </span>
         {view}
       </>
     );
@@ -641,6 +671,28 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
                         <span className="ead-he-sub" style={{ marginTop: 0 }}>
                           {edit.status === 'DONE' ? 'Delivered' : 'Revision requested'}
                         </span>
+                        {edit.status !== 'DONE' && (
+                          <button
+                            type="button"
+                            className="ead-btn sm"
+                            disabled={removeRevision.isPending}
+                            onClick={() => {
+                              void dialog
+                                .confirm({
+                                  title: 'Delete this revision?',
+                                  message:
+                                    'Use this when the revision was created by mistake. Files already delivered stay on the order.',
+                                  confirmLabel: 'Delete revision',
+                                  danger: true,
+                                })
+                                .then((ok) => {
+                                  if (ok) removeRevision.mutate(edit.id);
+                                });
+                            }}
+                          >
+                            Delete
+                          </button>
+                        )}
                         {paid && (
                           <span className={edit.invoiceStatus === 'PAID' ? 'ead-pill ok' : 'ead-pill'}>
                             {edit.invoiceStatus === 'PAID' ? 'Paid' : 'Unpaid'}

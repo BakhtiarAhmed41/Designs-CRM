@@ -59,9 +59,10 @@ export function PortalShell() {
     },
   });
 
-  useQuery({
+  const { data: orderSummary } = useQuery({
     queryKey: ['my-orders-summary'],
     queryFn: listMyOrderSummary,
+    refetchInterval: whenVisible(30_000),
   });
   useQuery({
     queryKey: ['portal-invoices-summary'],
@@ -115,6 +116,16 @@ export function PortalShell() {
       </span>
     ) : null;
 
+  const quotePending = (orderSummary?.awaitingQuote ?? 0) + (orderSummary?.infoNeeded ?? 0);
+  const orderPending = orderSummary?.pendingPayment ?? 0;
+
+  const countBadge = (count: number, label: string) =>
+    count > 0 ? (
+      <span className="cnt" aria-label={`${count} ${label}`}>
+        {count}
+      </span>
+    ) : null;
+
   const main: NavEntry[] = [
     { to: '/portal', label: 'Dashboard', icon: 'ti-layout-dashboard', end: true },
     {
@@ -129,13 +140,13 @@ export function PortalShell() {
       to: '/portal/quotes',
       label: 'Quotes',
       icon: 'ti-file-invoice',
-      badge: newBadge('quotes', 'quotes'),
+      badge: countBadge(quotePending, 'quotes waiting on you') ?? newBadge('quotes', 'quotes'),
     },
     {
       to: '/portal/orders',
       label: 'Orders',
       icon: 'ti-package',
-      badge: newBadge('orders', 'orders'),
+      badge: countBadge(orderPending, 'orders waiting on you') ?? newBadge('orders', 'orders'),
     },
     {
       to: '/portal/files',

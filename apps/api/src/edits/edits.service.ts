@@ -558,6 +558,80 @@ export class EditsService {
     return this.loadEdit(editId);
   }
 
+  async deleteEdit(user: AuthUser | undefined, editId: string) {
+    this.assertStaff(user);
+    const edit = await this.db.queryOne<EditRow>(
+      'SELECT * FROM edit_requests WHERE id = ? LIMIT 1',
+      [editId],
+    );
+    if (!edit) throw new NotFoundException('Edit request not found');
+    if (edit.status !== EditStatus.PENDING) {
+      throw new BadRequestException('Only an open revision can be deleted');
+    }
+
+    const ids = parseDesignIds(edit.design_ids, edit.design_id);
+    const others = await this.db.query<{ design_id: string | null; design_ids: unknown }>(
+      `SELECT design_id, design_ids FROM edit_requests
+        WHERE order_id = ? AND status = ? AND id <> ?`,
+      [edit.order_id, EditStatus.PENDING, editId],
+    );
+    const stillOpen = new Set(
+      others.flatMap((row) => parseDesignIds(row.design_ids, row.design_id)),
+    );
+    await this.releaseUnpaidRevisionInvoice(editId);
+    for (const designId of ids) {
+      if (stillOpen.has(designId)) continue;
+      if (!(await this.designWasDelivered(edit.order_id, designId))) continue;
+      await this.db.execute(
+        `UPDATE order_designs SET status = ?
+          WHERE id = ? AND order_id = ? AND status <> ?`,
+        [DesignStatus.DELIVERED, designId, edit.order_id, DesignStatus.DELIVERED],
+      );
+    }
+    await this.db.execute('DELETE FROM edit_requests WHERE id = ?', [editId]);
+    await this.writeLog(this.db, {
+      orderId: edit.order_id,
+      actorId: user.id,
+      event: 'edit_deleted',
+      meta: { editId, designIds: ids },
+    });
+    await this.settleOrderAfterRevision(edit.order_id);
+    return { ok: true as const };
+  }
+
+  private async designWasDelivered(orderId: string, designId: string) {
+    const linked = await this.db.queryOne<{ id: string }>(
+      `SELECT df.id
+         FROM delivery_files df
+         JOIN deliveries d ON d.id = df.delivery_id
+        WHERE d.order_id = ?
+          AND df.design_id = ?
+          AND d.released_at IS NOT NULL
+          AND (d.kind IS NULL OR d.kind <> 'PREVIEW')
+          AND df.original_name NOT LIKE 'Delivered by email'
+        LIMIT 1`,
+      [orderId, designId],
+    );
+    if (linked) return true;
+    const emailOnly = await this.db.queryOne<{ id: string }>(
+      `SELECT d.id
+         FROM deliveries d
+        WHERE d.order_id = ?
+          AND d.released_at IS NOT NULL
+          AND (d.kind IS NULL OR d.kind <> 'PREVIEW')
+          AND d.delivered_via IN ('EMAIL', 'BOTH')
+          AND NOT EXISTS (
+            SELECT 1 FROM delivery_files f
+             WHERE f.delivery_id = d.id
+               AND f.design_id IS NOT NULL
+               AND f.original_name NOT LIKE 'Delivered by email'
+          )
+        LIMIT 1`,
+      [orderId],
+    );
+    return Boolean(emailOnly);
+  }
+
   async getActivity(user: AuthUser | undefined, orderId: string) {
     this.assertStaff(user);
     const rows = await this.db.query<ActivityRow>(

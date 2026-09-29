@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -93,6 +94,14 @@ export class AdminEditsController {
     const data = updateEditSchema.parse(body);
     const edit = await this.edits.updateEdit(user, id, data);
     return { edit };
+  }
+
+  @Delete('edits/:id')
+  async remove(
+    @CurrentUser() user: AuthUser | undefined,
+    @Param('id') id: string,
+  ) {
+    return this.edits.deleteEdit(user, id);
   }
 
   @Get('orders/:id/edits')

@@ -390,9 +390,17 @@ body {
   margin-inline: auto;
   min-width: 0;
 }
-.main:not(.main-messaging) > div.portal-quotes-page {
+.main:not(.main-messaging) > div.portal-quotes-page,
+.main:not(.main-messaging) > div.portal-orders-page,
+.main:not(.main-messaging) > div.admin-quotes-page {
   max-width: none;
   margin-inline: 0;
+}
+.app-frame .main:has(.portal-quotes-page),
+.app-frame .main:has(.portal-orders-page),
+.app-frame .main:has(.admin-quotes-page) {
+  padding-left: 16px;
+  padding-right: 20px;
 }
 .main:not(.main-messaging) > div.admin-inbox-page {
   display: grid;

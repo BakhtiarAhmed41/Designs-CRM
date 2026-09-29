@@ -19,7 +19,7 @@ import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 
-type QuoteFilter = 'all' | 'needs' | 'sent' | 'urgent' | 'declined';
+const SENT: OrderStatus[] = ['QUOTATION_PROVIDED'];
 
 function customerLabel(o: Order) {
   const c = o.client;
@@ -31,18 +31,9 @@ function daysAgo(iso: string) {
   return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
 }
 
-const NEEDS: OrderStatus[] = ['CREATED', 'WAITING_FOR_QUOTATION'];
-const SENT: OrderStatus[] = ['QUOTATION_PROVIDED'];
-const DECLINED: OrderStatus[] = [
-  'CLIENT_REJECTED_QUOTATION',
-  'REJECTED',
-  'CANCELLED',
-];
-
 export function AdminQuotes() {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [filter, setFilter] = useState<QuoteFilter>('all');
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -57,24 +48,15 @@ export function AdminQuotes() {
     return () => window.clearTimeout(t);
   }, [toast]);
 
-  const tabStatuses =
-    filter === 'needs' || filter === 'urgent'
-      ? NEEDS
-      : filter === 'sent'
-        ? SENT
-        : filter === 'declined'
-          ? DECLINED
-          : undefined;
+  const approvedOnly = status === 'APPROVED';
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-quotes', filter, q, status, dateFrom, dateTo, page],
+    queryKey: ['admin-quotes', q, status, dateFrom, dateTo, page],
     queryFn: () =>
       listAdminOrders({
-        type: 'QUOTE_REQUEST',
+        quotePipeline: true,
         q: q || undefined,
-        status: filter === 'all' ? status || undefined : undefined,
-        statuses: tabStatuses,
-        olderThanDays: filter === 'urgent' ? 2 : undefined,
+        status: approvedOnly ? 'APPROVED' : status || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,
         page,
@@ -150,10 +132,10 @@ export function AdminQuotes() {
   });
 
   return (
-    <div>
+    <div className="admin-quotes-page">
       <PageHeader
         title="Quotes"
-        subtitle="Needs pricing, sent, urgent, and declined in one pipeline."
+        subtitle="Needs pricing, sent, approved, and declined in one pipeline."
         actions={
           <button
             type="button"
@@ -182,11 +164,12 @@ export function AdminQuotes() {
         statusOptions={[
           { value: '', label: 'All statuses' },
           { value: 'WAITING_FOR_QUOTATION', label: 'Needs pricing' },
+          { value: 'CREATED', label: 'New request' },
           { value: 'QUOTATION_PROVIDED', label: 'Awaiting customer' },
+          { value: 'APPROVED', label: 'Approved' },
           { value: 'WAITING_FOR_ADMIN_QUOTATION_APPROVAL', label: 'Counter pending' },
           { value: 'CLIENT_REJECTED_QUOTATION', label: 'Declined by customer' },
           { value: 'REJECTED', label: 'Declined by staff' },
-          { value: 'CREATED', label: 'Needs pricing' },
           { value: 'CANCELLED', label: 'Expired' },
         ]}
         dateFrom={dateFrom}
@@ -201,33 +184,13 @@ export function AdminQuotes() {
         }}
       />
 
-      <div>
-        <div className="filters">
-          <button type="button" className={filter === 'all' ? 'on' : ''} onClick={() => { setFilter('all'); setPage(1); }}>
-            All
-          </button>
-          <button type="button" className={filter === 'needs' ? 'on' : ''} onClick={() => { setFilter('needs'); setPage(1); }}>
-            Needs pricing
-          </button>
-          <button type="button" className={filter === 'sent' ? 'on' : ''} onClick={() => { setFilter('sent'); setPage(1); }}>
-            Sent, awaiting customer
-          </button>
-          <button type="button" className={filter === 'declined' ? 'on' : ''} onClick={() => { setFilter('declined'); setPage(1); }}>
-            Declined
-          </button>
-          <button type="button" className={filter === 'urgent' ? 'on' : ''} onClick={() => { setFilter('urgent'); setPage(1); }}>
-            Urgent
-          </button>
-        </div>
-      </div>
-
       <div className="card table-card">
         {isLoading && <SkeletonRows rows={5} />}
         {!isLoading && quotes.length === 0 && (
           <EmptyState
             icon="ti-file-invoice"
             title="No quotes in this view"
-            description="Try another tab or search, or generate a quote from the dashboard."
+            description="Try another status or search, or generate a quote from the dashboard."
           />
         )}
         {!isLoading && quotes.length > 0 && (
@@ -243,12 +206,20 @@ export function AdminQuotes() {
             </thead>
             <tbody>
               {quotes.map((o) => {
-                const chip = quoteLifecycleChip(o.status, 'admin', {
-                  partiallyAccepted: o.partiallyAccepted,
-                  adminRecounter: isAdminRecounter(o.quotations),
-                });
+                const approved = o.type === 'ORDER';
+                const chip = approved
+                  ? { cls: 'chip c-done', label: 'Approved' }
+                  : quoteLifecycleChip(o.status, 'admin', {
+                      partiallyAccepted: o.partiallyAccepted,
+                      adminRecounter: isAdminRecounter(o.quotations),
+                    });
+                const slug = orderSlug(o.humanRef, o.id);
                 return (
-                  <tr key={o.id} className="click-row" onClick={() => navigate(`/admin/quotes/${orderSlug(o.humanRef, o.id)}`)}>
+                  <tr
+                    key={o.id}
+                    className="click-row"
+                    onClick={() => navigate(approved ? `/admin/orders/${slug}` : `/admin/quotes/${slug}`)}
+                  >
                     <td>
                       <div className="cell-main">
                         <div className={`othumb ${serviceThumbClass(o.serviceType)}`}>

@@ -160,7 +160,6 @@ export function EmbroideryCustomerQuote({
         <section className="ecd-sec">
           <div className="ecd-sec-h">
             <h2>Order summary</h2>
-            <p className="ecd-sec-desc">Quoted prices and payment details</p>
           </div>
           {lines.length === 0 && (
             <p className="ecd-wait">

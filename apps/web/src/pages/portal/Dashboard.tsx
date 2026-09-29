@@ -85,6 +85,12 @@ export function PortalDashboard() {
     enabled: rangeReady,
     ...freshOnOpen,
   });
+  const { data: openOrdersData, isLoading: openOrdersLoading } = useQuery({
+    queryKey: ['my-orders', 'dash-open'],
+    queryFn: () =>
+      listMyOrders({ type: 'ORDER', lifecycle: 'active', page: 1, pageSize: 20 }),
+    ...freshOnOpen,
+  });
   const { data: quotesData, isLoading: quotesLoading } = useQuery({
     queryKey: ['my-quotes', 'dash-active'],
     queryFn: () =>
@@ -123,8 +129,16 @@ export function PortalDashboard() {
     ...freshOnOpen,
   });
 
-  const orders = (ordersData?.orders ?? []).filter((o) => !isQuote(o) && ACTIVE_ORDER.has(o.status));
-  const quotes = (quotesData?.orders ?? []).filter((o) => ACTIVE_QUOTE.has(o.status));
+  const orders = (openOrdersData?.orders ?? [])
+    .filter((o) => !isQuote(o) && ACTIVE_ORDER.has(o.status))
+    .sort((a, b) => Number(b.status === 'PENDING_PAYMENT') - Number(a.status === 'PENDING_PAYMENT'));
+  const quotes = (quotesData?.orders ?? [])
+    .filter((o) => ACTIVE_QUOTE.has(o.status) || o.needsCustomerInfo)
+    .sort((a, b) => {
+      const waiting = (o: Order) =>
+        o.status === 'QUOTATION_PROVIDED' || o.needsCustomerInfo ? 0 : 1;
+      return waiting(a) - waiting(b);
+    });
   const revisions = (editsData?.edits ?? []).filter((e) => e.status !== 'DONE');
   const unpaidInvoices = (invoicesData?.invoices ?? []).filter(
     (i) => i.status === 'AWAITING' || i.status === 'PARTIAL',
@@ -136,7 +150,7 @@ export function PortalDashboard() {
   const paidCents = rangeInvoices
     .filter((i) => i.status === 'PAID' || i.status === 'PARTIAL')
     .reduce((s, i) => s + (i.amountCents - (i.remainingCents ?? (i.status === 'PAID' ? 0 : i.amountCents))), 0);
-  const isLoading = ordersLoading || quotesLoading;
+  const isLoading = openOrdersLoading || ordersLoading || quotesLoading;
   const firstName = user?.firstName || 'there';
   const activities = activityData?.notifications ?? [];
   const activityPages = activityData?.totalPages ?? 1;
@@ -292,7 +306,9 @@ export function PortalDashboard() {
                           </td>
                           <td>{money(o.priceCents)}</td>
                           <td>
-                            <span className="activity-link">View</span>
+                            <span className="activity-link">
+                              {o.status === 'PENDING_PAYMENT' ? 'Pay' : 'View'}
+                            </span>
                           </td>
                         </tr>
                       );
@@ -363,7 +379,9 @@ export function PortalDashboard() {
                           </td>
                           <td>{o.priceCents ? money(o.priceCents) : '—'}</td>
                           <td>
-                            <span className="activity-link">View</span>
+                            <span className="activity-link">
+                              {o.status === 'QUOTATION_PROVIDED' || o.needsCustomerInfo ? 'Review' : 'View'}
+                            </span>
                           </td>
                         </tr>
                       );

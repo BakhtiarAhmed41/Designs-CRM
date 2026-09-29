@@ -2074,9 +2074,13 @@ export class BillingService {
         customer_name: string | null;
         order_ref: string | null;
         service_type: string | null;
+        line_order_ids: string | null;
       }
     >(
-      `SELECT i.*, c.name AS customer_name, o.human_ref AS order_ref, o.service_type
+      `SELECT i.*, c.name AS customer_name, o.human_ref AS order_ref, o.service_type,
+              (SELECT GROUP_CONCAT(DISTINCT l.order_id)
+                 FROM invoice_lines l
+                WHERE l.invoice_id = i.id AND l.order_id IS NOT NULL) AS line_order_ids
          FROM invoices i
          LEFT JOIN customers c ON c.id = i.customer_id
          LEFT JOIN orders o ON o.id = i.order_id
@@ -2100,7 +2104,17 @@ export class BillingService {
         : 0;
 
     return {
-      invoices: invoices.map((r) => this.invoiceDto(r)),
+      invoices: invoices.map((r) => {
+        const linked = new Set<string>();
+        if (r.order_id) linked.add(r.order_id);
+        for (const id of (r.line_order_ids ?? '').split(',')) {
+          if (id) linked.add(id);
+        }
+        return {
+          ...this.invoiceDto(r),
+          linkedOrderIds: [...linked],
+        };
+      }),
       storeCreditCents: customer.store_credit_cents,
       unbilledMonthCents,
     };

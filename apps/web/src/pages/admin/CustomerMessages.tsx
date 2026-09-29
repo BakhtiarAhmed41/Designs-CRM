@@ -30,6 +30,7 @@ import {
   type ConversationStatus,
 } from '@/lib/messaging';
 import { HelpRequestBadge, InboxBulkBar, InboxStarButton } from '@/components/messaging/InboxTools';
+import { PaginationBar } from '@/components/lists/ListToolbar';
 import { dateShort, money, statusChipClass, statusLabel, orderNumber, orderSlug } from '@/lib/format';
 import { useDialog } from '@/components/ui/AppDialog';
 import { canFeature } from '@/lib/permissions';
@@ -92,6 +93,8 @@ function inboxTitle(c: Conversation, hideCustomerDetails: boolean) {
 
 type FilterKey = 'all' | 'starred' | 'unread' | 'open' | 'closed' | 'GENERAL' | 'ORDER' | 'QUOTE';
 
+const INBOX_PAGE_SIZE = 10;
+
 const FILTERS: Array<{ key: FilterKey; label: string; icon: string }> = [
   { key: 'all', label: 'Inbox', icon: 'ti-inbox' },
   { key: 'starred', label: 'Starred', icon: 'ti-user-star' },
@@ -119,6 +122,7 @@ export function AdminCustomerMessages() {
 
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<FilterKey>('all');
+  const [page, setPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [notesDraft, setNotesDraft] = useState('');
   const [startMenuOpen, setStartMenuOpen] = useState(false);
@@ -150,6 +154,21 @@ export function AdminCustomerMessages() {
     if (filter === 'starred') return visible.filter((c) => isStarred(c, 'admin'));
     return visible;
   }, [listQuery.data?.conversations, hideCustomerDetails, filter]);
+
+  const totalPages = Math.max(1, Math.ceil(conversations.length / INBOX_PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pagedConversations = conversations.slice(
+    (currentPage - 1) * INBOX_PAGE_SIZE,
+    currentPage * INBOX_PAGE_SIZE,
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [q, filter]);
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, totalPages));
+  }, [totalPages]);
 
   useEffect(() => {
     setSelected((ids) => ids.filter((id) => conversations.some((c) => c.id === id)));
@@ -314,8 +333,10 @@ export function AdminCustomerMessages() {
   }
 
   function toggleAll() {
-    setSelected((ids) =>
-      ids.length === conversations.length ? [] : conversations.map((c) => c.id),
+    const ids = pagedConversations.map((c) => c.id);
+    const allOnPage = ids.length > 0 && ids.every((id) => selected.includes(id));
+    setSelected((current) =>
+      allOnPage ? current.filter((id) => !ids.includes(id)) : [...new Set([...current, ...ids])],
     );
   }
 
@@ -479,19 +500,6 @@ export function AdminCustomerMessages() {
                 )}
                 <button
                   type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={() =>
-                    updateMutation.mutate({
-                      status: active.status === 'OPEN' ? 'CLOSED' : 'OPEN',
-                    })
-                  }
-                  disabled={updateMutation.isPending}
-                >
-                  <i className={`ti ${active.status === 'OPEN' ? 'ti-x' : 'ti-refresh'}`} />
-                  {active.status === 'OPEN' ? 'Close' : 'Reopen'}
-                </button>
-                <button
-                  type="button"
                   className="icon-btn danger"
                   aria-label="Delete chat"
                   disabled={deleteChat.isPending}
@@ -627,22 +635,24 @@ export function AdminCustomerMessages() {
                 (contextQuery.data?.recentOrders ?? []).length === 0 && (
                   <div className="muted" style={{ fontSize: 13 }}>No orders yet.</div>
                 )}
-              {(contextQuery.data?.recentOrders ?? []).map((o) => (
-                <Link key={o.id} to={`/admin/orders/${orderSlug(o.humanRef, o.id)}`} className="msg-order-row">
-                  <div>
-                    <b>{o.humanRef ? `Order ${orderNumber(o.humanRef)}` : 'Order'}</b>
-                    <div className="msg-order-date">{dateShort(o.createdAt)}</div>
-                  </div>
-                  <div className="msg-order-meta">
-                    {!hideCustomerDetails && o.totalCents != null && (
-                      <b>{money(o.totalCents)}</b>
-                    )}
-                    <span className={statusChipClass(o.status)}>
-                      {statusLabel(o.status, 'admin')}
-                    </span>
-                  </div>
-                </Link>
-              ))}
+              <div className="msg-order-scroll">
+                {(contextQuery.data?.recentOrders ?? []).slice(0, 15).map((o) => (
+                  <Link key={o.id} to={`/admin/orders/${orderSlug(o.humanRef, o.id)}`} className="msg-order-row">
+                    <div>
+                      <b>{o.humanRef ? `Order ${orderNumber(o.humanRef)}` : 'Order'}</b>
+                      <div className="msg-order-date">{dateShort(o.createdAt)}</div>
+                    </div>
+                    <div className="msg-order-meta">
+                      {!hideCustomerDetails && o.totalCents != null && (
+                        <b>{money(o.totalCents)}</b>
+                      )}
+                      <span className={statusChipClass(o.status)}>
+                        {statusLabel(o.status, 'admin')}
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
             </div>
           </div>
           {active && (
@@ -688,7 +698,11 @@ export function AdminCustomerMessages() {
 
       <InboxBulkBar
         selectedCount={selected.length}
-        totalCount={conversations.length}
+        totalCount={pagedConversations.length}
+        allSelected={
+          pagedConversations.length > 0 &&
+          pagedConversations.every((c) => selected.includes(c.id))
+        }
         onToggleAll={toggleAll}
         onDelete={() => void confirmBulkDelete()}
         deleting={bulkChats.isPending}
@@ -703,7 +717,7 @@ export function AdminCustomerMessages() {
             description="Chats show up here when a customer messages you from a quote, order, or the inbox."
           />
         )}
-        {conversations.map((c) => {
+        {pagedConversations.map((c) => {
           const name = inboxTitle(c, hideCustomerDetails);
           const refLabel = conversationRefLabel(c);
           const help = isHelpRequest(c);
@@ -770,6 +784,12 @@ export function AdminCustomerMessages() {
           <div className="inbox-hint">Select a conversation to view messages.</div>
         )}
       </div>
+      <PaginationBar
+        page={currentPage}
+        totalPages={totalPages}
+        total={conversations.length}
+        onPage={setPage}
+      />
       </div>
     </div>
   );

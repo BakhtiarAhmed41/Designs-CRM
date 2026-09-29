@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
-import { startMyOrderCheckout } from '@/lib/billing';
+import { listMyInvoices, openInvoicePrint, startMyOrderCheckout } from '@/lib/billing';
 import { createOrder, getMyOrder, listMyOrders } from '@/lib/orders';
 import { listMyEdits, requestEdit } from '@/lib/edits';
 import { getMyCustomer } from '@/lib/customers';
@@ -18,6 +18,7 @@ import { SkeletonRows } from '@/components/ui/Skeleton';
 import { invalidateWorkCaches } from '@/lib/queryCache';
 import { freshOnOpen } from '@/lib/queryRefresh';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { openLinkedChat } from '@/lib/messaging';
 
 type OrderFilter = 'all' | 'in_progress' | 'revision' | 'delivered';
 
@@ -142,19 +143,72 @@ function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
     }
   }
 
+  const helpMut = useMutation({
+    mutationFn: () =>
+      openLinkedChat({
+        orderId,
+        chatType: 'ORDER',
+        label: 'HELP',
+        subject: order?.humanRef ? `Order ${orderNumber(order.humanRef)} Chat` : 'Order Chat',
+      }),
+    onSuccess: (convo) => navigate(`/portal/messages?c=${convo.id}`),
+    onError: (e) => setActionError(getErrorMessage(e)),
+  });
+
+  async function openOrderInvoice() {
+    setActionError(null);
+    setActionBusy(true);
+    try {
+      const { invoices } = await listMyInvoices();
+      const invoice = invoices.find(
+        (item) => item.orderId === orderId || item.linkedOrderIds?.includes(orderId),
+      );
+      if (!invoice) {
+        setActionError('No invoice for this order yet.');
+        return;
+      }
+      await openInvoicePrint(invoice.id);
+    } catch (e) {
+      setActionError(getErrorMessage(e));
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
   if (!open) return null;
 
   const expandLinks = (
     <div className="order-expand-actions">
+      {actionError && (
+        <div className="alert-error" style={{ flexBasis: '100%' }}>
+          {actionError}
+        </div>
+      )}
       <Link to={`/portal/orders/${orderSlug(order?.humanRef, orderId)}`} className="btn btn-primary btn-sm" onClick={(e) => e.stopPropagation()}>
         View order
       </Link>
-      <Link to="/portal/messages" className="btn btn-ghost btn-sm" onClick={(e) => e.stopPropagation()}>
-        Need help
-      </Link>
-      <Link to="/portal/invoices" className="btn btn-ghost btn-sm" onClick={(e) => e.stopPropagation()}>
-        View invoice
-      </Link>
+      <button
+        type="button"
+        className="btn btn-ghost btn-sm"
+        disabled={helpMut.isPending}
+        onClick={(e) => {
+          e.stopPropagation();
+          helpMut.mutate();
+        }}
+      >
+        {helpMut.isPending ? 'Opening…' : 'Help request'}
+      </button>
+      <button
+        type="button"
+        className="btn btn-ghost btn-sm"
+        disabled={actionBusy}
+        onClick={(e) => {
+          e.stopPropagation();
+          void openOrderInvoice();
+        }}
+      >
+        {actionBusy ? 'Opening…' : 'View invoice'}
+      </button>
     </div>
   );
 
@@ -173,11 +227,6 @@ function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
 
   const deliveredActions = canRequestRevision ? (
     <>
-      {actionError && (
-        <div className="alert-error" style={{ margin: '8px 0' }}>
-          {actionError}
-        </div>
-      )}
       <div
         style={{
           display: 'flex',
@@ -343,7 +392,7 @@ export function PortalOrders() {
   };
 
   return (
-    <div>
+    <div className="portal-orders-page">
       <PageHeader
         title="Orders"
         subtitle="View all your orders and track their current status."
@@ -461,7 +510,6 @@ export function PortalOrders() {
               <tr>
                 <th>Order</th>
                 <th>Category</th>
-                <th>Designs</th>
                 <th>Status</th>
                 <th>File delivery</th>
                 <th>Date</th>
@@ -487,7 +535,6 @@ export function PortalOrders() {
                         </div>
                       </td>
                       <td className="muted">{serviceCategoryLabel(o.serviceType)}</td>
-                      <td>{o.designCount ? `${o.designCount} design${o.designCount === 1 ? '' : 's'}` : '—'}</td>
                       <td>
                         <span className={chip.cls}>{chip.label}</span>
                       </td>
@@ -535,7 +582,7 @@ export function PortalOrders() {
                     </tr>
                     {open && (
                       <tr className="expand-row">
-                        <td colSpan={7}>
+                        <td colSpan={6}>
                           <OrderBatch orderId={o.id} open={open} />
                         </td>
                       </tr>

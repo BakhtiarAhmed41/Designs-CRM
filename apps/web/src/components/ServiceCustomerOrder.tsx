@@ -26,10 +26,12 @@ import {
 } from '@/lib/embroideryQuote';
 import {
   dateShort,
+  designDeliveredLabel,
   isImageFile,
   money,
   orderNumber,
   orderSlug,
+  revisionDeliveryState,
 } from '@/lib/format';
 import { listMyEdits, type EditRequest } from '@/lib/edits';
 import { openLinkedChat } from '@/lib/messaging';
@@ -91,11 +93,15 @@ function emailOnlyDelivery(order: CustomerOrder, row: DeliveryRow) {
 
 function rowStatus(order: CustomerOrder, row: DeliveryRow) {
   if (row.design?.status === 'DELIVERED') {
-    return emailOnlyDelivery(order, row)
-      ? { text: 'Delivered by email', ready: true }
-      : { text: 'Delivered', ready: true };
+    return {
+      text: designDeliveredLabel(order.deliveries, row.design.id),
+      tone: 'done' as const,
+    };
   }
-  return { text: 'In progress', ready: false };
+  if (row.design?.status === 'DONE') {
+    return { text: 'Ready', tone: 'ready' as const };
+  }
+  return { text: 'In progress', tone: 'wait' as const };
 }
 
 export function ServiceCustomerOrder({
@@ -176,8 +182,14 @@ export function ServiceCustomerOrder({
       const ids = edit.designIds?.length ? edit.designIds : edit.designId ? [edit.designId] : [];
       return Boolean(row.design && ids.includes(row.design.id));
     });
-  const header = openRevisions.length > 0
-    ? { text: 'Revision requested', ok: false }
+  const revisionState = revisionDeliveryState(revisions, (id) => {
+    const row = groups.flatMap((group) => group.rows).find((item) => item.design?.id === id);
+    return row?.design?.status ?? order.designs?.find((design) => design.id === id)?.status;
+  });
+  const header = revisionState === 'partial'
+    ? { text: 'Partially delivered', ok: false }
+    : revisionState === 'revision'
+      ? { text: 'Revision requested', ok: false }
     : counts.allDelivered
       ? { text: 'Delivered', ok: true }
       : awaiting
@@ -332,9 +344,9 @@ export function ServiceCustomerOrder({
           <div key={group.title} className="cop-block">
             <div className="cop-dhead">{group.title}</div>
             {group.rows.map((row, index) => {
-              const inRevision = rowInRevision(row);
+              const inRevision = rowInRevision(row) && row.design?.status !== 'DELIVERED';
               const status = inRevision
-                ? { text: 'Revision requested', ready: false }
+                ? { text: 'Revision requested', tone: 'wait' as const }
                 : rowStatus(order, row);
               const caption = rowCaption(group.title, index, row.name, group.rows.length, designs);
               const hasFiles = deliveredFiles(row).length > 0 || row.design?.status === 'DELIVERED';
@@ -344,8 +356,8 @@ export function ServiceCustomerOrder({
                     Size {index + 1}
                     {caption && <span>{caption}</span>}
                   </div>
-                  <div className={status.ready ? 'cop-state ready' : 'cop-state wait'}>
-                    {status.ready ? '✓ ' : '● '}
+                  <div className={`cop-state ${status.tone}`}>
+                    {status.tone === 'done' ? '✓ ' : '● '}
                     {status.text}
                   </div>
                   <div className="cop-actions">

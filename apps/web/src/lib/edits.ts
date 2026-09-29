@@ -82,6 +82,10 @@ export function createAdminEdit(
   });
 }
 
+export function deleteAdminEdit(id: string) {
+  return apiFetch<{ ok: boolean }>(`/admin/edits/${id}`, { method: 'DELETE' });
+}
+
 export function updateAdminEdit(
   id: string,
   data: { status?: EditStatus; assignedDesignerId?: string | null },
