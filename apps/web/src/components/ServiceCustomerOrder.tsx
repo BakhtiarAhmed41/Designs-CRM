@@ -392,7 +392,19 @@ export function ServiceCustomerOrder({
               )}
             </p>
           </div>
-          <strong className={header.ok ? 'cop-pill ok' : 'cop-pill'}>{header.text}</strong>
+          <div className="cop-head-side">
+            <strong className={header.ok ? 'cop-pill ok' : 'cop-pill'}>{header.text}</strong>
+            <div className="cop-actions">
+              <button
+                type="button"
+                className="cop-btn help"
+                disabled={chat.isPending}
+                onClick={() => chat.mutate()}
+              >
+                {chat.isPending ? 'Opening…' : 'Request help'}
+              </button>
+            </div>
+          </div>
         </div>
         {counts.total > 0 && (
           <div className="cop-progress">
@@ -478,35 +490,29 @@ export function ServiceCustomerOrder({
                   )}
                   <span className={`cop-state ${tone}`}>{tone === 'done' ? '✓ ' : '● '}{label}</span>
                 </div>
-                <div className="cop-actions">
-                  {charged && !settled && (
-                    <button
-                      type="button"
-                      className="cop-btn cop-download"
-                      disabled={payBusy || !revision.invoiceId}
-                      onClick={() => void payRevision(revision)}
-                    >
-                      <i className="ti ti-credit-card" /> {payBusy ? 'Opening checkout…' : 'Pay now'}
-                    </button>
-                  )}
-                  {published && viewRow && (
-                    <button
-                      type="button"
-                      className="cop-btn cop-download"
-                      onClick={() => setFilesFor({ row: viewRow, editId: revision.id })}
-                    >
-                      View & download
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="cop-btn help"
-                    disabled={chat.isPending}
-                    onClick={() => chat.mutate()}
-                  >
-                    {chat.isPending ? 'Opening…' : 'Request help'}
-                  </button>
-                </div>
+                {(charged && !settled) || (published && viewRow) ? (
+                  <div className="cop-actions">
+                    {charged && !settled && (
+                      <button
+                        type="button"
+                        className="cop-btn cop-download"
+                        disabled={payBusy || !revision.invoiceId}
+                        onClick={() => void payRevision(revision)}
+                      >
+                        <i className="ti ti-credit-card" /> {payBusy ? 'Opening checkout…' : 'Pay now'}
+                      </button>
+                    )}
+                    {published && viewRow && (
+                      <button
+                        type="button"
+                        className="cop-btn cop-download"
+                        onClick={() => setFilesFor({ row: viewRow, editId: revision.id })}
+                      >
+                        View & download
+                      </button>
+                    )}
+                  </div>
+                ) : null}
               </div>
             );
           })}
@@ -571,16 +577,6 @@ export function ServiceCustomerOrder({
                   </div>
                 </div>
               )}
-              <div className="cop-actions cop-block-acts">
-                <button
-                  type="button"
-                  className="cop-btn help"
-                  disabled={chat.isPending}
-                  onClick={() => chat.mutate()}
-                >
-                  {chat.isPending ? 'Opening…' : 'Request help'}
-                </button>
-              </div>
             </div>
           );
         })}
@@ -596,7 +592,7 @@ export function ServiceCustomerOrder({
             To see files from this and previous orders, open <Link to="/portal/files">My Files</Link>.
           </li>
           <li>
-            For a question about a design, select <strong>Request help</strong> beside that design.
+            For a question about this order, select <strong>Request help</strong> at the top of the page.
           </li>
         </ul>
       </section>
