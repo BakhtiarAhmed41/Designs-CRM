@@ -1266,7 +1266,8 @@
   box-shadow: 0 3px 14px rgba(35, 20, 22, 0.03);
 }
 .cop-head-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
-.cop-head-side { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.cop-help-row { display: flex; justify-content: flex-end; margin-bottom: 14px; }
+.cop-help-row .ecd-btn { gap: 8px; }
 .cop-head h1 { margin: 0 0 6px; font-size: 20px; font-weight: 600; }
 .cop-facts { margin: 0; font-size: 13px; color: var(--muted); }
 .cop-facts span { margin: 0 8px; color: var(--line2); }
@@ -1454,5 +1455,4 @@
   .cop-actions { justify-content: flex-start; }
   .cop-head { padding: 16px; }
   .cop-head-top { flex-wrap: wrap; }
-  .cop-head-side { margin-left: auto; }
 }

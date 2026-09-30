@@ -376,6 +376,11 @@ export function ServiceCustomerOrder({
         </div>
       )}
       {error && <ErrorBanner>{error}</ErrorBanner>}
+      <div className="cop-help-row">
+        <button type="button" className="ecd-btn pri" disabled={chat.isPending} onClick={() => chat.mutate()}>
+          <i className="ti ti-message" /> {chat.isPending ? 'Opening…' : 'Request help'}
+        </button>
+      </div>
       <section className="cop-head">
         <div className="cop-head-top">
           <div>
@@ -392,19 +397,7 @@ export function ServiceCustomerOrder({
               )}
             </p>
           </div>
-          <div className="cop-head-side">
-            <strong className={header.ok ? 'cop-pill ok' : 'cop-pill'}>{header.text}</strong>
-            <div className="cop-actions">
-              <button
-                type="button"
-                className="cop-btn help"
-                disabled={chat.isPending}
-                onClick={() => chat.mutate()}
-              >
-                {chat.isPending ? 'Opening…' : 'Request help'}
-              </button>
-            </div>
-          </div>
+          <strong className={header.ok ? 'cop-pill ok' : 'cop-pill'}>{header.text}</strong>
         </div>
         {counts.total > 0 && (
           <div className="cop-progress">
