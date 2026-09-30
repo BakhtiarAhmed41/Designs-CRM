@@ -299,8 +299,8 @@ export function AdminNewRequest({ mode }: { mode: Mode }) {
     }
   }
 
-  const changeCustomer = useCallback(async () => {
-    const ok = await confirmLoseForm('Pick a different customer?', 'Change customer');
+  const changeSelection = useCallback(async () => {
+    const ok = await confirmLoseForm('Change the service or customer?', 'Change service or customer');
     if (!ok) return;
     setService(null);
   }, [confirmLoseForm]);
@@ -405,28 +405,14 @@ export function AdminNewRequest({ mode }: { mode: Mode }) {
           <span>{service ? `For ${customerLabel || 'the selected customer'}` : copy.blurb}</span>
         </div>
         {service && (
-          <>
-            <button type="button" className="change-service" onClick={() => void changeCustomer()}>
-              Change customer
-              <i className="ti ti-user-edit" />
-            </button>
-            <button
-              type="button"
-              className="change-service"
-              onClick={() => {
-                void confirmLoseForm('Switch service?', 'Switch service').then((ok) => {
-                  if (ok) setService(null);
-                });
-              }}
-            >
-              Change service
-              <i className="ti ti-switch-horizontal" />
-            </button>
-          </>
+          <button type="button" className="change-service" onClick={() => void changeSelection()}>
+            Change service or customer
+            <i className="ti ti-refresh" />
+          </button>
         )}
       </div>
     ),
-    [service, mode, copy.title, copy.blurb, customerLabel, confirmLoseForm, changeCustomer],
+    [service, mode, copy.title, copy.blurb, customerLabel, changeSelection],
   );
   useTopbarLead(topbarLead);
 
@@ -442,17 +428,9 @@ export function AdminNewRequest({ mode }: { mode: Mode }) {
           <h1>{service ? service.title : copy.title}</h1>
         </div>
         {service && (
-          <button
-            type="button"
-            className="change-service"
-            onClick={() => {
-              void confirmLoseForm('Switch service?', 'Switch service').then((ok) => {
-                if (ok) setService(null);
-              });
-            }}
-          >
-            Change service
-            <i className="ti ti-switch-horizontal" />
+          <button type="button" className="change-service" onClick={() => void changeSelection()}>
+            Change service or customer
+            <i className="ti ti-refresh" />
           </button>
         )}
         <button
