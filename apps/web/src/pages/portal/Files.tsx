@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { listMyFiles, type MyFile } from '@/lib/designs';
+import { listMyEdits, type EditRequest } from '@/lib/edits';
 import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
 import { myDeliveryFileUrl } from '@/lib/orders';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
-import { dateShort, deliveryMethodLabel, mergeDeliveredVia, orderNumber, orderSlug } from '@/lib/format';
+import { dateShort, deliveryMethodLabel, mergeDeliveredVia, money, orderNumber } from '@/lib/format';
 import { serviceCategoryLabel } from '@/lib/serviceIcon';
 import { DeliveryPreview } from '@/components/FilePreview';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -49,8 +50,226 @@ function fileSizeLabel(bytes?: number | null) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function splitFiles(files: MyFile[]) {
+  const real = files.filter((file) => !file.emailNotice);
+  return {
+    preview: real.filter((file) => file.kind === 'PREVIEW'),
+    zip: real.filter((file) => file.isBundle && file.kind !== 'PREVIEW'),
+    download: real.filter((file) => file.kind !== 'PREVIEW' && !file.isBundle),
+  };
+}
+
+function OrderFileDetail({
+  orderId,
+  group,
+  onBack,
+  onDownloaded,
+  onError,
+}: {
+  orderId: string;
+  group?: Group;
+  onBack: () => void;
+  onDownloaded: () => void;
+  onError: (message: string) => void;
+}) {
+  const editsQ = useQuery({
+    queryKey: ['my-order-edits', orderId],
+    queryFn: () => listMyEdits(orderId),
+    ...freshOnOpen,
+  });
+  const files = group?.files ?? [];
+  const listed = files.filter((file) => !file.emailNotice);
+  const edits = editsQ.data?.edits ?? [];
+  const orderFiles = listed.filter((file) => !file.editId);
+  const emailed = files.some(
+    (file) => file.emailNotice || file.deliveredVia === 'EMAIL' || file.deliveredVia === 'BOTH',
+  );
+  const byDesign = new Map<string, MyFile[]>();
+  for (const file of orderFiles) {
+    const name = file.designName?.trim() || 'Files';
+    const bucket = byDesign.get(name) ?? [];
+    bucket.push(file);
+    byDesign.set(name, bucket);
+  }
+
+  function download(file: MyFile) {
+    void downloadSignedFile(myDeliveryFileUrl(file.orderId, file.fileId), file.originalName, {
+      stayOnPage: true,
+    })
+      .then(() => onDownloaded())
+      .catch((err) => onError(getErrorMessage(err)));
+  }
+
+  return (
+    <div>
+      <button type="button" className="files-back" onClick={onBack}>
+        ← Back to My Files
+      </button>
+      <div className="card files-order-head">
+        <h2>{group?.orderName?.trim() || 'Order'}</h2>
+        <div className="files-metas">
+          <span>
+            Order <b>{orderNumber(group?.humanRef, orderId.slice(0, 6))}</b>
+          </span>
+          {group?.deliveredAt && <span>Delivered {dateShort(group.deliveredAt)}</span>}
+          <span>
+            {listed.length} file{listed.length === 1 ? '' : 's'}
+          </span>
+        </div>
+      </div>
+
+      <h2 className="files-sec">Revision request files</h2>
+      <div className="card">
+        {edits.length === 0 && <div className="files-empty">No revision requests for this order.</div>}
+        {edits.map((edit, index) => (
+          <RevisionFiles
+            key={edit.id}
+            edit={edit}
+            index={index}
+            files={listed.filter((file) => file.editId === edit.id)}
+            onDownload={download}
+          />
+        ))}
+      </div>
+
+      <h2 className="files-sec">Order files</h2>
+      <div className="card">
+        {emailed && (
+          <div className="files-line">
+            <span className="files-kind email">Sent by email</span>
+            <span>ZIP with all files</span>
+          </div>
+        )}
+        {byDesign.size === 0 && !emailed && <div className="files-empty">No order files yet.</div>}
+        {[...byDesign.entries()].map(([name, items]) => (
+          <div key={name} className="files-block">
+            <div className="files-group">{name}</div>
+            <FileLines files={items} onDownload={download} />
+          </div>
+        ))}
+      </div>
+
+      <div className="card files-help">
+        <h3>Helpful to know</h3>
+        <ul>
+          <li>
+            Each size can be delivered as a <b>Preview</b>, a <b>ZIP file</b>, or by <b>email</b>.
+          </li>
+          <li>
+            <b>Delivered by email</b> means a ZIP containing the files was also sent to your email address.
+          </li>
+          <li>For a question about a design, contact us from Messages.</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
+function RevisionFiles({
+  edit,
+  index,
+  files,
+  onDownload,
+}: {
+  edit: EditRequest;
+  index: number;
+  files: MyFile[];
+  onDownload: (file: MyFile) => void;
+}) {
+  const charged = edit.kind === 'PAID' && (edit.priceCents ?? 0) > 0;
+  const paid = edit.invoiceStatus === 'PAID';
+  return (
+    <div className="files-block">
+      <div className="files-rev-h">
+        <div>
+          <b>Revision {index + 1}</b>
+          <span>{edit.note}</span>
+        </div>
+        <div className="files-rev-meta">
+          {charged ? (
+            <>
+              <b>{money(edit.priceCents, edit.currency ?? 'USD')}</b>
+              <span className={paid ? 'files-pill paid' : 'files-pill unpaid'}>{paid ? 'Paid' : 'Unpaid'}</span>
+            </>
+          ) : (
+            <span className="files-free">Free revision</span>
+          )}
+          <span className={edit.status === 'DONE' ? 'files-st done' : 'files-st wait'}>
+            {edit.status === 'DONE' ? '✓ Delivered' : '● Revision requested'}
+          </span>
+        </div>
+      </div>
+      {files.length === 0 ? (
+        <div className="files-empty">Files will appear here once this revision is published.</div>
+      ) : (
+        <FileLines files={files} onDownload={onDownload} />
+      )}
+    </div>
+  );
+}
+
+function FileLines({ files, onDownload }: { files: MyFile[]; onDownload: (file: MyFile) => void }) {
+  const parts = splitFiles(files);
+  if (parts.preview.length + parts.zip.length + parts.download.length === 0) return null;
+  return (
+    <div className="files-lines">
+      {parts.preview.length > 0 && (
+        <div className="files-line">
+          <span className="files-kind preview">Preview</span>
+          <span>
+            {parts.preview.length} file{parts.preview.length === 1 ? '' : 's'}
+          </span>
+          <span className="files-st done">View only</span>
+          <div className="od-files">
+            {parts.preview.map((file) => (
+              <DeliveryPreview
+                key={file.fileId}
+                orderId={file.orderId}
+                fileId={file.fileId}
+                name={file.originalName}
+                mimeType={file.mimeType}
+                previewUrl={file.previewUrl}
+                safe
+              />
+            ))}
+          </div>
+        </div>
+      )}
+      {parts.zip.map((file) => (
+        <div key={file.fileId} className="files-line">
+          <span className="files-kind zip">ZIP file</span>
+          <span>
+            {file.originalName}
+            <em>{fileSizeLabel(file.byteSize)}</em>
+          </span>
+          <button type="button" className="btn btn-sm files-dl" onClick={() => onDownload(file)}>
+            <i className="ti ti-download" /> Download ZIP
+          </button>
+        </div>
+      ))}
+      {parts.download.map((file) => (
+        <div key={file.fileId} className="files-line">
+          <span className="files-kind zip">File</span>
+          <span>
+            {file.originalName}
+            {(file.downloadCount ?? 0) === 0 && <em className="file-new">NEW</em>}
+            <em>{fileSizeLabel(file.byteSize)}</em>
+          </span>
+          {file.canDownload === false ? (
+            <span className="files-st done">View only</span>
+          ) : (
+            <button type="button" className="btn btn-sm files-dl" onClick={() => onDownload(file)}>
+              <i className="ti ti-download" /> Download
+            </button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function PortalFiles() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const focusOrder = searchParams.get('order');
   const [q, setQ] = useState('');
   const [month, setMonth] = useState('all');
@@ -58,7 +277,6 @@ export function PortalFiles() {
   const [dateTo, setDateTo] = useState('');
   const [method, setMethod] = useState('all');
   const [page, setPage] = useState(1);
-  const [openKey, setOpenKey] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({
@@ -71,11 +289,14 @@ export function PortalFiles() {
   const groups = useMemo<Group[]>(() => {
     const byKey = new Map<string, Group>();
     for (const f of data?.files ?? []) {
-      const key = `${f.orderId}-${dayKey(f.deliveredAt)}`;
+      const key = f.orderId;
       const g = byKey.get(key);
       if (g) {
         g.files.push(f);
         g.deliveredVia = mergeDeliveredVia([g.deliveredVia, f.deliveredVia]);
+        if (new Date(f.deliveredAt).getTime() > new Date(g.deliveredAt).getTime()) {
+          g.deliveredAt = f.deliveredAt;
+        }
       } else {
         byKey.set(key, {
           key,
@@ -95,17 +316,17 @@ export function PortalFiles() {
   }, [data]);
 
   const months = useMemo(() => {
-    const keys = new Set(groups.map((g) => monthKey(g.deliveredAt)));
+    const keys = new Set(groups.flatMap((g) => g.files.map((file) => monthKey(file.deliveredAt))));
     return Array.from(keys);
   }, [groups]);
 
   const visible = useMemo(() => {
     const term = q.trim().toLowerCase();
     return groups.filter((g) => {
-      const day = dayKey(g.deliveredAt);
-      if (month !== 'all' && monthKey(g.deliveredAt) !== month) return false;
-      if (dateFrom && day < dateFrom) return false;
-      if (dateTo && day > dateTo) return false;
+      const days = g.files.map((file) => dayKey(file.deliveredAt));
+      if (month !== 'all' && !days.some((day) => monthKey(day) === month)) return false;
+      if (dateFrom && days.every((day) => day < dateFrom)) return false;
+      if (dateTo && days.every((day) => day > dateTo)) return false;
       if (method === 'portal' && g.deliveredVia !== 'PORTAL' && g.deliveredVia !== 'BOTH') return false;
       if (method === 'email' && g.deliveredVia !== 'EMAIL' && g.deliveredVia !== 'BOTH') return false;
       if (!term) return true;
@@ -122,16 +343,7 @@ export function PortalFiles() {
   const totalPages = Math.max(1, Math.ceil(visible.length / pageSize));
   const paged = visible.slice((page - 1) * pageSize, page * pageSize);
 
-  useEffect(() => {
-    if (!focusOrder) return;
-    const match =
-      visible.find((g) => g.orderId === focusOrder) ??
-      groups.find((g) => g.orderId === focusOrder);
-    if (!match) return;
-    setOpenKey(match.key);
-    const idx = visible.findIndex((g) => g.key === match.key);
-    if (idx >= 0) setPage(Math.floor(idx / pageSize) + 1);
-  }, [focusOrder, groups, visible]);
+  const selected = focusOrder ? groups.find((group) => group.orderId === focusOrder) : undefined;
 
   return (
     <div>
@@ -146,6 +358,21 @@ export function PortalFiles() {
         </div>
       )}
 
+      {focusOrder ? (
+        <OrderFileDetail
+          orderId={focusOrder}
+          group={selected}
+          onBack={() => setSearchParams({})}
+          onDownloaded={() => {
+            setFileError(null);
+            void qc.invalidateQueries({ queryKey: ['my-files'] });
+            void qc.invalidateQueries({ queryKey: ['my-activity'] });
+            void qc.invalidateQueries({ queryKey: ['notifications'] });
+          }}
+          onError={setFileError}
+        />
+      ) : (
+      <>
       <div className="list-toolbar">
         <div className="searchbar" style={{ flex: 1, maxWidth: 420 }}>
           <i className="ti ti-search si" aria-hidden />
@@ -232,153 +459,42 @@ export function PortalFiles() {
             <table className="itable file-orders">
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>Order No.</th>
-                  <th>Project / Design</th>
-                  <th>Category</th>
+                  <th>Order no.</th>
+                  <th>Project / design</th>
                   <th>Files</th>
-                  <th>Delivery Method</th>
+                  <th>Delivery method</th>
+                  <th>Date</th>
                   <th />
                 </tr>
               </thead>
+              <tbody>
               {paged.map((g) => {
-                const open = openKey === g.key;
                 const emailed = g.deliveredVia === 'EMAIL' || g.deliveredVia === 'BOTH';
-                const onPortal = g.deliveredVia === 'PORTAL' || g.deliveredVia === 'BOTH';
                 const listed = g.files.filter((f) => !f.emailNotice);
                 return (
-                  <tbody key={g.key} className={`file-order${open ? ' is-open' : ''}`}>
                     <tr
+                      key={g.key}
                       className="click-row"
-                      onClick={() => setOpenKey(open ? null : g.key)}
+                      tabIndex={0}
+                      onClick={() => setSearchParams({ order: g.orderId })}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') setSearchParams({ order: g.orderId });
+                      }}
                     >
-                      <td className="muted">{dateShort(g.deliveredAt)}</td>
-                      <td>{orderNumber(g.humanRef, g.orderId.slice(0, 6))}</td>
+                      <td><b>{orderNumber(g.humanRef, g.orderId.slice(0, 6))}</b></td>
                       <td>
                         <div className="on">{g.orderName ?? 'Order'}</div>
                       </td>
-                      <td className="muted">{serviceCategoryLabel(g.serviceType)}</td>
                       <td>{listed.length || (emailed ? 'Email' : 0)}</td>
-                      <td>{deliveryMethodLabel(g.deliveredVia)}</td>
+                      <td className="muted">{deliveryMethodLabel(g.deliveredVia)}</td>
+                      <td className="muted">{dateShort(g.deliveredAt)}</td>
                       <td>
-                        <i className={`ti ${open ? 'ti-chevron-up' : 'ti-chevron-down'}`} />
+                        <i className="ti ti-chevron-right" />
                       </td>
                     </tr>
-                    {open && (
-                      <tr className="expand-row file-order-files">
-                        <td colSpan={7}>
-                            {emailed && (
-                              <div className="file-email-note">
-                                <p>
-                                  {g.deliveredVia === 'BOTH'
-                                    ? 'On the portal and also sent by email.'
-                                    : 'Sent by email.'}
-                                </p>
-                                <Link to={`/portal/orders/${orderSlug(g.humanRef, g.orderId)}`} className="file-email-link">
-                                  View order
-                                </Link>
-                              </div>
-                            )}
-                            {onPortal && listed.length > 0 && (
-                              <div className="file-split">
-                                {listed.some((f) => f.kind === 'PREVIEW') && (
-                                  <div className="file-split-block">
-                                    <div className="od-files-label">Order preview</div>
-                                    <p className="muted od-files-hint">
-                                      View only. These cannot be downloaded.
-                                    </p>
-                                    <div className="od-files">
-                                      {listed
-                                        .filter((f) => f.kind === 'PREVIEW')
-                                        .map((f) => (
-                                          <DeliveryPreview
-                                            key={f.fileId}
-                                            orderId={f.orderId}
-                                            fileId={f.fileId}
-                                            name={f.originalName}
-                                            mimeType={f.mimeType}
-                                            previewUrl={f.previewUrl}
-                                            safe
-                                          />
-                                        ))}
-                                    </div>
-                                  </div>
-                                )}
-                                {listed.some((f) => f.kind !== 'PREVIEW') && (
-                                  <table className="itable file-inner">
-                                    <thead>
-                                      <tr>
-                                        <th>Preview</th>
-                                        <th>File Name</th>
-                                        <th>Size</th>
-                                        <th>Action</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {listed
-                                        .filter((f) => f.kind !== 'PREVIEW')
-                                        .map((f) => (
-                                          <tr key={f.fileId}>
-                                            <td>
-                                              <DeliveryPreview
-                                                orderId={f.orderId}
-                                                fileId={f.fileId}
-                                                name={f.originalName}
-                                                mimeType={f.mimeType}
-                                                previewUrl={f.previewUrl}
-                                                safe
-                                              />
-                                            </td>
-                                            <td>
-                                              {f.originalName}
-                                              {f.isBundle ? ' (all designs)' : ''}
-                                              {(f.downloadCount ?? 0) === 0 && (
-                                                <span className="file-new">NEW</span>
-                                              )}
-                                            </td>
-                                            <td className="muted">{fileSizeLabel(f.byteSize)}</td>
-                                            <td>
-                                              {f.canDownload === false ? (
-                                                <span className="muted">View only</span>
-                                              ) : (
-                                                <button
-                                                  type="button"
-                                                  className="btn btn-ghost btn-sm"
-                                                  onClick={() =>
-                                                    void downloadSignedFile(
-                                                      myDeliveryFileUrl(f.orderId, f.fileId),
-                                                      f.originalName,
-                                                      { stayOnPage: true },
-                                                    ).then(() => {
-                                                      setFileError(null);
-                                                      void qc.invalidateQueries({ queryKey: ['my-files'] });
-                                                      void qc.invalidateQueries({ queryKey: ['my-activity'] });
-                                                      void qc.invalidateQueries({ queryKey: ['notifications'] });
-                                                    }).catch((err) => setFileError(getErrorMessage(err)))
-                                                  }
-                                                >
-                                                  <i className="ti ti-download" /> Download
-                                                </button>
-                                              )}
-                                            </td>
-                                          </tr>
-                                        ))}
-                                    </tbody>
-                                  </table>
-                                )}
-                              </div>
-                            )}
-                            {!emailed && !onPortal && (
-                              <div className="file-email-note">
-                                <p>{deliveryMethodLabel(g.deliveredVia)}</p>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                    )}
-                  </tbody>
                 );
               })}
+              </tbody>
             </table>
           </div>
         </div>
@@ -390,6 +506,8 @@ export function PortalFiles() {
         total={visible.length}
         onPage={setPage}
       />
+      </>
+      )}
     </div>
   );
 }

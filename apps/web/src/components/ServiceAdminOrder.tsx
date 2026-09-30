@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EmbroideryFileCard } from '@/components/EmbroideryFileCard';
@@ -15,7 +15,6 @@ import {
   deleteAdminEdit,
   getOrderActivity,
   listAdminOrderEdits,
-  type EditKind,
 } from '@/lib/edits';
 import {
   asEmbroideryPrefs,
@@ -89,6 +88,18 @@ function when(value: string) {
   });
 }
 
+type RevisionDraft = {
+  key: string;
+  rowKey: string;
+  note: string;
+  price: string;
+  free: boolean;
+};
+
+function blankRevision(rowKey: string): RevisionDraft {
+  return { key: crypto.randomUUID(), rowKey, note: '', price: '', free: false };
+}
+
 function linePhase(status?: DesignStatus | string) {
   if (status === 'DELIVERED') return 'delivered';
   if (status === 'DONE') return 'ready';
@@ -111,6 +122,8 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
   const qc = useQueryClient();
   const dialog = useDialog();
   const prefs = asEmbroideryPrefs(order.preferences);
+  const requestedFormats = (prefs?.formats ?? []).filter((fmt) => !/preview/i.test(fmt));
+  const wantsPreview = (prefs?.formats ?? []).some((fmt) => /preview/i.test(fmt));
   const requestDesigns = embroideryDesigns(order.preferences, order.name);
   const quotations = (order.quotations ?? []) as QuoteWithLines[];
   const studio = studioQuotation(quotations);
@@ -145,13 +158,13 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
   const [deliveredOnEmail, setDeliveredOnEmail] = useState(false);
   const [filesFor, setFilesFor] = useState<{ row: DeliveryRow; editId: string | null } | null>(null);
   const [uploadEditId, setUploadEditId] = useState<string | null>(null);
+  const [uploadRows, setUploadRows] = useState<DeliveryRow[]>([]);
   const [preview, setPreview] = useState<{ src: string; name: string } | null>(null);
   const [revisionOpen, setRevisionOpen] = useState(false);
-  const [revisionDesignIds, setRevisionDesignIds] = useState<string[]>([]);
-  const [revisionNote, setRevisionNote] = useState('');
-  const [revisionKind, setRevisionKind] = useState<EditKind>('FREE');
-  const [revisionPrice, setRevisionPrice] = useState('');
-  const [assignRevision, setAssignRevision] = useState(false);
+  const [revisionDrafts, setRevisionDrafts] = useState<RevisionDraft[]>([]);
+  const [revisionDesignerId, setRevisionDesignerId] = useState('');
+  const [revisionError, setRevisionError] = useState<string | null>(null);
+  const revModalRef = useRef<HTMLDivElement>(null);
   const [refundOpen, setRefundOpen] = useState(false);
   const [refundAmount, setRefundAmount] = useState(((order.priceCents ?? 0) / 100).toFixed(2));
   const [refundTo, setRefundTo] = useState<RefundTo>('STORE_CREDIT');
@@ -159,6 +172,15 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
 
   useEffect(() => setNotes(order.internalNotes ?? ''), [order.internalNotes]);
   useEffect(() => setDesignerId(order.assignedDesignerId ?? ''), [order.assignedDesignerId]);
+  useLayoutEffect(() => {
+    const modal = revModalRef.current;
+    if (!revisionOpen || !modal) return;
+    modal.style.height = '';
+    modal.style.height = `${modal.offsetHeight}px`;
+    return () => {
+      modal.style.height = '';
+    };
+  }, [revisionOpen]);
 
   const topbarLead = useMemo(
     () => (
@@ -227,10 +249,12 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
       zip?: File | null;
       emailed: boolean;
     }) => {
-      const designId = await ensureDesign(row);
+      const targets = uploadRows.length > 0 ? uploadRows : [row];
+      const designIds: string[] = [];
+      for (const item of targets) designIds.push(await ensureDesign(item));
       const hasPortal = files.length > 0 || Boolean(zip);
       return deliverOrder(order.id, files, {
-        designIds: [designId],
+        designIds,
         deliveredVia: deliveredViaFromFlags(hasPortal, emailed),
         zip: zip ?? undefined,
         notifyEmail: hasPortal,
@@ -241,6 +265,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
     },
     onSuccess: () => {
       setUploadFor(null);
+      setUploadRows([]);
       setUploadEditId(null);
       setPendingFiles([]);
       setPendingZip(null);
@@ -285,41 +310,60 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
 
   const revision = useMutation({
     mutationFn: async () => {
-      const dollars = Number(revisionPrice);
-      if (revisionKind === 'PAID' && (!Number.isFinite(dollars) || dollars <= 0)) {
-        throw new Error('Enter a price for a paid revision');
-      }
-      const priceCents = revisionKind === 'PAID' ? Math.round(dollars * 100) : null;
       const rows = groups.flatMap((group) => group.rows);
-      const chosen =
-        rows.length > 1 ? rows.filter((row) => revisionDesignIds.includes(row.key)) : rows;
-      if (rows.length > 1 && chosen.length === 0) {
-        throw new Error('Pick which item this revision is for.');
+      const created: string[] = [];
+      for (const line of revisionDrafts) {
+        const chosen = rows.find((row) => row.key === line.rowKey) ?? rows[0];
+        if (!chosen) throw new Error('Pick a design and size.');
+        const dollars = Number(line.price);
+        const priceCents = line.free ? null : Math.round(dollars * 100);
+        const designIds = [await ensureDesign(chosen)];
+        const result = await createAdminEdit(order.id, {
+          note: line.note.trim(),
+          kind: line.free ? 'FREE' : 'PAID',
+          priceCents,
+          designIds,
+          assignedDesignerId: revisionDesignerId || null,
+        });
+        created.push(result.edit.id);
+        setRevisionDrafts((prev) => prev.filter((item) => item.key !== line.key));
       }
-      const designIds: string[] = [];
-      for (const row of chosen) designIds.push(await ensureDesign(row));
-      return createAdminEdit(order.id, {
-        note: revisionNote.trim(),
-        kind: revisionKind,
-        priceCents,
-        designIds,
-        assignedDesignerId: assignRevision ? designerId || order.assignedDesignerId : null,
-      });
+      return created;
     },
-    onSuccess: async () => {
+    onSuccess: async (created) => {
+      const count = created.length;
       setRevisionOpen(false);
-      setRevisionNote('');
-      setRevisionPrice('');
-      setRevisionKind('FREE');
-      setRevisionDesignIds([]);
-      setAssignRevision(false);
+      setRevisionDrafts([]);
+      setRevisionDesignerId('');
+      setRevisionError(null);
       refresh();
       await dialog.alert({
-        title: 'Revision created',
-        message: 'This order is now revision requested. The customer keeps the current files until you publish the new ones. Publishing them marks the order delivered again.',
+        title: count === 1 ? 'Revision created' : 'Revisions created',
+        message:
+          count === 1
+            ? 'This order is now revision requested. The customer keeps the current files until you publish the new ones. Publishing them marks the order delivered again.'
+            : `${count} revisions were added. The customer keeps the current files until you publish the new ones.`,
         confirmLabel: 'Done',
         tone: 'success',
       });
+    },
+    onError: (e) => {
+      refresh();
+      setError(getErrorMessage(e));
+    },
+  });
+
+  const markRevisionReady = useMutation({
+    mutationFn: async (rows: DeliveryRow[]) => {
+      for (const row of rows) {
+        if (row.design?.status === 'DELIVERED' || row.design?.status === 'DONE') continue;
+        const designId = await ensureDesign(row);
+        await updateDesign(order.id, designId, { status: 'DONE' });
+      }
+    },
+    onSuccess: () => {
+      setError(null);
+      refresh();
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -415,6 +459,35 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
     });
   const editDesignIds = (edit: { designIds?: string[]; designId?: string | null }) =>
     edit.designIds?.length ? edit.designIds : edit.designId ? [edit.designId] : [];
+  const allRows = groups.flatMap((group) => group.rows);
+  const rowsForEdit = (edit: { designIds?: string[]; designId?: string | null }) => {
+    const ids = editDesignIds(edit);
+    if (ids.length === 0) return allRows;
+    return allRows.filter((row) => Boolean(row.design && ids.includes(row.design.id)));
+  };
+  const revisionPhase = (edit: { status: string; designIds?: string[]; designId?: string | null }) => {
+    if (edit.status === 'DONE') return 'published' as const;
+    const covered = rowsForEdit(edit);
+    const ready =
+      covered.length > 0 &&
+      covered.every((row) => row.design?.status === 'DONE' || row.design?.status === 'DELIVERED');
+    return ready ? ('ready' as const) : ('requested' as const);
+  };
+  const revisionFiles = (editId: string) =>
+    (order.deliveries ?? []).flatMap((batch) => {
+      if (revisionOwnerId(batch) !== editId) return [];
+      return batch.files;
+    });
+  const revisionTargetLabel = (edit: { designIds?: string[]; designId?: string | null }) => {
+    const covered = rowsForEdit(edit);
+    if (covered.length === 0) return '';
+    return covered
+      .map((row) => {
+        const group = groups.find((item) => item.rows.some((candidate) => candidate.key === row.key));
+        return group ? `${group.title} · ${row.name}` : row.name;
+      })
+      .join(', ');
+  };
   const rowInRevision = (row: DeliveryRow) =>
     edits.some(
       (edit) =>
@@ -462,9 +535,10 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
     input.click();
   }
 
-  function openPublish(row: DeliveryRow, editId: string | null = null) {
+  function openPublish(row: DeliveryRow, editId: string | null = null, rows: DeliveryRow[] = [row]) {
     setUploadEditId(editId);
     setUploadFor(row);
+    setUploadRows(rows);
     setPendingFiles([]);
     setPendingZip(null);
     setDeliveredOnEmail(false);
@@ -565,7 +639,9 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
               className="ead-btn"
               onClick={() => {
                 const rows = groups.flatMap((group) => group.rows);
-                setRevisionDesignIds(rows.length === 1 ? [rows[0].key] : []);
+                setRevisionDrafts([blankRevision(rows[0]?.key ?? '')]);
+                setRevisionDesignerId('');
+                setRevisionError(null);
                 setRevisionOpen(true);
               }}
             >
@@ -649,97 +725,105 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
             </div>
           </section>
 
-          {edits.length > 0 && (
-            <section className="ead-card">
-              <div className="ead-card-h">
-                <span className="ead-ic"><i className="ti ti-refresh" /></span>
-                <h2>Customer revision</h2>
-              </div>
-              <div className="ead-b">
-                {edits.map((edit) => {
-                  const ids = editDesignIds(edit);
-                  const allRows = groups.flatMap((group) => group.rows);
-                  const covered = allRows.filter((row) =>
-                    Boolean(row.design && ids.includes(row.design.id)),
-                  );
-                  const paid = edit.kind === 'PAID' && (edit.priceCents ?? 0) > 0;
-                  return (
-                    <div key={edit.id} className="ead-he">
-                      <div className="ead-he-top">
-                        <span>{paid ? 'Paid revision' : 'Free revision'}</span>
-                        {paid && <b>{money(edit.priceCents, order.currency)}</b>}
-                        <span className="ead-he-sub" style={{ marginTop: 0 }}>
-                          {edit.status === 'DONE' ? 'Delivered' : 'Revision requested'}
+          <section className="ead-card">
+            <div className="ead-card-h">
+              <span className="ead-ic"><i className="ti ti-refresh" /></span>
+              <h2>Customer revision</h2>
+            </div>
+            {edits.length === 0 && <div className="ead-b"><div className="ead-he-sub">No revisions yet.</div></div>}
+            {edits.map((edit) => {
+              const covered = rowsForEdit(edit);
+              const phase = revisionPhase(edit);
+              const paid = edit.kind === 'PAID' && (edit.priceCents ?? 0) > 0;
+              const settled = edit.invoiceStatus === 'PAID';
+              const names = revisionFiles(edit.id).map((file) => file.originalName);
+              const target = revisionTargetLabel(edit);
+              return (
+                <div key={edit.id} className="rev-row" title={target || undefined}>
+                  <div className="rev-note">
+                    <span>{edit.note}</span>
+                    {names.map((name, index) => (
+                      <span key={`${name}-${index}`} className="rev-chip">{name}</span>
+                    ))}
+                  </div>
+                  <div className="rev-acts">
+                    {paid ? (
+                      <>
+                        <b className="rev-price">{money(edit.priceCents, order.currency)}</b>
+                        <span className={settled ? 'ead-pill ok plain' : 'ead-pill bad plain'}>
+                          {settled ? 'Paid' : 'Unpaid'}
                         </span>
-                        {edit.status !== 'DONE' && (
-                          <button
-                            type="button"
-                            className="ead-btn sm"
-                            disabled={removeRevision.isPending}
-                            onClick={() => {
-                              void dialog
-                                .confirm({
-                                  title: 'Delete this revision?',
-                                  message:
-                                    'Use this when the revision was created by mistake. Files already delivered stay on the order.',
-                                  confirmLabel: 'Delete revision',
-                                  danger: true,
-                                })
-                                .then((ok) => {
-                                  if (ok) removeRevision.mutate(edit.id);
-                                });
-                            }}
-                          >
-                            Delete
-                          </button>
-                        )}
-                        {paid && (
-                          <span className={edit.invoiceStatus === 'PAID' ? 'ead-pill ok' : 'ead-pill'}>
-                            {edit.invoiceStatus === 'PAID' ? 'Paid' : 'Unpaid'}
-                          </span>
-                        )}
-                        {edit.status === 'DONE' && covered.length === 1 && (
-                          <button
-                            type="button"
-                            className="sod-eye"
-                            title="View revision files"
-                            onClick={() => setFilesFor({ row: covered[0], editId: edit.id })}
-                          >
-                            <i className="ti ti-eye" />
-                          </button>
-                        )}
-                      </div>
-                      <div className="ead-he-sub">{edit.note}</div>
-                      {edit.status === 'DONE' &&
-                        covered.length > 1 &&
-                        covered.map((row) => (
-                          <div key={row.key} className="sod-line">
-                            <b>{row.name}</b>
-                            <div className="sod-acts">
-                              <button
-                                type="button"
-                                className="sod-eye"
-                                title="View revision files"
-                                onClick={() => setFilesFor({ row, editId: edit.id })}
-                              >
-                                <i className="ti ti-eye" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      {edit.status !== 'DONE' &&
-                        covered.map((row) => (
-                          <div key={row.key} className="sod-line">
-                            {covered.length > 1 && <b>{row.name}</b>}
-                            <div className="sod-acts">{lineActions(row, 'revision', edit.id)}</div>
-                          </div>
-                        ))}
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          )}
+                      </>
+                    ) : (
+                      <span className="rev-free">Free revision</span>
+                    )}
+                    {phase === 'ready' && <span className="rev-status ready">● Revision ready</span>}
+                    {phase === 'published' && <span className="rev-status done">✓ Delivered</span>}
+                    {phase === 'requested' && <span className="ead-pill blue plain">In progress</span>}
+                    {phase === 'ready' && <span className="ead-pill ok plain">Ready</span>}
+                    {phase === 'requested' && (
+                      <button
+                        type="button"
+                        className="ead-btn sm"
+                        disabled={markRevisionReady.isPending || covered.length === 0}
+                        onClick={() => markRevisionReady.mutate(covered)}
+                      >
+                        Mark ready
+                      </button>
+                    )}
+                    {phase !== 'published' && (
+                      <>
+                        <button
+                          type="button"
+                          className="ead-btn sm pri"
+                          disabled={covered.length === 0}
+                          onClick={() => openPublish(covered[0], edit.id, covered)}
+                        >
+                          Attach & publish
+                        </button>
+                        <button
+                          type="button"
+                          className="ead-btn sm icon"
+                          title="Delete revision"
+                          aria-label="Delete revision"
+                          disabled={removeRevision.isPending}
+                          onClick={() => {
+                            const paidNote = paid && settled
+                              ? 'This revision was already paid. Deleting it will not refund the customer; issue the refund separately. '
+                              : '';
+                            void dialog
+                              .confirm({
+                                title: 'Delete this revision?',
+                                message: `${paidNote}“${edit.note}” will be removed from Customer revision and Quote history, and the customer will no longer see it.`,
+                                confirmLabel: 'Delete revision',
+                                cancelLabel: 'Keep revision',
+                                danger: true,
+                              })
+                              .then((ok) => {
+                                if (ok) removeRevision.mutate(edit.id);
+                              });
+                          }}
+                        >
+                          <i className="ti ti-trash" />
+                        </button>
+                      </>
+                    )}
+                    {phase === 'published' && covered[0] && (
+                      <button
+                        type="button"
+                        className="ead-btn sm icon"
+                        title="View delivered files"
+                        aria-label="View delivered files"
+                        onClick={() => setFilesFor({ row: covered[0], editId: edit.id })}
+                      >
+                        <i className="ti ti-eye" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </section>
 
           <section className="ead-card">
             <div className="ead-card-h">
@@ -899,11 +983,11 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
             <div className="ead-card-h">
               <h2>Quote history</h2>
               <span className="ead-sub">
-                {history.length} {history.length === 1 ? 'version' : 'versions'} · {accepted}/{quoted} items accepted
+                {history.length + edits.length} {history.length + edits.length === 1 ? 'version' : 'versions'} · {accepted}/{quoted} items accepted
               </span>
             </div>
             <div className="ead-b">
-              {history.length === 0 && (
+              {history.length === 0 && edits.length === 0 && (
                 <div className="ead-he-sub">
                   {unpriced
                     ? 'Prices appear here after you save them.'
@@ -912,18 +996,45 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
               )}
               {history.map((quote) => {
                 const acceptedPaid = quote.status === 'APPROVED' && paid;
+                const status = acceptedPaid
+                  ? 'Accepted & paid'
+                  : quote.status === 'APPROVED'
+                    ? 'Accepted'
+                    : quote.status === 'SENT'
+                      ? 'Sent'
+                      : quote.status === 'COUNTERED'
+                        ? 'Countered'
+                        : quote.status === 'REJECTED'
+                          ? 'Rejected'
+                          : quote.status;
                 return (
-                  <div key={quote.id} className="ead-he">
-                    <div className="ead-he-top">
-                      <span>{quoteHistoryLabel(quote, history)}</span>
+                  <div key={quote.id} className="rev-q">
+                    <div className="rev-q-line">
+                      <b>{quoteHistoryLabel(quote, history)}</b>
                       <b>{money(quote.amountCents, quote.currency)}</b>
-                      <span className="ead-he-sub" style={{ marginTop: 0 }}>
-                        {acceptedPaid ? 'Accepted & paid' : quote.status === 'APPROVED' ? 'Accepted' : quote.status === 'SENT' ? 'Sent' : quote.status}
-                      </span>
+                      <span className="ead-he-sub" style={{ marginTop: 0 }}>{status}</span>
                     </div>
                     <div className="ead-he-sub">
                       {dateShort(quote.createdAt)}
                       {quote.comment ? ` · ${quote.comment}` : ''}
+                    </div>
+                  </div>
+                );
+              })}
+              {edits.map((edit) => {
+                const charged = edit.kind === 'PAID' && (edit.priceCents ?? 0) > 0;
+                const settled = edit.invoiceStatus === 'PAID';
+                return (
+                  <div key={edit.id} className="rev-q">
+                    <div className="rev-q-line">
+                      <b>{charged ? 'Paid revision' : 'Free revision'}</b>
+                      {charged && <b>{money(edit.priceCents, order.currency)}</b>}
+                      <span className="ead-he-sub" style={{ marginTop: 0 }}>
+                        {charged ? (settled ? 'Accepted & paid' : 'Awaiting payment') : 'No charge'}
+                      </span>
+                    </div>
+                    <div className="ead-he-sub">
+                      {dateShort(edit.createdAt)} · {edit.note}
                     </div>
                   </div>
                 );
@@ -1081,12 +1192,14 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
                 <i className="ti ti-x" />
               </button>
             </div>
-            <p>
-              Attach up to 10 files in any format, then publish the final files to mark this item delivered.
-              <br />
-              <b>Customer usually needs: </b>
-              {(prefs?.formats ?? []).join(', ') || 'the requested formats'}
-            </p>
+            <p>Add up to 10 files, then select Publish files.</p>
+            {requestedFormats.length > 0 && (
+              <p>
+                <b>Requested formats: </b>
+                {requestedFormats.join(', ')}
+              </p>
+            )}
+            {wantsPreview && <p>For Preview Purpose</p>}
             <button type="button" className="sod-drop" onClick={() => openFilePicker('sod-files')}>
               <i className="ti ti-upload" /> Choose files
             </button>
@@ -1102,8 +1215,17 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
               }}
             />
             <div className="sod-flist">
-              {pendingFiles.map((file) => (
-                <div key={`${file.name}-${file.size}`}>{file.name}</div>
+              {pendingFiles.map((file, index) => (
+                <div key={`${file.name}-${file.size}-${file.lastModified}`} className="sod-file">
+                  <span>{file.name}</span>
+                  <button
+                    type="button"
+                    className="ead-btn sm"
+                    onClick={() => setPendingFiles((prev) => prev.filter((_, i) => i !== index))}
+                  >
+                    Remove
+                  </button>
+                </div>
               ))}
             </div>
             <div className="ead-he-sub">{pendingFiles.length} of 10 files attached</div>
@@ -1123,7 +1245,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
               }}
             />
             {pendingZip && (
-              <button type="button" className="ead-btn sm" onClick={() => setPendingZip(null)}>
+              <button type="button" className="ead-btn sm sod-zip-remove" onClick={() => setPendingZip(null)}>
                 Remove zip
               </button>
             )}
@@ -1187,51 +1309,39 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
                 : 'Preview or download the original delivered files.'}
             </p>
             <div className="sod-flist">
-              {scopedDeliveryFiles(filesFor.row, filesFor.editId).length === 0 &&
-                scopedBundleFiles(filesFor.editId).length === 0 && (
-                <div>No files published for this item yet.</div>
-              )}
-              {scopedDeliveryFiles(filesFor.row, filesFor.editId).map((file) => (
-                <div key={file.id} className="sod-file">
-                  <span>{file.originalName}</span>
-                  <span className="sod-file-acts">
-                    <button
-                      type="button"
-                      className="sod-eye"
-                      title="Preview"
-                      aria-label={`Preview ${file.originalName}`}
-                      onClick={() => void previewFile(file)}
-                    >
-                      <i className="ti ti-eye" />
-                    </button>
-                    <button
-                      type="button"
-                      className="sod-eye"
-                      title="Download"
-                      aria-label={`Download ${file.originalName}`}
-                      onClick={() => void downloadSignedFile(adminDeliveryFileUrl(order.id, file.id), file.originalName)}
-                    >
-                      <i className="ti ti-download" />
-                    </button>
-                  </span>
-                </div>
-              ))}
-              {scopedBundleFiles(filesFor.editId).map((file) => (
-                <div key={file.id} className="sod-file">
-                  <span>{file.originalName} (all designs)</span>
-                  <span className="sod-file-acts">
-                    <button
-                      type="button"
-                      className="sod-eye"
-                      title="Download zip"
-                      aria-label={`Download ${file.originalName}`}
-                      onClick={() => void downloadSignedFile(adminDeliveryFileUrl(order.id, file.id), file.originalName)}
-                    >
-                      <i className="ti ti-download" />
-                    </button>
-                  </span>
-                </div>
-              ))}
+              {(() => {
+                const shown = filesFor.editId
+                  ? revisionFiles(filesFor.editId)
+                  : [...scopedDeliveryFiles(filesFor.row, null), ...scopedBundleFiles(null)];
+                if (shown.length === 0) return <div>No files published for this item yet.</div>;
+                return shown.map((file) => (
+                  <div key={file.id} className="sod-file">
+                    <span>{file.originalName}{file.isBundle ? ' (all designs)' : ''}</span>
+                    <span className="sod-file-acts">
+                      {!file.isBundle && (
+                        <button
+                          type="button"
+                          className="sod-eye"
+                          title="Preview"
+                          aria-label={`Preview ${file.originalName}`}
+                          onClick={() => void previewFile(file)}
+                        >
+                          <i className="ti ti-eye" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="sod-eye"
+                        title={file.isBundle ? 'Download zip' : 'Download'}
+                        aria-label={`Download ${file.originalName}`}
+                        onClick={() => void downloadSignedFile(adminDeliveryFileUrl(order.id, file.id), file.originalName)}
+                      >
+                        <i className="ti ti-download" />
+                      </button>
+                    </span>
+                  </div>
+                ));
+              })()}
             </div>
             <div className="sod-mo-f">
               <button type="button" className="ead-btn" onClick={() => setFilesFor(null)}>Close</button>
@@ -1241,97 +1351,171 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
       )}
 
       {revisionOpen && (
-        <div className="sod-ov" role="presentation" onClick={() => setRevisionOpen(false)}>
-          <div className="sod-mo" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <div className="sod-mo-h">
-              <h3>Create revision {quoteNo}</h3>
-              <button type="button" onClick={() => setRevisionOpen(false)} aria-label="Close">
-                <i className="ti ti-x" />
+        <div className="sod-ov" role="presentation" onClick={() => { if (!revision.isPending) setRevisionOpen(false); }}>
+          <div
+            ref={revModalRef}
+            className="cr-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-rev-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="cr-head">
+              <h2 id="create-rev-title">Create revision {quoteNo}</h2>
+              <button type="button" className="cr-x" onClick={() => setRevisionOpen(false)} aria-label="Close" disabled={revision.isPending}>
+                ×
               </button>
             </div>
-            <div className="sod-info">
-              Stays on this order. The customer keeps the old files until you publish new ones.
-            </div>
-            {groups.flatMap((group) => group.rows).length > 1 && (
-              <>
-                <div className="sod-label">Which item</div>
-                {groups.flatMap((group) => group.rows).map((row) => (
-                  <label key={row.key} className="sod-check">
-                    <input
-                      type="checkbox"
-                      checked={revisionDesignIds.includes(row.key)}
-                      onChange={() =>
-                        setRevisionDesignIds((prev) =>
-                          prev.includes(row.key)
-                            ? prev.filter((key) => key !== row.key)
-                            : [...prev, row.key],
+            <div className="cr-scroll">
+              {revisionDrafts.map((line, index) => (
+                <div key={line.key} className="cr-rev">
+                  <div className="cr-rev-h">
+                    <b>Revision {index + 1}</b>
+                    <button
+                      type="button"
+                      className="cr-rm"
+                      style={{ display: revisionDrafts.length > 1 ? undefined : 'none' }}
+                      onClick={() => setRevisionDrafts((prev) => prev.filter((item) => item.key !== line.key))}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  {allRows.length > 0 && (
+                    <>
+                      <label htmlFor={`cr-size-${line.key}`}>Design & size</label>
+                      <select
+                        id={`cr-size-${line.key}`}
+                        value={line.rowKey}
+                        onChange={(e) =>
+                          setRevisionDrafts((prev) =>
+                            prev.map((item) => (item.key === line.key ? { ...item, rowKey: e.target.value } : item)),
+                          )
+                        }
+                      >
+                        {groups.flatMap((group) =>
+                          group.rows.map((row) => (
+                            <option key={row.key} value={row.key}>
+                              {group.title} · {row.name}
+                            </option>
+                          )),
+                        )}
+                      </select>
+                    </>
+                  )}
+                  <label htmlFor={`cr-note-${line.key}`}>Description</label>
+                  <textarea
+                    id={`cr-note-${line.key}`}
+                    placeholder='e.g. resize eagle to 3", make text bolder for stitching'
+                    value={line.note}
+                    onChange={(e) => {
+                      const note = e.target.value;
+                      setRevisionError(null);
+                      setRevisionDrafts((prev) => prev.map((item) => (item.key === line.key ? { ...item, note } : item)));
+                    }}
+                  />
+                  <label htmlFor={`cr-price-${line.key}`}>Price</label>
+                  <div className="cr-prow">
+                    <div className="cr-price">
+                      <span>$</span>
+                      <input
+                        id={`cr-price-${line.key}`}
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={line.free ? '0' : line.price}
+                        disabled={line.free}
+                        onChange={(e) => {
+                          const price = e.target.value;
+                          setRevisionError(null);
+                          setRevisionDrafts((prev) =>
+                            prev.map((item) => (item.key === line.key ? { ...item, price } : item)),
+                          );
+                        }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="cr-free"
+                      aria-pressed={line.free}
+                      onClick={() =>
+                        setRevisionDrafts((prev) =>
+                          prev.map((item) =>
+                            item.key === line.key
+                              ? { ...item, free: !item.free, price: item.free ? '' : '0' }
+                              : item,
+                          ),
                         )
                       }
-                    />
-                    {row.name}
-                  </label>
-                ))}
-              </>
-            )}
-            <div className="sod-label">What needs to change</div>
-            <textarea
-              className="ead-field"
-              value={revisionNote}
-              placeholder='e.g. resize eagle to 3", make text bolder for stitching'
-              onChange={(e) => setRevisionNote(e.target.value)}
-            />
-            <div className="sod-seg">
+                    >
+                      Free
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {revisionError && <div className="cr-err">{revisionError}</div>}
               <button
                 type="button"
-                className={revisionKind === 'FREE' ? 'ead-btn pri' : 'ead-btn'}
-                onClick={() => setRevisionKind('FREE')}
+                className="cr-add"
+                onClick={() =>
+                  setRevisionDrafts((prev) => [...prev, blankRevision(prev[0]?.rowKey || allRows[0]?.key || '')])
+                }
               >
-                Free revision
-              </button>
-              <button
-                type="button"
-                className={revisionKind === 'PAID' ? 'ead-btn pri' : 'ead-btn'}
-                onClick={() => setRevisionKind('PAID')}
-              >
-                Paid revision
+                + Add another revision
               </button>
             </div>
-            {revisionKind === 'PAID' && (
-              <>
-                <div className="sod-label">Revision price. The customer pays by card from the order.</div>
-                <input
-                  className="ead-field"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={revisionPrice}
-                  placeholder="5"
-                  onChange={(e) => setRevisionPrice(e.target.value)}
-                />
-              </>
-            )}
-            <label className="sod-check">
-              <input
-                type="checkbox"
-                checked={assignRevision}
-                onChange={(e) => setAssignRevision(e.target.checked)}
-              />
-              Assign to designer
-            </label>
-            <button
-              type="button"
-              className="ead-btn pri"
-              style={{ width: '100%' }}
-              disabled={
-                revision.isPending ||
-                !revisionNote.trim() ||
-                (revisionKind === 'PAID' && !(Number(revisionPrice) > 0)) ||
-                (groups.flatMap((group) => group.rows).length > 1 && revisionDesignIds.length === 0)
-              }
-              onClick={() => revision.mutate()}
-            >
-              <i className="ti ti-refresh" /> {revision.isPending ? 'Creating…' : 'Create revision'}
-            </button>
+            <div className="cr-foot">
+              <div className="cr-total">
+                <span>Total revision price</span>
+                <b>
+                  {money(
+                    Math.round(
+                      revisionDrafts.reduce((sum, line) => sum + (line.free ? 0 : Number(line.price) || 0), 0) * 100,
+                    ),
+                    order.currency,
+                  )}
+                </b>
+              </div>
+              <label htmlFor="cr-designer">Assign to designer</label>
+              <select
+                id="cr-designer"
+                value={revisionDesignerId}
+                onChange={(e) => setRevisionDesignerId(e.target.value)}
+              >
+                <option value="">Unassigned</option>
+                {designerOptions.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {personName(member)}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="cr-go"
+                disabled={revision.isPending || allRows.length === 0}
+                onClick={() => {
+                  for (let i = 0; i < revisionDrafts.length; i += 1) {
+                    const line = revisionDrafts[i];
+                    if (!line.note.trim()) {
+                      setRevisionError(`Enter a description for revision ${i + 1}.`);
+                      return;
+                    }
+                    if (!line.free && !(Number(line.price) > 0)) {
+                      setRevisionError(`Enter a price for revision ${i + 1}, or mark it free.`);
+                      return;
+                    }
+                    if (!line.rowKey) {
+                      setRevisionError(`Pick a design and size for revision ${i + 1}.`);
+                      return;
+                    }
+                  }
+                  setRevisionError(null);
+                  revision.mutate();
+                }}
+              >
+                {revision.isPending ? 'Creating…' : 'Create revision'}
+              </button>
+            </div>
           </div>
         </div>
       )}

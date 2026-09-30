@@ -85,6 +85,9 @@ export type MyFile = {
           downloadCount?: number;
   isBundle?: boolean;
   emailNotice?: boolean;
+  designId?: string | null;
+  designName?: string | null;
+  editId?: string | null;
 };
 
 export type QuoteBuilderLineInput = {

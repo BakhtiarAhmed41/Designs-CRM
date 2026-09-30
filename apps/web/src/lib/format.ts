@@ -62,6 +62,27 @@ export function orderSlug(ref?: string | null, id?: string | null): string {
   return id ?? '';
 }
 
+const DESIGN_NAME_LIMIT = 42;
+
+/** Joined design names stay on one line. Extra names end with an ellipsis. */
+export function clipDesignLabel(name: string) {
+  const full = name.trim();
+  const parts = full.split(/\s*\/\s*/).map((part) => part.trim()).filter(Boolean);
+  if (parts.length <= 1) return { text: full, full };
+  let text = '';
+  for (const part of parts) {
+    const next = text ? `${text} / ${part}` : part;
+    if (next.length > DESIGN_NAME_LIMIT) {
+      return {
+        text: `${text || part.slice(0, DESIGN_NAME_LIMIT).trimEnd()}…`,
+        full: parts.join(' / '),
+      };
+    }
+    text = next;
+  }
+  return { text, full: parts.join(' / ') };
+}
+
 export function orderNumber(ref?: string | null, fallback?: string | null): string {
   const digits = (ref ?? '').replace(/\D/g, '');
   if (digits.length === 10) return `#${digits}`;

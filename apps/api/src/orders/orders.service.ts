@@ -3953,19 +3953,24 @@ export class OrdersService {
       downloaded_at: Date | null;
       download_count: number | null;
       is_bundle?: number | null;
+      design_id?: string | null;
+      design_name?: string | null;
+      edit_id?: string | null;
     };
     let rows: FileListRow[] = [];
     try {
       rows = await this.db.query<FileListRow>(
         `SELECT df.id AS file_id, df.original_name, df.mime_type, df.format_label, df.byte_size,
-                df.created_at AS delivered_at, df.storage_key,
+                df.created_at AS delivered_at, df.storage_key, df.design_id,
                 df.downloaded_at, df.download_count, df.is_bundle,
                 o.id AS order_id, o.name AS order_name, o.human_ref, o.service_type,
-                d.delivered_via, d.kind, d.preview_status, u.email
+                d.delivered_via, d.kind, d.preview_status, d.edit_id, u.email,
+                od.name AS design_name
            FROM delivery_files df
            JOIN deliveries d ON d.id = df.delivery_id
            JOIN orders o ON o.id = d.order_id
            LEFT JOIN users u ON u.id = o.client_user_id
+           LEFT JOIN order_designs od ON od.id = df.design_id
           WHERE o.client_user_id = ? AND d.released_at IS NOT NULL
           ORDER BY df.created_at DESC`,
         [user.id],
@@ -4059,6 +4064,9 @@ export class OrdersService {
           downloadCount: Number(r.download_count ?? 0),
           isBundle: Boolean(r.is_bundle),
           emailNotice: false,
+          designId: r.design_id ?? null,
+          designName: r.design_name ?? null,
+          editId: r.edit_id ?? null,
         };
       }),
     );
@@ -4085,6 +4093,9 @@ export class OrdersService {
         downloadCount: 0,
         isBundle: false,
         emailNotice: true,
+        designId: null,
+        designName: null,
+        editId: null,
       });
     }
     return files;

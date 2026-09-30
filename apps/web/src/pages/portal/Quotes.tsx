@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { listMyOrderSummary, listMyOrders, listQuoteDrafts } from '@/lib/orders';
-import { money, dateShort, quoteLifecycleChip, orderNumber, orderSlug } from '@/lib/format';
+import { clipDesignLabel, money, dateShort, quoteLifecycleChip, orderNumber, orderSlug } from '@/lib/format';
 import { serviceCategoryLabel } from '@/lib/serviceIcon';
 import { isAdminRecounter, studioQuotation } from '@/lib/quoteHelpers';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
@@ -181,6 +181,7 @@ export function PortalQuotes() {
           <table className="qtable quote-table">
             <thead>
               <tr>
+                <th className="quote-no">Quote no.</th>
                 <th>Project</th>
                 <th>Category</th>
                 <th>Designs</th>
@@ -205,12 +206,13 @@ export function PortalQuotes() {
                 const href = o.type === 'ORDER'
                   ? `/portal/orders/${orderSlug(o.humanRef, o.id)}`
                   : `/portal/quotes/${orderSlug(o.humanRef, o.id)}`;
+                const project = clipDesignLabel(o.name ?? o.serviceType ?? 'Quote request');
 
                 return (
                   <tr key={o.id} className="click-row" onClick={() => navigate(href)}>
-                    <td>
-                      <div className="on">{o.name ?? o.serviceType ?? 'Quote request'}</div>
-                      <div className="om">{orderNumber(o.humanRef, o.id.slice(0, 6))}</div>
+                    <td className="quote-no">{orderNumber(o.humanRef, o.id.slice(0, 6))}</td>
+                    <td className="quote-project" title={project.full}>
+                      <div className="on quote-project-name">{project.text}</div>
                     </td>
                     <td className="muted">{serviceCategoryLabel(o.serviceType)}</td>
                     <td>{designCount || '—'}</td>

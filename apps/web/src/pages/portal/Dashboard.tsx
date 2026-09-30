@@ -10,7 +10,7 @@ import { listNotifications, markNotificationRead } from '@/lib/notifications';
 import { datesForPortalPreset, inDateRange, type PortalRangePreset } from '@/lib/dateRange';
 import { useAuth } from '@/context/AuthContext';
 import { freshOnOpen } from '@/lib/queryRefresh';
-import { money, quoteLifecycleChip, customerOrderChip, orderNumber, orderSlug } from '@/lib/format';
+import { clipDesignLabel, money, quoteLifecycleChip, customerOrderChip, orderNumber, orderSlug } from '@/lib/format';
 import { serviceCategoryLabel } from '@/lib/serviceIcon';
 import { portalActivityAction, unreadSections } from '@/lib/portalNew';
 import type { Order } from '@/lib/types';
@@ -290,14 +290,15 @@ export function PortalDashboard() {
                   <tbody>
                     {orders.map((o) => {
                       const chip = customerOrderChip(o);
+                      const project = clipDesignLabel(o.name ?? o.serviceType ?? 'Order');
                       return (
                         <tr
                           key={o.id}
                           className="click-row"
                           onClick={() => navigate(`/portal/orders/${orderSlug(o.humanRef, o.id)}`)}
                         >
-                          <td>
-                            <div className="on">{o.name ?? o.serviceType ?? 'Order'}</div>
+                          <td className="dash-project">
+                            <div className="on" title={project.full}>{project.text}</div>
                           </td>
                           <td className="muted">{orderNumber(o.humanRef, o.id.slice(0, 6))}</td>
                           <td className="muted">{serviceCategoryLabel(o.serviceType)}</td>
@@ -363,14 +364,15 @@ export function PortalDashboard() {
                         createdAt: o.createdAt,
                         type: o.type,
                       });
+                      const project = clipDesignLabel(o.name ?? 'Quote request');
                       return (
                         <tr
                           key={o.id}
                           className="click-row"
                           onClick={() => navigate(`/portal/quotes/${orderSlug(o.humanRef, o.id)}`)}
                         >
-                          <td>
-                            <div className="on">{o.name ?? 'Quote request'}</div>
+                          <td className="dash-project">
+                            <div className="on" title={project.full}>{project.text}</div>
                           </td>
                           <td className="muted">{orderNumber(o.humanRef, o.id.slice(0, 6))}</td>
                           <td className="muted">{serviceCategoryLabel(o.serviceType)}</td>

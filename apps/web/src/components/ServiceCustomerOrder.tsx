@@ -77,6 +77,45 @@ function releasedBatches(order: CustomerOrder) {
   return (order.deliveries ?? []).filter((batch) => batch.releasedAt && batch.kind !== 'PREVIEW');
 }
 
+function originalDeliveries(order: CustomerOrder) {
+  return (order.deliveries ?? []).filter(
+    (batch) => Boolean(batch.releasedAt) && batch.kind !== 'PREVIEW' && !batch.editId,
+  );
+}
+
+function filesUnderDesign(order: CustomerOrder, designId: string | undefined, delivered: boolean) {
+  const batches = originalDeliveries(order);
+  const realFiles = (batch: (typeof batches)[number]) =>
+    batch.files.filter((file) => !/^delivered by email$/i.test(file.originalName));
+  const linked = batches.filter((batch) =>
+    realFiles(batch).some((file) => file.designId === designId || (file.isBundle && !file.designId)),
+  );
+  const emailOnly = batches.filter(
+    (batch) =>
+      realFiles(batch).length === 0 &&
+      (batch.deliveredVia === 'EMAIL' || batch.deliveredVia === 'BOTH'),
+  );
+  const relevant = linked.length > 0 ? linked : delivered ? emailOnly : [];
+  const files = relevant.flatMap((batch) =>
+    realFiles(batch).filter((file) => {
+      if (file.isBundle) return !file.designId || file.designId === designId;
+      return file.designId === designId;
+    }),
+  );
+  const emailed = relevant.find((batch) => batch.deliveredVia === 'EMAIL' || batch.deliveredVia === 'BOTH');
+  return {
+    images: files.filter((file) => !file.isBundle && isImageFile(file.originalName, file.mimeType)),
+    zips: files.filter((file) => file.isBundle),
+    others: files.filter((file) => !file.isBundle && !isImageFile(file.originalName, file.mimeType)),
+    email: emailed
+      ? {
+          at: emailed.releasedAt || emailed.createdAt,
+          only: emailed.deliveredVia === 'EMAIL' && files.length === 0,
+        }
+      : null,
+  };
+}
+
 function emailOnlyDelivery(order: CustomerOrder, row: DeliveryRow) {
   if (row.design?.status !== 'DELIVERED') return false;
   const designId = row.design.id;
@@ -138,12 +177,24 @@ export function ServiceCustomerOrder({
   const claimed = new Set<string>();
   const designFiles = designs.map((design) => filesForDesign(design, attachments, claimed));
   const history = [...quotations].sort((a, b) => a.version - b.version);
-  const bundleFiles = (order.deliveries ?? []).flatMap((batch) =>
-    batch.files.filter((file) => file.isBundle),
-  );
   const serviceLabel = portalServiceLabel(kind);
   const designCount = groups.length || designs.length;
-  const percent = counts.total > 0 ? Math.round((counts.delivered / counts.total) * 100) : 0;
+  const sizeRows = groups.flatMap((group) => group.rows);
+  const sizeHasOriginalFiles = (row: DeliveryRow) => {
+    const designId = row.design?.id;
+    if (!designId) return false;
+    return (order.deliveries ?? []).some(
+      (batch) =>
+        Boolean(batch.releasedAt) &&
+        batch.kind !== 'PREVIEW' &&
+        !batch.editId &&
+        batch.files.some((file) => !file.isBundle && file.designId === designId),
+    );
+  };
+  const deliveredSizes = sizeRows.filter(
+    (row) => row.design?.status === 'DELIVERED' || sizeHasOriginalFiles(row),
+  ).length;
+  const percent = counts.total > 0 ? Math.round((deliveredSizes / counts.total) * 100) : 0;
 
   const [open, setOpen] = useState({
     summary: awaiting,
@@ -151,7 +202,7 @@ export function ServiceCustomerOrder({
     delivery: false,
     history: false,
   });
-  const [filesFor, setFilesFor] = useState<DeliveryRow | null>(null);
+  const [filesFor, setFilesFor] = useState<{ row: DeliveryRow; editId: string | null } | null>(null);
   const [preview, setPreview] = useState<{ src: string; name: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [payBusy, setPayBusy] = useState(false);
@@ -176,12 +227,8 @@ export function ServiceCustomerOrder({
     ...freshOnOpen,
   });
   const revisions = editsQ.data?.edits ?? [];
-  const openRevisions = revisions.filter((edit) => edit.status === 'PENDING');
-  const rowInRevision = (row: DeliveryRow) =>
-    openRevisions.some((edit) => {
-      const ids = edit.designIds?.length ? edit.designIds : edit.designId ? [edit.designId] : [];
-      return Boolean(row.design && ids.includes(row.design.id));
-    });
+  const publishedRevs = revisions.filter((edit) => edit.status === 'DONE').length;
+  const revPercent = revisions.length ? Math.round((publishedRevs / revisions.length) * 100) : 0;
   const revisionState = revisionDeliveryState(revisions, (id) => {
     const row = groups.flatMap((group) => group.rows).find((item) => item.design?.id === id);
     return row?.design?.status ?? order.designs?.find((design) => design.id === id)?.status;
@@ -209,11 +256,6 @@ export function ServiceCustomerOrder({
     onSuccess: (convo) => navigate(`/portal/messages?c=${convo.id}`),
     onError: (e) => setError(getErrorMessage(e)),
   });
-
-  const deliveredFiles = (row: DeliveryRow) =>
-    (order.deliveries ?? []).flatMap((batch) =>
-      batch.files.filter((file) => file.designId && file.designId === row.design?.id),
-    );
 
   async function payRevision(edit: EditRequest) {
     if (!edit.invoiceId) return;
@@ -246,6 +288,18 @@ export function ServiceCustomerOrder({
       setPayBusy(false);
     }
   }
+
+  const dialogFiles = !filesFor
+    ? []
+    : (order.deliveries ?? []).flatMap((batch) => {
+        if ((batch.editId ?? null) !== filesFor.editId) return [];
+        const files = filesFor.editId
+          ? batch.files
+          : batch.files.filter((file) => file.isBundle || file.designId === filesFor.row.design?.id);
+        return files.filter((file) => !/^delivered by email$/i.test(file.originalName));
+      });
+  const previewFiles = dialogFiles.filter((file) => !file.isBundle && isImageFile(file.originalName, file.mimeType));
+  const zipFiles = dialogFiles.filter((file) => file.isBundle);
 
   async function previewFile(file: { id: string; originalName: string; mimeType?: string | null }) {
     setError(null);
@@ -312,7 +366,7 @@ export function ServiceCustomerOrder({
           <div className="cop-progress">
             <div className="cop-progress-top">
               <strong>
-                {counts.delivered} of {countWord(counts.total, 'size', 'sizes')} delivered
+                {deliveredSizes} of {countWord(counts.total, 'size', 'sizes')} delivered
               </strong>
               <span>{percent}%</span>
             </div>
@@ -328,6 +382,26 @@ export function ServiceCustomerOrder({
             </div>
           </div>
         )}
+        {revisions.length > 0 && (
+          <div className="cop-progress">
+            <div className="cop-progress-top">
+              <strong>
+                {publishedRevs} of {countWord(revisions.length, 'revision', 'revisions')} published
+              </strong>
+              <span>{revPercent}%</span>
+            </div>
+            <div
+              className="cop-bar"
+              role="progressbar"
+              aria-label="Revision progress"
+              aria-valuenow={revPercent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
+              <span style={{ width: `${revPercent}%` }} />
+            </div>
+          </div>
+        )}
         {awaiting && !paid && (
           <div className="cop-pay">
             <button type="button" className="ecd-btn pri" disabled={payBusy} onClick={() => void pay()}>
@@ -337,49 +411,164 @@ export function ServiceCustomerOrder({
         )}
       </section>
 
+      {revisions.length > 0 && (
+        <section className="cop-designs cop-revs" aria-label="Revision requests">
+          <div className="cop-dhead">Revision requests</div>
+          {revisions.map((revision) => {
+            const ids = revision.designIds?.length
+              ? revision.designIds
+              : revision.designId
+                ? [revision.designId]
+                : [];
+            const covered = sizeRows.filter((row) => Boolean(row.design && ids.includes(row.design.id)));
+            const ready =
+              revision.status !== 'DONE' &&
+              covered.length > 0 &&
+              covered.every((row) => row.design?.status === 'DONE' || row.design?.status === 'DELIVERED');
+            const published = revision.status === 'DONE';
+            const charged = revision.kind === 'PAID' && (revision.priceCents ?? 0) > 0;
+            const settled = revision.invoiceStatus === 'PAID';
+            const tone = published ? 'done' : ready ? 'ready' : 'wait';
+            const label = published ? 'Delivered' : ready ? 'Ready' : 'In progress';
+            const viewRow = covered[0] ?? sizeRows[0];
+            return (
+              <div key={revision.id} className="cop-rev-row">
+                <div className="cop-rev-note">{revision.note}</div>
+                <div className="cop-rev-meta">
+                  {charged ? (
+                    <>
+                      <b className="cop-rev-price">{money(revision.priceCents, order.currency)}</b>
+                      <span className={settled ? 'cop-mini paid' : 'cop-mini unpaid'}>{settled ? 'Paid' : 'Unpaid'}</span>
+                    </>
+                  ) : (
+                    <span className="cop-rev-free">Free revision</span>
+                  )}
+                  <span className={`cop-state ${tone}`}>{tone === 'done' ? '✓ ' : '● '}{label}</span>
+                </div>
+                <div className="cop-actions">
+                  {charged && !settled && (
+                    <button
+                      type="button"
+                      className="cop-btn cop-download"
+                      disabled={payBusy || !revision.invoiceId}
+                      onClick={() => void payRevision(revision)}
+                    >
+                      <i className="ti ti-credit-card" /> {payBusy ? 'Opening checkout…' : 'Pay now'}
+                    </button>
+                  )}
+                  {published && viewRow && (
+                    <button
+                      type="button"
+                      className="cop-btn cop-download"
+                      onClick={() => setFilesFor({ row: viewRow, editId: revision.id })}
+                    >
+                      View & download
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="cop-btn help"
+                    disabled={chat.isPending}
+                    onClick={() => chat.mutate()}
+                  >
+                    {chat.isPending ? 'Opening…' : 'Request help'}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      )}
+
       <h2 className="cop-title">Designs & files</h2>
       <div className="cop-designs">
         {groups.length === 0 && <p className="ecd-wait">No items on this order yet.</p>}
-        {groups.map((group) => (
-          <div key={group.title} className="cop-block">
-            <div className="cop-dhead">{group.title}</div>
-            {group.rows.map((row, index) => {
-              const inRevision = rowInRevision(row) && row.design?.status !== 'DELIVERED';
-              const status = inRevision
-                ? { text: 'Revision requested', tone: 'wait' as const }
-                : rowStatus(order, row);
-              const caption = rowCaption(group.title, index, row.name, group.rows.length, designs);
-              const hasFiles = deliveredFiles(row).length > 0 || row.design?.status === 'DELIVERED';
-              return (
-                <div key={row.key} className="cop-row">
-                  <div className="cop-name">
-                    Size {index + 1}
-                    {caption && <span>{caption}</span>}
+        {groups.map((group) => {
+          const designId = group.rows.find((row) => row.design?.id)?.design?.id;
+          const delivered = group.rows.some(
+            (row) => row.design?.status === 'DELIVERED' || sizeHasOriginalFiles(row),
+          );
+          const detail = filesUnderDesign(order, designId, delivered);
+          const hasListed = detail.images.length + detail.zips.length + detail.others.length > 0;
+          return (
+            <div key={group.title} className="cop-block">
+              <div className="cop-dhead">{group.title}</div>
+              {group.rows.map((row, index) => {
+                const delivered = row.design?.status === 'DELIVERED' || sizeHasOriginalFiles(row);
+                const status = delivered
+                  ? { text: designDeliveredLabel(order.deliveries, row.design?.id), tone: 'done' as const }
+                  : rowStatus(order, row);
+                const caption = rowCaption(group.title, index, row.name, group.rows.length, designs);
+                return (
+                  <div key={row.key} className="cop-row">
+                    <div className="cop-name">
+                      Size {index + 1}
+                      {caption && <span>{caption}</span>}
+                    </div>
+                    <div className={`cop-state ${status.tone}`}>
+                      {status.tone === 'done' ? '✓ ' : '● '}
+                      {status.text}
+                    </div>
                   </div>
-                  <div className={`cop-state ${status.tone}`}>
-                    {status.tone === 'done' ? '✓ ' : '● '}
-                    {status.text}
-                  </div>
-                  <div className="cop-actions">
-                    {hasFiles && (
-                      <button type="button" className="cop-btn cop-download" onClick={() => setFilesFor(row)}>
-                        View & download
+                );
+              })}
+              {(hasListed || detail.email) && (
+                <div className="cop-files">
+                  {detail.images.map((file) => (
+                    <div key={file.id} className="cop-file">
+                      <span className="cop-file-name">{file.originalName}</span>
+                      <span className="cop-file-meta">For viewing only</span>
+                      <button type="button" className="cdf-preview-btn" onClick={() => void previewFile(file)}>
+                        Preview
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      className="cop-btn help"
-                      disabled={chat.isPending}
-                      onClick={() => chat.mutate()}
-                    >
-                      {chat.isPending ? 'Opening…' : 'Request help'}
-                    </button>
-                  </div>
+                    </div>
+                  ))}
+                  {detail.zips.map((file) => (
+                    <div key={file.id} className="cop-file">
+                      <span className="cop-file-name">{file.originalName}</span>
+                      <span className="cop-file-meta">All designs</span>
+                      <button
+                        type="button"
+                        className="ecd-btn pri cdf-dl-btn"
+                        onClick={() => void downloadSignedFile(myDeliveryFileUrl(order.id, file.id), file.originalName)}
+                      >
+                        Download
+                      </button>
+                    </div>
+                  ))}
+                  {detail.others.map((file) => (
+                    <div key={file.id} className="cop-file">
+                      <span className="cop-file-name">{file.originalName}</span>
+                      <span className="cop-file-meta">
+                        {detail.zips.length > 0 ? 'Included in the zip' : 'Prepared for this design'}
+                      </span>
+                    </div>
+                  ))}
+                  {detail.email && (
+                    <div className="cop-email">
+                      <strong>Sent by email{detail.email.at ? ` · ${dateShort(detail.email.at)}` : ''}</strong>
+                      <p>
+                        {detail.email.only
+                          ? 'These files were sent to your email. They are not available to download here.'
+                          : 'A copy of these files was sent to your email.'}
+                      </p>
+                    </div>
+                  )}
                 </div>
-              );
-            })}
-          </div>
-        ))}
+              )}
+              <div className="cop-actions cop-block-acts">
+                <button
+                  type="button"
+                  className="cop-btn help"
+                  disabled={chat.isPending}
+                  onClick={() => chat.mutate()}
+                >
+                  {chat.isPending ? 'Opening…' : 'Request help'}
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <section className="cop-note" aria-label="Helpful information">
@@ -396,43 +585,6 @@ export function ServiceCustomerOrder({
           </li>
         </ul>
       </section>
-
-      {revisions.map((revision) => (
-          <section key={revision.id} className="cop-revision" aria-label="Revision">
-            <div className="cop-revision-top">
-              <strong>
-                {revision.status === 'DONE' ? 'Revision delivered' : 'Revision requested'}
-              </strong>
-              {revision.kind === 'PAID' ? (
-                <b>{money(revision.priceCents, order.currency)}</b>
-              ) : (
-                <span>Free revision</span>
-              )}
-            </div>
-            {revision.note && <p>{revision.note}</p>}
-            {revision.kind === 'PAID' && (
-              <div className="cop-revision-pay">
-                {revision.invoiceStatus === 'PAID' ? (
-                  <span className="ecd-tag ok">
-                    <i className="ti ti-check" /> Paid
-                  </span>
-                ) : (
-                  <>
-                    <span>Unpaid</span>
-                    <button
-                      type="button"
-                      className="ecd-btn pri"
-                      disabled={payBusy || !revision.invoiceId}
-                      onClick={() => void payRevision(revision)}
-                    >
-                      <i className="ti ti-credit-card" /> {payBusy ? 'Opening checkout…' : 'Pay now'}
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-          </section>
-      ))}
 
       <div className="ecd-sheet">
         <section className="ecd-sec">
@@ -660,8 +812,8 @@ export function ServiceCustomerOrder({
             onToggle={() => setOpen((prev) => ({ ...prev, history: !prev.history }))}
           />
           <div className={open.history ? 'ecd-body' : 'ecd-body collapsed'}>
-            {history.length === 0 && <p className="ecd-wait">No quote has been sent yet.</p>}
-            {history.length > 0 && (
+            {history.length === 0 && revisions.length === 0 && <p className="ecd-wait">No quote has been sent yet.</p>}
+            {(history.length > 0 || revisions.length > 0) && (
               <div className="ecd-tl">
                 {history.map((quote) => (
                   <div key={quote.id} className="ecd-tl-row">
@@ -669,12 +821,31 @@ export function ServiceCustomerOrder({
                       <div className="ecd-tl-name">{quoteHistoryLabel(quote, history)}</div>
                       <div className="ecd-tl-sub">
                         {dateShort(quote.createdAt)}
-                        {quote.status === 'APPROVED' && paid ? ' · Accepted & paid' : ''}
+                        {quote.status === 'APPROVED' && paid ? ' · Accepted & paid' : quote.status === 'SENT' ? ' · Sent' : ''}
                       </div>
                     </div>
                     <div className="ecd-tl-price">{money(quote.amountCents, quote.currency)}</div>
                   </div>
                 ))}
+                {revisions.map((edit) => {
+                  const charged = edit.kind === 'PAID' && (edit.priceCents ?? 0) > 0;
+                  return (
+                    <div key={edit.id} className="ecd-tl-row">
+                      <div>
+                        <div className="ecd-tl-name">{charged ? 'Paid revision' : 'Free revision'}</div>
+                        <div className="ecd-tl-sub">
+                          {dateShort(edit.createdAt)} · {edit.note}
+                          {charged
+                            ? edit.invoiceStatus === 'PAID'
+                              ? ' · Accepted & paid'
+                              : ' · Awaiting payment'
+                            : ' · No charge'}
+                        </div>
+                      </div>
+                      <div className="ecd-tl-price">{charged ? money(edit.priceCents, order.currency) : 'Free'}</div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -683,68 +854,57 @@ export function ServiceCustomerOrder({
 
       {filesFor && (
         <div className="sod-ov" role="presentation" onClick={() => setFilesFor(null)}>
-          <div className="sod-mo" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+          <div className="sod-mo cdf-mo" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className="sod-mo-h">
               <h3>Delivered files</h3>
               <button type="button" onClick={() => setFilesFor(null)} aria-label="Close">
                 <i className="ti ti-x" />
               </button>
             </div>
-            <p>
-              {emailOnlyDelivery(order, filesFor)
-                ? 'These files were delivered by email.'
-                : 'Preview or download the files delivered for this item.'}
-            </p>
-            <div className="sod-flist">
-              {deliveredFiles(filesFor).length === 0 && bundleFiles.length === 0 && (
-                <div>
-                  {emailOnlyDelivery(order, filesFor)
-                    ? 'These files were delivered by email.'
-                    : 'No files are available yet.'}
-                </div>
-              )}
-              {deliveredFiles(filesFor).map((file) => (
-                <div key={file.id} className="sod-file">
-                  <span>{file.originalName}</span>
-                  <span className="sod-file-acts">
+            <p>Preview the design, then download the files prepared for your order.</p>
+            {previewFiles.length === 0 && zipFiles.length === 0 && (
+              <p>
+                {!filesFor.editId && emailOnlyDelivery(order, filesFor.row)
+                  ? 'These files were delivered by email.'
+                  : 'No files are available yet.'}
+              </p>
+            )}
+            {previewFiles.length > 0 && (
+              <div className="cdf-preview">
+                <div className="cdf-kicker">Design preview</div>
+                <p className="cdf-note">See how your finished design looks. This image is for viewing only.</p>
+                {previewFiles.map((file) => (
+                  <div key={file.id} className="cdf-row">
+                    <span>{file.originalName}</span>
                     <button
                       type="button"
-                      className="sod-eye"
-                      title="Preview"
-                      aria-label={`Preview ${file.originalName}`}
+                      className="cdf-preview-btn"
                       onClick={() => void previewFile(file)}
                     >
-                      <i className="ti ti-eye" />
+                      Preview
                     </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {zipFiles.length > 0 && (
+              <div className="cdf-downloads">
+                <div className="cdf-kicker">Your download files</div>
+                <p className="cdf-note">Files prepared in the formats requested for this design.</p>
+                {zipFiles.map((file) => (
+                  <div key={file.id} className="cdf-row cdf-dl-row">
+                    <span>{file.originalName} · All designs</span>
                     <button
                       type="button"
-                      className="sod-eye"
-                      title="Download"
-                      aria-label={`Download ${file.originalName}`}
+                      className="ecd-btn pri cdf-dl-btn"
                       onClick={() => void downloadSignedFile(myDeliveryFileUrl(order.id, file.id), file.originalName)}
                     >
-                      <i className="ti ti-download" />
+                      Download
                     </button>
-                  </span>
-                </div>
-              ))}
-              {bundleFiles.map((file) => (
-                <div key={file.id} className="sod-file">
-                  <span>{file.originalName} (all designs)</span>
-                  <span className="sod-file-acts">
-                    <button
-                      type="button"
-                      className="sod-eye"
-                      title="Download zip"
-                      aria-label={`Download ${file.originalName}`}
-                      onClick={() => void downloadSignedFile(myDeliveryFileUrl(order.id, file.id), file.originalName)}
-                    >
-                      <i className="ti ti-download" />
-                    </button>
-                  </span>
-                </div>
-              ))}
-            </div>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="sod-mo-f">
               <button type="button" className="ecd-btn" onClick={() => setFilesFor(null)}>Close</button>
             </div>
