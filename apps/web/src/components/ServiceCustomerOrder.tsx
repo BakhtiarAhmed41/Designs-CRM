@@ -321,17 +321,28 @@ export function ServiceCustomerOrder({
     }
   }
 
-  const dialogFiles = !filesFor
+  const dialogBatches = !filesFor
     ? []
-    : (order.deliveries ?? []).flatMap((batch) => {
-        if ((batch.editId ?? null) !== filesFor.editId) return [];
-        const files = filesFor.editId
-          ? batch.files
-          : batch.files.filter((file) => file.isBundle || file.designId === filesFor.row.design?.id);
-        return files.filter((file) => !/^delivered by email$/i.test(file.originalName));
+    : (order.deliveries ?? []).filter((batch) => {
+        if (!batch.releasedAt || batch.kind === 'PREVIEW') return false;
+        if (filesFor.editId) return revisionOwnerId(revisions, batch) === filesFor.editId;
+        if (batch.editId) return false;
+        const designId = filesFor.row.design?.id;
+        const real = batch.files.filter((file) => !/^delivered by email$/i.test(file.originalName));
+        if (real.length === 0) return batch.deliveredVia === 'EMAIL' || batch.deliveredVia === 'BOTH';
+        return real.some((file) => file.isBundle || file.designId === designId);
       });
+  const dialogFiles = dialogBatches.flatMap((batch) => {
+    const files = filesFor?.editId
+      ? batch.files
+      : batch.files.filter((file) => file.isBundle || file.designId === filesFor?.row.design?.id);
+    return files.filter((file) => !/^delivered by email$/i.test(file.originalName));
+  });
   const previewFiles = dialogFiles.filter((file) => !isZipFile(file) && isImageFile(file.originalName, file.mimeType));
   const zipFiles = dialogFiles.filter((file) => isZipFile(file));
+  const sentThroughEmail = ['EMAIL', 'BOTH'].includes(
+    mergeDeliveredVia(dialogBatches.map((batch) => batch.deliveredVia)) ?? '',
+  );
 
   async function previewFile(file: { id: string; originalName: string; mimeType?: string | null }) {
     setError(null);
@@ -516,11 +527,6 @@ export function ServiceCustomerOrder({
       <div className="cop-designs">
         {groups.length === 0 && <p className="ecd-wait">No items on this order yet.</p>}
         {groups.map((group) => {
-          const designId = group.rows.find((row) => row.design?.id)?.design?.id;
-          const delivered = group.rows.some(
-            (row) => row.design?.status === 'DELIVERED' || sizeHasOriginalFiles(row),
-          );
-          const detail = filesUnderDesign(order, designId, delivered);
           return (
             <div key={group.title} className="cop-block">
               <div className="cop-dhead">{group.title}</div>
@@ -558,18 +564,6 @@ export function ServiceCustomerOrder({
                   </div>
                 );
               })}
-              {detail.email && (
-                <div className="cop-files">
-                  <div className="cop-email">
-                    <strong>Sent by email{detail.email.at ? ` · ${dateShort(detail.email.at)}` : ''}</strong>
-                    <p>
-                      {detail.email.only
-                        ? 'These files were sent to your email. They are not available to download here.'
-                        : 'A copy of these files was sent to your email.'}
-                    </p>
-                  </div>
-                </div>
-              )}
             </div>
           );
         })}
@@ -865,8 +859,12 @@ export function ServiceCustomerOrder({
                 <i className="ti ti-x" />
               </button>
             </div>
-            <p>Preview the design, then download the files prepared for your order.</p>
-            {previewFiles.length === 0 && zipFiles.length === 0 && !emailOnlyDelivery(order, filesFor.row) && (
+            <p>
+              {sentThroughEmail && previewFiles.length === 0
+                ? 'These files were sent to you through email.'
+                : 'Preview the design, then download the files prepared for your order.'}
+            </p>
+            {previewFiles.length === 0 && zipFiles.length === 0 && !sentThroughEmail && (
               <p>No files are available yet.</p>
             )}
             {previewFiles.length > 0 && (

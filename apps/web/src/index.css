@@ -1510,7 +1510,8 @@ button { font-family: inherit; }
   border-radius:8px;background:rgba(15,18,22,.74);color:#fff;
   display:grid;place-items:center;cursor:pointer;
 }
-.file-lightbox-dl i{font-size:17px;color:#fff;}
+.file-lightbox-dl i,
+.file-lightbox-dl i::before{font-size:17px;color:#fff !important;}
 .file-lightbox-dl:hover{background:rgba(15,18,22,.9);}
 .file-lightbox-x{
   position:absolute;top:16px;right:18px;width:36px;height:36px;border:none;

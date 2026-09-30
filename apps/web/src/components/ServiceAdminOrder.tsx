@@ -1218,7 +1218,9 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
                 </div>
               ))}
             </div>
-            <div className="ead-he-sub">{pendingFiles.length} of 10 files attached</div>
+            <div className="ead-he-sub">
+              {pendingFiles.length} {pendingFiles.length === 1 ? 'file' : 'files'} attached
+            </div>
             <div className="sod-label">All designs zip (optional)</div>
             <p>Upload one zip that contains every design in this order.</p>
             <button type="button" className="sod-drop sod-drop-sm" onClick={() => openFilePicker('sod-zip')}>
