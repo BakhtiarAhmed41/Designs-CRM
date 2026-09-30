@@ -10,7 +10,7 @@ import {
 import { getErrorMessage } from '@/lib/api';
 import { invalidateWorkCaches } from '@/lib/queryCache';
 import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
-import { money, dateShort, quoteLifecycleChip, orderNumber, orderSlug } from '@/lib/format';
+import { clipDesignLabel, money, dateShort, quoteLifecycleChip, orderNumber, orderSlug } from '@/lib/format';
 import { isAdminRecounter, isStaffCreatedOrder } from '@/lib/quoteHelpers';
 import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
 import type { Order, OrderStatus } from '@/lib/types';
@@ -197,6 +197,7 @@ export function AdminQuotes() {
           <table className="itable">
             <thead>
               <tr>
+                <th className="ref-no">Quote no.</th>
                 <th>Quote</th>
                 <th>Customer</th>
                 <th>Status</th>
@@ -214,23 +215,22 @@ export function AdminQuotes() {
                       adminRecounter: isAdminRecounter(o.quotations),
                     });
                 const slug = orderSlug(o.humanRef, o.id);
+                const project = clipDesignLabel(o.name ?? 'Quote request');
                 return (
                   <tr
                     key={o.id}
                     className="click-row"
                     onClick={() => navigate(approved ? `/admin/orders/${slug}` : `/admin/quotes/${slug}`)}
                   >
-                    <td>
+                    <td className="ref-no">{orderNumber(o.humanRef, o.id.slice(0, 6))}</td>
+                    <td className="ref-name">
                       <div className="cell-main">
                         <div className={`othumb ${serviceThumbClass(o.serviceType)}`}>
                           <i className={`ti ${serviceTi(o.serviceType)}`} />
                         </div>
                         <div>
-                          <div className="on">{o.name ?? 'Quote request'}</div>
-                          <div className="om">
-                            {orderNumber(o.humanRef, o.id.slice(0, 6))}
-                            {isStaffCreatedOrder(o) ? ' · Admin created' : ''}
-                          </div>
+                          <div className="on" title={project.full}>{project.text}</div>
+                          {isStaffCreatedOrder(o) && <div className="om">Admin created</div>}
                         </div>
                       </div>
                     </td>

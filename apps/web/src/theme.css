@@ -121,8 +121,8 @@ body {
   font-weight: 600;
 }
 .nav a.on i { color: var(--sidebar-active-text); }
-.nav a .cnt { background: var(--sidebar-text); color: var(--sidebar-bg); }
-.nav a.on .cnt { background: var(--sidebar-active-text); color: var(--sidebar-active-bg); }
+.nav a .cnt { background: var(--tint-m); color: var(--maroon); }
+.nav a.on .cnt { background: var(--tint-m); color: var(--maroon); }
 .nav a .dot { background: var(--maroon); }
 .side .foot { border-top: 1px solid var(--line); }
 .side .av, .side .me .av { background: var(--ink); color: #fff; }
@@ -392,13 +392,15 @@ body {
 }
 .main:not(.main-messaging) > div.portal-quotes-page,
 .main:not(.main-messaging) > div.portal-orders-page,
-.main:not(.main-messaging) > div.admin-quotes-page {
+.main:not(.main-messaging) > div.admin-quotes-page,
+.main:not(.main-messaging) > div.admin-orders-page {
   max-width: none;
   margin-inline: 0;
 }
 .app-frame .main:has(.portal-quotes-page),
 .app-frame .main:has(.portal-orders-page),
-.app-frame .main:has(.admin-quotes-page) {
+.app-frame .main:has(.admin-quotes-page),
+.app-frame .main:has(.admin-orders-page) {
   padding-left: 16px;
   padding-right: 20px;
 }
@@ -814,6 +816,18 @@ button.metric { font: inherit; text-align: left; width: 100%; }
 }
 .qtable td, .itable td { padding: 14px 16px; }
 .itable th.num, .itable td.num, .qtable th.num, .qtable td.num { text-align: right; }
+.itable .ref-no {
+  width: 132px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.itable td.ref-name .cell-main > div:last-child { min-width: 0; }
+.itable td.ref-name .on {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 32ch;
+}
 .itable td.muted { color: var(--muted); font-size: 12.5px; }
 .click-row { cursor: pointer; }
 .click-row:hover td { background: #f5f8fb; }

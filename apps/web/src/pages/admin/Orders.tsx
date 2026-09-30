@@ -8,7 +8,7 @@ import { SkeletonRows } from '@/components/ui/Skeleton';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { listAdminOrders } from '@/lib/orders';
 import { freshOnOpen } from '@/lib/queryRefresh';
-import { money, dateShort, lifecycleChip, orderNumber, orderSlug } from '@/lib/format';
+import { clipDesignLabel, money, dateShort, lifecycleChip, orderNumber, orderSlug } from '@/lib/format';
 import { isStaffCreatedOrder } from '@/lib/quoteHelpers';
 import { serviceTi, serviceThumbClass } from '@/lib/serviceIcon';
 import type { Order, OrderStatus } from '@/lib/types';
@@ -62,7 +62,7 @@ export function AdminOrders() {
   const orders = useMemo(() => data?.orders ?? [], [data?.orders]);
 
   return (
-    <div>
+    <div className="admin-orders-page">
       <PageHeader
         title="Orders"
         subtitle="Find a job in seconds. Search, filter, then open the workspace."
@@ -124,6 +124,7 @@ export function AdminOrders() {
           <table className="itable">
             <thead>
               <tr>
+                <th className="ref-no">Order no.</th>
                 <th>Order</th>
                 {!hideCustomer && <th>Customer</th>}
                 <th>Status</th>
@@ -138,19 +139,18 @@ export function AdminOrders() {
                   partiallyDelivered: o.partiallyDelivered,
                   revisionPartial: o.revisionPartial,
                 });
+                const project = clipDesignLabel(o.name || 'Order');
                 return (
                   <tr key={o.id} className="click-row" onClick={() => navigate(`/admin/orders/${orderSlug(o.humanRef, o.id)}`)}>
-                    <td>
+                    <td className="ref-no">{orderNumber(o.humanRef, o.id.slice(0, 8))}</td>
+                    <td className="ref-name">
                       <div className="cell-main">
                         <div className={`othumb ${serviceThumbClass(o.serviceType)}`}>
                           <i className={`ti ${serviceTi(o.serviceType)}`} />
                         </div>
                         <div>
-                          <div className="on">{o.name || orderNumber(o.humanRef) || 'Order'}</div>
-                          <div className="om">
-                            {orderNumber(o.humanRef, o.id.slice(0, 8))}
-                            {isStaffCreatedOrder(o) ? ' · Admin created' : ''}
-                          </div>
+                          <div className="on" title={project.full}>{project.text}</div>
+                          {isStaffCreatedOrder(o) && <div className="om">Admin created</div>}
                         </div>
                       </div>
                     </td>

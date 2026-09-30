@@ -85,6 +85,7 @@ export type MyFile = {
           downloadCount?: number;
   isBundle?: boolean;
   emailNotice?: boolean;
+  batchVia?: string | null;
   designId?: string | null;
   designName?: string | null;
   editId?: string | null;

@@ -28,6 +28,7 @@ import {
   dateShort,
   designDeliveredLabel,
   isImageFile,
+  mergeDeliveredVia,
   money,
   orderNumber,
   orderSlug,
@@ -77,6 +78,12 @@ function releasedBatches(order: CustomerOrder) {
   return (order.deliveries ?? []).filter((batch) => batch.releasedAt && batch.kind !== 'PREVIEW');
 }
 
+function isZipFile(file: { isBundle?: boolean; originalName?: string; mimeType?: string | null }) {
+  if (file.isBundle) return true;
+  const name = (file.originalName ?? '').toLowerCase();
+  return name.endsWith('.zip') || file.mimeType === 'application/zip' || file.mimeType === 'application/x-zip-compressed';
+}
+
 function originalDeliveries(order: CustomerOrder) {
   return (order.deliveries ?? []).filter(
     (batch) => Boolean(batch.releasedAt) && batch.kind !== 'PREVIEW' && !batch.editId,
@@ -105,8 +112,8 @@ function filesUnderDesign(order: CustomerOrder, designId: string | undefined, de
   const emailed = relevant.find((batch) => batch.deliveredVia === 'EMAIL' || batch.deliveredVia === 'BOTH');
   return {
     images: files.filter((file) => !file.isBundle && isImageFile(file.originalName, file.mimeType)),
-    zips: files.filter((file) => file.isBundle),
-    others: files.filter((file) => !file.isBundle && !isImageFile(file.originalName, file.mimeType)),
+    zips: files.filter((file) => isZipFile(file)),
+    others: files.filter((file) => !isZipFile(file) && !isImageFile(file.originalName, file.mimeType)),
     email: emailed
       ? {
           at: emailed.releasedAt || emailed.createdAt,
@@ -114,6 +121,31 @@ function filesUnderDesign(order: CustomerOrder, designId: string | undefined, de
         }
       : null,
   };
+}
+
+function revisionDeliveredLabel(order: CustomerOrder, revisions: EditRequest[], revisionId: string) {
+  const batches = (order.deliveries ?? []).filter((batch) => {
+    if (!batch.releasedAt || batch.kind === 'PREVIEW') return false;
+    return revisionOwnerId(revisions, batch) === revisionId;
+  });
+  const via = mergeDeliveredVia(batches.map((batch) => batch.deliveredVia));
+  if (via === 'BOTH') return 'Delivered on portal & through email';
+  if (via === 'EMAIL') return 'Delivered through email';
+  if (via === 'PORTAL') return 'Delivered on portal';
+  return 'Delivered';
+}
+
+function revisionOwnerId(
+  revisions: EditRequest[],
+  batch: { editId?: string | null; createdAt?: string },
+) {
+  if (batch.editId) return batch.editId;
+  const at = batch.createdAt ? new Date(batch.createdAt).getTime() : 0;
+  let owner: string | null = null;
+  for (const edit of revisions) {
+    if (at >= new Date(edit.createdAt).getTime() - 2000) owner = edit.id;
+  }
+  return owner;
 }
 
 function emailOnlyDelivery(order: CustomerOrder, row: DeliveryRow) {
@@ -298,8 +330,8 @@ export function ServiceCustomerOrder({
           : batch.files.filter((file) => file.isBundle || file.designId === filesFor.row.design?.id);
         return files.filter((file) => !/^delivered by email$/i.test(file.originalName));
       });
-  const previewFiles = dialogFiles.filter((file) => !file.isBundle && isImageFile(file.originalName, file.mimeType));
-  const zipFiles = dialogFiles.filter((file) => file.isBundle);
+  const previewFiles = dialogFiles.filter((file) => !isZipFile(file) && isImageFile(file.originalName, file.mimeType));
+  const zipFiles = dialogFiles.filter((file) => isZipFile(file));
 
   async function previewFile(file: { id: string; originalName: string; mimeType?: string | null }) {
     setError(null);
@@ -426,7 +458,11 @@ export function ServiceCustomerOrder({
             const charged = revision.kind === 'PAID' && (revision.priceCents ?? 0) > 0;
             const settled = revision.invoiceStatus === 'PAID';
             const tone = published ? 'done' : ready ? 'ready' : 'wait';
-            const label = published ? 'Delivered' : ready ? 'Ready' : 'In progress';
+            const label = published
+              ? revisionDeliveredLabel(order, revisions, revision.id)
+              : ready
+                ? 'Ready'
+                : 'In progress';
             const viewRow = covered[0] ?? sizeRows[0];
             return (
               <div key={revision.id} className="cop-rev-row">
@@ -496,7 +532,7 @@ export function ServiceCustomerOrder({
                   : rowStatus(order, row);
                 const caption = rowCaption(group.title, index, row.name, group.rows.length, designs);
                 const lineFiles = filesUnderDesign(order, row.design?.id, rowDelivered);
-                const canView = lineFiles.images.length > 0 || lineFiles.zips.length > 0;
+                const canView = rowDelivered && (lineFiles.images.length > 0 || lineFiles.zips.length > 0 || Boolean(lineFiles.email));
                 return (
                   <div key={row.key} className="cop-row">
                     <div className="cop-name">
@@ -511,10 +547,12 @@ export function ServiceCustomerOrder({
                       {canView && (
                         <button
                           type="button"
-                          className="cop-btn cop-download"
+                          className="sod-eye"
+                          title="View files"
+                          aria-label="View files"
                           onClick={() => setFilesFor({ row, editId: null })}
                         >
-                          View
+                          <i className="ti ti-eye" />
                         </button>
                       )}
                     </div>
@@ -839,17 +877,12 @@ export function ServiceCustomerOrder({
               </button>
             </div>
             <p>Preview the design, then download the files prepared for your order.</p>
-            {previewFiles.length === 0 && zipFiles.length === 0 && (
-              <p>
-                {!filesFor.editId && emailOnlyDelivery(order, filesFor.row)
-                  ? 'These files were delivered by email.'
-                  : 'No files are available yet.'}
-              </p>
+            {previewFiles.length === 0 && zipFiles.length === 0 && !emailOnlyDelivery(order, filesFor.row) && (
+              <p>No files are available yet.</p>
             )}
             {previewFiles.length > 0 && (
               <div className="cdf-preview">
                 <div className="cdf-kicker">Design preview</div>
-                <p className="cdf-note">See how your finished design looks. This image is for viewing only.</p>
                 {previewFiles.map((file) => (
                   <div key={file.id} className="cdf-row">
                     <span>{file.originalName}</span>
@@ -864,7 +897,7 @@ export function ServiceCustomerOrder({
                 ))}
               </div>
             )}
-            {zipFiles.length > 0 && (
+            {(zipFiles.length > 0 || (!filesFor.editId && emailOnlyDelivery(order, filesFor.row))) && (
               <div className="cdf-downloads">
                 <div className="cdf-kicker">Your download files</div>
                 <p className="cdf-note">Files prepared in the formats requested for this design.</p>
@@ -880,6 +913,11 @@ export function ServiceCustomerOrder({
                     </button>
                   </div>
                 ))}
+                {zipFiles.length === 0 && (
+                  <div className="cdf-row cdf-dl-row">
+                    <span>Sent by email · ZIP with all files</span>
+                  </div>
+                )}
               </div>
             )}
             <div className="sod-mo-f">

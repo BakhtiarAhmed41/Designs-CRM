@@ -83,6 +83,7 @@ export function QuoteFormPage() {
   const dirtyRef = useRef(false);
   const draftRestoredRef = useRef(false);
   const requested = params.get('service');
+  const resumeDraft = params.get('draft') === '1';
   const initial = requested === 'svg' ? 'laser' : requested;
   const found = SERVICES.find((s) => s.key === initial);
   const [service, setService] = useState<(typeof SERVICES)[number] | null>(found ?? null);
@@ -94,13 +95,13 @@ export function QuoteFormPage() {
 
   useEffect(() => {
     if (requested === 'svg') {
-      navigate('/portal/quotes/new?service=laser', { replace: true });
+      navigate(`/portal/quotes/new?service=laser${resumeDraft ? '&draft=1' : ''}`, { replace: true });
       return;
     }
     const match = SERVICES.find((s) => s.key === initial);
     setService(match ?? null);
     draftRestoredRef.current = false;
-  }, [initial, requested, navigate]);
+  }, [initial, requested, navigate, resumeDraft]);
 
   useEffect(() => {
     postThemeToWindow(iframeRef.current?.contentWindow, themeColors);
@@ -220,10 +221,10 @@ export function QuoteFormPage() {
           postThemeToWindow(win, themeColors);
           win.postMessage({ type: 'lvd-set-context', role: 'customer', kind: 'quote' }, '*');
         }
-        if (win && customerPrefs && !draftRestoredRef.current) {
+        if (win && customerPrefs && !resumeDraft && !draftRestoredRef.current) {
           win.postMessage({ type: 'lvd-apply-prefs', prefs: customerPrefs }, '*');
         }
-        if (service) {
+        if (service && resumeDraft) {
           void getQuoteDraft(service.key).then((res) => {
             if (res.draft && win) {
               draftRestoredRef.current = true;
@@ -254,13 +255,13 @@ export function QuoteFormPage() {
     }
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
-  }, [submitFromIframe, navigate, customerPrefs, service, qc, themeColors, closePage]);
+  }, [submitFromIframe, navigate, customerPrefs, service, resumeDraft, qc, themeColors, closePage]);
 
   useEffect(() => {
-    if (!service || !customerPrefs || draftRestoredRef.current) return;
+    if (!service || !customerPrefs || resumeDraft || draftRestoredRef.current) return;
     const win = iframeRef.current?.contentWindow;
     if (win) win.postMessage({ type: 'lvd-apply-prefs', prefs: customerPrefs }, '*');
-  }, [service, customerPrefs]);
+  }, [service, customerPrefs, resumeDraft]);
 
   const topbarLead = useMemo(
     () => (

@@ -3993,6 +3993,7 @@ export class OrdersService {
     }
     type EmailOnlyRow = {
       id: string;
+      edit_id?: string | null;
       delivered_at: Date;
       delivered_via: string;
       order_id: string;
@@ -4004,7 +4005,7 @@ export class OrdersService {
     let emailOnly: EmailOnlyRow[] = [];
     try {
       emailOnly = await this.db.query<EmailOnlyRow>(
-        `SELECT d.id, COALESCE(d.released_at, d.created_at) AS delivered_at, d.delivered_via,
+        `SELECT d.id, d.edit_id, COALESCE(d.released_at, d.created_at) AS delivered_at, d.delivered_via,
                 o.id AS order_id, o.name AS order_name, o.human_ref, o.service_type, u.email
            FROM deliveries d
            JOIN orders o ON o.id = d.order_id
@@ -4030,9 +4031,6 @@ export class OrdersService {
     };
     for (const r of rows) pushVia(r.order_id, r.delivered_via, r.kind);
     for (const r of emailOnly) pushVia(r.order_id, r.delivered_via, null);
-    const ordersWithFiles = new Set(
-      rows.filter((r) => r.kind !== DeliveryKind.PREVIEW).map((r) => r.order_id),
-    );
     const files = await Promise.all(
       rows.map(async (r) => {
         const isPreview = r.kind === DeliveryKind.PREVIEW;
@@ -4064,6 +4062,7 @@ export class OrdersService {
           downloadCount: Number(r.download_count ?? 0),
           isBundle: Boolean(r.is_bundle),
           emailNotice: false,
+          batchVia: r.delivered_via,
           designId: r.design_id ?? null,
           designName: r.design_name ?? null,
           editId: r.edit_id ?? null,
@@ -4071,7 +4070,6 @@ export class OrdersService {
       }),
     );
     for (const r of emailOnly) {
-      if (ordersWithFiles.has(r.order_id)) continue;
       files.push({
         orderId: r.order_id,
         orderName: r.order_name,
@@ -4093,9 +4091,10 @@ export class OrdersService {
         downloadCount: 0,
         isBundle: false,
         emailNotice: true,
+        batchVia: r.delivered_via,
         designId: null,
         designName: null,
-        editId: null,
+        editId: r.edit_id ?? null,
       });
     }
     return files;

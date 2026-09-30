@@ -746,22 +746,6 @@
     return true;
   }
 
-  function restoreDraft(svc) {
-    fetch(apiBase() + '/orders/drafts/' + encodeURIComponent(svc), {
-      credentials: 'include',
-    })
-      .then(function (res) {
-        return res.ok ? res.json() : null;
-      })
-      .then(function (data) {
-        if (data && data.draft && data.draft.payload) applyDraft(data.draft.payload);
-      })
-      .catch(function () {
-        /* not signed in */
-      });
-    return false;
-  }
-
   function submitStandalone(svc) {
     var collected = window.LVD_COLLECT ? window.LVD_COLLECT() : {};
     fetch(apiBase() + '/users/me', { credentials: 'include' })
@@ -1112,7 +1096,6 @@
         patchFileInputs(document);
       }).observe(document.body, { childList: true, subtree: true });
     }
-    var restored = restoreDraft(svc);
     loadTurnaroundLabels();
     reportHeightSoon();
     if (window.ResizeObserver) {
@@ -1179,7 +1162,7 @@
       });
     });
 
-    parent.postMessage({ type: 'lvd-form-ready', service: svc, restoredDraft: restored }, '*');
+    parent.postMessage({ type: 'lvd-form-ready', service: svc, restoredDraft: false }, '*');
   });
 
   window.addEventListener('message', function (ev) {

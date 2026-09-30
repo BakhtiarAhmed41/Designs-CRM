@@ -10,7 +10,6 @@ import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 import { freshOnOpen } from '@/lib/queryRefresh';
 import { PageHeader } from '@/components/ui/PageHeader';
-import { useRequestQuote } from '@/context/RequestQuoteContext';
 import { RequestQuoteMenu } from '@/components/RequestQuoteMenu';
 
 const DRAFT_LABELS: Record<string, string> = {
@@ -37,7 +36,6 @@ function quoteRowAction(statusLabel: string) {
 export function PortalQuotes() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { openRequestQuote } = useRequestQuote();
   const [draftsOpen, setDraftsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -87,7 +85,7 @@ export function PortalQuotes() {
   function continueDraft(serviceKey: string) {
     setDraftsOpen(false);
     const key = serviceKey === 'svg' ? 'laser' : serviceKey;
-    openRequestQuote(key);
+    navigate(`/portal/quotes/new?service=${encodeURIComponent(key)}&draft=1`);
   }
 
   return (

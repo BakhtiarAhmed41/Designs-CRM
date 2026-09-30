@@ -7,7 +7,7 @@ import { listMyEdits, requestEdit } from '@/lib/edits';
 import { getMyCustomer } from '@/lib/customers';
 import { RevisionRequestForm } from '@/components/RevisionRequestForm';
 import { getErrorMessage } from '@/lib/api';
-import { money, dateShort, customerOrderChip, deliveryMethodLabel, orderNumber, orderSlug } from '@/lib/format';
+import { clipDesignLabel, money, dateShort, customerOrderChip, deliveryMethodLabel, orderNumber, orderSlug } from '@/lib/format';
 import { serviceCategoryLabel, serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
 import { designStatusChipClass, designStatusLabel, type Design } from '@/lib/designs';
 import type { Order } from '@/lib/types';
@@ -508,6 +508,7 @@ export function PortalOrders() {
           <table className="itable">
             <thead>
               <tr>
+                <th className="ref-no">Order no.</th>
                 <th>Order</th>
                 <th>Category</th>
                 <th>Status</th>
@@ -520,17 +521,18 @@ export function PortalOrders() {
               {pageItems.map((o) => {
                 const open = expanded === o.id;
                 const chip = customerOrderChip(o);
+                const project = clipDesignLabel(o.name ?? o.serviceType ?? 'Order');
                 return (
                   <Fragment key={o.id}>
                     <tr className="click-row" onClick={() => navigate(`/portal/orders/${orderSlug(o.humanRef, o.id)}`)}>
-                      <td>
+                      <td className="ref-no">{orderNumber(o.humanRef, o.id.slice(0, 6))}</td>
+                      <td className="ref-name">
                         <div className="cell-main">
                           <div className={`thumb${serviceThumbClass(o.serviceType) ? ' m' : ''}`}>
                             <i className={`ti ${serviceTi(o.serviceType)}`} />
                           </div>
                           <div>
-                            <div className="on">{o.name ?? o.serviceType ?? 'Order'}</div>
-                            <div className="om">{orderNumber(o.humanRef, o.id.slice(0, 6))}</div>
+                            <div className="on" title={project.full}>{project.text}</div>
                           </div>
                         </div>
                       </td>
@@ -582,7 +584,7 @@ export function PortalOrders() {
                     </tr>
                     {open && (
                       <tr className="expand-row">
-                        <td colSpan={6}>
+                        <td colSpan={7}>
                           <OrderBatch orderId={o.id} open={open} />
                         </td>
                       </tr>

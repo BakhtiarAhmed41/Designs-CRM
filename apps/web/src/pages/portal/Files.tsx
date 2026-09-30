@@ -128,7 +128,7 @@ function OrderFileDetail({
             key={edit.id}
             edit={edit}
             index={index}
-            files={listed.filter((file) => file.editId === edit.id)}
+            files={files.filter((file) => file.editId === edit.id)}
             onDownload={download}
           />
         ))}
@@ -184,6 +184,11 @@ function RevisionFiles({
 }) {
   const charged = edit.kind === 'PAID' && (edit.priceCents ?? 0) > 0;
   const paid = edit.invoiceStatus === 'PAID';
+  const portalFiles = files.filter((file) => !file.emailNotice);
+  const emailed = files.some(
+    (file) =>
+      file.emailNotice || file.batchVia === 'EMAIL' || file.batchVia === 'BOTH',
+  );
   return (
     <div className="files-block">
       <div className="files-rev-h">
@@ -205,12 +210,12 @@ function RevisionFiles({
           </span>
         </div>
       </div>
-      {files.length === 0 ? (
+      {portalFiles.length === 0 && !emailed ? (
         <div className="files-empty">Files will appear here once this revision is published.</div>
       ) : (
         <FileLines
-          files={files}
-          emailed={files.some((file) => file.deliveredVia === 'EMAIL' || file.deliveredVia === 'BOTH')}
+          files={portalFiles}
+          emailed={emailed}
           onDownload={onDownload}
         />
       )}
