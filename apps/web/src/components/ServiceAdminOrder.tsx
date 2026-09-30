@@ -15,6 +15,7 @@ import {
   deleteAdminEdit,
   getOrderActivity,
   listAdminOrderEdits,
+  updateAdminEdit,
 } from '@/lib/edits';
 import {
   asEmbroideryPrefs,
@@ -354,13 +355,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
   });
 
   const markRevisionReady = useMutation({
-    mutationFn: async (rows: DeliveryRow[]) => {
-      for (const row of rows) {
-        if (row.design?.status === 'DELIVERED' || row.design?.status === 'DONE') continue;
-        const designId = await ensureDesign(row);
-        await updateDesign(order.id, designId, { status: 'DONE' });
-      }
-    },
+    mutationFn: (editId: string) => updateAdminEdit(editId, { ready: true }),
     onSuccess: () => {
       setError(null);
       refresh();
@@ -465,13 +460,10 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
     if (ids.length === 0) return allRows;
     return allRows.filter((row) => Boolean(row.design && ids.includes(row.design.id)));
   };
-  const revisionPhase = (edit: { status: string; designIds?: string[]; designId?: string | null }) => {
+  const revisionPhase = (edit: { status: string; readyAt?: string | null }) => {
     if (edit.status === 'DONE') return 'published' as const;
-    const covered = rowsForEdit(edit);
-    const ready =
-      covered.length > 0 &&
-      covered.every((row) => row.design?.status === 'DONE' || row.design?.status === 'DELIVERED');
-    return ready ? ('ready' as const) : ('requested' as const);
+    if (edit.readyAt) return 'ready' as const;
+    return 'requested' as const;
   };
   const revisionFiles = (editId: string) =>
     (order.deliveries ?? []).flatMap((batch) => {
@@ -765,8 +757,8 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
                       <button
                         type="button"
                         className="ead-btn sm"
-                        disabled={markRevisionReady.isPending || covered.length === 0}
-                        onClick={() => markRevisionReady.mutate(covered)}
+                        disabled={markRevisionReady.isPending}
+                        onClick={() => markRevisionReady.mutate(edit.id)}
                       >
                         Mark ready
                       </button>

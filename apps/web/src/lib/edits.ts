@@ -15,6 +15,7 @@ export type EditRequest = {
   kind: EditKind;
   priceCents: number | null;
   status: EditStatus;
+  readyAt?: string | null;
   currency?: string | null;
   assignedDesignerId: string | null;
   requestedById: string | null;
@@ -88,7 +89,7 @@ export function deleteAdminEdit(id: string) {
 
 export function updateAdminEdit(
   id: string,
-  data: { status?: EditStatus; assignedDesignerId?: string | null },
+  data: { status?: EditStatus; assignedDesignerId?: string | null; ready?: boolean },
 ) {
   return apiFetch<{ edit: EditRequest }>(`/admin/edits/${id}`, {
     method: 'PATCH',

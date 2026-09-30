@@ -59,6 +59,7 @@ type EditRow = {
   kind: EditKind;
   price_cents: number | null;
   status: EditStatus;
+  ready_at: Date | null;
   assigned_designer_id: string | null;
   requested_by_id: string | null;
   created_at: Date;
@@ -127,6 +128,7 @@ export class EditsService {
       kind: e.kind,
       priceCents: e.price_cents,
       status: e.status,
+      readyAt: e.ready_at,
       assignedDesignerId: e.assigned_designer_id,
       requestedById: e.requested_by_id,
       createdAt: e.created_at,
@@ -501,7 +503,7 @@ export class EditsService {
   async updateEdit(
     user: AuthUser | undefined,
     editId: string,
-    input: { status?: EditStatus; assignedDesignerId?: string | null },
+    input: { status?: EditStatus; assignedDesignerId?: string | null; ready?: boolean },
   ) {
     this.assertStaff(user);
     const edit = await this.db.queryOne<EditRow>(
@@ -528,6 +530,11 @@ export class EditsService {
     if (input.assignedDesignerId !== undefined) {
       sets.push('assigned_designer_id = ?');
       params.push(input.assignedDesignerId ?? null);
+    }
+    if (input.ready === true) {
+      sets.push('ready_at = COALESCE(ready_at, NOW())');
+    } else if (input.ready === false) {
+      sets.push('ready_at = NULL');
     }
 
     if (sets.length) {

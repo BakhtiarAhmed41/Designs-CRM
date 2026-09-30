@@ -421,10 +421,7 @@ export function ServiceCustomerOrder({
                 ? [revision.designId]
                 : [];
             const covered = sizeRows.filter((row) => Boolean(row.design && ids.includes(row.design.id)));
-            const ready =
-              revision.status !== 'DONE' &&
-              covered.length > 0 &&
-              covered.every((row) => row.design?.status === 'DONE' || row.design?.status === 'DELIVERED');
+            const ready = revision.status !== 'DONE' && Boolean(revision.readyAt);
             const published = revision.status === 'DONE';
             const charged = revision.kind === 'PAID' && (revision.priceCents ?? 0) > 0;
             const settled = revision.invoiceStatus === 'PAID';

@@ -32,6 +32,7 @@ const createEditSchema = z.object({
 const updateEditSchema = z.object({
   status: z.enum([EditStatus.PENDING, EditStatus.DONE]).optional(),
   assignedDesignerId: z.string().optional().nullable(),
+  ready: z.boolean().optional(),
 });
 
 @Controller('admin')
