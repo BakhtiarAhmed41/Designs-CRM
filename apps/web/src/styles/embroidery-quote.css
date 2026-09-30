@@ -538,6 +538,11 @@
 .rev-note { font-size: 13.5px; font-weight: 500; min-width: 0; }
 .rev-chip {
   display: inline-block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
   background: #f7eef0;
   color: var(--maroon);
   border-radius: 6px;
@@ -818,7 +823,6 @@
   border-radius: 8px;
 }
 .ecd-sec-h.is-toggle.open { margin-bottom: 10px; }
-.ecd-sec-h.is-toggle:hover { background: rgba(20, 63, 101, 0.03); }
 .ecd-sec-h.is-toggle:focus-visible { outline: 2px solid var(--maroon); outline-offset: -2px; }
 .ecd-disclose {
   background: none;
@@ -1354,7 +1358,7 @@
 }
 .cop-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 15px;
   padding: 12px 22px;

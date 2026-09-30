@@ -486,16 +486,17 @@ export function ServiceCustomerOrder({
             (row) => row.design?.status === 'DELIVERED' || sizeHasOriginalFiles(row),
           );
           const detail = filesUnderDesign(order, designId, delivered);
-          const hasListed = detail.images.length + detail.zips.length + detail.others.length > 0;
           return (
             <div key={group.title} className="cop-block">
               <div className="cop-dhead">{group.title}</div>
               {group.rows.map((row, index) => {
-                const delivered = row.design?.status === 'DELIVERED' || sizeHasOriginalFiles(row);
-                const status = delivered
+                const rowDelivered = row.design?.status === 'DELIVERED' || sizeHasOriginalFiles(row);
+                const status = rowDelivered
                   ? { text: designDeliveredLabel(order.deliveries, row.design?.id), tone: 'done' as const }
                   : rowStatus(order, row);
                 const caption = rowCaption(group.title, index, row.name, group.rows.length, designs);
+                const lineFiles = filesUnderDesign(order, row.design?.id, rowDelivered);
+                const canView = lineFiles.images.length > 0 || lineFiles.zips.length > 0;
                 return (
                   <div key={row.key} className="cop-row">
                     <div className="cop-name">
@@ -506,51 +507,30 @@ export function ServiceCustomerOrder({
                       {status.tone === 'done' ? '✓ ' : '● '}
                       {status.text}
                     </div>
+                    <div className="cop-actions">
+                      {canView && (
+                        <button
+                          type="button"
+                          className="cop-btn cop-download"
+                          onClick={() => setFilesFor({ row, editId: null })}
+                        >
+                          View
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
-              {(hasListed || detail.email) && (
+              {detail.email && (
                 <div className="cop-files">
-                  {detail.images.map((file) => (
-                    <div key={file.id} className="cop-file">
-                      <span className="cop-file-name">{file.originalName}</span>
-                      <span className="cop-file-meta">For viewing only</span>
-                      <button type="button" className="cdf-preview-btn" onClick={() => void previewFile(file)}>
-                        Preview
-                      </button>
-                    </div>
-                  ))}
-                  {detail.zips.map((file) => (
-                    <div key={file.id} className="cop-file">
-                      <span className="cop-file-name">{file.originalName}</span>
-                      <span className="cop-file-meta">All designs</span>
-                      <button
-                        type="button"
-                        className="ecd-btn pri cdf-dl-btn"
-                        onClick={() => void downloadSignedFile(myDeliveryFileUrl(order.id, file.id), file.originalName)}
-                      >
-                        Download
-                      </button>
-                    </div>
-                  ))}
-                  {detail.others.map((file) => (
-                    <div key={file.id} className="cop-file">
-                      <span className="cop-file-name">{file.originalName}</span>
-                      <span className="cop-file-meta">
-                        {detail.zips.length > 0 ? 'Included in the zip' : 'Prepared for this design'}
-                      </span>
-                    </div>
-                  ))}
-                  {detail.email && (
-                    <div className="cop-email">
-                      <strong>Sent by email{detail.email.at ? ` · ${dateShort(detail.email.at)}` : ''}</strong>
-                      <p>
-                        {detail.email.only
-                          ? 'These files were sent to your email. They are not available to download here.'
-                          : 'A copy of these files was sent to your email.'}
-                      </p>
-                    </div>
-                  )}
+                  <div className="cop-email">
+                    <strong>Sent by email{detail.email.at ? ` · ${dateShort(detail.email.at)}` : ''}</strong>
+                    <p>
+                      {detail.email.only
+                        ? 'These files were sent to your email. They are not available to download here.'
+                        : 'A copy of these files was sent to your email.'}
+                    </p>
+                  </div>
                 </div>
               )}
               <div className="cop-actions cop-block-acts">

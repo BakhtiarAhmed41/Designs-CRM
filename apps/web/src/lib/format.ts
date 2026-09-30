@@ -450,8 +450,8 @@ export function designDeliveredLabel(
       )
     : [];
   const via = mergeDeliveredVia(linked.map((batch) => batch.deliveredVia));
-  if (via === 'BOTH') return 'Delivered on portal & emailed';
-  if (via === 'EMAIL') return 'Delivered by email';
+  if (via === 'BOTH') return 'Delivered on portal & through email';
+  if (via === 'EMAIL') return 'Delivered through email';
   if (via === 'PORTAL') return 'Delivered on portal';
-  return 'Delivered by email';
+  return 'Delivered through email';
 }

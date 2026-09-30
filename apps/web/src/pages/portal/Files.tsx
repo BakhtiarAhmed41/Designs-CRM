@@ -6,7 +6,7 @@ import { listMyEdits, type EditRequest } from '@/lib/edits';
 import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
 import { myDeliveryFileUrl } from '@/lib/orders';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
-import { dateShort, deliveryMethodLabel, mergeDeliveredVia, money, orderNumber } from '@/lib/format';
+import { dateShort, deliveryMethodLabel, isImageFile, mergeDeliveredVia, money, orderNumber } from '@/lib/format';
 import { serviceCategoryLabel } from '@/lib/serviceIcon';
 import { DeliveryPreview } from '@/components/FilePreview';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -52,11 +52,13 @@ function fileSizeLabel(bytes?: number | null) {
 
 function splitFiles(files: MyFile[]) {
   const real = files.filter((file) => !file.emailNotice);
-  return {
-    preview: real.filter((file) => file.kind === 'PREVIEW'),
-    zip: real.filter((file) => file.isBundle && file.kind !== 'PREVIEW'),
-    download: real.filter((file) => file.kind !== 'PREVIEW' && !file.isBundle),
-  };
+  const preview = real.filter(
+    (file) => !file.isBundle && (file.kind === 'PREVIEW' || isImageFile(file.originalName, file.mimeType)),
+  );
+  const zip = real.filter((file) => file.isBundle && file.kind !== 'PREVIEW');
+  const previewIds = new Set(preview.map((file) => file.fileId));
+  const download = real.filter((file) => !file.isBundle && file.kind !== 'PREVIEW' && !previewIds.has(file.fileId));
+  return { preview, zip, download };
 }
 
 function OrderFileDetail({
@@ -134,17 +136,21 @@ function OrderFileDetail({
 
       <h2 className="files-sec">Order files</h2>
       <div className="card">
-        {emailed && (
+        {byDesign.size === 0 && !emailed && <div className="files-empty">No order files yet.</div>}
+        {byDesign.size === 0 && emailed && (
           <div className="files-line">
-            <span className="files-kind email">Sent by email</span>
-            <span>ZIP with all files</span>
+            <span className="files-kind email">Email</span>
+            <span className="files-st done">Sent by email · ZIP with all files</span>
           </div>
         )}
-        {byDesign.size === 0 && !emailed && <div className="files-empty">No order files yet.</div>}
         {[...byDesign.entries()].map(([name, items]) => (
           <div key={name} className="files-block">
             <div className="files-group">{name}</div>
-            <FileLines files={items} onDownload={download} />
+            <FileLines
+              files={items}
+              emailed={items.some((file) => file.deliveredVia === 'EMAIL' || file.deliveredVia === 'BOTH')}
+              onDownload={download}
+            />
           </div>
         ))}
       </div>
@@ -153,10 +159,10 @@ function OrderFileDetail({
         <h3>Helpful to know</h3>
         <ul>
           <li>
-            Each size can be delivered as a <b>Preview</b>, a <b>ZIP file</b>, or by <b>email</b>.
+            Each size can be delivered in more than one way: <b>Preview</b> files, a <b>ZIP file</b>, or by <b>email</b>.
           </li>
           <li>
-            <b>Delivered by email</b> means a ZIP containing the files was also sent to your email address.
+            <b>Delivered by email</b> means a ZIP file containing all your files was also sent to your email address.
           </li>
           <li>For a question about a design, contact us from Messages.</li>
         </ul>
@@ -202,25 +208,40 @@ function RevisionFiles({
       {files.length === 0 ? (
         <div className="files-empty">Files will appear here once this revision is published.</div>
       ) : (
-        <FileLines files={files} onDownload={onDownload} />
+        <FileLines
+          files={files}
+          emailed={files.some((file) => file.deliveredVia === 'EMAIL' || file.deliveredVia === 'BOTH')}
+          onDownload={onDownload}
+        />
       )}
     </div>
   );
 }
 
-function FileLines({ files, onDownload }: { files: MyFile[]; onDownload: (file: MyFile) => void }) {
+function FileLines({
+  files,
+  emailed = false,
+  onDownload,
+}: {
+  files: MyFile[];
+  emailed?: boolean;
+  onDownload: (file: MyFile) => void;
+}) {
   const parts = splitFiles(files);
-  if (parts.preview.length + parts.zip.length + parts.download.length === 0) return null;
+  const showDownload = parts.zip.length === 0 ? parts.download : [];
+  if (parts.preview.length + parts.zip.length + showDownload.length === 0 && !emailed) return null;
   return (
     <div className="files-lines">
       {parts.preview.length > 0 && (
-        <div className="files-line">
-          <span className="files-kind preview">Preview</span>
-          <span>
-            {parts.preview.length} file{parts.preview.length === 1 ? '' : 's'}
-          </span>
-          <span className="files-st done">View only</span>
-          <div className="od-files">
+        <div className="files-line files-line-preview">
+          <div className="files-line-main">
+            <span className="files-kind preview">Preview</span>
+            <span>
+              {parts.preview.length} file{parts.preview.length === 1 ? '' : 's'}
+            </span>
+            <span className="files-st done">View only</span>
+          </div>
+          <div className="files-thumbs">
             {parts.preview.map((file) => (
               <DeliveryPreview
                 key={file.fileId}
@@ -247,7 +268,7 @@ function FileLines({ files, onDownload }: { files: MyFile[]; onDownload: (file: 
           </button>
         </div>
       ))}
-      {parts.download.map((file) => (
+      {showDownload.map((file) => (
         <div key={file.fileId} className="files-line">
           <span className="files-kind zip">File</span>
           <span>
@@ -255,15 +276,17 @@ function FileLines({ files, onDownload }: { files: MyFile[]; onDownload: (file: 
             {(file.downloadCount ?? 0) === 0 && <em className="file-new">NEW</em>}
             <em>{fileSizeLabel(file.byteSize)}</em>
           </span>
-          {file.canDownload === false ? (
-            <span className="files-st done">View only</span>
-          ) : (
-            <button type="button" className="btn btn-sm files-dl" onClick={() => onDownload(file)}>
-              <i className="ti ti-download" /> Download
-            </button>
-          )}
+          <button type="button" className="btn btn-sm files-dl" onClick={() => onDownload(file)}>
+            <i className="ti ti-download" /> Download
+          </button>
         </div>
       ))}
+      {emailed && (
+        <div className="files-line">
+          <span className="files-kind email">Email</span>
+          <span className="files-st done">Sent by email · ZIP with all files</span>
+        </div>
+      )}
     </div>
   );
 }

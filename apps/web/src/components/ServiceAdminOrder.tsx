@@ -35,7 +35,6 @@ import {
   dateShort,
   deliveredViaFromFlags,
   deliveryMethodLabel,
-  designDeliveredLabel,
   isImageFile,
   money,
   orderDeliveredVia,
@@ -583,9 +582,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
     }
     return (
       <>
-        <span className="sod-status ready">
-          {designDeliveredLabel(order.deliveries, row.design?.id)}
-        </span>
+        <span className="sod-status ready">Delivered</span>
         {view}
       </>
     );
@@ -717,12 +714,12 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
             </div>
           </section>
 
+          {edits.length > 0 && (
           <section className="ead-card">
             <div className="ead-card-h">
               <span className="ead-ic"><i className="ti ti-refresh" /></span>
               <h2>Customer revision</h2>
             </div>
-            {edits.length === 0 && <div className="ead-b"><div className="ead-he-sub">No revisions yet.</div></div>}
             {edits.map((edit) => {
               const covered = rowsForEdit(edit);
               const phase = revisionPhase(edit);
@@ -735,7 +732,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
                   <div className="rev-note">
                     <span>{edit.note}</span>
                     {names.map((name, index) => (
-                      <span key={`${name}-${index}`} className="rev-chip">{name}</span>
+                      <span key={`${name}-${index}`} className="rev-chip" title={name}>{name}</span>
                     ))}
                   </div>
                   <div className="rev-acts">
@@ -816,6 +813,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
               );
             })}
           </section>
+          )}
 
           <section className="ead-card">
             <div className="ead-card-h">

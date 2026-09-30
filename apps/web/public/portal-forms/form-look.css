@@ -266,8 +266,10 @@ textarea {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px 12px;
+  gap: 8px;
+}
+#s-formats .format-grid {
+  justify-content: flex-start;
 }
 #s-formats .format-chips {
   display: flex;
@@ -280,7 +282,7 @@ textarea {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-left: auto;
+  margin-left: 4px;
   flex: 0 0 auto;
 }
 #s-formats .format-grid > .note-banner {

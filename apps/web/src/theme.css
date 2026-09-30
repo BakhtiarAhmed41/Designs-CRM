@@ -2208,16 +2208,16 @@ button.primary i,
   padding-right: 18px;
 }
 .dash-col-icon { width: 52px; }
-.dash-col-project { width: 22%; }
+.dash-col-project { width: 20%; }
 .dash-table td.dash-project { max-width: 0; }
 .dash-table td.dash-project .on {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.dash-col-id { width: 20%; }
-.dash-col-cat { width: 16%; }
-.dash-col-status { width: 18%; }
+.dash-col-id { width: 16%; }
+.dash-col-cat { width: 14%; }
+.dash-col-status { width: 22%; }
 .dash-col-amount { width: 12%; }
 .dash-col-activity { width: 24%; }
 .dash-col-detail { width: 36%; }
@@ -2293,9 +2293,16 @@ button.primary i,
   align-items: center;
   gap: 6px;
   border-radius: 999px;
-  padding: 3px 10px;
+  padding: 4px 10px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.dash-table td:has(.portal-chip),
+.quote-table td:has(.portal-chip) {
+  overflow: visible;
 }
 .portal-chip::before {
   content: '';
@@ -2822,7 +2829,8 @@ button.primary i,
   border: 1px solid transparent;
 }
 .files-kind.preview { background: #e8eef7; color: #3b62a0; border-color: #cbd8ec; }
-.files-kind.zip, .files-kind.email { background: #fbf1d3; color: #a16207; border-color: #efdca0; }
+.files-kind.zip { background: #fbf1d3; color: #a16207; border-color: #efdca0; }
+.files-kind.email { background: #e3f4e9; color: #15803d; border-color: #bfe3cb; }
 .files-pill { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 7px; }
 .files-pill.paid { background: #e3f4e9; color: #15803d; }
 .files-pill.unpaid { background: #fdeaea; color: #b42318; }
@@ -2831,6 +2839,12 @@ button.primary i,
 .files-st.done { color: #15803d; }
 .files-st.wait { color: #a16207; }
 .files-line em { margin-left: 8px; color: var(--dash-muted); font-style: normal; font-size: 12px; }
+.files-line-preview { flex-direction: column; align-items: stretch; }
+.files-line-main { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.files-thumbs { display: flex; flex-wrap: wrap; gap: 8px; }
+.files-thumbs .file-thumb { width: 72px; }
+.files-thumbs .file-thumb img,
+.files-thumbs .file-thumb-icon { height: 54px; }
 .files-dl { background: var(--maroon, #7c1f2b); color: #fff; border-color: var(--maroon, #7c1f2b); }
 .files-help { margin-top: 28px; padding: 16px 20px; }
 .files-help h3 { margin: 0 0 10px; font-size: 14px; }
