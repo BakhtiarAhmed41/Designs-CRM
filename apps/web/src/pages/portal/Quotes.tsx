@@ -179,8 +179,8 @@ export function PortalQuotes() {
           <table className="qtable quote-table">
             <thead>
               <tr>
-                <th className="quote-no">Quote no.</th>
                 <th>Project</th>
+                <th className="quote-no">Quote no.</th>
                 <th>Category</th>
                 <th>Designs</th>
                 <th>Requested</th>
@@ -208,10 +208,10 @@ export function PortalQuotes() {
 
                 return (
                   <tr key={o.id} className="click-row" onClick={() => navigate(href)}>
-                    <td className="quote-no">{orderNumber(o.humanRef, o.id.slice(0, 6))}</td>
                     <td className="quote-project" title={project.full}>
                       <div className="on quote-project-name">{project.text}</div>
                     </td>
+                    <td className="quote-no">{orderNumber(o.humanRef, o.id.slice(0, 6))}</td>
                     <td className="muted">{serviceCategoryLabel(o.serviceType)}</td>
                     <td>{designCount || '—'}</td>
                     <td className="muted">{dateShort(o.createdAt)}</td>

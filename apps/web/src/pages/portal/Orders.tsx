@@ -508,8 +508,8 @@ export function PortalOrders() {
           <table className="itable">
             <thead>
               <tr>
-                <th className="ref-no">Order no.</th>
                 <th>Order</th>
+                <th className="ref-no">Order no.</th>
                 <th>Category</th>
                 <th>Status</th>
                 <th>File delivery</th>
@@ -525,7 +525,6 @@ export function PortalOrders() {
                 return (
                   <Fragment key={o.id}>
                     <tr className="click-row" onClick={() => navigate(`/portal/orders/${orderSlug(o.humanRef, o.id)}`)}>
-                      <td className="ref-no">{orderNumber(o.humanRef, o.id.slice(0, 6))}</td>
                       <td className="ref-name">
                         <div className="cell-main">
                           <div className={`thumb${serviceThumbClass(o.serviceType) ? ' m' : ''}`}>
@@ -536,6 +535,7 @@ export function PortalOrders() {
                           </div>
                         </div>
                       </td>
+                      <td className="ref-no">{orderNumber(o.humanRef, o.id.slice(0, 6))}</td>
                       <td className="muted">{serviceCategoryLabel(o.serviceType)}</td>
                       <td>
                         <span className={chip.cls}>{chip.label}</span>

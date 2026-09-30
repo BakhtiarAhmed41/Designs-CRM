@@ -124,8 +124,8 @@ export function AdminOrders() {
           <table className="itable">
             <thead>
               <tr>
-                <th className="ref-no">Order no.</th>
                 <th>Order</th>
+                <th className="ref-no">Order no.</th>
                 {!hideCustomer && <th>Customer</th>}
                 <th>Status</th>
                 <th>Date</th>
@@ -142,7 +142,6 @@ export function AdminOrders() {
                 const project = clipDesignLabel(o.name || 'Order');
                 return (
                   <tr key={o.id} className="click-row" onClick={() => navigate(`/admin/orders/${orderSlug(o.humanRef, o.id)}`)}>
-                    <td className="ref-no">{orderNumber(o.humanRef, o.id.slice(0, 8))}</td>
                     <td className="ref-name">
                       <div className="cell-main">
                         <div className={`othumb ${serviceThumbClass(o.serviceType)}`}>
@@ -154,6 +153,7 @@ export function AdminOrders() {
                         </div>
                       </div>
                     </td>
+                    <td className="ref-no">{orderNumber(o.humanRef, o.id.slice(0, 8))}</td>
                     {!hideCustomer && <td>{customerLabel(o)}</td>}
                     <td>
                       <span className={chip.cls}>{chip.label}</span>

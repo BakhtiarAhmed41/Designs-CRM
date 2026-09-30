@@ -197,8 +197,8 @@ export function AdminQuotes() {
           <table className="itable">
             <thead>
               <tr>
-                <th className="ref-no">Quote no.</th>
                 <th>Quote</th>
+                <th className="ref-no">Quote no.</th>
                 <th>Customer</th>
                 <th>Status</th>
                 <th>Date</th>
@@ -222,7 +222,6 @@ export function AdminQuotes() {
                     className="click-row"
                     onClick={() => navigate(approved ? `/admin/orders/${slug}` : `/admin/quotes/${slug}`)}
                   >
-                    <td className="ref-no">{orderNumber(o.humanRef, o.id.slice(0, 6))}</td>
                     <td className="ref-name">
                       <div className="cell-main">
                         <div className={`othumb ${serviceThumbClass(o.serviceType)}`}>
@@ -234,6 +233,7 @@ export function AdminQuotes() {
                         </div>
                       </div>
                     </td>
+                    <td className="ref-no">{orderNumber(o.humanRef, o.id.slice(0, 6))}</td>
                     <td>{customerLabel(o)}</td>
                     <td>
                       <span className={chip.cls}>{chip.label}</span>

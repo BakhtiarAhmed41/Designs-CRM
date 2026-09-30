@@ -487,8 +487,8 @@ export function PortalFiles() {
             <table className="itable file-orders">
               <thead>
                 <tr>
-                  <th>Order no.</th>
                   <th>Project / design</th>
+                  <th>Order no.</th>
                   <th>Files</th>
                   <th>Delivery method</th>
                   <th>Date</th>
@@ -509,10 +509,10 @@ export function PortalFiles() {
                         if (e.key === 'Enter') setSearchParams({ order: g.orderId });
                       }}
                     >
-                      <td><b>{orderNumber(g.humanRef, g.orderId.slice(0, 6))}</b></td>
                       <td>
                         <div className="on">{g.orderName ?? 'Order'}</div>
                       </td>
+                      <td><b>{orderNumber(g.humanRef, g.orderId.slice(0, 6))}</b></td>
                       <td>{listed.length || (emailed ? 'Email' : 0)}</td>
                       <td className="muted">{deliveryMethodLabel(g.deliveredVia)}</td>
                       <td className="muted">{dateShort(g.deliveredAt)}</td>
