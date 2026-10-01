@@ -4532,12 +4532,107 @@ form.card-pad > .btn {
   border-radius: 8px;
   box-shadow: none;
 }
+.edit-assign-wrap { position: relative; }
 .edit-row-side .edit-assign {
-  min-width: 108px;
-  padding-right: 28px;
-  background-position: right 8px center;
-  background-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 118px;
+  max-width: 168px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
   font-weight: 500;
+  cursor: pointer;
+}
+.edit-row-side .edit-assign span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.edit-row-side .edit-assign:not(.is-set) span { color: var(--muted); }
+.edit-row-side .edit-assign i {
+  font-size: 14px;
+  color: var(--faint);
+  flex-shrink: 0;
+  transition: transform 140ms ease;
+}
+.edit-row-side .edit-assign.is-open {
+  border-color: #c8ccd3;
+  background: #fff;
+}
+.edit-row-side .edit-assign.is-open i { transform: rotate(180deg); }
+.edit-row-side .edit-assign:disabled { opacity: 0.6; cursor: default; }
+.edit-assign-menu {
+  position: fixed;
+  z-index: 90;
+  max-height: min(280px, calc(100vh - 24px));
+  overflow: auto;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(14, 30, 45, 0.12);
+}
+.edit-assign-menu button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  border-radius: 8px;
+  padding: 7px 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+.edit-assign-menu button:hover { background: #f4f7fa; }
+.edit-assign-menu button.is-on { background: #f6f7f9; }
+.edit-assign-av {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #f6ecee;
+  color: #9a1e22;
+  font-size: 10px;
+  font-weight: 650;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+.edit-assign-name {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.edit-assign-menu button.is-on .ti-check {
+  margin-left: auto;
+  font-size: 15px;
+  color: #1f9d55;
+}
+.edit-assign-rule {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--line);
+}
+.edit-assign-menu .edit-assign-clear {
+  color: var(--muted);
+  justify-content: flex-start;
+}
+.edit-assign-empty {
+  padding: 10px 8px;
+  font-size: 13px;
+  color: var(--muted);
 }
 .edit-row-error {
   grid-column: 2 / -1;

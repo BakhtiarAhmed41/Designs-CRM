@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { listAdminEdits, updateAdminEdit, type EditRequest, type EditStatus } from '@/lib/edits';
@@ -22,6 +22,152 @@ const FILTERS: Array<{ id: FilterId; label: string }> = [
   { id: 'FREE', label: 'Free' },
   { id: 'PAID', label: 'Paid' },
 ];
+
+type DesignerOption = {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  initials: string | null;
+};
+
+function designerLabel(d: Pick<DesignerOption, 'firstName' | 'lastName' | 'email'>) {
+  return [d.firstName, d.lastName].filter(Boolean).join(' ') || d.email;
+}
+
+function designerInitials(d: DesignerOption) {
+  if (d.initials?.trim()) return d.initials.trim().slice(0, 2).toUpperCase();
+  const first = d.firstName?.[0] ?? d.email[0] ?? '?';
+  const last = d.lastName?.[0] ?? '';
+  return `${first}${last}`.toUpperCase();
+}
+
+function AssignMenu({
+  designers,
+  value,
+  disabled,
+  onChange,
+}: {
+  designers: DesignerOption[];
+  value: string | null;
+  disabled?: boolean;
+  onChange: (id: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const selected = designers.find((d) => d.id === value) ?? null;
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const menu = menuRef.current;
+    const button = buttonRef.current;
+    if (!menu || !button) return;
+
+    function place() {
+      if (!menu || !button) return;
+      const rect = button.getBoundingClientRect();
+      const width = Math.max(220, rect.width);
+      menu.style.width = `${width}px`;
+      const height = menu.offsetHeight;
+      const gap = 6;
+      const spaceBelow = window.innerHeight - rect.bottom - gap;
+      const openUp = spaceBelow < height && rect.top > spaceBelow;
+      let top = openUp ? rect.top - gap - height : rect.bottom + gap;
+      top = Math.max(8, Math.min(top, window.innerHeight - height - 8));
+      let left = rect.right - width;
+      if (left < 8) left = 8;
+      if (left + width > window.innerWidth - 8) left = window.innerWidth - 8 - width;
+      menu.style.top = `${top}px`;
+      menu.style.left = `${left}px`;
+    }
+
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [open, designers.length]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      const target = e.target as Node;
+      if (buttonRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false);
+    }
+    document.addEventListener('mousedown', onDoc);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const stop = (ev: { stopPropagation: () => void }) => ev.stopPropagation();
+
+  return (
+    <div className="edit-assign-wrap" onMouseDown={stop} onClick={stop}>
+      <button
+        ref={buttonRef}
+        type="button"
+        className={`edit-assign${open ? ' is-open' : ''}${selected ? ' is-set' : ''}`}
+        disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span>{selected ? designerLabel(selected) : 'Assign…'}</span>
+        <i className="ti ti-chevron-down" aria-hidden />
+      </button>
+      {open && (
+        <div ref={menuRef} className="edit-assign-menu" role="listbox" aria-label="Assign designer">
+          {designers.length === 0 && <div className="edit-assign-empty">No designers yet</div>}
+          {designers.map((d) => {
+            const on = d.id === value;
+            return (
+              <button
+                key={d.id}
+                type="button"
+                role="option"
+                aria-selected={on}
+                className={on ? 'is-on' : ''}
+                onClick={() => {
+                  setOpen(false);
+                  if (!on) onChange(d.id);
+                }}
+              >
+                <span className="edit-assign-av">{designerInitials(d)}</span>
+                <span className="edit-assign-name">{designerLabel(d)}</span>
+                {on && <i className="ti ti-check" aria-hidden />}
+              </button>
+            );
+          })}
+          {selected && (
+            <>
+              <div className="edit-assign-rule" />
+              <button
+                type="button"
+                className="edit-assign-clear"
+                onClick={() => {
+                  setOpen(false);
+                  onChange(null);
+                }}
+              >
+                Clear assignment
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function sectionFor(e: EditRequest): 'waiting' | 'progress' | 'done' {
   if (e.status === 'DONE') return 'done';
@@ -154,7 +300,7 @@ function EditRow({
   designers,
 }: {
   edit: EditRequest;
-  designers: Array<{ id: string; email: string; firstName: string | null }>;
+  designers: DesignerOption[];
 }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -224,24 +370,12 @@ function EditRow({
         </span>
         {section !== 'done' && (
           <>
-            <select
-              className="stat-select edit-assign"
-              value={e.assignedDesignerId ?? ''}
+            <AssignMenu
+              designers={designers}
+              value={e.assignedDesignerId}
               disabled={assign.isPending}
-              onMouseDown={stopRow}
-              onClick={stopRow}
-              onChange={(ev) => {
-                ev.stopPropagation();
-                assign.mutate(ev.target.value || null);
-              }}
-            >
-              <option value="">Assign…</option>
-              {designers.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.firstName ?? d.email}
-                </option>
-              ))}
-            </select>
+              onChange={(id) => assign.mutate(id)}
+            />
             <button
               type="button"
               className="btn btn-ghost btn-sm"
