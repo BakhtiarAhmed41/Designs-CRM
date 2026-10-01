@@ -506,6 +506,14 @@ export function ServiceCustomerOrder({
                           View & download
                         </button>
                       )}
+                      <button
+                        type="button"
+                        className="cop-btn help"
+                        disabled={chat.isPending}
+                        onClick={() => chat.mutate()}
+                      >
+                        Request help
+                      </button>
                     </div>
                   </div>
                 );
@@ -530,7 +538,7 @@ export function ServiceCustomerOrder({
         </ul>
       </section>
 
-      <div className="ecd-sheet">
+      <div className="ecd-sheet ecd-summary">
         <section className="ecd-sec">
           <DetailsSectionHead
             title="Order summary"
@@ -575,7 +583,7 @@ export function ServiceCustomerOrder({
 
         <section className="ecd-sec">
           <DetailsSectionHead
-            title="Customer request"
+            title="Designs Details"
             description={
               vector
                 ? 'Artwork, instructions and specifications'

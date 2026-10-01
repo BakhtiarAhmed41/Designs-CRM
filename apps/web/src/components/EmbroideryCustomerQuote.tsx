@@ -61,7 +61,6 @@ export function EmbroideryCustomerQuote({
   const adminRecounter = isAdminRecounter(quotations);
   const canPick = canDecide && !adminRecounter;
   const declined = order.status === 'REJECTED' || order.status === 'CLIENT_REJECTED_QUOTATION';
-  const waiting = order.status === 'WAITING_FOR_QUOTATION' || order.status === 'CREATED';
 
   const [kept, setKept] = useState<string[] | null>(null);
   const [open, setOpen] = useState({ request: false, delivery: false, history: false });
@@ -145,9 +144,7 @@ export function EmbroideryCustomerQuote({
               }
             : declined
               ? { text: 'Declined', cls: 'ecd-tag' }
-              : waiting
-                ? { text: 'Being prepared', cls: 'ecd-tag' }
-                : { text: 'Quote in progress', cls: 'ecd-tag' };
+              : { text: 'Quote in Progress', cls: 'ecd-tag' };
   const journeyCopy =
     order.needsCustomerInfo && phase === 'preparing'
       ? {
@@ -197,7 +194,7 @@ export function EmbroideryCustomerQuote({
         </div>
         <div className="ecd-acts">
           <button type="button" className="ecd-btn pri" disabled={chatMut.isPending} onClick={() => chatMut.mutate()}>
-            <i className="ti ti-message" /> {chatMut.isPending ? 'Opening…' : 'Start Chat'}
+            <i className="ti ti-message" /> {chatMut.isPending ? 'Opening…' : 'Need help?'}
           </button>
         </div>
       </div>
@@ -284,10 +281,13 @@ export function EmbroideryCustomerQuote({
             </div>
           )}
         </section>
+      </div>
 
+      <div className="ecd-sheet ecd-summary">
+        <h2 className="ecd-summary-title">Quote summary</h2>
         <section className="ecd-sec">
           <DetailsSectionHead
-            title="Customer request"
+            title="Design request"
             description={
               vector
                 ? 'Artwork, instructions and specifications'

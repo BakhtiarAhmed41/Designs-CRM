@@ -37,6 +37,25 @@
 
 .ecd > .qj {
   border-color: #8e949c;
+  padding: 14px 22px 12px;
+}
+
+.ecd > .qj h2 {
+  font-size: 18px;
+}
+
+.ecd > .qj .qj-lead {
+  font-size: 13.5px;
+}
+
+.ecd > .qj .qj-steps {
+  margin-top: 0;
+  padding-top: 22px;
+}
+
+.ecd > .qj .qj-note {
+  margin-top: 12px;
+  padding-top: 10px;
 }
 
 .qj-step:not(:last-child)::after {
@@ -170,6 +189,7 @@
   border-top: 1px solid #eceef2;
   color: #6d7380;
   font-size: 13px;
+  text-align: center;
 }
 
 .qj-actions {

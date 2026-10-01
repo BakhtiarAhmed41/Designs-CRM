@@ -39,7 +39,10 @@ export function DetailsSectionHead({
     >
       <h2>{title}</h2>
       {description ? <p className="ecd-sec-desc">{description}</p> : null}
-      <span className="ecd-disclose">{open ? 'Hide details' : 'View details'}</span>
+      <span className="ecd-disclose">
+        {open ? 'Hide details' : 'View details'}
+        <i className={open ? 'ti ti-chevron-down' : 'ti ti-chevron-right'} aria-hidden />
+      </span>
     </div>
   );
 }
