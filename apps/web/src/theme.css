@@ -4308,6 +4308,11 @@ form.card-pad > .btn {
 }
 .quote-dropdown.open {
   display: block;
+  position: fixed;
+  right: auto;
+  z-index: 90;
+  max-height: min(520px, calc(100vh - 24px));
+  overflow: auto;
 }
 .qd-header {
   display: flex;
@@ -4468,6 +4473,7 @@ form.card-pad > .btn {
 }
 .qd-overlay.open {
   display: block;
+  z-index: 80;
 }
 @media (max-width: 720px) {
   .quote-dropdown {

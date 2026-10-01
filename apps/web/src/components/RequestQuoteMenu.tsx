@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRequestQuote } from '@/context/RequestQuoteContext';
 
@@ -52,6 +52,42 @@ export function RequestQuoteMenu({
   const { openRequestQuote } = useRequestQuote();
   const [open, setOpen] = useState(false);
   const menuId = useId();
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const menu = menuRef.current;
+    const button = buttonRef.current;
+    if (!menu || !button) return;
+
+    function place() {
+      if (!menu || !button) return;
+      const rect = button.getBoundingClientRect();
+      const width = Math.min(380, window.innerWidth - 24);
+      menu.style.width = `${width}px`;
+      const height = menu.offsetHeight;
+      const gap = 10;
+      const spaceBelow = window.innerHeight - rect.bottom - gap;
+      const spaceAbove = rect.top - gap;
+      const openUp = spaceBelow < height && spaceAbove > spaceBelow;
+      let top = openUp ? rect.top - gap - height : rect.bottom + gap;
+      top = Math.max(12, Math.min(top, window.innerHeight - height - 12));
+      let left = rect.left;
+      if (left + width > window.innerWidth - 12) left = window.innerWidth - 12 - width;
+      if (left < 12) left = 12;
+      menu.style.top = `${top}px`;
+      menu.style.left = `${left}px`;
+    }
+
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -79,6 +115,7 @@ export function RequestQuoteMenu({
   return (
     <div className={`quote-menu${open ? ' is-open' : ''}`}>
       <button
+        ref={buttonRef}
         type="button"
         className={className}
         aria-expanded={open}
@@ -91,7 +128,7 @@ export function RequestQuoteMenu({
       {open && (
         <>
           <div className="qd-overlay open" onClick={() => setOpen(false)} />
-          <div className="quote-dropdown open" id={menuId} role="dialog" aria-label="Request a quote">
+          <div ref={menuRef} className="quote-dropdown open" id={menuId} role="dialog" aria-label="Request a quote">
             <div className="qd-header">
               <h2>
                 <span className="plus">+</span>Request a quote
