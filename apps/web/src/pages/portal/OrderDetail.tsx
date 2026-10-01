@@ -341,6 +341,7 @@ export function PortalOrderDetail() {
             const chip = lifecycleChip(order.status, 'customer', {
               partiallyAccepted: order.partiallyAccepted,
               partiallyDelivered: order.partiallyDelivered,
+              fullyDelivered: order.fullyDelivered,
               revisionPartial: order.revisionPartial,
               paymentStatus: order.paymentStatus,
             });

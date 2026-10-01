@@ -179,6 +179,7 @@ export function lifecycleChip(
   opts?: {
     partiallyAccepted?: boolean;
     partiallyDelivered?: boolean;
+    fullyDelivered?: boolean;
     revisionPartial?: boolean;
     paymentStatus?: string | null;
   },
@@ -226,6 +227,9 @@ export function lifecycleChip(
           return { cls: 'chip c-prog', label: 'Partially delivered' };
         }
         return { cls: 'chip c-wait', label: 'Revision requested' };
+      }
+      if (opts?.fullyDelivered) {
+        return { cls: 'chip c-done', label: 'Delivered' };
       }
       if (opts?.partiallyDelivered) {
         return { cls: 'chip c-prog', label: 'Partially delivered' };
@@ -362,6 +366,7 @@ export function revisionDeliveryState(
 export function customerOrderChip(o: {
   status: OrderStatus | string;
   partiallyDelivered?: boolean;
+  fullyDelivered?: boolean;
   revisionPartial?: boolean;
 }): StatusChip {
   if (o.status === 'CANCELLED') return { cls: 'portal-chip c-cancelled', label: 'Cancelled' };
@@ -373,6 +378,9 @@ export function customerOrderChip(o: {
       return { cls: 'portal-chip c-review', label: 'Partially delivered' };
     }
     return { cls: 'portal-chip c-revision', label: 'Revision Requested' };
+  }
+  if (o.fullyDelivered) {
+    return { cls: 'portal-chip c-delivered', label: 'Delivered' };
   }
   if (o.partiallyDelivered) {
     return { cls: 'portal-chip c-review', label: 'Partially delivered' };

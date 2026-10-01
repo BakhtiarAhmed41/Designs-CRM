@@ -404,13 +404,13 @@ export class OrdersService {
   }
 
   private async listExtrasFor(orderIds: string[]) {
-    const [designCounts, attachments, quotations, partials, partialDeliveries, revisionPartials] =
+    const [designCounts, attachments, quotations, partials, deliveryFlags, revisionPartials] =
       await Promise.all([
         this.designCountsFor(orderIds),
         this.attachmentsFor(orderIds),
         this.quotationsFor(orderIds),
         this.partialFlagsFor(orderIds),
-        this.partialDeliveryFlagsFor(orderIds),
+        this.deliveryProgressFlagsFor(orderIds),
         this.revisionPartialFlagsFor(orderIds),
       ]);
     return {
@@ -418,24 +418,137 @@ export class OrdersService {
       attachments,
       quotations,
       partials,
-      partialDeliveries,
+      partialDeliveries: deliveryFlags.partial,
+      fullDeliveries: deliveryFlags.full,
       revisionPartials,
     };
   }
 
-  private async partialDeliveryFlagsFor(orderIds: string[]) {
-    const set = new Set<string>();
-    if (orderIds.length === 0) return set;
-    const rows = await this.db.query<{ order_id: string }>(
-      `SELECT order_id
-         FROM order_designs
-        WHERE order_id IN (${this.sqlIn(orderIds)})
-        GROUP BY order_id
-       HAVING SUM(status = ?) > 0 AND SUM(status = ?) < COUNT(*)`,
-      [...orderIds, DesignStatus.DELIVERED, DesignStatus.DELIVERED],
-    );
-    for (const r of rows) set.add(r.order_id);
-    return set;
+  /** Designs that appear as priced sizes. A leftover design with a different name is ignored. */
+  private pickCountedDesigns<T extends { name: string }>(designs: T[], lineNames: string[]) {
+    if (lineNames.length === 0) return designs;
+    const pool = [...designs];
+    const taken: T[] = [];
+    for (const name of lineNames) {
+      const index = pool.findIndex((design) => design.name === name);
+      if (index < 0) continue;
+      taken.push(pool.splice(index, 1)[0]);
+    }
+    return taken.length > 0 ? taken : designs;
+  }
+
+  private designDeliveryState(
+    designs: Array<{ name: string; status: string }>,
+    lineNames: string[],
+  ) {
+    const counted = this.pickCountedDesigns(designs, lineNames);
+    const delivered = counted.filter((design) => design.status === DesignStatus.DELIVERED).length;
+    return {
+      partial: delivered > 0 && delivered < counted.length,
+      full: counted.length > 0 && delivered === counted.length,
+    };
+  }
+
+  private keptLineNamesFromQuotes(
+    quotations: Array<{
+      version: number;
+      status: string;
+      createdByRole: string;
+      lines?: Array<{ name: string; clientDecision?: string | null }>;
+    }>,
+  ) {
+    const studio = [...quotations]
+      .filter((quote) => quote.createdByRole !== 'CLIENT')
+      .sort((a, b) => b.version - a.version);
+    const quote =
+      studio.find((item) => item.status === 'PROPOSED' || item.status === 'APPROVED') ??
+      studio[0];
+    return (quote?.lines ?? [])
+      .filter((line) => line.clientDecision !== 'DROPPED')
+      .map((line) => line.name);
+  }
+
+  private async keptLineNames(orderId: string) {
+    return this.keptLineNamesFromQuotes(await this.getQuotations(orderId));
+  }
+
+  private async deliveryProgressFlagsFor(orderIds: string[]) {
+    const partial = new Set<string>();
+    const full = new Set<string>();
+    if (orderIds.length === 0) return { partial, full };
+    const [designs, lineRows] = await Promise.all([
+      this.db.query<{ order_id: string; name: string; status: string }>(
+        `SELECT order_id, name, status
+           FROM order_designs
+          WHERE order_id IN (${this.sqlIn(orderIds)})
+          ORDER BY sort_order ASC, created_at ASC`,
+        orderIds,
+      ),
+      this.db.query<{
+        order_id: string;
+        version: number;
+        status: string;
+        created_by_role: string;
+        name: string;
+        client_decision: string | null;
+      }>(
+        `SELECT q.order_id, q.version, q.status, q.created_by_role, ql.name,
+                COALESCE(ql.client_decision, 'PENDING') AS client_decision
+           FROM quotation_lines ql
+           JOIN quotations q ON q.id = ql.quotation_id
+          WHERE q.order_id IN (${this.sqlIn(orderIds)})
+          ORDER BY ql.sort_order ASC`,
+        orderIds,
+      ),
+    ]);
+    const designsByOrder = new Map<string, Array<{ name: string; status: string }>>();
+    for (const design of designs) {
+      const list = designsByOrder.get(design.order_id) ?? [];
+      list.push(design);
+      designsByOrder.set(design.order_id, list);
+    }
+    const linesByOrder = new Map<string, typeof lineRows>();
+    for (const line of lineRows) {
+      const list = linesByOrder.get(line.order_id) ?? [];
+      list.push(line);
+      linesByOrder.set(line.order_id, list);
+    }
+    for (const orderId of orderIds) {
+      const progress = this.designDeliveryState(
+        designsByOrder.get(orderId) ?? [],
+        this.keptLineNamesFromRows(linesByOrder.get(orderId) ?? []),
+      );
+      if (progress.partial) partial.add(orderId);
+      if (progress.full) full.add(orderId);
+    }
+    return { partial, full };
+  }
+
+  private keptLineNamesFromRows(
+    rows: Array<{
+      version: number;
+      status: string;
+      created_by_role: string;
+      name: string;
+      client_decision: string | null;
+    }>,
+  ) {
+    const byVersion = new Map<number, typeof rows>();
+    for (const row of rows) {
+      const list = byVersion.get(row.version) ?? [];
+      list.push(row);
+      byVersion.set(row.version, list);
+    }
+    const quotes = [...byVersion.values()]
+      .filter((lines) => lines[0]?.created_by_role !== 'CLIENT')
+      .sort((a, b) => b[0].version - a[0].version);
+    const quote =
+      quotes.find((lines) => lines[0].status === 'PROPOSED' || lines[0].status === 'APPROVED') ??
+      quotes[0];
+    if (!quote) return [];
+    return quote
+      .filter((line) => line.client_decision !== 'DROPPED')
+      .map((line) => line.name);
   }
 
   /** True when some, but not all, designs in the open revision have been delivered again. */
@@ -640,12 +753,6 @@ export class OrdersService {
     };
   }
 
-  private designPartialDelivery(designs: Array<{ status: string }>) {
-    if (designs.length < 2) return false;
-    const delivered = designs.filter((d) => d.status === DesignStatus.DELIVERED).length;
-    return delivered > 0 && delivered < designs.length;
-  }
-
   private parseRevisionDesignIds(raw: unknown, fallback: string | null): string[] {
     if (Array.isArray(raw)) {
       return raw.filter((x): x is string => typeof x === 'string' && x.length > 0);
@@ -841,6 +948,7 @@ export class OrdersService {
     extras?: {
       partiallyAccepted?: boolean;
       partiallyDelivered?: boolean;
+      fullyDelivered?: boolean;
       revisionPartial?: boolean;
       paymentStatus?: OrderPaymentStatus;
     },
@@ -879,6 +987,7 @@ export class OrdersService {
       updatedAt: o.updated_at,
       partiallyAccepted: extras?.partiallyAccepted ?? false,
       partiallyDelivered: extras?.partiallyDelivered ?? false,
+      fullyDelivered: extras?.fullyDelivered ?? false,
       revisionPartial: extras?.revisionPartial ?? false,
       paymentStatus: extras?.paymentStatus,
     };
@@ -1263,10 +1372,15 @@ export class OrdersService {
           [id],
         ),
       ]);
+    const delivery = this.designDeliveryState(
+      designs,
+      this.keptLineNamesFromQuotes(quotations),
+    );
     return {
       ...this.orderDto(row, {
         partiallyAccepted,
-        partiallyDelivered: this.designPartialDelivery(designs),
+        partiallyDelivered: delivery.partial,
+        fullyDelivered: delivery.full,
         revisionPartial: this.revisionPartialFrom(revisionEdits, designs),
         paymentStatus,
       }),
@@ -1434,6 +1548,7 @@ export class OrdersService {
         ...this.orderDto(r, {
           partiallyAccepted: extras.partials.has(r.id),
           partiallyDelivered: extras.partialDeliveries.has(r.id),
+          fullyDelivered: extras.fullDeliveries.has(r.id),
         }),
         revisionPartial: extras.revisionPartials.has(r.id),
         designCount: extras.designCounts.get(r.id) || lineCount,
@@ -2151,6 +2266,7 @@ export class OrdersService {
         ...this.orderDto(r, {
           partiallyAccepted: extras.partials.has(r.id),
           partiallyDelivered: extras.partialDeliveries.has(r.id),
+          fullyDelivered: extras.fullDeliveries.has(r.id),
           revisionPartial: extras.revisionPartials.has(r.id),
         }),
         customerName: r.customer_name,
@@ -2599,7 +2715,10 @@ export class OrdersService {
         [row.client_user_id],
       );
     }
-    const designs = await this.getDesigns(orderId);
+    const [designs, lineNames] = await Promise.all([
+      this.getDesigns(orderId),
+      this.keptLineNames(orderId),
+    ]);
     const paymentStatus = await this.billing.resolveOrderPaymentStatus(row);
     const revisionEdits = await this.db.query<{
       status: string;
@@ -2612,9 +2731,11 @@ export class OrdersService {
          FROM edit_requests WHERE order_id = ?`,
       [orderId],
     );
+    const delivery = this.designDeliveryState(designs, lineNames);
     const assembled = {
       ...this.orderDto(row, {
-        partiallyDelivered: this.designPartialDelivery(designs),
+        partiallyDelivered: delivery.partial,
+        fullyDelivered: delivery.full,
         revisionPartial: this.revisionPartialFrom(revisionEdits, designs),
         paymentStatus,
       }),
@@ -3158,9 +3279,13 @@ export class OrdersService {
     }
 
     const designs = await this.getDesigns(orderId);
+    const countedDesigns = this.pickCountedDesigns(
+      designs,
+      await this.keptLineNames(orderId),
+    );
     const allDelivered =
-      designs.length === 0 ||
-      designs.every((d) => d.status === DesignStatus.DELIVERED);
+      countedDesigns.length === 0 ||
+      countedDesigns.every((d) => d.status === DesignStatus.DELIVERED);
     const partial = release && !allDelivered && designs.length > 0;
 
     const alreadyReleased = existing.some(

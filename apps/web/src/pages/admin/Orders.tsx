@@ -137,6 +137,7 @@ export function AdminOrders() {
                 const chip = lifecycleChip(o.status as OrderStatus, 'admin', {
                   partiallyAccepted: o.partiallyAccepted,
                   partiallyDelivered: o.partiallyDelivered,
+                  fullyDelivered: o.fullyDelivered,
                   revisionPartial: o.revisionPartial,
                 });
                 const project = clipDesignLabel(o.name || 'Order');

@@ -392,6 +392,7 @@ body {
 }
 .main:not(.main-messaging) > div.portal-quotes-page,
 .main:not(.main-messaging) > div.portal-orders-page,
+.main:not(.main-messaging) > div.portal-invoices-page,
 .main:not(.main-messaging) > div.admin-quotes-page,
 .main:not(.main-messaging) > div.admin-orders-page {
   max-width: none;
@@ -399,6 +400,7 @@ body {
 }
 .app-frame .main:has(.portal-quotes-page),
 .app-frame .main:has(.portal-orders-page),
+.app-frame .main:has(.portal-invoices-page),
 .app-frame .main:has(.admin-quotes-page),
 .app-frame .main:has(.admin-orders-page) {
   padding-left: 16px;

@@ -154,6 +154,7 @@ export type Order = {
   rejectionReason?: string | null;
   partiallyAccepted?: boolean;
   partiallyDelivered?: boolean;
+  fullyDelivered?: boolean;
   revisionPartial?: boolean;
   createdAt: string;
   updatedAt: string;

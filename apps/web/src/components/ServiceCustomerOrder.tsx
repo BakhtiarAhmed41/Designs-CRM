@@ -188,7 +188,8 @@ export function ServiceCustomerOrder({
   const deliveredSizes = sizeRows.filter(
     (row) => row.design?.status === 'DELIVERED' || sizeHasOriginalFiles(row),
   ).length;
-  const tracked = (order.designs?.length ? order.designs : sizeRows.map((row) => row.design).filter(Boolean)) as Design[];
+  const linked = sizeRows.map((row) => row.design).filter(Boolean) as Design[];
+  const tracked = (linked.length ? linked : order.designs ?? []) as Design[];
   const readyDesigns = tracked.filter(
     (design) => design.status === 'DONE' || design.status === 'DELIVERED',
   ).length;

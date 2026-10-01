@@ -133,7 +133,7 @@ export function PortalInvoices() {
   const monthName = new Date().toLocaleDateString('en-US', { month: 'long' });
 
   return (
-    <div>
+    <div className="portal-invoices-page">
       <PageHeader
         title="Invoices"
         subtitle={
