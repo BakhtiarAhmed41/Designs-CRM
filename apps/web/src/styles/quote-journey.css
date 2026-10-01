@@ -89,16 +89,34 @@
 }
 
 .ojs h2 {
-  margin: 18px 0 0;
-  font-size: 20px;
+  margin: 10px 0 0;
+  font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: #1b1d22;
 }
 
-.ojs + .ojs {
-  margin-top: 22px;
+.ojs .qj-lead {
+  margin-top: 2px;
+  font-size: 13.5px;
+}
+
+.ojs .qj-steps {
+  margin-top: 0;
+  padding-top: 6px;
+}
+
+.ojs .qj-steps:has(.is-current) {
   padding-top: 18px;
+}
+
+.ojs .qj-name {
+  margin-top: 6px;
+}
+
+.ojs + .ojs {
+  margin-top: 12px;
+  padding-top: 10px;
   border-top: 1px solid #eceef2;
 }
 
@@ -107,7 +125,7 @@
 }
 
 .ojs-count {
-  margin: 18px 0 0;
+  margin: 8px 0 0;
   color: #6d7380;
   font-size: 13px;
 }
@@ -228,6 +246,19 @@
 .qj-empty {
   text-align: center;
   padding: 34px 16px 22px;
+}
+
+.qj-price.ecd-sec {
+  padding-top: 14px;
+  padding-bottom: 12px;
+}
+
+.qj-price .qj-empty {
+  padding: 4px 16px 0;
+}
+
+.qj-price .qj-empty strong {
+  margin-top: 6px;
 }
 
 .qj-empty i {
