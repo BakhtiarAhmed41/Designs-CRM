@@ -4,7 +4,7 @@ import { useTopbarLead } from '@/components/Shell';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { DesignNameTitle, DetailsSectionHead } from '@/components/DesignNameTitle';
 import { EmbroideryFileCard } from '@/components/EmbroideryFileCard';
-import { startMyOrderCheckout } from '@/lib/billing';
+import { confirmMyOrder, startMyOrderCheckout } from '@/lib/billing';
 import { getErrorMessage } from '@/lib/api';
 import { isAdminRecounter, isStaffCreatedOrder, lineTotal, quoteHistoryLabel, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
 import {
@@ -24,15 +24,19 @@ import { openLinkedChat } from '@/lib/messaging';
 import { acceptQuotation, myAttachmentUrl } from '@/lib/orders';
 import { applyOrderChange } from '@/lib/queryCache';
 import { dateShort, money, orderNumber, orderSlug } from '@/lib/format';
+import { quoteJourneyPhase } from '@/lib/quoteJourney';
 import type { Order } from '@/lib/types';
+import { QuoteJourney, QuotePricingEmpty } from '@/components/QuoteJourney';
 import '@/styles/embroidery-quote.css';
 
 export function EmbroideryCustomerQuote({
   order,
   kind = 'embroidery',
+  notice,
 }: {
   order: Order;
   kind?: 'embroidery' | 'cutting' | 'vector';
+  notice?: string | null;
 }) {
   const cutting = kind === 'cutting';
   const vector = kind === 'vector';
@@ -74,22 +78,42 @@ export function EmbroideryCustomerQuote({
   const claimed = new Set<string>();
   const designFiles = designs.map((design) => filesForDesign(design, attachments, claimed));
 
+  const quotePath = `/portal/quotes/${orderSlug(order.humanRef, order.id)}`;
+  const orderPath = `/portal/orders/${orderSlug(order.humanRef, order.id)}`;
+
+  async function payQuote() {
+    setPayBusy(true);
+    setError(null);
+    try {
+      const pay = await startMyOrderCheckout(order.id, quotePath);
+      if (pay?.alreadyPaid) {
+        await confirmMyOrder(order.id).catch(() => null);
+        await qc.invalidateQueries({ queryKey: ['my-order'] });
+      }
+    } catch (e) {
+      setError(getErrorMessage(e));
+    } finally {
+      setPayBusy(false);
+    }
+  }
+
   const acceptMut = useMutation({
     mutationFn: () => acceptQuotation(order.id, selected),
     onSuccess: async (res) => {
       void applyOrderChange(qc, res.order);
-      if (res.order.status === 'PENDING_PAYMENT') {
-        setPayBusy(true);
-        try {
-          const pay = await startMyOrderCheckout(res.order.id);
-          if (pay?.alreadyPaid) navigate(`/portal/orders/${orderSlug(res.order.humanRef, res.order.id)}`);
-        } catch (e) {
-          setError(getErrorMessage(e));
-          setPayBusy(false);
+      if (res.order.status !== 'PENDING_PAYMENT') return;
+      setPayBusy(true);
+      try {
+        const pay = await startMyOrderCheckout(res.order.id, quotePath);
+        if (pay?.alreadyPaid) {
+          await confirmMyOrder(res.order.id).catch(() => null);
+          await qc.invalidateQueries({ queryKey: ['my-order'] });
         }
-        return;
+      } catch (e) {
+        setError(getErrorMessage(e));
+      } finally {
+        setPayBusy(false);
       }
-      navigate(`/portal/orders/${orderSlug(order.humanRef, order.id)}`);
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -105,13 +129,37 @@ export function EmbroideryCustomerQuote({
     onError: (e) => setError(getErrorMessage(e)),
   });
 
-  const status = declined
-    ? { text: 'Declined', ok: false }
-    : canDecide
-      ? { text: 'Ready for approval', ok: false }
-      : waiting
-        ? { text: 'Being prepared', ok: false }
-        : { text: 'Quote in progress', ok: false };
+  const phase = quoteJourneyPhase(order);
+  const counterPending = order.status === 'WAITING_FOR_ADMIN_QUOTATION_APPROVAL';
+  const status =
+    phase === 'paid'
+      ? { text: 'Paid', cls: 'ecd-tag ok soft' }
+      : phase === 'accepted'
+        ? { text: 'Confirmed', cls: 'ecd-tag ok soft' }
+        : phase === 'pay'
+          ? { text: 'Awaiting payment', cls: 'ecd-tag' }
+          : phase === 'review'
+            ? {
+                text: counterPending ? 'Quote in progress' : 'Ready for review',
+                cls: counterPending ? 'ecd-tag' : 'ecd-tag review soft',
+              }
+            : declined
+              ? { text: 'Declined', cls: 'ecd-tag' }
+              : waiting
+                ? { text: 'Being prepared', cls: 'ecd-tag' }
+                : { text: 'Quote in progress', cls: 'ecd-tag' };
+  const journeyCopy =
+    order.needsCustomerInfo && phase === 'preparing'
+      ? {
+          title: "We're preparing your quote",
+          subtitle: 'We need a few more details from you before we can finish the price.',
+        }
+      : counterPending
+        ? {
+            title: "We're reviewing your counter",
+            subtitle: "We'll send an updated quote once we've looked at your offer.",
+          }
+        : undefined;
 
   const history = [...quotations].sort((a, b) => a.version - b.version);
   const quoteNo = orderNumber(order.humanRef, order.id.slice(0, 6));
@@ -136,7 +184,7 @@ export function EmbroideryCustomerQuote({
             fallback={order.name?.trim() || 'Embroidery quote'}
           />
           <div className="ecd-meta">
-            <span className={status.ok ? 'ecd-tag ok' : 'ecd-tag'}>{status.text}</span>
+            <span className={status.cls}>{status.text}</span>
             <span className="ecd-sep" />
             <span>Requested {dateShort(order.createdAt)}</span>
             {isStaffCreatedOrder(order) && (
@@ -154,19 +202,34 @@ export function EmbroideryCustomerQuote({
         </div>
       </div>
 
-      {error && <div className="ead-banner">{error}</div>}
+      {(error || notice) && <div className="ead-banner">{error || notice}</div>}
+
+      {phase !== 'closed' && (
+        <QuoteJourney
+          phase={phase}
+          orderTo={orderPath}
+          canChoose={canPick}
+          paying={payBusy}
+          onPay={phase === 'pay' ? () => void payQuote() : undefined}
+          title={journeyCopy?.title}
+          subtitle={journeyCopy?.subtitle}
+        />
+      )}
 
       <div className="ecd-sheet">
-        <section className="ecd-sec">
+        <section className="ecd-sec qj-price">
           <div className="ecd-sec-h">
-            <h2>Order summary</h2>
+            <h2>Quote pricing</h2>
           </div>
           {lines.length === 0 && (
-            <p className="ecd-wait">
-              {declined
-                ? order.rejectionReason || 'The team declined this request.'
-                : 'The team is reviewing your files and details. Prices will show here when the quote is ready.'}
-            </p>
+            <QuotePricingEmpty
+              declined={declined}
+              settled={phase !== 'preparing' && phase !== 'closed'}
+              reason={order.rejectionReason}
+            />
+          )}
+          {declined && lines.length > 0 && (
+            <p className="ecd-wait">{order.rejectionReason || 'The team declined this request.'}</p>
           )}
           {groups.map((group) => (
             <div key={group.title} className="ecd-group">

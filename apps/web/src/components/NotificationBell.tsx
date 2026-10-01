@@ -8,7 +8,7 @@ import {
   markNotificationRead,
 } from '@/lib/notifications';
 import { STAFF_ROLES } from '@/lib/types';
-import { portalActivityAction } from '@/lib/portalNew';
+import { displayActivityBody, isAccountApprovedNotice, portalActivityAction } from '@/lib/portalNew';
 import { whenVisible } from '@/lib/queryRefresh';
 import { IconBell } from './Icon';
 
@@ -25,6 +25,7 @@ function relativeTime(iso: string) {
 
 function iconFor(title: string) {
   const t = title.toLowerCase();
+  if (t.includes('approved')) return { cls: 'file', icon: 'ti-circle-check' };
   if (t.includes('message') || t.includes('replied')) return { cls: 'msg', icon: 'ti-message' };
   if (t.includes('quote')) return { cls: 'quote', icon: 'ti-file-invoice' };
   if (t.includes('file') || t.includes('deliver')) return { cls: 'file', icon: 'ti-download' };
@@ -64,7 +65,9 @@ export function NotificationBell() {
   async function onItem(id: string, title: string, link: string | null) {
     await markNotificationRead(id);
     qc.invalidateQueries({ queryKey: ['notifications'] });
+    qc.invalidateQueries({ queryKey: ['my-activity'] });
     setOpen(false);
+    if (isAccountApprovedNotice(title, link)) return;
     if (!isStaff) {
       const action = portalActivityAction(title, link);
       if (action) {
@@ -145,6 +148,7 @@ export function NotificationBell() {
             )}
             {items.map((n) => {
               const ic = iconFor(n.title);
+              const body = displayActivityBody(n.title, n.body, n.link);
               return (
                 <div
                   key={n.id}
@@ -157,7 +161,7 @@ export function NotificationBell() {
                   <div>
                     <div className="ntx">
                       <b>{n.title.toLowerCase().includes('new message') ? 'New Message' : n.title}</b>
-                      {n.body ? `: ${n.body}` : ''}
+                      {body ? `: ${body}` : ''}
                     </div>
                     <div className="ntm">{relativeTime(n.createdAt)}</div>
                   </div>

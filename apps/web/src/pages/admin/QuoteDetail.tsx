@@ -25,6 +25,8 @@ import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
 import { getCustomer } from '@/lib/customers';
 import { getErrorMessage } from '@/lib/api';
 import { money, dateShort, quoteLifecycleChip, friendlyFileName, orderNumber, orderSlug } from '@/lib/format';
+import { quoteJourneyPhase } from '@/lib/quoteJourney';
+import { QuoteJourney } from '@/components/QuoteJourney';
 import { isCuttingRequest, isEmbroideryRequest, isVectorRequest } from '@/lib/embroideryQuote';
 import { isAdminRecounter, isStaffCreatedOrder, lineTotal, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
 import { useDialog } from '@/components/ui/AppDialog';
@@ -111,10 +113,6 @@ export function AdminQuoteDetail() {
   useEffect(() => {
     if (!order) return;
     const slug = orderSlug(order.humanRef, order.id);
-    if (order.type === 'ORDER') {
-      navigate(`/admin/orders/${slug}`, { replace: true });
-      return;
-    }
     if (slug !== id) navigate(`/admin/quotes/${slug}`, { replace: true });
   }, [order, id, navigate]);
 
@@ -297,7 +295,46 @@ export function AdminQuoteDetail() {
     );
   }
   if (order.type === 'ORDER') {
-    return <div style={{ padding: 16, color: 'var(--muted)' }}>Converted to order. Redirecting…</div>;
+    const phase = quoteJourneyPhase(order);
+    const shown =
+      phase === 'preparing' || phase === 'review' || phase === 'closed'
+        ? order.paymentStatus === 'PAID'
+          ? 'paid'
+          : 'accepted'
+        : phase;
+    const orderTo = `/admin/orders/${orderSlug(order.humanRef, order.id)}`;
+    const studioQuote = studioQuotation(order.quotations as QuoteWithLines[] | undefined);
+    const priced = studioQuote?.lines ?? [];
+    return (
+      <div className="qd-page">
+        <div className="ph">
+          <div>
+            <div className="crumbs">
+              <Link to="/admin/quotes">Quotes</Link>
+              <span>/</span>
+              <span>{orderNumber(order.humanRef, 'Quote')}</span>
+            </div>
+            <h1>{order.name ?? 'Quote'}</h1>
+            <div className="muted" style={{ marginTop: 4 }}>
+              {orderNumber(order.humanRef, order.id.slice(0, 6))} · {dateShort(order.createdAt)}
+            </div>
+          </div>
+        </div>
+        <QuoteJourney phase={shown} orderTo={orderTo} />
+        <div className="card card-pad qj-price-card">
+          <h2 className="qj-price-title">Quote pricing</h2>
+          {priced.length === 0 && (
+            <p className="muted" style={{ margin: '12px 0 0' }}>No priced items on this quote.</p>
+          )}
+          {priced.map((line) => (
+            <div key={line.id} className="quote-line">
+              <div style={{ flex: 1, fontWeight: 600 }}>{line.name}</div>
+              <div style={{ fontWeight: 600 }}>{money(lineTotal(line))}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   const customer = customerQ.data?.customer;

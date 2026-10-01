@@ -220,7 +220,7 @@ export function AdminQuotes() {
                   <tr
                     key={o.id}
                     className="click-row"
-                    onClick={() => navigate(approved ? `/admin/orders/${slug}` : `/admin/quotes/${slug}`)}
+                    onClick={() => navigate(`/admin/quotes/${slug}`)}
                   >
                     <td className="ref-name">
                       <div className="cell-main">

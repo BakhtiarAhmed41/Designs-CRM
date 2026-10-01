@@ -201,9 +201,7 @@ export function PortalQuotes() {
                 const quote = studioQuotation(o.quotations);
                 const designCount = o.designCount ?? quote?.lines?.length ?? 0;
                 const total = quote?.amountCents ?? null;
-                const href = o.type === 'ORDER'
-                  ? `/portal/orders/${orderSlug(o.humanRef, o.id)}`
-                  : `/portal/quotes/${orderSlug(o.humanRef, o.id)}`;
+                const href = `/portal/quotes/${orderSlug(o.humanRef, o.id)}`;
                 const project = clipDesignLabel(o.name ?? o.serviceType ?? 'Quote request');
 
                 return (

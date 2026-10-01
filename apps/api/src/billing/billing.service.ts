@@ -1506,7 +1506,7 @@ export class BillingService {
   async startCheckoutForMyOrder(
     user: AuthUser | undefined,
     orderId: string,
-    opts?: { returnOrigin?: string },
+    opts?: { returnOrigin?: string; returnPath?: string },
   ) {
     const customer = await this.resolveMyCustomer(user);
     const invoice = await this.db.queryOne<InvoiceRow>(
@@ -1527,7 +1527,7 @@ export class BillingService {
     }
     return this.startCheckoutForMyInvoice(user, invoice.id, {
       returnOrigin: opts?.returnOrigin,
-      returnPath: `/portal/orders/${orderId}`,
+      returnPath: opts?.returnPath ?? `/portal/orders/${orderId}`,
     });
   }
 

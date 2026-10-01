@@ -415,7 +415,7 @@ export class AdminOrdersController {
     FileFieldsInterceptor(
       [
         { name: 'files', maxCount: 10 },
-        { name: 'zip', maxCount: 1 },
+        { name: 'zip', maxCount: 10 },
       ],
       {
         storage: memoryStorage(),
@@ -452,7 +452,7 @@ export class AdminOrdersController {
           : via === DeliveredVia.BOTH
             ? DeliveredVia.BOTH
             : DeliveredVia.PORTAL,
-      zip: uploaded?.zip?.[0],
+      zip: uploaded?.zip ?? [],
       designIds,
       notifyEmail: parseBool(body?.notifyEmail, true),
       notifySms: parseBool(body?.notifySms, true),

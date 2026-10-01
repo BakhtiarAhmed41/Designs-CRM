@@ -12,7 +12,14 @@ import { useAuth } from '@/context/AuthContext';
 import { freshOnOpen } from '@/lib/queryRefresh';
 import { clipDesignLabel, money, quoteLifecycleChip, customerOrderChip, orderNumber, orderSlug } from '@/lib/format';
 import { serviceCategoryLabel } from '@/lib/serviceIcon';
-import { portalActivityAction, unreadSections } from '@/lib/portalNew';
+import {
+  ACCOUNT_APPROVED_TITLE,
+  ACCOUNT_WELCOME_BODY,
+  displayActivityBody,
+  isAccountApprovedNotice,
+  portalActivityAction,
+  unreadSections,
+} from '@/lib/portalNew';
 import type { Order } from '@/lib/types';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -128,6 +135,11 @@ export function PortalDashboard() {
     queryFn: () => listNotifications({ page: activityPage, pageSize: 6 }),
     ...freshOnOpen,
   });
+  const { data: everWorkData, isLoading: everWorkLoading } = useQuery({
+    queryKey: ['my-orders', 'dash-ever'],
+    queryFn: () => listMyOrders({ page: 1, pageSize: 1 }),
+    ...freshOnOpen,
+  });
 
   const orders = (openOrdersData?.orders ?? [])
     .filter((o) => !isQuote(o) && ACTIVE_ORDER.has(o.status))
@@ -177,6 +189,23 @@ export function PortalDashboard() {
   );
 
   const news = unreadSections(activities);
+  const isFirstTimeCustomer = !everWorkLoading && (everWorkData?.total ?? 0) === 0;
+  const welcomeNotice = activities.find((n) => isAccountApprovedNotice(n.title, n.link));
+  const showWelcomeCard = isFirstTimeCustomer;
+  const tableActivities = showWelcomeCard
+    ? activities.filter((n) => !isAccountApprovedNotice(n.title, n.link))
+    : activities;
+
+  function refreshActivity() {
+    void qc.invalidateQueries({ queryKey: ['my-activity'] });
+    void qc.invalidateQueries({ queryKey: ['notifications'] });
+  }
+
+  async function markActivityRead(id: string) {
+    await markNotificationRead(id);
+    refreshActivity();
+  }
+
   const tabs: Array<{ id: WorkTab; label: string; count: number; to: string; viewAll: string; isNew?: boolean }> = [
     { id: 'orders', label: 'Orders', count: orders.length, to: '/portal/orders', viewAll: 'View All Orders', isNew: news.has('orders') },
     { id: 'quotes', label: 'Quotes', count: quotes.length, to: '/portal/quotes', viewAll: 'View All Quotes', isNew: news.has('quotes') },
@@ -457,11 +486,38 @@ export function PortalDashboard() {
             </button>
           )}
         </div>
-        {activityLoading && <SkeletonRows rows={3} />}
-        {!activityLoading && activities.length === 0 && (
+        {showWelcomeCard && (
+          <div className="welcome-card">
+            <div className="welcome-card-check" aria-hidden>
+              <i className="ti ti-circle-check" />
+            </div>
+            <div className="welcome-card-body">
+              <div className="welcome-card-head">
+                <span className="welcome-card-title">{ACCOUNT_APPROVED_TITLE}</span>
+                {(!welcomeNotice || !welcomeNotice.readAt) && (
+                  <span className="welcome-card-new">New</span>
+                )}
+                <span className="welcome-card-time">
+                  {welcomeNotice ? relativeTime(welcomeNotice.createdAt) : 'Just now'}
+                </span>
+              </div>
+              <p>{ACCOUNT_WELCOME_BODY}</p>
+              <div className="welcome-card-actions">
+                <RequestQuoteMenu>
+                  <i className="ti ti-file-invoice" /> Request a quote
+                </RequestQuoteMenu>
+                <Link to="/portal/settings#portal-colors" className="welcome-card-link">
+                  <i className="ti ti-palette" /> Customize colors
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+        {activityLoading && !showWelcomeCard && <SkeletonRows rows={3} />}
+        {!activityLoading && !showWelcomeCard && activities.length === 0 && (
           <EmptyState icon="ti-bell" title="No recent activity" description="Updates will appear here as work moves along." />
         )}
-        {activities.length > 0 && (
+        {tableActivities.length > 0 && (
           <div className="dash-table-wrap">
             <table className="dash-table activity-table">
               <colgroup>
@@ -479,10 +535,11 @@ export function PortalDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {activities.map((n) => {
+                {tableActivities.map((n) => {
                   const action = portalActivityAction(n.title, n.link);
                   const unread = !n.readAt;
                   const title = displayActivityTitle(n.title);
+                  const body = displayActivityBody(n.title, n.body, n.link);
                   return (
                     <tr key={n.id} className={`click-row${unread ? ' is-unread' : ''}`}>
                       <td>
@@ -491,7 +548,7 @@ export function PortalDashboard() {
                           {unread && <span className="activity-unread">Unread</span>}
                         </div>
                       </td>
-                      <td className="activity-detail">{n.body || '—'}</td>
+                      <td className="activity-detail">{body || '—'}</td>
                       <td className="activity-time">{relativeTime(n.createdAt)}</td>
                       <td>
                         {action ? (
@@ -500,14 +557,19 @@ export function PortalDashboard() {
                             className="activity-link"
                             onClick={() => {
                               if (!unread) return;
-                              void markNotificationRead(n.id).then(() => {
-                                void qc.invalidateQueries({ queryKey: ['my-activity'] });
-                                void qc.invalidateQueries({ queryKey: ['notifications'] });
-                              });
+                              void markActivityRead(n.id);
                             }}
                           >
                             {action.label} <i className="ti ti-chevron-right" />
                           </Link>
+                        ) : unread ? (
+                          <button
+                            type="button"
+                            className="activity-link"
+                            onClick={() => void markActivityRead(n.id)}
+                          >
+                            Mark as read
+                          </button>
                         ) : null}
                       </td>
                     </tr>

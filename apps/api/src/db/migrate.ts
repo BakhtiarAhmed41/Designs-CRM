@@ -478,6 +478,14 @@ export async function runMigrations() {
         AND body LIKE 'Client is waiting for quotation%'`,
   );
 
+  await conn.query(
+    `UPDATE notifications
+        SET body = 'Welcome to Las Vegas Designs! Your account is ready. Complete your profile, personalize your portal colors, or submit your first quote request.',
+            link = NULL
+      WHERE title = 'Account approved'
+        AND (link = '/login' OR body LIKE '%You can sign in now%')`,
+  );
+
   if (existsSync(migrationsDir)) {
     const applied = new Set(
       (

@@ -462,8 +462,7 @@ export class AuthService {
     if (status === LoginStatus.ACTIVE) {
       await this.notifications.createFor(userId, {
         title: 'Account approved',
-        body: 'Your account has been approved. You can sign in now.',
-        link: '/login',
+        body: 'Welcome to Las Vegas Designs! Your account is ready. Complete your profile, personalize your portal colors, or submit your first quote request.',
       });
       await this.mail.sendAccountApproved(user.email);
     }

@@ -348,7 +348,12 @@ export function PortalSettings() {
         </div>
       </div>
 
-      <form className="card card-pad settings-form" onSubmit={(e) => void onSaveLook(e)} style={{ maxWidth: 480 }}>
+      <form
+        id="portal-colors"
+        className="card card-pad settings-form"
+        onSubmit={(e) => void onSaveLook(e)}
+        style={{ maxWidth: 480 }}
+      >
         <div className="profile-card-head">
           <h2 className="profile-card-title">Portal colors</h2>
           <p className="profile-card-sub">Heading text and page background for your portal.</p>

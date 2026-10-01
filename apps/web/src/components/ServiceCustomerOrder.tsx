@@ -4,6 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { DetailsSectionHead } from '@/components/DesignNameTitle';
 import { EmbroideryFileCard } from '@/components/EmbroideryFileCard';
 import { ImageLightbox } from '@/components/FilePreview';
+import { OrderSteps, RevisionSteps } from '@/components/QuoteJourney';
 import { useTopbarLead } from '@/components/Shell';
 import { ErrorBanner } from '@/components/ui/EmptyState';
 import { apiFetch, downloadSignedFile, getErrorMessage, resolveFileUrl } from '@/lib/api';
@@ -82,45 +83,6 @@ function isZipFile(file: { isBundle?: boolean; originalName?: string; mimeType?:
   if (file.isBundle) return true;
   const name = (file.originalName ?? '').toLowerCase();
   return name.endsWith('.zip') || file.mimeType === 'application/zip' || file.mimeType === 'application/x-zip-compressed';
-}
-
-function originalDeliveries(order: CustomerOrder) {
-  return (order.deliveries ?? []).filter(
-    (batch) => Boolean(batch.releasedAt) && batch.kind !== 'PREVIEW' && !batch.editId,
-  );
-}
-
-function filesUnderDesign(order: CustomerOrder, designId: string | undefined, delivered: boolean) {
-  const batches = originalDeliveries(order);
-  const realFiles = (batch: (typeof batches)[number]) =>
-    batch.files.filter((file) => !/^delivered by email$/i.test(file.originalName));
-  const linked = batches.filter((batch) =>
-    realFiles(batch).some((file) => file.designId === designId || (file.isBundle && !file.designId)),
-  );
-  const emailOnly = batches.filter(
-    (batch) =>
-      realFiles(batch).length === 0 &&
-      (batch.deliveredVia === 'EMAIL' || batch.deliveredVia === 'BOTH'),
-  );
-  const relevant = linked.length > 0 ? linked : delivered ? emailOnly : [];
-  const files = relevant.flatMap((batch) =>
-    realFiles(batch).filter((file) => {
-      if (file.isBundle) return !file.designId || file.designId === designId;
-      return file.designId === designId;
-    }),
-  );
-  const emailed = relevant.find((batch) => batch.deliveredVia === 'EMAIL' || batch.deliveredVia === 'BOTH');
-  return {
-    images: files.filter((file) => !file.isBundle && isImageFile(file.originalName, file.mimeType)),
-    zips: files.filter((file) => isZipFile(file)),
-    others: files.filter((file) => !isZipFile(file) && !isImageFile(file.originalName, file.mimeType)),
-    email: emailed
-      ? {
-          at: emailed.releasedAt || emailed.createdAt,
-          only: emailed.deliveredVia === 'EMAIL' && files.length === 0,
-        }
-      : null,
-  };
 }
 
 function revisionDeliveredLabel(order: CustomerOrder, revisions: EditRequest[], revisionId: string) {
@@ -226,7 +188,11 @@ export function ServiceCustomerOrder({
   const deliveredSizes = sizeRows.filter(
     (row) => row.design?.status === 'DELIVERED' || sizeHasOriginalFiles(row),
   ).length;
-  const percent = counts.total > 0 ? Math.round((deliveredSizes / counts.total) * 100) : 0;
+  const tracked = (order.designs?.length ? order.designs : sizeRows.map((row) => row.design).filter(Boolean)) as Design[];
+  const readyDesigns = tracked.filter(
+    (design) => design.status === 'DONE' || design.status === 'DELIVERED',
+  ).length;
+  const deliveredDesigns = tracked.filter((design) => design.status === 'DELIVERED').length;
 
   const [open, setOpen] = useState({
     summary: awaiting,
@@ -259,8 +225,18 @@ export function ServiceCustomerOrder({
     ...freshOnOpen,
   });
   const revisions = editsQ.data?.edits ?? [];
-  const publishedRevs = revisions.filter((edit) => edit.status === 'DONE').length;
-  const revPercent = revisions.length ? Math.round((publishedRevs / revisions.length) * 100) : 0;
+  const revisionReady = revisions.filter((edit) => edit.status === 'DONE' || Boolean(edit.readyAt)).length;
+  const revisionPublished = revisions.filter((edit) => edit.status === 'DONE').length;
+  const awaitingRevisionPayment =
+    revisions.length > 0 &&
+    revisionReady === 0 &&
+    revisions.every(
+      (edit) =>
+        edit.kind === 'PAID' &&
+        (edit.priceCents ?? 0) > 0 &&
+        edit.invoiceStatus !== 'PAID' &&
+        edit.status !== 'DONE',
+    );
   const revisionState = revisionDeliveryState(revisions, (id) => {
     const row = groups.flatMap((group) => group.rows).find((item) => item.design?.id === id);
     return row?.design?.status ?? order.designs?.find((design) => design.id === id)?.status;
@@ -339,7 +315,6 @@ export function ServiceCustomerOrder({
     return files.filter((file) => !/^delivered by email$/i.test(file.originalName));
   });
   const previewFiles = dialogFiles.filter((file) => !isZipFile(file) && isImageFile(file.originalName, file.mimeType));
-  const zipFiles = dialogFiles.filter((file) => isZipFile(file));
   const sentThroughEmail = ['EMAIL', 'BOTH'].includes(
     mergeDeliveredVia(dialogBatches.map((batch) => batch.deliveredVia)) ?? '',
   );
@@ -395,7 +370,6 @@ export function ServiceCustomerOrder({
       <section className="cop-head">
         <div className="cop-head-top">
           <div>
-            <h1>Order progress</h1>
             <p className="cop-facts">
               {countWord(designCount, 'design', 'designs')}
               <span>·</span>
@@ -410,45 +384,20 @@ export function ServiceCustomerOrder({
           </div>
           <strong className={header.ok ? 'cop-pill ok' : 'cop-pill'}>{header.text}</strong>
         </div>
-        {counts.total > 0 && (
-          <div className="cop-progress">
-            <div className="cop-progress-top">
-              <strong>
-                {deliveredSizes} of {countWord(counts.total, 'size', 'sizes')} delivered
-              </strong>
-              <span>{percent}%</span>
-            </div>
-            <div
-              className="cop-bar"
-              role="progressbar"
-              aria-label="Order delivery progress"
-              aria-valuenow={percent}
-              aria-valuemin={0}
-              aria-valuemax={100}
-            >
-              <span style={{ width: `${percent}%` }} />
-            </div>
-          </div>
-        )}
+        <OrderSteps
+          ready={readyDesigns}
+          total={tracked.length}
+          delivered={deliveredDesigns}
+          sizeDelivered={deliveredSizes}
+          sizeTotal={counts.total}
+        />
         {revisions.length > 0 && (
-          <div className="cop-progress">
-            <div className="cop-progress-top">
-              <strong>
-                {publishedRevs} of {countWord(revisions.length, 'revision', 'revisions')} published
-              </strong>
-              <span>{revPercent}%</span>
-            </div>
-            <div
-              className="cop-bar"
-              role="progressbar"
-              aria-label="Revision progress"
-              aria-valuenow={revPercent}
-              aria-valuemin={0}
-              aria-valuemax={100}
-            >
-              <span style={{ width: `${revPercent}%` }} />
-            </div>
-          </div>
+          <RevisionSteps
+            ready={revisionReady}
+            total={revisions.length}
+            published={revisionPublished}
+            awaitingPayment={awaitingRevisionPayment}
+          />
         )}
         {awaiting && !paid && (
           <div className="cop-pay">
@@ -536,8 +485,6 @@ export function ServiceCustomerOrder({
                   ? { text: designDeliveredLabel(order.deliveries, row.design?.id), tone: 'done' as const }
                   : rowStatus(order, row);
                 const caption = rowCaption(group.title, index, row.name, group.rows.length, designs);
-                const lineFiles = filesUnderDesign(order, row.design?.id, rowDelivered);
-                const canView = rowDelivered && (lineFiles.images.length > 0 || lineFiles.zips.length > 0 || Boolean(lineFiles.email));
                 return (
                   <div key={row.key} className="cop-row">
                     <div className="cop-name">
@@ -549,15 +496,13 @@ export function ServiceCustomerOrder({
                       {status.text}
                     </div>
                     <div className="cop-actions">
-                      {canView && (
+                      {rowDelivered && (
                         <button
                           type="button"
-                          className="sod-eye"
-                          title="View files"
-                          aria-label="View files"
+                          className="cop-btn cop-download"
                           onClick={() => setFilesFor({ row, editId: null })}
                         >
-                          <i className="ti ti-eye" />
+                          View & download
                         </button>
                       )}
                     </div>
@@ -864,7 +809,7 @@ export function ServiceCustomerOrder({
                 ? 'These files were sent to you through email.'
                 : 'Preview the design, then download the files prepared for your order.'}
             </p>
-            {previewFiles.length === 0 && zipFiles.length === 0 && !sentThroughEmail && (
+            {previewFiles.length === 0 && dialogFiles.length === 0 && !sentThroughEmail && (
               <p>No files are available yet.</p>
             )}
             {previewFiles.length > 0 && (
@@ -884,13 +829,13 @@ export function ServiceCustomerOrder({
                 ))}
               </div>
             )}
-            {(zipFiles.length > 0 || (!filesFor.editId && emailOnlyDelivery(order, filesFor.row))) && (
+            {(dialogFiles.length > 0 || (!filesFor.editId && emailOnlyDelivery(order, filesFor.row))) && (
               <div className="cdf-downloads">
                 <div className="cdf-kicker">Your download files</div>
                 <p className="cdf-note">Files prepared in the formats requested for this design.</p>
-                {zipFiles.map((file) => (
+                {dialogFiles.map((file) => (
                   <div key={file.id} className="cdf-row cdf-dl-row">
-                    <span>{file.originalName} · All designs</span>
+                    <span>{file.originalName}{file.isBundle ? ' · All designs' : ''}</span>
                     <button
                       type="button"
                       className="ecd-btn pri cdf-dl-btn"
@@ -900,9 +845,9 @@ export function ServiceCustomerOrder({
                     </button>
                   </div>
                 ))}
-                {zipFiles.length === 0 && (
+                {dialogFiles.length === 0 && (
                   <div className="cdf-row cdf-dl-row">
-                    <span>Sent by email · ZIP with all files</span>
+                    <span>Sent by email · all files</span>
                   </div>
                 )}
               </div>

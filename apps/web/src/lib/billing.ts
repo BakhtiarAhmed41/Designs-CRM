@@ -264,12 +264,12 @@ export async function startMyInvoiceCheckout(
   goToCheckout(res.url);
 }
 
-export async function startMyOrderCheckout(orderId: string) {
+export async function startMyOrderCheckout(orderId: string, returnPath?: string) {
   const res = await apiFetch<{ url?: string; alreadyPaid?: boolean }>(
     `/invoices/by-order/${orderId}/checkout`,
     {
       method: 'POST',
-      body: JSON.stringify({ returnOrigin: pageOrigin() }),
+      body: JSON.stringify({ returnOrigin: pageOrigin(), returnPath }),
     },
   );
   if (res.alreadyPaid) return { alreadyPaid: true as const };

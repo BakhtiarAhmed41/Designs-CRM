@@ -1,18 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   acceptQuotation,
   getMyOrder,
   myAttachmentUrl,
 } from '@/lib/orders';
-import { startMyOrderCheckout } from '@/lib/billing';
+import { confirmMyOrder, startMyOrderCheckout } from '@/lib/billing';
 import { openLinkedChat } from '@/lib/messaging';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import { dateShort, money, quoteLifecycleChip, orderNumber, orderSlug } from '@/lib/format';
 import { useCanonicalOrderUrl } from '@/lib/useCanonicalOrderUrl';
-import { isCuttingRequest, isEmbroideryRequest, isVectorRequest, serviceOrderKind } from '@/lib/embroideryQuote';
-import { ServiceCustomerOrder } from '@/components/ServiceCustomerOrder';
+import { isCuttingRequest, isEmbroideryRequest, isVectorRequest } from '@/lib/embroideryQuote';
 import { isAdminRecounter, isStaffCreatedOrder, latestCounter, lineTotal, studioQuotation } from '@/lib/quoteHelpers';
 import type { Order } from '@/lib/types';
 import { applyOrderChange } from '@/lib/queryCache';
@@ -22,10 +21,15 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { QuoteHistory } from '@/components/QuoteHistory';
 import { EmbroideryCustomerQuote } from '@/components/EmbroideryCustomerQuote';
 import { FormPreferencesDisplay } from '@/components/FormPreferencesDisplay';
+import { QuoteJourney, QuotePricingEmpty } from '@/components/QuoteJourney';
+import { quoteJourneyPhase } from '@/lib/quoteJourney';
 
 export function PortalQuoteDetail() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const paidReturn = searchParams.get('paid') === '1';
+  const paySyncStarted = useRef(0);
   const qc = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -38,6 +42,14 @@ export function PortalQuoteDetail() {
     enabled: !!id,
     ...freshOnOpen,
     refetchOnWindowFocus: 'always',
+    refetchInterval: (q) => {
+      if (!paidReturn) return false;
+      const current = q.state.data?.order as { paymentStatus?: string } | undefined;
+      if (current?.paymentStatus === 'PAID') return false;
+      if (!paySyncStarted.current) paySyncStarted.current = Date.now();
+      if (Date.now() - paySyncStarted.current > 20_000) return false;
+      return 1500;
+    },
   });
 
   useEffect(() => {
@@ -46,8 +58,35 @@ export function PortalQuoteDetail() {
     return () => window.clearTimeout(t);
   }, [toast]);
 
+  useEffect(() => {
+    if (searchParams.get('canceled') !== '1') return;
+    setError("Payment was not completed. You can pay when you're ready.");
+    const next = new URLSearchParams(searchParams);
+    next.delete('canceled');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   const order = data?.order as Order | undefined;
   useCanonicalOrderUrl('portal', 'quotes', id, order?.humanRef);
+
+  useEffect(() => {
+    if (!paidReturn || !order?.id) return;
+    let cancelled = false;
+    void confirmMyOrder(order.id).finally(() => {
+      if (!cancelled) void refetch();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [paidReturn, order?.id, refetch]);
+
+  useEffect(() => {
+    if (!paidReturn || order?.paymentStatus !== 'PAID') return;
+    const next = new URLSearchParams(searchParams);
+    if (!next.has('paid')) return;
+    next.delete('paid');
+    setSearchParams(next, { replace: true });
+  }, [paidReturn, order?.paymentStatus, searchParams, setSearchParams]);
   const studio = studioQuotation(order?.quotations);
   const counterQuote = latestCounter(order?.quotations);
   const lines = studio?.lines ?? [];
@@ -61,14 +100,18 @@ export function PortalQuoteDetail() {
     .filter((l) => selected.includes(l.id))
     .reduce((sum, l) => sum + lineTotal(l), 0);
 
-  async function goToPayment(orderId: string) {
+  async function goToPayment(next: { id: string; humanRef?: string | null }) {
     setPayBusy(true);
     setError(null);
     try {
-      const res = await startMyOrderCheckout(orderId);
+      const res = await startMyOrderCheckout(
+        next.id,
+        `/portal/quotes/${orderSlug(next.humanRef, next.id)}`,
+      );
       if (res?.alreadyPaid) {
-        setToast('Payment successful. Your order has been created.');
-        window.setTimeout(() => navigate(`/portal/orders/${orderSlug(order?.humanRef, orderId)}`), 700);
+        await confirmMyOrder(next.id).catch(() => null);
+        await qc.invalidateQueries({ queryKey: ['my-order'] });
+        setToast('Payment received.');
       }
     } catch (e) {
       setError(getErrorMessage(e));
@@ -84,15 +127,10 @@ export function PortalQuoteDetail() {
       const next = res.order;
       if (next.status === 'PENDING_PAYMENT') {
         setToast('Quote accepted. Continue to payment…');
-        void goToPayment(next.id);
+        void goToPayment(next);
         return;
       }
-      setToast(
-        selected.length < lines.length && lines.length > 0
-          ? 'Partially accepted. Opening your order…'
-          : 'Quote accepted. Opening your order…',
-      );
-      window.setTimeout(() => navigate(`/portal/orders/${orderSlug(next.humanRef, next.id)}`), 700);
+      setToast('Quote accepted.');
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -138,63 +176,11 @@ export function PortalQuoteDetail() {
     );
   }
 
-  if (order.type === 'ORDER' && order.status === 'PENDING_PAYMENT') {
-    return (
-      <div>
-        {error && <ErrorBanner>{error}</ErrorBanner>}
-        <EmptyState
-          icon="ti-credit-card"
-          title="Complete payment"
-          description="Your quote is accepted. Pay to create the order."
-          action={
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={payBusy}
-                onClick={() => void goToPayment(order.id)}
-              >
-                <i className="ti ti-credit-card" /> {payBusy ? 'Opening checkout…' : 'Accept & Pay'}
-              </button>
-              <Link to="/portal/quotes" className="btn btn-ghost">
-                Back to quotes
-              </Link>
-            </div>
-          }
-        />
-      </div>
-    );
-  }
-
-  if (order.type === 'ORDER' && serviceOrderKind(order)) {
-    return <ServiceCustomerOrder order={order} />;
-  }
-
-  if (order.type === 'ORDER') {
-    return (
-      <EmptyState
-        icon="ti-circle-check"
-        title="This quote is now an order"
-        description="You accepted the price. Track production from the order workspace."
-        action={
-          <Link to={`/portal/orders/${orderSlug(order.humanRef, order.id)}`} className="btn btn-primary">
-            Open order
-          </Link>
-        }
-      />
-    );
-  }
-
-  if (isEmbroideryRequest(order)) {
-    return <EmbroideryCustomerQuote order={order} />;
-  }
-
-  if (isCuttingRequest(order)) {
-    return <EmbroideryCustomerQuote order={order} kind="cutting" />;
-  }
-
-  if (isVectorRequest(order)) {
-    return <EmbroideryCustomerQuote order={order} kind="vector" />;
+  const phase = quoteJourneyPhase(order);
+  const serviceQuote = isEmbroideryRequest(order) || isCuttingRequest(order) || isVectorRequest(order);
+  if (serviceQuote) {
+    const kind = isCuttingRequest(order) ? 'cutting' : isVectorRequest(order) ? 'vector' : 'embroidery';
+    return <EmbroideryCustomerQuote order={order} kind={kind} notice={error} />;
   }
 
   const canDecide = order.status === 'QUOTATION_PROVIDED';
@@ -210,6 +196,29 @@ export function PortalQuoteDetail() {
     createdAt: order.createdAt,
     type: order.type,
   });
+  const headerChip =
+    phase === 'paid'
+      ? { cls: 'qj-chip ok', label: 'Paid' }
+      : phase === 'accepted'
+        ? { cls: 'qj-chip ok', label: 'Confirmed' }
+        : phase === 'pay'
+          ? { cls: 'qj-chip review', label: 'Awaiting payment' }
+          : phase === 'review' && !counterPending
+            ? { cls: 'qj-chip review', label: adminRecounter ? 'Updated quote' : 'Ready for review' }
+            : statusChip;
+  const journeyCopy =
+    order.needsCustomerInfo && phase === 'preparing'
+      ? {
+          title: "We're preparing your quote",
+          subtitle: 'We need a few more details from you before we can finish the price.',
+        }
+      : counterPending
+        ? {
+            title: "We're reviewing your counter",
+            subtitle: "We'll send an updated quote once we've looked at your offer.",
+          }
+        : undefined;
+  const orderPath = `/portal/orders/${orderSlug(order.humanRef, order.id)}`;
 
   return (
     <div className="qd-page">
@@ -222,7 +231,7 @@ export function PortalQuoteDetail() {
         ]}
         actions={
           <div className="qd-hero-actions">
-            <span className={statusChip.cls}>{statusChip.label}</span>
+            <span className={headerChip.cls}>{headerChip.label}</span>
             <button
               type="button"
               className="btn btn-ghost"
@@ -240,6 +249,18 @@ export function PortalQuoteDetail() {
         <div className="alert-success" style={{ marginBottom: 12 }}>
           <i className="ti ti-circle-check" /> {toast}
         </div>
+      )}
+
+      {phase !== 'closed' && (
+        <QuoteJourney
+          phase={phase}
+          orderTo={orderPath}
+          canChoose={canPickLines}
+          paying={payBusy}
+          onPay={phase === 'pay' ? () => void goToPayment(order) : undefined}
+          title={journeyCopy?.title}
+          subtitle={journeyCopy?.subtitle}
+        />
       )}
 
       {canDecide && adminRecounter && (
@@ -268,7 +289,7 @@ export function PortalQuoteDetail() {
         </div>
       )}
 
-      {declinedByStudio && (
+      {declinedByStudio && lines.length > 0 && (
         <div className="note amber" style={{ marginBottom: 12 }}>
           <i className="ti ti-x" /> This quote was declined by the team
           {order.rejectionReason ? `: ${order.rejectionReason}` : '.'}
@@ -316,40 +337,15 @@ export function PortalQuoteDetail() {
         </div>
       )}
 
-      {lines.length === 0 && !canDecide && (
-        <div className={`qd-wait${order.status === 'REJECTED' ? ' is-declined' : ''}`}>
-          <div className="qd-wait-icon" aria-hidden>
-            <i className={`ti ${order.status === 'REJECTED' ? 'ti-alert-circle' : 'ti-clock'}`} />
-          </div>
-          <div className="qd-wait-copy">
-            <strong>
-              {order.status === 'WAITING_FOR_QUOTATION' || order.status === 'CREATED'
-                ? 'Your quote is being prepared'
-                : order.status === 'REJECTED'
-                  ? 'This request was declined'
-                  : 'Pricing is not ready yet'}
-            </strong>
-            <p>
-              {order.status === 'WAITING_FOR_QUOTATION' || order.status === 'CREATED'
-                ? 'The team is reviewing your files and details. The price will show here when it is ready.'
-                : order.status === 'REJECTED'
-                  ? 'The team declined this request. Start a chat if you need help with a new one.'
-                  : 'Pricing will show here when the quote is ready.'}
-            </p>
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              disabled={startChat.isPending}
-              onClick={() => startChat.mutate()}
-            >
-              <i className="ti ti-message" /> {startChat.isPending ? 'Opening…' : 'Ask a question'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {(lines.length > 0 || canDecide) && (
-      <div className="card card-pad qd-offer">
+      <div className="card card-pad qd-offer qj-price-card">
+        <h2 className="qj-price-title">Quote pricing</h2>
+        {lines.length === 0 && (
+          <QuotePricingEmpty
+            declined={declinedByStudio || order.status === 'CLIENT_REJECTED_QUOTATION' || order.status === 'CANCELLED'}
+            settled={phase !== 'preparing' && phase !== 'closed'}
+            reason={order.rejectionReason}
+          />
+        )}
         {lines.length > 0 && (
           <>
             {lines.map((l) => {
@@ -443,7 +439,6 @@ export function PortalQuoteDetail() {
           </>
         )}
       </div>
-      )}
 
       <FormPreferencesDisplay
         preferences={order.preferences}

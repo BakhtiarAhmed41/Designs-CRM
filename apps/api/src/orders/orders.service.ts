@@ -735,17 +735,6 @@ export class OrdersService {
     return DeliveredVia.PORTAL;
   }
 
-  private isZipUpload(file: Express.Multer.File) {
-    const name = file.originalname.toLowerCase();
-    const mime = (file.mimetype || '').toLowerCase();
-    return (
-      name.endsWith('.zip') ||
-      mime === 'application/zip' ||
-      mime === 'application/x-zip-compressed' ||
-      mime === 'application/x-zip'
-    );
-  }
-
   private async insertDeliveryFile(input: {
     deliveryId: string;
     designId: string | null;
@@ -757,7 +746,7 @@ export class OrdersService {
       randomUUID(),
       input.deliveryId,
       input.designId,
-      input.isBundle ? 'ZIP' : formatLabelFromName(input.file.originalname),
+      formatLabelFromName(input.file.originalname),
       input.file.originalname,
       input.file.mimetype || null,
       typeof input.file.size === 'number' ? input.file.size : null,
@@ -2957,7 +2946,7 @@ export class OrdersService {
     files: Express.Multer.File[],
     options?: {
       deliveredVia?: DeliveredVia;
-      zip?: Express.Multer.File;
+      zip?: Express.Multer.File | Express.Multer.File[];
       designIds?: string[];
       notifyEmail?: boolean;
       notifySms?: boolean;
@@ -2979,11 +2968,13 @@ export class OrdersService {
         'You cannot publish directly to the customer. Send for approval instead.',
       );
     }
-    const incoming = (files ?? []).filter((f) => !this.isZipUpload(f));
-    if (options?.zip && !this.isZipUpload(options.zip)) {
-      throw new BadRequestException('The all-designs package must be a .zip file');
-    }
-    const zipFile = options?.zip ?? (files ?? []).find((f) => this.isZipUpload(f)) ?? null;
+    const incoming = files ?? [];
+    const bundleFiles = (Array.isArray(options?.zip)
+      ? options.zip
+      : options?.zip
+        ? [options.zip]
+        : []
+    ).filter(Boolean);
 
     const order = await this.getOrderRow(orderId);
     if (!order) throw new NotFoundException('Order not found');
@@ -3007,7 +2998,7 @@ export class OrdersService {
       );
     }
     const existing = await this.getDeliveries(orderId);
-    if (incoming.length > 10) {
+    if (incoming.length > 10 || bundleFiles.length > 10) {
       throw new BadRequestException('Upload at most 10 files at a time');
     }
     if (isPreview && incoming.length === 0) {
@@ -3021,7 +3012,7 @@ export class OrdersService {
         'Preview files must be images (PNG, JPG, or WebP)',
       );
     }
-    const hasPortalFiles = incoming.length > 0 || Boolean(zipFile);
+    const hasPortalFiles = incoming.length > 0 || bundleFiles.length > 0;
     const emailed =
       options?.deliveredVia === DeliveredVia.EMAIL ||
       options?.deliveredVia === DeliveredVia.BOTH;
@@ -3030,8 +3021,8 @@ export class OrdersService {
         'Upload finished files first, or mark the order as delivered by email',
       );
     }
-    if (zipFile && isPreview) {
-      throw new BadRequestException('Zip packages can only be attached to final files');
+    if (bundleFiles.length > 0 && isPreview) {
+      throw new BadRequestException('Package files can only be attached to final files');
     }
 
     const deliveredVia = this.resolveDeliveredVia(options?.deliveredVia, hasPortalFiles);
@@ -3046,7 +3037,7 @@ export class OrdersService {
         isPreview ? DeliveryKind.PREVIEW : DeliveryKind.FINAL,
       );
     }
-    if (zipFile && !isPreview) {
+    if (bundleFiles.length > 0 && !isPreview) {
       await this.clearBundleFiles(orderId);
     }
 
@@ -3124,20 +3115,20 @@ export class OrdersService {
         });
       }
 
-      if (zipFile) {
+      for (const bundle of bundleFiles) {
         const key = this.storage.newObjectKey(
           ['orders', orderId, 'deliveries', String(nextVersion)],
-          zipFile.originalname,
+          bundle.originalname,
         );
         await this.storage.uploadObject({
           key,
-          body: zipFile.buffer,
-          contentType: zipFile.mimetype || 'application/zip',
+          body: bundle.buffer,
+          contentType: bundle.mimetype || 'application/octet-stream',
         });
         await this.insertDeliveryFile({
           deliveryId,
           designId: designIds.length === 1 ? designIds[0] : null,
-          file: zipFile,
+          file: bundle,
           key,
           isBundle: true,
         });
@@ -3175,7 +3166,7 @@ export class OrdersService {
     const alreadyReleased = existing.some(
       (d) => Boolean(d.releasedAt) && d.kind !== DeliveryKind.PREVIEW,
     );
-    const isNewUpload = incoming.length > 0 || Boolean(zipFile);
+    const isNewUpload = incoming.length > 0 || bundleFiles.length > 0;
     const submittedIds = new Set(
       (await this.getDeliveries(orderId)).flatMap((d) =>
         d.files.map((f) => f.designId).filter((x): x is string => !!x),

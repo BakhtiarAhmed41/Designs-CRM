@@ -1,0 +1,334 @@
+import { Link } from 'react-router-dom';
+import type { QuoteJourneyPhase } from '@/lib/quoteJourney';
+import '@/styles/quote-journey.css';
+
+type LivePhase = Exclude<QuoteJourneyPhase, 'closed'>;
+
+const STEPS = [
+  { title: 'Preparing your quote' },
+  { title: 'Review your quote' },
+  { title: 'Pay your invoice' },
+] as const;
+
+function stepIndex(phase: LivePhase) {
+  if (phase === 'preparing') return 0;
+  if (phase === 'review') return 1;
+  if (phase === 'pay') return 2;
+  return 3;
+}
+
+function stepDetail(index: number, phase: LivePhase) {
+  if (index === 0) {
+    return phase === 'preparing' ? 'Reviewing your design details' : 'Design details reviewed';
+  }
+  if (index === 1) {
+    return phase === 'preparing' || phase === 'review'
+      ? 'Check the price and details'
+      : 'Quote confirmed';
+  }
+  if (phase === 'paid') return 'Payment received';
+  if (phase === 'accepted') return 'Added to your account';
+  return 'Payment confirms your order';
+}
+
+function defaultCopy(phase: LivePhase, canChoose: boolean) {
+  if (phase === 'preparing') {
+    return {
+      title: "We're preparing your quote",
+      subtitle: "We'll notify you when it's ready to review.",
+    };
+  }
+  if (phase === 'review') {
+    return {
+      title: 'Your quote is ready',
+      subtitle: canChoose
+        ? "Review the pricing below and choose the items you'd like to proceed with."
+        : 'Review the pricing below.',
+    };
+  }
+  if (phase === 'pay') {
+    return {
+      title: 'Pay your invoice',
+      subtitle: 'Payment confirms your order.',
+    };
+  }
+  if (phase === 'paid') {
+    return {
+      title: 'Payment received',
+      subtitle: "Thank you! Follow your design's progress on the Order page.",
+    };
+  }
+  return {
+    title: 'Your order is confirmed',
+    subtitle: "Follow your design's progress on the Order page.",
+  };
+}
+
+export function QuoteJourney({
+  phase,
+  orderTo,
+  canChoose = true,
+  paying = false,
+  onPay,
+  title,
+  subtitle,
+}: {
+  phase: LivePhase;
+  orderTo?: string;
+  canChoose?: boolean;
+  paying?: boolean;
+  onPay?: () => void;
+  title?: string;
+  subtitle?: string;
+}) {
+  const copy = defaultCopy(phase, canChoose);
+  const current = stepIndex(phase);
+  const finished = phase === 'paid' || phase === 'accepted';
+
+  return (
+    <section className="qj" aria-label="Quote progress">
+      <h2>{title ?? copy.title}</h2>
+      <p className="qj-lead">{subtitle ?? copy.subtitle}</p>
+      <ol className="qj-steps">
+        {STEPS.map((step, index) => {
+          const state = index < current ? 'done' : index === current ? 'current' : 'upcoming';
+          return (
+            <li
+              key={step.title}
+              className={`qj-step is-${state}`}
+              aria-current={state === 'current' ? 'step' : undefined}
+            >
+              <div className="qj-node">
+                {state === 'current' && <span className="qj-flag">Current</span>}
+                <span className="qj-dot">
+                  {state === 'done' ? <i className="ti ti-check" aria-hidden /> : index + 1}
+                </span>
+              </div>
+              <strong className="qj-name">{step.title}</strong>
+              <span className="qj-sub">{stepDetail(index, phase)}</span>
+            </li>
+          );
+        })}
+      </ol>
+      {!finished && (
+        <p className="qj-note">After payment, you'll be taken to your Order page.</p>
+      )}
+      {finished && orderTo && (
+        <div className="qj-actions">
+          <Link className="qj-cta" to={orderTo}>
+            View order
+          </Link>
+        </div>
+      )}
+      {!finished && phase === 'pay' && onPay && (
+        <div className="qj-actions">
+          <button type="button" className="qj-cta" disabled={paying} onClick={onPay}>
+            {paying ? 'Opening checkout…' : 'Pay now'}
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+export function OrderSteps({
+  ready,
+  total,
+  delivered,
+  sizeDelivered,
+  sizeTotal,
+}: {
+  ready: number;
+  total: number;
+  delivered: number;
+  sizeDelivered: number;
+  sizeTotal: number;
+}) {
+  const allReady = total > 0 && ready >= total;
+  const allDelivered = total > 0 && delivered >= total;
+  const lineReady = total > 0 ? Math.round((Math.min(ready, total) / total) * 100) : 0;
+  const copy = allDelivered
+    ? {
+        title: 'Your files are ready',
+        subtitle: 'Download them from Designs & files below.',
+      }
+    : allReady
+      ? {
+          title: 'Your designs are ready',
+          subtitle: "We'll notify you when your files are delivered.",
+        }
+      : {
+          title: "We're working on your designs",
+          subtitle: "We'll notify you when your files are ready.",
+        };
+  const steps = [
+    {
+      title: allReady ? 'Designs ready' : 'Design in progress',
+      detail: allReady ? 'All designs prepared' : 'Creating your files',
+      state: allReady ? 'done' : 'current',
+    },
+    {
+      title: 'Files delivered',
+      detail: allDelivered ? 'Ready to download' : allReady ? 'In progress' : 'Ready to download',
+      state: allDelivered ? 'done' : allReady ? 'current' : 'upcoming',
+    },
+  ] as const;
+  const sizeLabel = sizeTotal === 1 ? 'size' : 'sizes';
+
+  return (
+    <div className="ojs">
+      <h2>{copy.title}</h2>
+      <p className="qj-lead">{copy.subtitle}</p>
+      <ol
+        className="qj-steps cols-2"
+        style={{ ['--line-ready' as string]: `${allReady ? 100 : lineReady}%` }}
+      >
+        {steps.map((step, index) => (
+          <li
+            key={step.title}
+            className={`qj-step is-${step.state}`}
+            aria-current={step.state === 'current' ? 'step' : undefined}
+          >
+            <div className="qj-node">
+              {step.state === 'current' && <span className="qj-flag">Current</span>}
+              <span className="qj-dot">
+                {step.state === 'done' ? <i className="ti ti-check" aria-hidden /> : index + 1}
+              </span>
+            </div>
+            <strong className="qj-name">{step.title}</strong>
+            <span className="qj-sub">{step.detail}</span>
+          </li>
+        ))}
+      </ol>
+      {sizeTotal > 0 && (
+        <p className="ojs-count">
+          {sizeDelivered} of {sizeTotal} {sizeLabel} delivered
+        </p>
+      )}
+    </div>
+  );
+}
+
+export function RevisionSteps({
+  ready,
+  total,
+  published,
+  awaitingPayment = false,
+}: {
+  ready: number;
+  total: number;
+  published: number;
+  awaitingPayment?: boolean;
+}) {
+  const allReady = total > 0 && ready >= total;
+  const allPublished = total > 0 && published >= total;
+  const lineReady = total > 0 ? Math.round((Math.min(ready, total) / total) * 100) : 0;
+  const many = total !== 1;
+  const copy = allPublished
+    ? {
+        title: 'Your revision files are ready',
+        subtitle: 'Download them from Revision requests below.',
+      }
+    : awaitingPayment && !allReady
+      ? {
+          title: many ? 'Your revisions are waiting for payment' : 'Your revision is waiting for payment',
+          subtitle: many ? "We'll start each revision once it's paid." : "We'll start as soon as it's paid.",
+        }
+      : allReady
+        ? {
+            title: many ? 'Your revisions are ready' : 'Your revision is ready',
+            subtitle: "We'll notify you when your files are delivered.",
+          }
+        : {
+            title: many ? "We're working on your revisions" : "We're working on your revision",
+            subtitle: "We'll notify you when your files are ready.",
+          };
+  const steps = [
+    {
+      title: allReady ? (many ? 'Revisions ready' : 'Revision ready') : 'Revision in progress',
+      detail: allReady
+        ? many
+          ? 'All revisions prepared'
+          : 'Revision prepared'
+        : awaitingPayment
+          ? 'Waiting for payment'
+          : 'Updating your files',
+      state: allReady ? 'done' : 'current',
+    },
+    {
+      title: 'Files delivered',
+      detail: allPublished ? 'Ready to download' : allReady ? 'In progress' : 'Ready to download',
+      state: allPublished ? 'done' : allReady ? 'current' : 'upcoming',
+    },
+  ] as const;
+  const noun = many ? 'revisions' : 'revision';
+
+  return (
+    <div className="ojs">
+      <h2>{copy.title}</h2>
+      <p className="qj-lead">{copy.subtitle}</p>
+      <ol
+        className="qj-steps cols-2"
+        style={{ ['--line-ready' as string]: `${allReady ? 100 : lineReady}%` }}
+      >
+        {steps.map((step, index) => (
+          <li
+            key={step.title}
+            className={`qj-step is-${step.state}`}
+            aria-current={step.state === 'current' ? 'step' : undefined}
+          >
+            <div className="qj-node">
+              {step.state === 'current' && <span className="qj-flag">Current</span>}
+              <span className="qj-dot">
+                {step.state === 'done' ? <i className="ti ti-check" aria-hidden /> : index + 1}
+              </span>
+            </div>
+            <strong className="qj-name">{step.title}</strong>
+            <span className="qj-sub">{step.detail}</span>
+          </li>
+        ))}
+      </ol>
+      {total > 0 && (
+        <p className="ojs-count">
+          {published} of {total} {noun} published
+        </p>
+      )}
+    </div>
+  );
+}
+
+export function QuotePricingEmpty({
+  declined = false,
+  settled = false,
+  reason,
+}: {
+  declined?: boolean;
+  settled?: boolean;
+  reason?: string | null;
+}) {
+  if (declined) {
+    return (
+      <div className="qj-empty">
+        <i className="ti ti-alert-circle" aria-hidden />
+        <strong>This request was declined</strong>
+        <p>{reason?.trim() || 'The team declined this request. Start a chat if you need help with a new one.'}</p>
+      </div>
+    );
+  }
+  if (settled) {
+    return (
+      <div className="qj-empty">
+        <i className="ti ti-file-text" aria-hidden />
+        <strong>No priced items on this quote</strong>
+        <p>Open the order to see the final total.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="qj-empty">
+      <i className="ti ti-file-text" aria-hidden />
+      <strong>Pricing is being prepared</strong>
+      <p>Your prices will appear here once we've reviewed your request.</p>
+    </div>
+  );
+}

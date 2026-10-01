@@ -154,7 +154,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
   const [uploadFor, setUploadFor] = useState<DeliveryRow | null>(null);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const suppressPublishClick = useRef(false);
-  const [pendingZip, setPendingZip] = useState<File | null>(null);
+  const [pendingBundles, setPendingBundles] = useState<File[]>([]);
   const [deliveredOnEmail, setDeliveredOnEmail] = useState(false);
   const [filesFor, setFilesFor] = useState<{ row: DeliveryRow; editId: string | null } | null>(null);
   const [uploadEditId, setUploadEditId] = useState<string | null>(null);
@@ -246,17 +246,18 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
     }: {
       row: DeliveryRow;
       files: File[];
-      zip?: File | null;
+      zip?: File[];
       emailed: boolean;
     }) => {
       const targets = uploadRows.length > 0 ? uploadRows : [row];
       const designIds: string[] = [];
       for (const item of targets) designIds.push(await ensureDesign(item));
-      const hasPortal = files.length > 0 || Boolean(zip);
+      const bundles = zip ?? [];
+      const hasPortal = files.length > 0 || bundles.length > 0;
       return deliverOrder(order.id, files, {
         designIds,
         deliveredVia: deliveredViaFromFlags(hasPortal, emailed),
-        zip: zip ?? undefined,
+        zip: bundles,
         notifyEmail: hasPortal,
         release: true,
         kind: 'FINAL',
@@ -268,7 +269,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
       setUploadRows([]);
       setUploadEditId(null);
       setPendingFiles([]);
-      setPendingZip(null);
+      setPendingBundles([]);
       setDeliveredOnEmail(false);
       setError(null);
       refresh();
@@ -531,7 +532,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
     setUploadFor(row);
     setUploadRows(rows);
     setPendingFiles([]);
-    setPendingZip(null);
+    setPendingBundles([]);
     setDeliveredOnEmail(false);
   }
 
@@ -1162,7 +1163,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
             if (publish.isPending) return;
             setUploadFor(null);
             setPendingFiles([]);
-            setPendingZip(null);
+            setPendingBundles([]);
             setDeliveredOnEmail(false);
           }}
         >
@@ -1174,7 +1175,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
                 onClick={() => {
                   setUploadFor(null);
                   setPendingFiles([]);
-                  setPendingZip(null);
+                  setPendingBundles([]);
                   setDeliveredOnEmail(false);
                 }}
                 aria-label="Close"
@@ -1221,26 +1222,36 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
             <div className="ead-he-sub">
               {pendingFiles.length} {pendingFiles.length === 1 ? 'file' : 'files'} attached
             </div>
-            <div className="sod-label">All designs zip (optional)</div>
-            <p>Upload one zip that contains every design in this order.</p>
+            <div className="sod-label">All designs files (optional)</div>
+            <p>Upload files that apply to every design in this order.</p>
             <button type="button" className="sod-drop sod-drop-sm" onClick={() => openFilePicker('sod-zip')}>
-              <i className="ti ti-file-zip" /> {pendingZip ? pendingZip.name : 'Choose zip'}
+              <i className="ti ti-upload" /> Choose files
             </button>
             <input
               id="sod-zip"
               type="file"
-              accept=".zip,application/zip,application/x-zip-compressed"
+              multiple
               hidden
               onChange={(e) => {
-                setPendingZip(e.target.files?.[0] ?? null);
+                const next = [...pendingBundles, ...Array.from(e.target.files ?? [])].slice(0, 10);
+                setPendingBundles(next);
                 e.target.value = '';
               }}
             />
-            {pendingZip && (
-              <button type="button" className="ead-btn sm sod-zip-remove" onClick={() => setPendingZip(null)}>
-                Remove zip
-              </button>
-            )}
+            <div className="sod-flist">
+              {pendingBundles.map((file, index) => (
+                <div key={`${file.name}-${file.size}-${file.lastModified}`} className="sod-file">
+                  <span>{file.name}</span>
+                  <button
+                    type="button"
+                    className="ead-btn sm"
+                    onClick={() => setPendingBundles((prev) => prev.filter((_, i) => i !== index))}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
             <label className="sod-check">
               <input
                 type="checkbox"
@@ -1256,7 +1267,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
                 onClick={() => {
                   setUploadFor(null);
                   setPendingFiles([]);
-                  setPendingZip(null);
+                  setPendingBundles([]);
                   setDeliveredOnEmail(false);
                 }}
               >
@@ -1267,14 +1278,14 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
                 className="ead-btn pri"
                 disabled={
                   publish.isPending ||
-                  (pendingFiles.length === 0 && !pendingZip && !deliveredOnEmail)
+                  (pendingFiles.length === 0 && pendingBundles.length === 0 && !deliveredOnEmail)
                 }
                 onClick={() => {
                   if (suppressPublishClick.current) return;
                   publish.mutate({
                     row: uploadFor,
                     files: pendingFiles,
-                    zip: pendingZip,
+                    zip: pendingBundles,
                     emailed: deliveredOnEmail,
                   });
                 }}
@@ -1324,7 +1335,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
                       <button
                         type="button"
                         className="sod-eye"
-                        title={file.isBundle ? 'Download zip' : 'Download'}
+                        title="Download"
                         aria-label={`Download ${file.originalName}`}
                         onClick={() => void downloadSignedFile(adminDeliveryFileUrl(order.id, file.id), file.originalName)}
                       >

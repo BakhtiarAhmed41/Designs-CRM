@@ -51,7 +51,23 @@ export function filesSectionPath(link: string | null) {
   return orderId ? `/portal/files?order=${orderId}` : '/portal/files';
 }
 
+export const ACCOUNT_APPROVED_TITLE = 'Account approved';
+export const ACCOUNT_WELCOME_BODY =
+  'Welcome to Las Vegas Designs! Your account is ready. Complete your profile, personalize your portal colors, or submit your first quote request.';
+
+export function isAccountApprovedNotice(title: string, link?: string | null) {
+  const t = title.toLowerCase();
+  const href = (link ?? '').toLowerCase();
+  return t === 'account approved' || href === '/login';
+}
+
+export function displayActivityBody(title: string, body: string | null, link?: string | null) {
+  if (isAccountApprovedNotice(title, link)) return ACCOUNT_WELCOME_BODY;
+  return body;
+}
+
 export function portalActivityAction(title: string, link: string | null) {
+  if (isAccountApprovedNotice(title, link)) return null;
   const t = title.toLowerCase();
   if (t.includes('quote')) return { label: 'Review quote', to: link || '/portal/quotes' };
   if (t.includes('deliver') || t.includes('file')) {
