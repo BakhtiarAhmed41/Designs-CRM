@@ -789,13 +789,14 @@
 .ecd-sheet { overflow: hidden; margin-top: 0; }
 .ecd-summary-title {
   margin: 0;
-  padding: 16px 30px 14px;
+  padding: 12px 20px 10px;
   border-bottom: 1px solid #e4e6ea;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: var(--ink);
 }
+.ecd-summary .ecd-sec { padding: 2px 20px; }
 .ecd-summary .ecd-sec + .ecd-sec { border-top-color: #e4e6ea; }
 .ecd-summary .ecd-sec-h.is-toggle {
   display: grid;
@@ -805,8 +806,11 @@
     "desc action";
   align-items: center;
   column-gap: 16px;
-  row-gap: 2px;
+  row-gap: 1px;
+  margin: 0;
+  padding: 8px 0;
 }
+.ecd-summary .ecd-sec-h.is-toggle.open { margin-bottom: 6px; }
 .ecd-summary .ecd-sec-h h2 { grid-area: title; font-size: 15px; }
 .ecd-summary .ecd-sec-desc {
   grid-area: desc;
