@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { listAdminEdits, updateAdminEdit, type EditRequest, type EditStatus } from '@/lib/edits';
 import { listTeam } from '@/lib/team';
 import { getErrorMessage } from '@/lib/api';
@@ -157,6 +157,7 @@ function EditRow({
   designers: Array<{ id: string; email: string; firstName: string | null }>;
 }) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const section = sectionFor(e);
 
   const invalidate = () => {
@@ -179,11 +180,13 @@ function EditRow({
       ? ` · ${e.designer.firstName ?? e.designer.initials}`
       : '';
 
+  const priceLabel = e.kind === 'PAID' && e.priceCents ? money(e.priceCents) : 'Free';
+  const stopRow = (ev: { stopPropagation: () => void }) => ev.stopPropagation();
+
   return (
-    <Link
-      to={`/admin/orders/${orderSlug(e.orderRef, e.orderId)}`}
-      className="orow"
-      style={{ textDecoration: 'none', color: 'inherit' }}
+    <div
+      className="orow edit-row"
+      onClick={() => navigate(`/admin/orders/${orderSlug(e.orderRef, e.orderId)}`)}
     >
       <div className={`othumb ${e.kind === 'PAID' ? 'm' : ''}`}>
         <i className="ti ti-refresh" />
@@ -210,65 +213,53 @@ function EditRow({
           <div style={{ marginTop: 6, fontSize: 12, color: 'var(--muted)' }}>No note was added.</div>
         )}
       </div>
-      <span
-        className={`chip ${
-          section === 'done' ? 'c-done' : section === 'progress' ? 'c-prog' : 'c-review'
-        }`}
-      >
-        {section === 'done' ? 'Done' : section === 'progress' ? 'In progress' : 'Revision requested'}
-      </span>
-      {section !== 'done' && (
-        <div
-          style={{ display: 'flex', gap: 6, alignItems: 'center' }}
-          onClick={(ev) => ev.preventDefault()}
+      <div className="edit-row-side">
+        <div className={`oprice${priceLabel === 'Free' ? ' is-free' : ''}`}>{priceLabel}</div>
+        <span
+          className={`chip ${
+            section === 'done' ? 'c-done' : section === 'progress' ? 'c-prog' : 'c-review'
+          }`}
         >
-          <select
-            className="stat-select"
-            style={{ fontSize: 11, padding: '4px 8px', minWidth: 110 }}
-            value={e.assignedDesignerId ?? ''}
-            disabled={assign.isPending}
-            onClick={(ev) => ev.stopPropagation()}
-            onChange={(ev) => {
-              ev.stopPropagation();
-              assign.mutate(ev.target.value || null);
-            }}
-          >
-            <option value="">Assign…</option>
-            {designers.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.firstName ?? d.email}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            className="btn btn-ghost btn-sm"
-            disabled={markDone.isPending}
-            onClick={(ev) => {
-              ev.preventDefault();
-              ev.stopPropagation();
-              markDone.mutate();
-            }}
-          >
-            <i className="ti ti-check" /> Done
-          </button>
-        </div>
-      )}
-      {(markDone.isError || assign.isError) && (
-        <span style={{ fontSize: 11, color: 'var(--maroon)' }}>
-          {getErrorMessage(markDone.error ?? assign.error)}
+          {section === 'done' ? 'Done' : section === 'progress' ? 'In progress' : 'Revision requested'}
         </span>
-      )}
-      <div
-        className="oprice"
-        style={{
-          fontSize: e.kind === 'FREE' && section !== 'done' ? 11 : undefined,
-          color: e.kind === 'FREE' && section !== 'done' ? 'var(--faint)' : undefined,
-          fontWeight: e.kind === 'FREE' && section !== 'done' ? 500 : undefined,
-        }}
-      >
-        {e.kind === 'PAID' && e.priceCents ? money(e.priceCents) : 'Free'}
+        {section !== 'done' && (
+          <>
+            <select
+              className="stat-select edit-assign"
+              value={e.assignedDesignerId ?? ''}
+              disabled={assign.isPending}
+              onMouseDown={stopRow}
+              onClick={stopRow}
+              onChange={(ev) => {
+                ev.stopPropagation();
+                assign.mutate(ev.target.value || null);
+              }}
+            >
+              <option value="">Assign…</option>
+              {designers.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.firstName ?? d.email}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              disabled={markDone.isPending}
+              onMouseDown={stopRow}
+              onClick={(ev) => {
+                ev.stopPropagation();
+                markDone.mutate();
+              }}
+            >
+              <i className="ti ti-check" /> Done
+            </button>
+          </>
+        )}
       </div>
-    </Link>
+      {(markDone.isError || assign.isError) && (
+        <span className="edit-row-error">{getErrorMessage(markDone.error ?? assign.error)}</span>
+      )}
+    </div>
   );
 }

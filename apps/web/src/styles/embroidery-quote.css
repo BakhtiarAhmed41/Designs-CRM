@@ -942,6 +942,9 @@
   border-radius: 10px;
   padding: 12px 16px;
 }
+.ecd-summary .ecd-spec {
+  margin-inline: -18px;
+}
 .ecd-spec .ecd-table {
   width: 100%;
   border-collapse: collapse;

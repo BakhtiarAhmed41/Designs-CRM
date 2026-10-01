@@ -4495,3 +4495,52 @@ form.card-pad > .btn {
 .btn-danger-solid i::before {
   color: #fff !important;
 }
+
+.edit-row {
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+}
+.edit-row-side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.edit-row-side .oprice {
+  display: block;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-align: right;
+}
+.edit-row-side .oprice.is-free {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--faint);
+}
+.edit-row-side .edit-assign,
+.edit-row-side .btn {
+  box-sizing: border-box;
+  height: 32px;
+  min-height: 32px;
+  width: auto;
+  margin: 0;
+  padding: 0 12px;
+  font-size: 12.5px;
+  line-height: 1;
+  border-radius: 8px;
+  box-shadow: none;
+}
+.edit-row-side .edit-assign {
+  min-width: 108px;
+  padding-right: 28px;
+  background-position: right 8px center;
+  background-size: 14px;
+  font-weight: 500;
+}
+.edit-row-error {
+  grid-column: 2 / -1;
+  font-size: 11px;
+  color: var(--maroon);
+}
