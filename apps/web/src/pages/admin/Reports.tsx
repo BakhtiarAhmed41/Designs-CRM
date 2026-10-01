@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { BarChart } from '@/components/BarChart';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { SelectMenu } from '@/components/ui/SelectMenu';
 import { getErrorMessage } from '@/lib/api';
 import { money, statusLabel, orderNumber, orderSlug } from '@/lib/format';
 import {
@@ -275,18 +276,16 @@ export function AdminReports() {
         <div style={{ padding: 16 }}>
           <div className="ff" style={{ maxWidth: 420, marginBottom: needsRange ? 14 : 0 }}>
             <label htmlFor="report-type">Report</label>
-            <select
+            <SelectMenu
               id="report-type"
+              ariaLabel="Report"
               value={kind}
-              onChange={(e) => onPickReport(e.target.value)}
-            >
-              <option value="">Select a report…</option>
-              {REPORT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
+              onChange={onPickReport}
+              options={[
+                { value: '', label: 'Select a report…' },
+                ...REPORT_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label })),
+              ]}
+            />
           </div>
           {selected && (
             <p className="muted" style={{ margin: '0 0 4px', fontSize: 13 }}>

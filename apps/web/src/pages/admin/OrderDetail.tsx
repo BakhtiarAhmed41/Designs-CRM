@@ -33,6 +33,7 @@ import {
 import { HelpRequestBadge } from '@/components/messaging/InboxTools';
 import { createInvoice, createPayLink, listInvoices, payInvoice, refundOrder, type RefundTo } from '@/lib/billing';
 import { assignOrder, listTeam, skipAssignOrder, unassignOrder } from '@/lib/team';
+import { SelectMenu } from '@/components/ui/SelectMenu';
 import {
   designStatusChipClass,
   designStatusLabel,
@@ -1645,19 +1646,18 @@ export function AdminOrderDetail() {
               )}
               {canAssignDesigner ? (
                 <>
-              <select
-                className="stat-select"
-                style={{ width: '100%', marginBottom: 9 }}
+              <SelectMenu
+                style={{ marginBottom: 9 }}
                 value={designerId}
-                onChange={(e) => setDesignerId(e.target.value)}
-              >
-                <option value="">Unassigned</option>
-                {designers.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.firstName ?? d.email} ({d.skills.join(', ') || 'Designer'})
-                  </option>
-                ))}
-              </select>
+                onChange={setDesignerId}
+                options={[
+                  { value: '', label: 'Unassigned' },
+                  ...designers.map((d) => ({
+                    value: d.id,
+                    label: `${d.firstName ?? d.email} (${d.skills.join(', ') || 'Designer'})`,
+                  })),
+                ]}
+              />
               <button
                 type="button"
                 className="btn btn-primary btn-sm"
@@ -2240,19 +2240,18 @@ function RevisionModal({
                 Assign to designer
               </label>
               {assignDesigner && (
-                <select
-                  className="stat-select"
-                  style={{ width: '100%', marginBottom: 12 }}
+                <SelectMenu
+                  style={{ marginBottom: 12 }}
                   value={designerId}
-                  onChange={(e) => setDesignerId(e.target.value)}
-                >
-                  <option value="">Choose designer</option>
-                  {designers.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.firstName ?? d.email}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setDesignerId}
+                  options={[
+                    { value: '', label: 'Choose designer' },
+                    ...designers.map((d) => ({
+                      value: d.id,
+                      label: d.firstName ?? d.email,
+                    })),
+                  ]}
+                />
               )}
             </>
           )}
@@ -2318,10 +2317,14 @@ function RefundModal({
           </div>
           <div className="ff">
             <label>Refund to</label>
-            <select value={to} onChange={(e) => setTo(e.target.value as RefundTo)}>
-              <option value="CARD">Card</option>
-              <option value="STORE_CREDIT">Store credit</option>
-            </select>
+            <SelectMenu
+              value={to}
+              onChange={(value) => setTo(value as RefundTo)}
+              options={[
+                { value: 'CARD', label: 'Card' },
+                { value: 'STORE_CREDIT', label: 'Store credit' },
+              ]}
+            />
           </div>
           <div className="ff">
             <label>Reason</label>

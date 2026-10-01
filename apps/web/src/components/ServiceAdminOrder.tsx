@@ -5,6 +5,7 @@ import { EmbroideryFileCard } from '@/components/EmbroideryFileCard';
 import { ImageLightbox } from '@/components/FilePreview';
 import { useTopbarLead } from '@/components/Shell';
 import { useDialog } from '@/components/ui/AppDialog';
+import { SelectMenu } from '@/components/ui/SelectMenu';
 import { ErrorBanner } from '@/components/ui/EmptyState';
 import { apiFetch, downloadSignedFile, getErrorMessage, resolveFileUrl } from '@/lib/api';
 import { refundOrder } from '@/lib/billing';
@@ -1040,14 +1041,19 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
           <section className="ead-card">
             <div className="ead-card-h"><h2>Designer</h2></div>
             <div className="ead-b">
-              <select className="ead-select" value={designerId} onChange={(e) => setDesignerId(e.target.value)}>
-                <option value="">Unassigned</option>
-                {designerOptions.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {personName(member)}
-                  </option>
-                ))}
-              </select>
+              <SelectMenu
+                size="ead"
+                ariaLabel="Assign designer"
+                value={designerId}
+                onChange={setDesignerId}
+                options={[
+                  { value: '', label: 'Unassigned' },
+                  ...designerOptions.map((member) => ({
+                    value: member.id,
+                    label: personName(member),
+                  })),
+                ]}
+              />
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 <button
                   type="button"
@@ -1386,23 +1392,22 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
                   {allRows.length > 0 && (
                     <>
                       <label htmlFor={`cr-size-${line.key}`}>Design & size</label>
-                      <select
+                      <SelectMenu
                         id={`cr-size-${line.key}`}
+                        size="ead"
                         value={line.rowKey}
-                        onChange={(e) =>
+                        onChange={(value) =>
                           setRevisionDrafts((prev) =>
-                            prev.map((item) => (item.key === line.key ? { ...item, rowKey: e.target.value } : item)),
+                            prev.map((item) => (item.key === line.key ? { ...item, rowKey: value } : item)),
                           )
                         }
-                      >
-                        {groups.flatMap((group) =>
-                          group.rows.map((row) => (
-                            <option key={row.key} value={row.key}>
-                              {group.title} · {row.name}
-                            </option>
-                          )),
+                        options={groups.flatMap((group) =>
+                          group.rows.map((row) => ({
+                            value: row.key,
+                            label: `${group.title} · ${row.name}`,
+                          })),
                         )}
-                      </select>
+                      />
                     </>
                   )}
                   <label htmlFor={`cr-note-${line.key}`}>Description</label>
@@ -1480,18 +1485,19 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
                 </b>
               </div>
               <label htmlFor="cr-designer">Assign to designer</label>
-              <select
+              <SelectMenu
                 id="cr-designer"
+                size="ead"
                 value={revisionDesignerId}
-                onChange={(e) => setRevisionDesignerId(e.target.value)}
-              >
-                <option value="">Unassigned</option>
-                {designerOptions.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {personName(member)}
-                  </option>
-                ))}
-              </select>
+                onChange={setRevisionDesignerId}
+                options={[
+                  { value: '', label: 'Unassigned' },
+                  ...designerOptions.map((member) => ({
+                    value: member.id,
+                    label: personName(member),
+                  })),
+                ]}
+              />
               <button
                 type="button"
                 className="cr-go"
@@ -1535,10 +1541,16 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
             <div className="sod-label">Amount</div>
             <input className="ead-field" value={refundAmount} onChange={(e) => setRefundAmount(e.target.value)} />
             <div className="sod-label">Refund to</div>
-            <select className="ead-select" value={refundTo} onChange={(e) => setRefundTo(e.target.value as RefundTo)}>
-              <option value="STORE_CREDIT">Store credit</option>
-              <option value="CARD">Original payment method</option>
-            </select>
+            <SelectMenu
+              size="ead"
+              ariaLabel="Refund to"
+              value={refundTo}
+              onChange={(value) => setRefundTo(value as RefundTo)}
+              options={[
+                { value: 'STORE_CREDIT', label: 'Store credit' },
+                { value: 'CARD', label: 'Original payment method' },
+              ]}
+            />
             <div className="sod-label">Reason</div>
             <input
               className="ead-field"

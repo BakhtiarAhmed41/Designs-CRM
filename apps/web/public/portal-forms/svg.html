@@ -164,6 +164,18 @@ body{font-family:system-ui,sans-serif;background:#fff;padding:4px 2px 8px;font-s
 /* Remake: stronger section grouping so Detailed reads in chunks, not a wall */
 #mode-d .sl{font-size:11px;font-weight:700;color:#222222;letter-spacing:.05em;margin:8px 0 4px;padding-top:0;border-top:none;}
 #mode-d .sl:first-of-type{border-top:none;padding-top:0;margin-top:6px;}
+.csel{position:relative;width:100%}
+.csel-native{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px}
+.csel-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;height:40px;border:1px solid rgba(34,34,34,.12);border-radius:10px;padding:0 12px;font-size:13px;color:#222;background:#fff;cursor:pointer;text-align:left;box-shadow:0 1px 2px rgba(16,24,40,.03)}
+.csel-trigger:hover{border-color:rgba(34,34,34,.22)}
+.csel.is-open .csel-trigger{border-color:#222;box-shadow:0 0 0 3px rgba(34,34,34,.12)}
+.csel-trigger svg{width:15px;height:15px;stroke:#6B7280;flex-shrink:0;transition:transform .12s ease}
+.csel.is-open .csel-trigger svg{transform:rotate(180deg)}
+.csel-menu{position:absolute;left:0;right:0;top:calc(100% + 4px);background:#fff;border:1px solid rgba(34,34,34,.12);border-radius:10px;box-shadow:0 12px 32px rgba(14,30,45,.14);padding:4px;z-index:40;display:none;max-height:240px;overflow:auto}
+.csel.is-open .csel-menu{display:block}
+.csel-option{padding:8px 10px;font-size:13px;color:#222;border-radius:8px;cursor:pointer}
+.csel-option:hover{background:#f4f7fa}
+.csel-option.is-selected{background:#f6f7f9;font-weight:600}
 </style>
 <link rel="stylesheet" href="theme.css">
 <link rel="stylesheet" href="new-quote.css">
@@ -523,6 +535,7 @@ function addRow(){
   d.className='drow';d.id=id;
   d.innerHTML='<div class="drow-head"><span class="drow-num"><i class="ti ti-file" style="font-size:13px;"></i> Design '+rowCnt+'</span><button class="drow-del" onclick="document.getElementById(\''+id+'\').remove()"><i class="ti ti-trash" style="font-size:13px;"></i> Remove</button></div><div style="display:grid;grid-template-columns:80px 1fr 1fr 1fr;gap:8px;align-items:start;"><div class="ff"><label>File</label><div class="mini-up"><div class="mini-trg" onclick="this.nextElementSibling.nextElementSibling.click()"><i class="ti ti-upload" style="font-size:13px;"></i> Upload</div><div class="mini-fl" id="'+mflid+'"></div><input type="file" multiple style="display:none" onchange="handleMini(\''+mflid+'\',this)"></div></div><div class="ff"><label>Design name</label><input type="text" placeholder="e.g. Back design"></div><div class="ff"><label>SVG type</label><select><option>One color SVG</option><option>Full color SVG</option><option>Line art</option><option>Cricut / Silhouette cut file</option><option>Not sure</option></select></div><div class="ff"><label>Colors</label><select><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6+</option><option>Not sure</option></select></div></div><div class="ff" style="margin-top:8px;"><label>Notes for this design</label><input type="text" placeholder="Any specific instructions..."></div>';
   wrap.appendChild(d);
+  enhanceSelectsIn(d);
 }
 function handleMini(lid,inp){
   var list=document.getElementById(lid);
@@ -665,7 +678,61 @@ function handleFiles(lid,inp){
   });
 }
 
+function enhanceSelect(select){
+  if(select.dataset.enhanced) return;
+  select.dataset.enhanced = '1';
+  const wrap = document.createElement('div');
+  wrap.className = 'csel';
+  select.parentNode.insertBefore(wrap, select);
+  wrap.appendChild(select);
+  select.classList.add('csel-native');
+  select.tabIndex = -1;
+  const trigger = document.createElement('button');
+  trigger.type = 'button';
+  trigger.className = 'csel-trigger';
+  trigger.innerHTML = '<span class="csel-value"></span><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+  wrap.appendChild(trigger);
+  const menu = document.createElement('div');
+  menu.className = 'csel-menu';
+  wrap.appendChild(menu);
+  function buildMenu(){
+    menu.innerHTML = '';
+    Array.from(select.options).forEach(function(opt){
+      const row = document.createElement('div');
+      row.className = 'csel-option' + (opt.value === select.value ? ' is-selected' : '');
+      row.textContent = opt.textContent;
+      row.addEventListener('click', function(e){
+        e.stopPropagation();
+        select.value = opt.value;
+        select.dispatchEvent(new Event('change', {bubbles:true}));
+        syncTrigger();
+        wrap.classList.remove('is-open');
+      });
+      menu.appendChild(row);
+    });
+  }
+  function syncTrigger(){
+    const opt = select.options[select.selectedIndex];
+    trigger.querySelector('.csel-value').textContent = opt ? opt.textContent : '';
+  }
+  buildMenu();
+  syncTrigger();
+  trigger.addEventListener('click', function(e){
+    e.stopPropagation();
+    const willOpen = !wrap.classList.contains('is-open');
+    document.querySelectorAll('.csel.is-open').forEach(function(o){ o.classList.remove('is-open'); });
+    if(willOpen){ buildMenu(); wrap.classList.add('is-open'); }
+  });
+}
+function enhanceSelectsIn(root){
+  root.querySelectorAll('select').forEach(enhanceSelect);
+}
+document.addEventListener('click', function(){
+  document.querySelectorAll('.csel.is-open').forEach(function(o){ o.classList.remove('is-open'); });
+});
+
 renderStyles('1color');
+enhanceSelectsIn(document);
 </script>
 <link rel="stylesheet" href="theme.css">
 <script src="theme.js"></script>

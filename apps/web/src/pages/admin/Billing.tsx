@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { SelectMenu } from '@/components/ui/SelectMenu';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   adjustStoreCredit,
@@ -519,29 +520,28 @@ export function AdminBilling() {
                   value={createCustomerSearch}
                   onChange={(e) => setCreateCustomerSearch(e.target.value)}
                 />
-                <select
-                  value={createCustomerId}
-                  onChange={(e) => setCreateCustomerId(e.target.value)}
+                <SelectMenu
                   style={{ marginTop: 8 }}
-                >
-                  <option value="">Select customer…</option>
-                  {(customersQ.data?.customers ?? [])
-                    .filter((c) => {
-                      const term = createCustomerSearch.trim().toLowerCase();
-                      if (!term) return true;
-                      return (
-                        c.name.toLowerCase().includes(term) ||
-                        (c.email ?? '').toLowerCase().includes(term)
-                      );
-                    })
-                    .slice(0, 80)
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                        {c.email ? ` · ${c.email}` : ''}
-                      </option>
-                    ))}
-                </select>
+                  value={createCustomerId}
+                  onChange={setCreateCustomerId}
+                  options={[
+                    { value: '', label: 'Select customer…' },
+                    ...(customersQ.data?.customers ?? [])
+                      .filter((c) => {
+                        const term = createCustomerSearch.trim().toLowerCase();
+                        if (!term) return true;
+                        return (
+                          c.name.toLowerCase().includes(term) ||
+                          (c.email ?? '').toLowerCase().includes(term)
+                        );
+                      })
+                      .slice(0, 80)
+                      .map((c) => ({
+                        value: c.id,
+                        label: `${c.name}${c.email ? ` · ${c.email}` : ''}`,
+                      })),
+                  ]}
+                />
               </div>
               <div className="ff">
                 <label>Amount (USD)</label>
@@ -651,10 +651,14 @@ function RecordPaymentModal({
           </div>
           <div className="ff">
             <label>Method</label>
-            <select value={method} onChange={(e) => setMethod(e.target.value as PayMethod)}>
-              <option value="CARD">Card / bank</option>
-              <option value="STORE_CREDIT">Store credit</option>
-            </select>
+            <SelectMenu
+              value={method}
+              onChange={(value) => setMethod(value as PayMethod)}
+              options={[
+                { value: 'CARD', label: 'Card / bank' },
+                { value: 'STORE_CREDIT', label: 'Store credit' },
+              ]}
+            />
           </div>
           <button
             type="button"
@@ -741,10 +745,14 @@ function RefundModal({
           </div>
           <div className="ff">
             <label>Refund to</label>
-            <select value={to} onChange={(e) => setTo(e.target.value as RefundTo)}>
-              <option value="CARD">Card</option>
-              <option value="STORE_CREDIT">Store credit</option>
-            </select>
+            <SelectMenu
+              value={to}
+              onChange={(value) => setTo(value as RefundTo)}
+              options={[
+                { value: 'CARD', label: 'Card' },
+                { value: 'STORE_CREDIT', label: 'Store credit' },
+              ]}
+            />
           </div>
           <button
             type="button"

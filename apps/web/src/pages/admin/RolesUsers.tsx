@@ -18,6 +18,7 @@ import {
 } from '@/lib/roles';
 import type { UserRole } from '@/lib/types';
 import { useDialog } from '@/components/ui/AppDialog';
+import { SelectMenu } from '@/components/ui/SelectMenu';
 import { defaultFeaturesForRole } from '@/lib/permissions';
 
 type Tab = 'roles' | 'users';
@@ -368,14 +369,15 @@ function RoleFormModal({
           </div>
           <div className="ff">
             <label>Base system role</label>
-            <select
+            <SelectMenu
               value={baseRole}
-              onChange={(e) => setBaseRole(e.target.value as BaseRole)}
-            >
-              <option value="ADMIN">Admin</option>
-              <option value="SUPPORT">Support</option>
-              <option value="DESIGNER">Designer</option>
-            </select>
+              onChange={(value) => setBaseRole(value as BaseRole)}
+              options={[
+                { value: 'ADMIN', label: 'Admin' },
+                { value: 'SUPPORT', label: 'Support' },
+                { value: 'DESIGNER', label: 'Designer' },
+              ]}
+            />
             <div style={{ fontSize: 11, color: 'var(--faint)', marginTop: 4 }}>
               Used for system-level access (e.g. designer workload). Feature checkboxes control
               which admin screens this role can open.
@@ -710,17 +712,14 @@ function UserFormModal({
           {user?.role !== 'SUPER_ADMIN' && (
           <div className="ff">
             <label>Assign custom role</label>
-            <select
+            <SelectMenu
               value={form.customRoleId}
-              onChange={(e) => setForm({ ...form, customRoleId: e.target.value })}
-            >
-              <option value="">None (use system role)</option>
-              {roles.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => setForm({ ...form, customRoleId: value })}
+              options={[
+                { value: '', label: 'None (use system role)' },
+                ...roles.map((r) => ({ value: r.id, label: r.name })),
+              ]}
+            />
           </div>
           )}
           {!form.customRoleId && (
@@ -734,35 +733,37 @@ function UserFormModal({
                   </div>
                 </>
               ) : (
-                <select
+                <SelectMenu
                   value={form.systemRole === 'SUPER_ADMIN' ? 'ADMIN' : form.systemRole}
-                  onChange={(e) =>
-                    setForm({ ...form, systemRole: e.target.value as SystemStaffRole })
+                  onChange={(value) =>
+                    setForm({ ...form, systemRole: value as SystemStaffRole })
                   }
-                >
-                  <option value="SUPPORT">Support</option>
-                  <option value="DESIGNER">Designer</option>
-                  <option value="ADMIN">Admin</option>
-                </select>
+                  options={[
+                    { value: 'SUPPORT', label: 'Support' },
+                    { value: 'DESIGNER', label: 'Designer' },
+                    { value: 'ADMIN', label: 'Admin' },
+                  ]}
+                />
               )}
             </div>
           )}
           <div style={{ fontSize: 11, color: 'var(--faint)', marginBottom: 10 }}>{roleHint}</div>
           <div className="ff">
             <label>Can login / active status</label>
-            <select
+            <SelectMenu
               value={form.loginStatus}
-              onChange={(e) =>
+              onChange={(value) =>
                 setForm({
                   ...form,
-                  loginStatus: e.target.value as 'ACTIVE' | 'DISABLED' | 'PENDING',
+                  loginStatus: value as 'ACTIVE' | 'DISABLED' | 'PENDING',
                 })
               }
-            >
-              <option value="ACTIVE">Active (can login)</option>
-              <option value="DISABLED">Disabled (cannot login)</option>
-              {editing && <option value="PENDING">Pending</option>}
-            </select>
+              options={[
+                { value: 'ACTIVE', label: 'Active (can login)' },
+                { value: 'DISABLED', label: 'Disabled (cannot login)' },
+                ...(editing ? [{ value: 'PENDING', label: 'Pending' }] : []),
+              ]}
+            />
           </div>
           <button
             type="button"

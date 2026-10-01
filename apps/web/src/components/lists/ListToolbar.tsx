@@ -1,3 +1,5 @@
+import { SelectMenu } from '@/components/ui/SelectMenu';
+
 type Props = {
   search: string;
   onSearch: (v: string) => void;
@@ -37,17 +39,13 @@ export function ListToolbar({
         />
       </div>
       {statusOptions && onStatus && (
-        <select
+        <SelectMenu
+          size="compact"
+          ariaLabel="Filter by status"
           value={status ?? ''}
-          onChange={(e) => onStatus(e.target.value)}
-          aria-label="Filter by status"
-        >
-          {statusOptions.map((o) => (
-            <option key={o.value || 'all'} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+          onChange={onStatus}
+          options={statusOptions}
+        />
       )}
       {onDateFrom && onDateTo && (
         <>

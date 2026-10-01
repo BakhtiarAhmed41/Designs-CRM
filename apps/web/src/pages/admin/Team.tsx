@@ -13,6 +13,7 @@ import { getErrorMessage } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import type { UserRole } from '@/lib/types';
 import { PaginationBar } from '@/components/lists/ListToolbar';
+import { SelectMenu } from '@/components/ui/SelectMenu';
 
 type TeamFilter = '' | UserRole | 'online';
 
@@ -334,19 +335,14 @@ function TeamRow({
       </td>
       <td>
         {isMe ? (
-          <select
+          <SelectMenu
+            size="compact"
+            ariaLabel="Presence"
             value={m.presence}
             disabled={presenceMut.isPending}
-            onChange={(e) => presenceMut.mutate(e.target.value as Presence)}
-            className="stat-select"
-            style={{ fontSize: 12 }}
-          >
-            {PRESENCE_OPTIONS.map((p) => (
-              <option key={p} value={p}>
-                {presenceLabel(p)}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => presenceMut.mutate(value as Presence)}
+            options={PRESENCE_OPTIONS.map((p) => ({ value: p, label: presenceLabel(p) }))}
+          />
         ) : (
           <span className={presenceClass(m.presence)}>{presenceLabel(m.presence)}</span>
         )}
@@ -456,16 +452,11 @@ function NewMemberModal({ onClose }: { onClose: () => void }) {
           </div>
           <div className="ff">
             <label>Role</label>
-            <select
+            <SelectMenu
               value={form.role}
-              onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}
-            >
-              {STAFF_ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {roleLabel(r)}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => setForm({ ...form, role: value as UserRole })}
+              options={STAFF_ROLES.map((r) => ({ value: r, label: roleLabel(r) }))}
+            />
           </div>
           <div className="ff">
             <label>Skills (comma separated)</label>
@@ -543,13 +534,11 @@ function EditMemberModal({ member, onClose }: { member: TeamMember; onClose: () 
           </div>
           <div className="ff">
             <label>Role</label>
-            <select value={role} onChange={(e) => setRole(e.target.value as UserRole)}>
-              {STAFF_ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {roleLabel(r)}
-                </option>
-              ))}
-            </select>
+            <SelectMenu
+              value={role}
+              onChange={(value) => setRole(value as UserRole)}
+              options={STAFF_ROLES.map((r) => ({ value: r, label: roleLabel(r) }))}
+            />
           </div>
           <div className="ff">
             <label>Skills (comma separated)</label>

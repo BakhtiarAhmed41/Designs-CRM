@@ -18,6 +18,7 @@ import { SkeletonRows } from '@/components/ui/Skeleton';
 import { invalidateWorkCaches } from '@/lib/queryCache';
 import { freshOnOpen } from '@/lib/queryRefresh';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { SelectMenu } from '@/components/ui/SelectMenu';
 import { openLinkedChat } from '@/lib/messaging';
 
 type OrderFilter = 'all' | 'in_progress' | 'revision' | 'delivered';
@@ -431,20 +432,16 @@ export function PortalOrders() {
           setPage(1);
         }}
       >
-        <select
+        <SelectMenu
+          size="compact"
+          ariaLabel="Period"
           value={month}
-          onChange={(e) => {
-            setMonth(e.target.value);
+          onChange={(value) => {
+            setMonth(value);
             setPage(1);
           }}
-          aria-label="Period"
-        >
-          {months.map((m) => (
-            <option key={m} value={m}>
-              {monthLabel(m)}
-            </option>
-          ))}
-        </select>
+          options={months.map((m) => ({ value: m, label: monthLabel(m) }))}
+        />
       </ListToolbar>
 
       <div className="period-sum">

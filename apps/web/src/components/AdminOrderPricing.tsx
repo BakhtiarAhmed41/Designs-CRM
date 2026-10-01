@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDialog } from '@/components/ui/AppDialog';
+import { SelectMenu } from '@/components/ui/SelectMenu';
 import { getErrorMessage } from '@/lib/api';
 import { setOrderPricing } from '@/lib/designs';
 import {
@@ -165,23 +166,20 @@ export function AdminOrderPricing({ order }: { order: Order }) {
                 Remove
               </button>
             </div>
-            <select
-              className="ead-select"
-              aria-label="Select Design"
+            <SelectMenu
+              size="ead"
+              ariaLabel="Select Design"
               value={block.designKey}
-              onChange={(e) =>
+              onChange={(value) =>
                 setBlocks((prev) =>
-                  prev.map((b) => (b.key === block.key ? { ...b, designKey: e.target.value } : b)),
+                  prev.map((b) => (b.key === block.key ? { ...b, designKey: value } : b)),
                 )
               }
-            >
-              <option value="">Select Design</option>
-              {options.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: '', label: 'Select Design' },
+                ...options.map((option) => ({ value: option, label: option })),
+              ]}
+            />
             {block.rows.map((row) => (
               <div key={row.key} className="ead-art">
                 <div className="ead-ql-top">

@@ -12,6 +12,7 @@ import {
   setOrderInfoNeeded,
 } from '@/lib/orders';
 import { AdminCounterDecision } from '@/components/AdminCounterDecision';
+import { SelectMenu } from '@/components/ui/SelectMenu';
 import { QuoteHistory } from '@/components/QuoteHistory';
 import {
   createAdminConversation,
@@ -677,10 +678,12 @@ export function AdminQuoteDetail() {
                         }}
                       />
                     </div>
-                    <select
+                    <SelectMenu
+                      size="ead"
+                      style={{ marginTop: 6 }}
                       value={line.attachmentId ?? ''}
-                      onChange={(e) => {
-                        const attachmentId = e.target.value || null;
+                      onChange={(value) => {
+                        const attachmentId = value || null;
                         const attachedName =
                           attachments.find((a) => a.id === attachmentId)?.originalName ?? null;
                         setLines((prev) =>
@@ -689,23 +692,14 @@ export function AdminQuoteDetail() {
                           ),
                         );
                       }}
-                      style={{
-                        width: '100%',
-                        marginTop: 6,
-                        border: '0.5px solid var(--line)',
-                        borderRadius: 8,
-                        padding: '8px 10px',
-                        fontSize: 12,
-                        fontFamily: 'inherit',
-                      }}
-                    >
-                      <option value="">Attach a customer file (optional)</option>
-                      {attachments.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {friendlyFileName(a.originalName)}
-                        </option>
-                      ))}
-                    </select>
+                      options={[
+                        { value: '', label: 'Attach a customer file (optional)' },
+                        ...attachments.map((a) => ({
+                          value: a.id,
+                          label: friendlyFileName(a.originalName),
+                        })),
+                      ]}
+                    />
                     {line.attachedName && (
                       <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
                         Attached: {friendlyFileName(line.attachedName)}

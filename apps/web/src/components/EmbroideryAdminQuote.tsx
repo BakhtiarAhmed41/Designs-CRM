@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminCounterDecision } from '@/components/AdminCounterDecision';
 import { EmbroideryFileCard } from '@/components/EmbroideryFileCard';
 import { useDialog } from '@/components/ui/AppDialog';
+import { SelectMenu } from '@/components/ui/SelectMenu';
 import { useAuth } from '@/context/AuthContext';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import type { CustomerDetail } from '@/lib/customers';
@@ -604,21 +605,20 @@ export function EmbroideryAdminQuote({
                           Remove
                         </button>
                       </div>
-                      <select
-                        className="ead-select"
-                        aria-label="Select Design"
+                      <SelectMenu
+                        size="ead"
+                        ariaLabel="Select Design"
                         value={block.designKey}
-                        onChange={(e) =>
+                        onChange={(value) =>
                           setBlocks((prev) =>
-                            prev.map((b) => (b.key === block.key ? { ...b, designKey: e.target.value } : b)),
+                            prev.map((b) => (b.key === block.key ? { ...b, designKey: value } : b)),
                           )
                         }
-                      >
-                        <option value="">Select Design</option>
-                        {options.map((option) => (
-                          <option key={option} value={option}>{option}</option>
-                        ))}
-                      </select>
+                        options={[
+                          { value: '', label: 'Select Design' },
+                          ...options.map((option) => ({ value: option, label: option })),
+                        ]}
+                      />
                       {block.rows.map((row) => (
                         <div key={row.key} className="ead-art">
                           <div className="ead-ql-top">

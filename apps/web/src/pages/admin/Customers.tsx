@@ -21,6 +21,7 @@ import { useDialog } from '@/components/ui/AppDialog';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { SelectMenu } from '@/components/ui/SelectMenu';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 import {
   asCustomerFilePrefs,
@@ -341,53 +342,40 @@ function CustomerDetailModal({
                 </div>
                 <div className="ff">
                   <label>Account type</label>
-                  <select
+                  <SelectMenu
                     value={effective.accountType}
-                    onChange={(e) =>
-                      setForm({ ...effective, accountType: e.target.value as AccountType })
+                    onChange={(value) =>
+                      setForm({ ...effective, accountType: value as AccountType })
                     }
-                  >
-                    {ACCOUNT_TYPES.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.label}
-                      </option>
-                    ))}
-                  </select>
+                    options={ACCOUNT_TYPES.map((t) => ({ value: t.id, label: t.label }))}
+                  />
                 </div>
                 <div className="ff">
                   <label>Source</label>
-                  <select
+                  <SelectMenu
                     value={effective.source}
-                    onChange={(e) =>
-                      setForm({ ...effective, source: e.target.value as CustomerSource })
+                    onChange={(value) =>
+                      setForm({ ...effective, source: value as CustomerSource })
                     }
-                  >
-                    {SOURCES.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
+                    options={SOURCES.map((s) => ({ value: s, label: s }))}
+                  />
                 </div>
                 {effective.accountType === 'NET_MONTHLY' && (
                   <div className="ff full">
                     <label>Net terms</label>
-                    <select
+                    <SelectMenu
                       value={effective.netTerms ?? ''}
-                      onChange={(e) =>
+                      onChange={(value) =>
                         setForm({
                           ...effective,
-                          netTerms: (e.target.value || null) as NetTerms | null,
+                          netTerms: (value || null) as NetTerms | null,
                         })
                       }
-                    >
-                      <option value="">None</option>
-                      {NET_TERMS.map((n) => (
-                        <option key={n} value={n}>
-                          {n.replace('_', ' ')}
-                        </option>
-                      ))}
-                    </select>
+                      options={[
+                        { value: '', label: 'None' },
+                        ...NET_TERMS.map((n) => ({ value: n, label: n.replace('_', ' ') })),
+                      ]}
+                    />
                   </div>
                 )}
               </div>
@@ -536,16 +524,11 @@ function NewCustomerModal({ onClose }: { onClose: () => void }) {
           </div>
           <div className="ff">
             <label>Account type</label>
-            <select
+            <SelectMenu
               value={form.accountType}
-              onChange={(e) => setForm({ ...form, accountType: e.target.value as AccountType })}
-            >
-              {ACCOUNT_TYPES.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => setForm({ ...form, accountType: value as AccountType })}
+              options={ACCOUNT_TYPES.map((t) => ({ value: t.id, label: t.label }))}
+            />
           </div>
           <label className="form-check">
             <input
@@ -610,25 +593,27 @@ function MergeModal({
           </div>
           <div className="ff">
             <label>Duplicate to remove</label>
-            <select value={sourceId} onChange={(e) => setSourceId(e.target.value)}>
-              <option value="">Select…</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+            <SelectMenu
+              value={sourceId}
+              onChange={setSourceId}
+              options={[
+                { value: '', label: 'Select…' },
+                ...customers.map((c) => ({ value: c.id, label: c.name })),
+              ]}
+            />
           </div>
           <div className="ff">
             <label>Merge into</label>
-            <select value={intoId} onChange={(e) => setIntoId(e.target.value)}>
-              <option value="">Select…</option>
-              {customers.filter((c) => c.id !== sourceId).map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+            <SelectMenu
+              value={intoId}
+              onChange={setIntoId}
+              options={[
+                { value: '', label: 'Select…' },
+                ...customers
+                  .filter((c) => c.id !== sourceId)
+                  .map((c) => ({ value: c.id, label: c.name })),
+              ]}
+            />
           </div>
           <button
             type="button"

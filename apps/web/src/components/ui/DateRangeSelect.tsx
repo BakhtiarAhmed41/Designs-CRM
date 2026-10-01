@@ -1,4 +1,5 @@
 import type { PortalRangePreset } from '@/lib/dateRange';
+import { SelectMenu } from '@/components/ui/SelectMenu';
 
 const OPTIONS: Array<{ id: PortalRangePreset; label: string }> = [
   { id: 'today', label: 'Today' },
@@ -31,17 +32,13 @@ export function DateRangeSelect({
     <div className="dash-range">
       <label className="date-range-select">
         <span>Date range</span>
-        <select
+        <SelectMenu
+          size="compact"
+          ariaLabel="Date range"
           value={preset}
-          onChange={(e) => onPreset(e.target.value as PortalRangePreset)}
-          aria-label="Date range"
-        >
-          {OPTIONS.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+          onChange={(value) => onPreset(value as PortalRangePreset)}
+          options={OPTIONS.map((o) => ({ value: o.id, label: o.label }))}
+        />
       </label>
       {preset === 'custom' && (
         <div className="pulse-dates">
