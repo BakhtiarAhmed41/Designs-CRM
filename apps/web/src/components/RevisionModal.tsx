@@ -68,7 +68,7 @@ export function RevisionModal({
     <div className="overlay open" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
         <div className="modal-h">
-          <span>Create revision #{orderRef}</span>
+          <span>Create revision {orderRef}</span>
           <button type="button" className="modal-x" onClick={onClose}>
             &times;
           </button>
