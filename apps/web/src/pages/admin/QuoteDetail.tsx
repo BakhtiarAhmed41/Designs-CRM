@@ -321,7 +321,7 @@ export function AdminQuoteDetail() {
             </div>
           </div>
         </div>
-        <QuoteJourney phase={shown} orderTo={orderTo} />
+        <QuoteJourney phase={shown} orderTo={orderTo} audience="staff" />
         <div className="card card-pad qj-price-card">
           <h2 className="qj-price-title">Quote pricing</h2>
           {priced.length === 0 && (

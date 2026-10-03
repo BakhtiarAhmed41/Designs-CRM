@@ -10,6 +10,12 @@ const STEPS = [
   { title: 'Pay your invoice' },
 ] as const;
 
+const STAFF_STEPS = [
+  { title: 'Prepare quote' },
+  { title: 'Customer review' },
+  { title: 'Payment' },
+] as const;
+
 function stepIndex(phase: LivePhase) {
   if (phase === 'preparing') return 0;
   if (phase === 'review') return 1;
@@ -29,6 +35,50 @@ function stepDetail(index: number, phase: LivePhase) {
   if (phase === 'paid') return 'Payment received';
   if (phase === 'accepted') return 'Added to your account';
   return 'Payment confirms your order';
+}
+
+function staffStepDetail(index: number, phase: LivePhase) {
+  if (index === 0) return phase === 'preparing' ? 'In progress' : 'Complete';
+  if (index === 1) {
+    if (phase === 'preparing') return 'Not sent';
+    if (phase === 'review') return 'With customer';
+    return 'Accepted';
+  }
+  if (phase === 'paid') return 'Received';
+  if (phase === 'accepted') return 'On account';
+  if (phase === 'pay') return 'Awaiting';
+  return 'Not due';
+}
+
+function staffCopy(phase: LivePhase) {
+  if (phase === 'preparing') {
+    return {
+      title: 'Preparing quote',
+      subtitle: 'Pricing has not been sent to the customer.',
+    };
+  }
+  if (phase === 'review') {
+    return {
+      title: 'With customer',
+      subtitle: 'Waiting for the customer to review this quote.',
+    };
+  }
+  if (phase === 'pay') {
+    return {
+      title: 'Awaiting payment',
+      subtitle: 'The customer accepted. Payment is still open.',
+    };
+  }
+  if (phase === 'paid') {
+    return {
+      title: 'Paid',
+      subtitle: 'Payment is in. Continue on the order.',
+    };
+  }
+  return {
+    title: 'Confirmed',
+    subtitle: 'This quote is confirmed. Continue on the order.',
+  };
 }
 
 function defaultCopy(phase: LivePhase, canChoose: boolean) {
@@ -72,6 +122,7 @@ export function QuoteJourney({
   onPay,
   title,
   subtitle,
+  audience = 'customer',
 }: {
   phase: LivePhase;
   orderTo?: string;
@@ -80,8 +131,11 @@ export function QuoteJourney({
   onPay?: () => void;
   title?: string;
   subtitle?: string;
+  audience?: 'customer' | 'staff';
 }) {
-  const copy = defaultCopy(phase, canChoose);
+  const staff = audience === 'staff';
+  const copy = staff ? staffCopy(phase) : defaultCopy(phase, canChoose);
+  const steps = staff ? STAFF_STEPS : STEPS;
   const current = stepIndex(phase);
   const finished = phase === 'paid' || phase === 'accepted';
 
@@ -90,7 +144,7 @@ export function QuoteJourney({
       <h2>{title ?? copy.title}</h2>
       <p className="qj-lead">{subtitle ?? copy.subtitle}</p>
       <ol className="qj-steps">
-        {STEPS.map((step, index) => {
+        {steps.map((step, index) => {
           const state = index < current ? 'done' : index === current ? 'current' : 'upcoming';
           return (
             <li
@@ -105,13 +159,15 @@ export function QuoteJourney({
                 </span>
               </div>
               <strong className="qj-name">{step.title}</strong>
-              <span className="qj-sub">{stepDetail(index, phase)}</span>
+              <span className="qj-sub">{staff ? staffStepDetail(index, phase) : stepDetail(index, phase)}</span>
             </li>
           );
         })}
       </ol>
       {!finished && (
-        <p className="qj-note">After payment, you'll be taken to your Order page.</p>
+        <p className="qj-note">
+          {staff ? 'The order opens after the customer pays.' : "After payment, you'll be taken to your Order page."}
+        </p>
       )}
       {finished && orderTo && (
         <div className="qj-actions">

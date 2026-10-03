@@ -1,7 +1,7 @@
 .cko-page {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: minmax(320px, 1.05fr) minmax(380px, 520px);
+  grid-template-columns: 65% 35%;
   background: #f4f5f7;
   color: var(--ink, #222);
 }
@@ -13,10 +13,12 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  min-width: 0;
 }
 
 .cko-pay {
   padding: 28px 40px 48px;
+  min-width: 0;
 }
 
 .cko-brand {

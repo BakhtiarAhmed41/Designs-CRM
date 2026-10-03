@@ -177,6 +177,7 @@ export function EmbroideryCustomerQuote({
     !paid &&
     !declined &&
     (phase === 'pay' || order.status === 'PENDING_PAYMENT' || order.paymentStatus === 'AWAITING');
+  const showSelect = !paid && !declined;
   const counterPending = order.status === 'WAITING_FOR_ADMIN_QUOTATION_APPROVAL';
   const status =
     phase === 'paid'
@@ -297,23 +298,26 @@ export function EmbroideryCustomerQuote({
               <div key={group.title} className="ecd-group">
                 <div className="ecd-label">Design name</div>
                 <div className="ecd-group-name">{group.title}</div>
-                <div className={`ecd-quotes${canPick ? '' : ' no-select'}`}>
+                <div className={`ecd-quotes${showSelect ? '' : ' no-select'}`}>
                   <div className="qj-price-head">
-                    {canPick && <span>Select</span>}
+                    {showSelect && <span>Select</span>}
                     <span>Quoted item</span>
                     <span className="qj-col-place">Size & placement</span>
-                    <span>Price</span>
+                    <span className="qj-col-price">Price</span>
                   </div>
                   {group.lines.map((line, index) => {
                     const on = selected.includes(line.id);
+                    const included = line.clientDecision !== 'DROPPED';
                     const Row = canPick ? 'label' : 'div';
                     return (
                       <Row key={line.id} className="ecd-line">
-                        {canPick && (
+                        {showSelect && (
                           <input
                             type="checkbox"
-                            checked={on}
+                            checked={canPick ? on : included}
+                            disabled={!canPick}
                             onChange={() => {
+                              if (!canPick) return;
                               setKept((prev) => {
                                 const current = prev ?? lines.map((item) => item.id);
                                 return on ? current.filter((id) => id !== line.id) : [...current, line.id];
@@ -323,7 +327,7 @@ export function EmbroideryCustomerQuote({
                         )}
                         <span>{serviceName}</span>
                         <span className="qj-col-place">{lineSizeLabel(line, design, index)}</span>
-                        <b>{money(lineTotal(line))}</b>
+                        <span className="qj-col-price">{money(lineTotal(line))}</span>
                       </Row>
                     );
                   })}

@@ -2785,10 +2785,8 @@ function buildInvoicePrintHtml(
     padding: 0 8px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: 12px;
-    color: var(--muted);
-    font-size: 12.5px;
   }
   .toolbar button {
     font: inherit;
@@ -2819,8 +2817,9 @@ function buildInvoicePrintHtml(
   }
   .mark {
     display: flex;
-    align-items: center;
-    gap: 14px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
   }
   .logo {
     height: 52px;
@@ -2998,8 +2997,7 @@ function buildInvoicePrintHtml(
 </head>
 <body>
   <div class="toolbar no-print">
-    <span>Choose “Save as PDF” in the print dialog.</span>
-    <button type="button" onclick="downloadPdf()">Download PDF</button>
+    <button type="button" id="download-pdf" onclick="downloadPdf()">Download PDF</button>
   </div>
   <div class="page">
   <article class="sheet">
@@ -3010,9 +3008,7 @@ function buildInvoicePrintHtml(
             ? `<img class="logo" src="${logoSrc}" alt="Las Vegas Designs USA" />`
             : `<div class="logo" aria-hidden="true"></div>`
         }
-        <div>
-          <div class="place">USA · Custom embroidery &amp; design</div>
-        </div>
+        <div class="place">USA · Custom embroidery &amp; design</div>
       </div>
       <div class="doc-title">
         <h1>Invoice</h1>
@@ -3109,10 +3105,31 @@ function buildInvoicePrintHtml(
     </footer>
   </article>
   </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
   <script>
     function downloadPdf() {
-      document.title = ${JSON.stringify(`Invoice-LVD-${ref}`)};
-      window.print();
+      var button = document.getElementById('download-pdf');
+      if (!window.html2pdf) {
+        button.textContent = 'PDF download unavailable';
+        return;
+      }
+      var label = button.textContent;
+      button.disabled = true;
+      button.textContent = 'Preparing PDF…';
+      html2pdf().set({
+        margin: 0,
+        filename: ${JSON.stringify(`Invoice-LVD-${ref}.pdf`)},
+        image: { type: 'jpeg', quality: 0.98 },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] },
+        html2canvas: { scale: 2, backgroundColor: '#ffffff', useCORS: true },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+      }).from(document.querySelector('.sheet')).save().then(function () {
+        button.disabled = false;
+        button.textContent = label;
+      }).catch(function () {
+        button.disabled = false;
+        button.textContent = 'Download PDF';
+      });
     }
   </script>
 </body>
