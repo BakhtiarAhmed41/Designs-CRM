@@ -353,7 +353,8 @@ export function ServiceCustomerOrder({
     ? groups.filter((group) => group.rows.length > 0 && group.rows.every(designDelivered)).length
     : deliveredDesigns;
   const originalsDelivered = designCount > 0 && deliveredDesignCount >= designCount;
-  const showDesignProgress = !(originalsDelivered && revisions.length > 0);
+  const expectsRevisions = order.status === 'REVISION_REQUESTED' || Boolean(order.revisionPartial);
+  const showDesignProgress = !(originalsDelivered && (expectsRevisions || revisions.length > 0));
   const awaitingRevisionPayment =
     revisions.length > 0 &&
     revisionReady === 0 &&
@@ -364,7 +365,11 @@ export function ServiceCustomerOrder({
         edit.invoiceStatus !== 'PAID' &&
         edit.status !== 'DONE',
     );
-  const revisionState = revisionDeliveryState(revisions, (id) => {
+  const revisionState = editsQ.isPending && expectsRevisions
+    ? order.revisionPartial
+      ? 'partial'
+      : 'revision'
+    : revisionDeliveryState(revisions, (id) => {
     const row = groups.flatMap((group) => group.rows).find((item) => item.design?.id === id);
     return row?.design?.status ?? order.designs?.find((design) => design.id === id)?.status;
   });

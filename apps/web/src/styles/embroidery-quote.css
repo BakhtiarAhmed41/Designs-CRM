@@ -1462,7 +1462,7 @@
   border-top: 0;
 }
 .ecd .cop-filecard .cop-actions .cop-btn.help {
-  gap: 6px;
+  gap: 8px;
   padding: 8px 12px;
   border-radius: 7px;
   background: var(--maroon);
@@ -1589,6 +1589,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   width: auto;
   height: auto;
   min-height: 0;
@@ -1610,7 +1611,7 @@
 .ecd .cop-actions .cop-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .ecd .cop-actions .cop-btn.help { font-size: 11.5px; padding: 6px 9px; }
 .ecd .cop-actions .cop-btn.cop-download {
-  gap: 6px;
+  gap: 8px;
   background: #7c1f2b !important;
   background-color: #7c1f2b !important;
   color: #fff !important;
