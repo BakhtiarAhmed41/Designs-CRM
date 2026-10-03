@@ -1378,14 +1378,21 @@
   letter-spacing: -0.02em;
   line-height: 1.25;
 }
-.cop-table { padding: 10px 8px 0; }
+.cop-table {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(140px, 1.15fr) max-content max-content;
+  column-gap: 20px;
+  padding: 10px 14px 0;
+  overflow-x: auto;
+}
 .cop-thead,
 .cop-filecard .cop-row {
   display: grid;
-  grid-template-columns: minmax(120px, 1.1fr) minmax(180px, 1.6fr) minmax(140px, 0.9fr) minmax(148px, 0.85fr);
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
-  column-gap: 16px;
-  padding: 10px 14px;
+  column-gap: 20px;
+  padding: 10px 0;
 }
 .cop-thead {
   border-bottom: 1px solid #e4e9f2;
@@ -1394,9 +1401,11 @@
   font-weight: 600;
 }
 .cop-thead span:nth-child(3),
-.cop-status-cell { justify-self: center; }
+.cop-status-cell { justify-self: start; }
+.cop-status-cell { position: relative; z-index: 1; }
 .cop-thead span:nth-child(4),
 .cop-filecard .cop-row .cop-actions { justify-self: end; }
+.cop-filecard .cop-row .cop-actions { min-width: max-content; }
 .cop-filecard .cop-row {
   border-bottom: 0;
   padding-top: 16px;
@@ -1629,9 +1638,12 @@
 .cop-note strong, .cop-note a { color: var(--ink); }
 
 @media (max-width: 700px) {
+  .cop-table { display: block; overflow-x: visible; }
   .cop-row { grid-template-columns: 1fr; }
   .cop-thead { display: none; }
   .cop-filecard .cop-row {
+    display: grid;
+    grid-column: auto;
     grid-template-columns: 1fr;
     row-gap: 8px;
   }

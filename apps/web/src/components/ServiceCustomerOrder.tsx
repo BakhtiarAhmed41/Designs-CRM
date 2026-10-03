@@ -541,10 +541,10 @@ export function ServiceCustomerOrder({
         )}
       </section>
 
-      {revisions.some((revision) => revision.status !== 'DONE' && revision.kind === 'PAID' && (revision.priceCents ?? 0) > 0 && revision.invoiceStatus !== 'PAID') && (
+      {revisions.some((revision) => revision.status !== 'DONE') && (
         <section className="cop-designs cop-revs" aria-label="Revision requests">
           <div className="cop-dhead">Revision requests</div>
-          {revisions.filter((revision) => revision.status !== 'DONE' && revision.kind === 'PAID' && (revision.priceCents ?? 0) > 0 && revision.invoiceStatus !== 'PAID').map((revision) => {
+          {revisions.filter((revision) => revision.status !== 'DONE').map((revision) => {
             const ids = revision.designIds?.length
               ? revision.designIds
               : revision.designId
