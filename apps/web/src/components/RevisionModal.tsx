@@ -82,31 +82,25 @@ export function RevisionModal({
           {showPicker && (
             <div className="ff">
               <label>Which designs</label>
-              {designs.map((d) => (
-                <label
-                  key={d.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    fontSize: 13,
-                    marginBottom: 6,
-                    cursor: 'pointer',
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={designIds.includes(d.id)}
-                    onChange={() =>
-                      setDesignIds((prev) =>
-                        prev.includes(d.id) ? prev.filter((x) => x !== d.id) : [...prev, d.id],
-                      )
-                    }
-                  />
-                  {d.name}
-                  {d.placement ? ` (${d.placement})` : ''}
-                </label>
-              ))}
+              <div className="rev-picks">
+                {designs.map((d) => (
+                  <label key={d.id} className="rev-pick">
+                    <input
+                      type="checkbox"
+                      checked={designIds.includes(d.id)}
+                      onChange={() =>
+                        setDesignIds((prev) =>
+                          prev.includes(d.id) ? prev.filter((x) => x !== d.id) : [...prev, d.id],
+                        )
+                      }
+                    />
+                    <span>
+                      {d.name}
+                      {d.placement ? <small>{d.placement}</small> : null}
+                    </span>
+                  </label>
+                ))}
+              </div>
             </div>
           )}
           <div className="ff">
@@ -149,16 +143,7 @@ export function RevisionModal({
           )}
           {designers.length > 0 && (
             <>
-              <label
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  fontSize: 12.5,
-                  marginBottom: 8,
-                  cursor: 'pointer',
-                }}
-              >
+              <label className="rev-check">
                 <input
                   type="checkbox"
                   checked={assignDesigner}

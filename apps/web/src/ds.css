@@ -485,7 +485,7 @@ button.ghost.icon { padding: 0; width: 36px; height: 36px; min-width: 36px; colo
   line-height: 1.3;
   color: var(--form-label, var(--muted));
 }
-.ff input, .ff select, .ff textarea,
+.ff input:not([type="checkbox"]):not([type="radio"]), .ff select, .ff textarea,
 .pf input, .pf select, .pf textarea,
 .login-field input,
 .notes-box, .stat-select, .msg-search, .msg-composer-row textarea,
