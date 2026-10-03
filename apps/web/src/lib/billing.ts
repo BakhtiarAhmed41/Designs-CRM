@@ -141,6 +141,7 @@ export type CheckoutSummary = {
 export type CheckoutSession = {
   clientSecret: string;
   sessionId: string;
+  publishableKey: string;
   emailOnFile: boolean;
   summary: CheckoutSummary;
 };

@@ -55,7 +55,6 @@
 
 .ecd > .qj .qj-note {
   margin-top: 12px;
-  padding-top: 10px;
 }
 
 .qj-step:not(:last-child)::after {
@@ -243,8 +242,6 @@
 
 .qj-note {
   margin: 18px 0 0;
-  padding-top: 14px;
-  border-top: 1px solid #eceef2;
   color: #6d7380;
   font-size: 13px;
   text-align: center;
@@ -425,24 +422,26 @@
 
 .qj-price .ecd-quotes {
   display: grid;
-  gap: 8px;
+  grid-template-columns: 64px minmax(0, 1.15fr) minmax(0, 1.35fr) max-content;
+  column-gap: 12px;
+  row-gap: 8px;
   margin-top: 8px;
   border: 0;
   border-radius: 0;
   padding: 0;
 }
 
+.qj-price .ecd-quotes.no-select {
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.35fr) max-content;
+}
+
 .qj-price .qj-price-head,
 .qj-price .ecd-line {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1.15fr) minmax(0, 1.35fr) auto;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
   column-gap: 12px;
-}
-
-.qj-price .ecd-quotes.no-select .qj-price-head,
-.qj-price .ecd-quotes.no-select .ecd-line {
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.35fr) auto;
 }
 
 .qj-price .qj-price-head {
@@ -452,9 +451,16 @@
   color: var(--muted);
 }
 
+.qj-price .qj-col-place {
+  justify-self: start;
+  text-align: left;
+}
+
 .qj-price .qj-price-head span:last-child,
 .qj-price .ecd-line b {
+  justify-self: end;
   text-align: right;
+  white-space: nowrap;
 }
 
 .qj-price .ecd-line {

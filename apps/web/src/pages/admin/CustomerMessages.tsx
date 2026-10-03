@@ -28,6 +28,7 @@ import {
   type ChatType,
   type Conversation,
   type ConversationStatus,
+  type Message,
 } from '@/lib/messaging';
 import { HelpRequestBadge, InboxBulkBar, InboxStarButton } from '@/components/messaging/InboxTools';
 import { PaginationBar } from '@/components/lists/ListToolbar';
@@ -35,6 +36,12 @@ import { dateShort, money, statusChipClass, statusLabel, orderNumber, orderSlug 
 import { useDialog } from '@/components/ui/AppDialog';
 import { canFeature } from '@/lib/permissions';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
+import { RevisionModal } from '@/components/RevisionModal';
+import { createAdminEdit } from '@/lib/edits';
+import { getAdminOrder } from '@/lib/orders';
+import { listTeam } from '@/lib/team';
+import type { Design } from '@/lib/designs';
+import type { Order } from '@/lib/types';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 import {
   emitConversationTyping,
@@ -42,6 +49,16 @@ import {
   showBrowserNotification,
   useMessagingSocket,
 } from '@/hooks/useMessagingSocket';
+
+function latestCustomerAsk(messages: Message[] | undefined) {
+  for (let i = (messages?.length ?? 0) - 1; i >= 0; i -= 1) {
+    const message = messages?.[i];
+    if (!message || message.deletedAt || message.direction !== 'INBOUND') continue;
+    const body = message.body.trim();
+    if (body) return body;
+  }
+  return '';
+}
 
 function initials(name: string) {
   return name
@@ -128,6 +145,8 @@ export function AdminCustomerMessages() {
   const [startMenuOpen, setStartMenuOpen] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [peerTyping, setPeerTyping] = useState(false);
+  const [revisionOpen, setRevisionOpen] = useState(false);
+  const [revisionToast, setRevisionToast] = useState<string | null>(null);
   const startMenuRef = useRef<HTMLDivElement>(null);
 
   const listFilters = useMemo(() => {
@@ -198,9 +217,40 @@ export function AdminCustomerMessages() {
   const listedActive = conversations.find((c) => c.id === activeConversationId);
   const customerId = active?.customerId ?? listedActive?.customerId ?? null;
 
+  const orderChatId =
+    active?.chatType === 'ORDER' && active.orderId && active.orderType !== 'QUOTE_REQUEST'
+      ? active.orderId
+      : null;
+
   useEffect(() => {
     setNotesDraft(active?.privateNotes ?? '');
+    setRevisionOpen(false);
   }, [active?.id, active?.privateNotes]);
+
+  useEffect(() => {
+    if (!revisionToast) return;
+    const timer = window.setTimeout(() => setRevisionToast(null), 3200);
+    return () => window.clearTimeout(timer);
+  }, [revisionToast]);
+
+  const revisionOrderQ = useQuery({
+    queryKey: ['admin-order', orderChatId],
+    queryFn: () => getAdminOrder(orderChatId as string),
+    enabled: revisionOpen && Boolean(orderChatId),
+  });
+  const revisionTeamQ = useQuery({
+    queryKey: ['admin-team'],
+    queryFn: listTeam,
+    enabled: revisionOpen && Boolean(orderChatId),
+  });
+
+  useEffect(() => {
+    if (!revisionOpen) return;
+    const failed = revisionOrderQ.error ?? revisionTeamQ.error;
+    if (!failed) return;
+    setError(getErrorMessage(failed));
+    setRevisionOpen(false);
+  }, [revisionOpen, revisionOrderQ.error, revisionTeamQ.error]);
 
   useEffect(() => {
     if (!startMenuOpen) return;
@@ -443,6 +493,22 @@ export function AdminCustomerMessages() {
             </div>
             {active && (
               <div className="msg-center-actions">
+                {orderChatId && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    disabled={revisionOpen && (revisionOrderQ.isLoading || revisionTeamQ.isFetching)}
+                    onClick={() => {
+                      setError(null);
+                      setRevisionOpen(true);
+                    }}
+                  >
+                    <i className="ti ti-refresh" />
+                    {revisionOpen && (revisionOrderQ.isLoading || revisionTeamQ.isFetching)
+                      ? 'Opening…'
+                      : 'Create revision'}
+                  </button>
+                )}
                 {canStart && customerId && (
                   <div ref={startMenuRef} style={{ position: 'relative' }}>
                     <button
@@ -535,6 +601,11 @@ export function AdminCustomerMessages() {
               {!canReply && active.status === 'OPEN' && (
                 <div className="muted" style={{ margin: '0 12px 8px', fontSize: 12.5 }}>
                   You don’t have permission to reply in customer chats.
+                </div>
+              )}
+              {revisionToast && (
+                <div className="toast show">
+                  <i className="ti ti-circle-check" /> {revisionToast}
                 </div>
               )}
               <MessageComposer
@@ -675,6 +746,34 @@ export function AdminCustomerMessages() {
             </div>
           )}
         </aside>
+        {revisionOpen && revisionOrderQ.data && revisionTeamQ.isFetched && orderChatId && (
+          <RevisionModal
+            key={orderChatId}
+            orderRef={orderNumber(
+              revisionOrderQ.data.order.humanRef,
+              revisionOrderQ.data.order.id.slice(0, 6),
+            )}
+            defaultDesignerId={revisionOrderQ.data.order.assignedDesignerId ?? ''}
+            designers={(revisionTeamQ.data?.members ?? [])
+              .filter((member) => member.role === 'DESIGNER')
+              .map((member) => ({
+                id: member.id,
+                firstName: member.firstName,
+                email: member.email,
+                skills: member.skills,
+              }))}
+            designs={(revisionOrderQ.data.order as Order & { designs?: Design[] }).designs ?? []}
+            initialNote={latestCustomerAsk(active?.messages)}
+            onClose={() => setRevisionOpen(false)}
+            onSubmit={async (data) => {
+              await createAdminEdit(orderChatId, data);
+              setRevisionOpen(false);
+              setRevisionToast('Revision started on this order.');
+              void qc.invalidateQueries({ queryKey: ['admin-order-edits', orderChatId] });
+              void qc.invalidateQueries({ queryKey: ['admin-order', orderChatId] });
+            }}
+          />
+        )}
       </div>
     );
   }

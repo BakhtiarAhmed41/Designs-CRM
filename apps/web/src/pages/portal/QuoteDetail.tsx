@@ -400,7 +400,10 @@ export function PortalQuoteDetail() {
                   {money(offerTotal)}
                 </div>
               </div>
-              {canDecide && (
+              {(canDecide ||
+                (phase !== 'paid' &&
+                  phase !== 'closed' &&
+                  (phase === 'pay' || order.status === 'PENDING_PAYMENT' || order.paymentStatus === 'AWAITING'))) && (
                 <div className="quote-total-actions">
                   <button
                     type="button"
@@ -411,14 +414,25 @@ export function PortalQuoteDetail() {
                     <i className="ti ti-message" />{' '}
                     {startChat.isPending ? 'Opening…' : 'Need help?'}
                   </button>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    disabled={acceptMut.isPending || (canPickLines && selected.length === 0)}
-                    onClick={() => acceptMut.mutate()}
-                  >
-                    {acceptMut.isPending || payBusy ? 'Please wait…' : 'Accept & Pay'}
-                  </button>
+                  {canDecide ? (
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      disabled={acceptMut.isPending || (canPickLines && selected.length === 0)}
+                      onClick={() => acceptMut.mutate()}
+                    >
+                      {acceptMut.isPending || payBusy ? 'Please wait…' : 'Accept & Pay'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      disabled={payBusy}
+                      onClick={() => void goToPayment(order)}
+                    >
+                      {payBusy ? 'Opening checkout…' : 'Pay now'}
+                    </button>
+                  )}
                 </div>
               )}
             </div>

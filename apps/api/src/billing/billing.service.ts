@@ -1651,6 +1651,7 @@ export class BillingService {
           return {
             clientSecret: existing.client_secret,
             sessionId: existing.id,
+            publishableKey: getEnv().STRIPE_PUBLISHABLE_KEY.trim(),
             emailOnFile,
             summary: await this.buildCheckoutSummary(invoice),
           };
@@ -1677,6 +1678,7 @@ export class BillingService {
     return {
       clientSecret: session.client_secret!,
       sessionId: session.id,
+      publishableKey: getEnv().STRIPE_PUBLISHABLE_KEY.trim(),
       emailOnFile,
       summary,
     };

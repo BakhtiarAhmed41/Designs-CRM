@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { loadStripe } from '@stripe/stripe-js';
 import {
@@ -12,8 +12,16 @@ import type { CheckoutSummary } from '@/lib/billing';
 import { money } from '@/lib/format';
 import '@/styles/checkout.css';
 
-const publishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '';
-const stripePromise = publishableKey ? loadStripe(publishableKey) : null;
+const stripeByKey = new Map<string, ReturnType<typeof loadStripe>>();
+
+function stripeFor(publishableKey: string) {
+  const key = publishableKey.trim();
+  const cached = stripeByKey.get(key);
+  if (cached) return cached;
+  const created = loadStripe(key);
+  stripeByKey.set(key, created);
+  return created;
+}
 
 const appearance = {
   theme: 'stripe' as const,
@@ -196,16 +204,23 @@ function SummaryColumn({
 export function CheckoutScreen({
   summary,
   clientSecret,
+  publishableKey,
   emailOnFile,
   backHref,
   banner,
 }: {
   summary: CheckoutSummary;
   clientSecret: string;
+  publishableKey: string;
   emailOnFile: boolean;
   backHref?: string | null;
   banner?: string | null;
 }) {
+  const stripePromise = useMemo(() => {
+    const key = (publishableKey || '').trim();
+    return key ? stripeFor(key) : null;
+  }, [publishableKey]);
+
   if (!stripePromise) {
     return (
       <div className="cko-status">

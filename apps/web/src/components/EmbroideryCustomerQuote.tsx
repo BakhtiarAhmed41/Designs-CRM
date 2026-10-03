@@ -173,6 +173,10 @@ export function EmbroideryCustomerQuote({
 
   const phase = quoteJourneyPhase(order);
   const paid = phase === 'paid';
+  const owesPayment =
+    !paid &&
+    !declined &&
+    (phase === 'pay' || order.status === 'PENDING_PAYMENT' || order.paymentStatus === 'AWAITING');
   const counterPending = order.status === 'WAITING_FOR_ADMIN_QUOTATION_APPROVAL';
   const status =
     phase === 'paid'
@@ -208,7 +212,9 @@ export function EmbroideryCustomerQuote({
   const topbarLead = useMemo(
     () => (
       <nav className="ecd-crumb" aria-label="Breadcrumb">
-        <Link to="/portal/quotes">Quote/{serviceName}</Link>
+        <Link to="/portal/quotes">Quote</Link>
+        <span aria-hidden="true">/</span>
+        <span>{serviceName}</span>
         <span aria-hidden="true">/</span>
         <b>{quoteNo}</b>
       </nav>
@@ -294,8 +300,8 @@ export function EmbroideryCustomerQuote({
                 <div className={`ecd-quotes${canPick ? '' : ' no-select'}`}>
                   <div className="qj-price-head">
                     {canPick && <span>Select</span>}
-                    <span>{serviceName}</span>
-                    <span>Size & placement</span>
+                    <span>Quoted item</span>
+                    <span className="qj-col-place">Size & placement</span>
                     <span>Price</span>
                   </div>
                   {group.lines.map((line, index) => {
@@ -316,7 +322,7 @@ export function EmbroideryCustomerQuote({
                           />
                         )}
                         <span>{serviceName}</span>
-                        <span>{lineSizeLabel(line, design, index)}</span>
+                        <span className="qj-col-place">{lineSizeLabel(line, design, index)}</span>
                         <b>{money(lineTotal(line))}</b>
                       </Row>
                     );
@@ -366,7 +372,7 @@ export function EmbroideryCustomerQuote({
                     <button type="button" className="ecd-btn" disabled={chatMut.isPending} onClick={() => chatMut.mutate()}>
                       Need help?
                     </button>
-                    {canDecide && (
+                    {canDecide ? (
                       <button
                         type="button"
                         className="ecd-btn pri"
@@ -375,6 +381,17 @@ export function EmbroideryCustomerQuote({
                       >
                         {acceptMut.isPending || payBusy ? 'Please wait…' : 'Accept & Pay'}
                       </button>
+                    ) : (
+                      owesPayment && (
+                        <button
+                          type="button"
+                          className="ecd-btn pri"
+                          disabled={payBusy}
+                          onClick={() => void payQuote()}
+                        >
+                          {payBusy ? 'Opening checkout…' : 'Pay now'}
+                        </button>
+                      )
                     )}
                   </>
                 )}

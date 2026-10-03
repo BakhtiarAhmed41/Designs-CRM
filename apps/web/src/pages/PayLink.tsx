@@ -95,6 +95,7 @@ export function PayLink() {
       <CheckoutScreen
         summary={session.summary}
         clientSecret={session.clientSecret}
+        publishableKey={session.publishableKey}
         emailOnFile={session.emailOnFile}
         banner={notice}
       />

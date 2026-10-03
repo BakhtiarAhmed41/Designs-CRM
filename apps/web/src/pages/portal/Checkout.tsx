@@ -62,6 +62,7 @@ export function CheckoutPage() {
     <CheckoutScreen
       summary={result.summary}
       clientSecret={result.clientSecret}
+      publishableKey={result.publishableKey}
       emailOnFile={result.emailOnFile}
       backHref={returnPath}
     />

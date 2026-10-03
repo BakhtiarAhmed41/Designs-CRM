@@ -40,6 +40,7 @@ const ACTIVE_QUOTE = new Set([
   'QUOTATION_PROVIDED',
   'WAITING_FOR_ADMIN_QUOTATION_APPROVAL',
 ]);
+const ACTIVITY_PAGE_SIZE = 10;
 
 function isQuote(o: Order) {
   return (
@@ -132,7 +133,7 @@ export function PortalDashboard() {
   });
   const { data: activityData, isLoading: activityLoading } = useQuery({
     queryKey: ['my-activity', activityPage],
-    queryFn: () => listNotifications({ page: activityPage, pageSize: 6 }),
+    queryFn: () => listNotifications({ page: activityPage, pageSize: ACTIVITY_PAGE_SIZE }),
     ...freshOnOpen,
   });
   const { data: everWorkData, isLoading: everWorkLoading } = useQuery({
@@ -165,7 +166,10 @@ export function PortalDashboard() {
   const isLoading = openOrdersLoading || ordersLoading || quotesLoading;
   const firstName = user?.firstName || 'there';
   const activities = activityData?.notifications ?? [];
+  const activityTotal = activityData?.total ?? activities.length;
   const activityPages = activityData?.totalPages ?? 1;
+  const activityFrom = activities.length === 0 ? 0 : (activityPage - 1) * ACTIVITY_PAGE_SIZE + 1;
+  const activityTo = activities.length === 0 ? 0 : activityFrom + activities.length - 1;
 
   const orderCount = ordersData?.total ?? orders.length;
   const quoteCount = quotesRangeData?.total ?? quotes.length;
@@ -251,6 +255,136 @@ export function PortalDashboard() {
           </div>
         ) : (
           <div className="pulse-empty">Pick a start and end date.</div>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="panel-head">
+          <div>
+            <h3>Recent Activity</h3>
+            <p className="panel-sub">Your latest order, quote, revision and payment updates.</p>
+          </div>
+        </div>
+        {showWelcomeCard && (
+          <div className="welcome-card">
+            <div className="welcome-card-check" aria-hidden>
+              <i className="ti ti-circle-check" />
+            </div>
+            <div className="welcome-card-body">
+              <div className="welcome-card-head">
+                <span className="welcome-card-title">{ACCOUNT_APPROVED_TITLE}</span>
+                {(!welcomeNotice || !welcomeNotice.readAt) && (
+                  <span className="welcome-card-new">New</span>
+                )}
+                <span className="welcome-card-time">
+                  {welcomeNotice ? relativeTime(welcomeNotice.createdAt) : 'Just now'}
+                </span>
+              </div>
+              <p>{ACCOUNT_WELCOME_BODY}</p>
+              <div className="welcome-card-actions">
+                <RequestQuoteMenu>
+                  <i className="ti ti-file-invoice" /> Request a quote
+                </RequestQuoteMenu>
+                <Link to="/portal/settings#portal-colors" className="welcome-card-link">
+                  <i className="ti ti-palette" /> Customize colors
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+        {activityLoading && !showWelcomeCard && <SkeletonRows rows={3} />}
+        {!activityLoading && !showWelcomeCard && activities.length === 0 && (
+          <EmptyState icon="ti-bell" title="No recent activity" description="Updates will appear here as work moves along." />
+        )}
+        {tableActivities.length > 0 && (
+          <div className="activity-scroll">
+            <table className="dash-table activity-table">
+              <colgroup>
+                <col className="dash-col-activity" />
+                <col className="dash-col-detail" />
+                <col className="dash-col-time" />
+                <col className="dash-col-action" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>Activity</th>
+                  <th>Details</th>
+                  <th>Time</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tableActivities.map((n) => {
+                  const action = portalActivityAction(n.title, n.link);
+                  const unread = !n.readAt;
+                  const title = displayActivityTitle(n.title);
+                  const body = displayActivityBody(n.title, n.body, n.link);
+                  return (
+                    <tr key={n.id} className={`click-row${unread ? ' is-unread' : ''}`}>
+                      <td>
+                        <div className="activity-title">
+                          <span className="on">{title}</span>
+                          {unread && <span className="activity-unread">Unread</span>}
+                        </div>
+                      </td>
+                      <td className="activity-detail">{body || '—'}</td>
+                      <td className="activity-time">{relativeTime(n.createdAt)}</td>
+                      <td>
+                        {action ? (
+                          <Link
+                            to={action.to}
+                            className="activity-link"
+                            onClick={() => {
+                              if (!unread) return;
+                              void markActivityRead(n.id);
+                            }}
+                          >
+                            {action.label} <i className="ti ti-chevron-right" />
+                          </Link>
+                        ) : unread ? (
+                          <button
+                            type="button"
+                            className="activity-link"
+                            onClick={() => void markActivityRead(n.id)}
+                          >
+                            Mark as read
+                          </button>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {tableActivities.length > 0 && (
+          <div className="activity-pager">
+            <span>
+              {activityFrom}–{activityTo} of {activityTotal} {activityTotal === 1 ? 'activity' : 'activities'}
+            </span>
+            <div className="activity-pager-nav">
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                disabled={activityPage <= 1}
+                onClick={() => setActivityPage((p) => Math.max(1, p - 1))}
+              >
+                <i className="ti ti-chevron-left" /> Previous
+              </button>
+              <span>
+                Page {activityPage} of {activityPages}
+              </span>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                disabled={activityPage >= activityPages}
+                onClick={() => setActivityPage((p) => p + 1)}
+              >
+                Next <i className="ti ti-chevron-right" />
+              </button>
+            </div>
+          </div>
         )}
       </section>
 
@@ -469,140 +603,6 @@ export function PortalDashboard() {
           </>
         )}
       </div>
-
-      <section className="panel">
-        <div className="panel-head">
-          <div>
-            <h3>Recent Activity</h3>
-            <p className="panel-sub">Your latest order, quote, revision and payment updates.</p>
-          </div>
-          {activityPages > 1 && (
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => setActivityPage((p) => (p < activityPages ? p + 1 : 1))}
-            >
-              View all activity
-            </button>
-          )}
-        </div>
-        {showWelcomeCard && (
-          <div className="welcome-card">
-            <div className="welcome-card-check" aria-hidden>
-              <i className="ti ti-circle-check" />
-            </div>
-            <div className="welcome-card-body">
-              <div className="welcome-card-head">
-                <span className="welcome-card-title">{ACCOUNT_APPROVED_TITLE}</span>
-                {(!welcomeNotice || !welcomeNotice.readAt) && (
-                  <span className="welcome-card-new">New</span>
-                )}
-                <span className="welcome-card-time">
-                  {welcomeNotice ? relativeTime(welcomeNotice.createdAt) : 'Just now'}
-                </span>
-              </div>
-              <p>{ACCOUNT_WELCOME_BODY}</p>
-              <div className="welcome-card-actions">
-                <RequestQuoteMenu>
-                  <i className="ti ti-file-invoice" /> Request a quote
-                </RequestQuoteMenu>
-                <Link to="/portal/settings#portal-colors" className="welcome-card-link">
-                  <i className="ti ti-palette" /> Customize colors
-                </Link>
-              </div>
-            </div>
-          </div>
-        )}
-        {activityLoading && !showWelcomeCard && <SkeletonRows rows={3} />}
-        {!activityLoading && !showWelcomeCard && activities.length === 0 && (
-          <EmptyState icon="ti-bell" title="No recent activity" description="Updates will appear here as work moves along." />
-        )}
-        {tableActivities.length > 0 && (
-          <div className="dash-table-wrap">
-            <table className="dash-table activity-table">
-              <colgroup>
-                <col className="dash-col-activity" />
-                <col className="dash-col-detail" />
-                <col className="dash-col-time" />
-                <col className="dash-col-action" />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th>Activity</th>
-                  <th>Details</th>
-                  <th>Time</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tableActivities.map((n) => {
-                  const action = portalActivityAction(n.title, n.link);
-                  const unread = !n.readAt;
-                  const title = displayActivityTitle(n.title);
-                  const body = displayActivityBody(n.title, n.body, n.link);
-                  return (
-                    <tr key={n.id} className={`click-row${unread ? ' is-unread' : ''}`}>
-                      <td>
-                        <div className="activity-title">
-                          <span className="on">{title}</span>
-                          {unread && <span className="activity-unread">Unread</span>}
-                        </div>
-                      </td>
-                      <td className="activity-detail">{body || '—'}</td>
-                      <td className="activity-time">{relativeTime(n.createdAt)}</td>
-                      <td>
-                        {action ? (
-                          <Link
-                            to={action.to}
-                            className="activity-link"
-                            onClick={() => {
-                              if (!unread) return;
-                              void markActivityRead(n.id);
-                            }}
-                          >
-                            {action.label} <i className="ti ti-chevron-right" />
-                          </Link>
-                        ) : unread ? (
-                          <button
-                            type="button"
-                            className="activity-link"
-                            onClick={() => void markActivityRead(n.id)}
-                          >
-                            Mark as read
-                          </button>
-                        ) : null}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {activityPages > 1 && (
-          <div className="activity-pager">
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              disabled={activityPage <= 1}
-              onClick={() => setActivityPage((p) => Math.max(1, p - 1))}
-            >
-              Previous
-            </button>
-            <span>
-              Page {activityPage} of {activityPages}
-            </span>
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              disabled={activityPage >= activityPages}
-              onClick={() => setActivityPage((p) => p + 1)}
-            >
-              Next
-            </button>
-          </div>
-        )}
-      </section>
     </div>
   );
 }

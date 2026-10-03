@@ -2256,6 +2256,26 @@ button.primary i,
 .dash-col-time { width: 16%; }
 .dash-col-action { width: 16%; }
 .activity-table { min-width: 800px; }
+.activity-scroll {
+  width: 100%;
+  max-height: 252px;
+  overflow: auto;
+}
+.activity-scroll .activity-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.activity-scroll .activity-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--etsy-white, #fff);
+}
+.activity-scroll .activity-table td.activity-detail {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .dash-table td.activity-detail {
   white-space: normal;
   overflow: visible;
@@ -2411,11 +2431,17 @@ button.activity-link {
 .activity-pager {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   gap: 12px;
-  padding: 12px;
+  padding: 12px 18px;
   color: var(--dash-muted);
   font-size: 13px;
+  border-top: 1px solid rgba(34, 34, 34, 0.08);
+}
+.activity-pager-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .portal-chip {
   display: inline-flex;
