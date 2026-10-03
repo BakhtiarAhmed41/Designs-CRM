@@ -328,8 +328,8 @@ select option:checked,select option:hover{background:var(--accent-soft);color:va
       <span class="step-num">2</span>
       <div class="step-head">
         <div>
-          <h2>File formats</h2>
-          <p>Choose the formats you need, or let us recommend the best options</p>
+          <h2>File formats <span class="req" id="formatsReq" aria-hidden="true">*</span></h2>
+          <p id="formatsHint">Choose at least one file format for this request.</p>
         </div>
       </div>
       <div class="format-grid" id="formatGrid">
@@ -413,7 +413,7 @@ select option:checked,select option:hover{background:var(--accent-soft);color:va
       <p>Not sure what to select? Our team can help with artwork, sizing, and file requirements.</p>
       <button type="button" class="btn" id="messageUsBtn">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 6l9 6 9-6"/></svg>
-        Message us
+        Need help?
       </button>
     </div>
   </aside>
@@ -458,7 +458,7 @@ select option:checked,select option:hover{background:var(--accent-soft);color:va
       <div class="artwork" data-artwork>
         <div class="drop-row">
           <div class="field">
-            <label class="flabel">Artwork <span class="opt" data-req>(at least one file required)</span></label>
+            <label class="flabel">Artwork <span class="req" aria-hidden="true">*</span></label>
             <div class="dropzone" data-dropzone>
               <span class="dz-ico">${upIcon}</span>
               <div class="dz-title">Upload your artwork</div>
@@ -498,11 +498,11 @@ select option:checked,select option:hover{background:var(--accent-soft);color:va
 
           <div class="grid-2">
             <div class="field">
-              <label class="flabel dname-label"><span class="design-num" data-design-num>${n}</span>Design Name <span class="opt">(optional)</span></label>
-              <input type="text" placeholder="e.g. Family name sign, tumbler" data-design-name>
+              <label class="flabel dname-label"><span class="design-num" data-design-num>${n}</span>Design Name <span class="req" aria-hidden="true">*</span></label>
+              <input type="text" placeholder="e.g. Family name sign, tumbler" data-design-name aria-required="true" autocomplete="off">
             </div>
             <div class="field">
-              <label class="flabel">Service</label>
+              <label class="flabel">Service <span class="req" aria-hidden="true">*</span></label>
               <select data-service>${serviceOptions()}</select>
             </div>
           </div>
@@ -724,15 +724,6 @@ select option:checked,select option:hover{background:var(--accent-soft);color:va
   addEventListener('resize', updateSteps);
   updateSteps();
 
-  // Cancel / draft / submit talk to the portal frame.
-  function designHasArtwork(card){
-    const input = card.querySelector('[data-file-input]');
-    if(!input) return false;
-    const bag = input._lvdFiles && input._lvdFiles.length
-      ? input._lvdFiles
-      : (input.files ? Array.from(input.files) : []);
-    return bag.length > 0;
-  }
   document.getElementById('cancelBtn').addEventListener('click', () => {
     parent.postMessage({ type: 'lvd-quote-cancel' }, '*');
   });
@@ -742,17 +733,7 @@ select option:checked,select option:hover{background:var(--accent-soft);color:va
   document.getElementById('submitBtn').addEventListener('click', () => {
     const btn = document.getElementById('submitBtn');
     if(btn.dataset.busy === '1') return;
-    const cards = [...document.querySelectorAll('[data-design-card]')];
-    const missingService = cards.some(card => !card.querySelector('[data-service]').value);
-    if(missingService){
-      alert('Select a service for each design before submitting.');
-      return;
-    }
-    const missingArt = cards.some(card => !designHasArtwork(card));
-    if(missingArt){
-      alert('Upload at least one artwork file for each design.');
-      return;
-    }
+    if(window.LVD_VALIDATE && !window.LVD_VALIDATE()) return;
     btn.dataset.busy = '1';
     btn.disabled = true;
     parent.postMessage({ type: 'lvd-quote-submit' }, '*');

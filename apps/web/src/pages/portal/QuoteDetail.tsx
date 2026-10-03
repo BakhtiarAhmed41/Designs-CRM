@@ -6,7 +6,7 @@ import {
   getMyOrder,
   myAttachmentUrl,
 } from '@/lib/orders';
-import { confirmMyOrder, startMyOrderCheckout } from '@/lib/billing';
+import { confirmMyOrder, goToOrderCheckout } from '@/lib/billing';
 import { openLinkedChat } from '@/lib/messaging';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import { dateShort, money, quoteLifecycleChip, orderNumber, orderSlug } from '@/lib/format';
@@ -100,24 +100,10 @@ export function PortalQuoteDetail() {
     .filter((l) => selected.includes(l.id))
     .reduce((sum, l) => sum + lineTotal(l), 0);
 
-  async function goToPayment(next: { id: string; humanRef?: string | null }) {
+  function goToPayment(next: { id: string; humanRef?: string | null }) {
     setPayBusy(true);
     setError(null);
-    try {
-      const res = await startMyOrderCheckout(
-        next.id,
-        `/portal/quotes/${orderSlug(next.humanRef, next.id)}`,
-      );
-      if (res?.alreadyPaid) {
-        await confirmMyOrder(next.id).catch(() => null);
-        await qc.invalidateQueries({ queryKey: ['my-order'] });
-        setToast('Payment received.');
-      }
-    } catch (e) {
-      setError(getErrorMessage(e));
-    } finally {
-      setPayBusy(false);
-    }
+    goToOrderCheckout(next.id, `/portal/quotes/${orderSlug(next.humanRef, next.id)}`);
   }
 
   const acceptMut = useMutation({
@@ -238,7 +224,7 @@ export function PortalQuoteDetail() {
               disabled={startChat.isPending}
               onClick={() => startChat.mutate()}
             >
-              <i className="ti ti-message" /> Start Chat
+              <i className="ti ti-message" /> Need help?
             </button>
           </div>
         }
@@ -423,7 +409,7 @@ export function PortalQuoteDetail() {
                     onClick={() => startChat.mutate()}
                   >
                     <i className="ti ti-message" />{' '}
-                    {startChat.isPending ? 'Opening…' : 'Contact us'}
+                    {startChat.isPending ? 'Opening…' : 'Need help?'}
                   </button>
                   <button
                     type="button"

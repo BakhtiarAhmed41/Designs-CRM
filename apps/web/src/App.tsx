@@ -1,4 +1,4 @@
-import { lazy, type ReactNode } from 'react';
+import { lazy, Suspense, type ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { STAFF_ROLES } from '@/lib/types';
@@ -45,6 +45,9 @@ const PortalRevisions = lazy(() =>
 );
 const PortalSettings = lazy(() =>
   import('@/pages/portal/Settings').then((m) => ({ default: m.PortalSettings })),
+);
+const CheckoutPage = lazy(() =>
+  import('@/pages/portal/Checkout').then((m) => ({ default: m.CheckoutPage })),
 );
 const PortalPolicies = lazy(() =>
   import('@/pages/portal/Policies').then((m) => ({ default: m.PortalPolicies })),
@@ -144,6 +147,26 @@ export function App() {
     <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/pay/:token" element={<PayLink />} />
+        <Route
+          path="/portal/checkout/order/:orderId"
+          element={
+            <RequireRole staff={false}>
+              <Suspense fallback={<PageLoading />}>
+                <CheckoutPage />
+              </Suspense>
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/portal/checkout/invoice/:invoiceId"
+          element={
+            <RequireRole staff={false}>
+              <Suspense fallback={<PageLoading />}>
+                <CheckoutPage />
+              </Suspense>
+            </RequireRole>
+          }
+        />
         <Route path="/" element={<HomeRedirect />} />
 
         <Route

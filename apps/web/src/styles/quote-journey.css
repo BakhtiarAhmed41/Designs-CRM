@@ -88,30 +88,70 @@
   );
 }
 
+.ojs {
+  padding: 10px 12px 6px;
+}
+
 .ojs h2 {
-  margin: 10px 0 0;
-  font-size: 18px;
+  margin: 6px 0 0;
+  font-size: 22px;
   font-weight: 700;
   letter-spacing: -0.02em;
   color: #1b1d22;
 }
 
 .ojs .qj-lead {
-  margin-top: 2px;
-  font-size: 13.5px;
+  margin-top: 6px;
+  font-size: 15px;
 }
 
 .ojs .qj-steps {
-  margin-top: 0;
-  padding-top: 6px;
+  margin-top: 8px;
+  padding-top: 10px;
+}
+
+.ojs .qj-steps.cols-2 {
+  max-width: 720px;
 }
 
 .ojs .qj-steps:has(.is-current) {
-  padding-top: 18px;
+  padding-top: 28px;
+}
+
+.ojs .qj-node {
+  height: 48px;
+}
+
+.ojs .qj-dot {
+  width: 48px;
+  height: 48px;
+  font-size: 16px;
+}
+
+.ojs .qj-dot i {
+  font-size: 22px;
+}
+
+.ojs .qj-step.is-marked .qj-dot {
+  background: #1f9d55;
+  color: #fff;
+  box-shadow: none;
+}
+
+.ojs .qj-step:not(:last-child)::after {
+  top: 23px;
+  left: calc(50% + 24px);
+  width: calc(100% - 48px);
 }
 
 .ojs .qj-name {
-  margin-top: 6px;
+  margin-top: 12px;
+  font-size: 15.5px;
+}
+
+.ojs .qj-sub {
+  margin-top: 4px;
+  font-size: 13.5px;
 }
 
 .ojs + .ojs {
@@ -125,9 +165,9 @@
 }
 
 .ojs-count {
-  margin: 8px 0 0;
+  margin: 16px 0 0;
   color: #6d7380;
-  font-size: 13px;
+  font-size: 14.5px;
 }
 
 .qj-node {
@@ -360,24 +400,119 @@
   outline-offset: 2px;
 }
 
+.qj-price-lead {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.qj-price .ecd-group {
+  padding-top: 4px;
+}
+
+.qj-price .ecd-group + .ecd-group {
+  margin-top: 8px;
+}
+
+.qj-price .ecd-label {
+  margin: 12px 0 2px;
+}
+
+.qj-price .ecd-group-name {
+  margin-top: 0;
+}
+
 .qj-price .ecd-quotes {
+  display: grid;
+  gap: 8px;
   margin-top: 8px;
   border: 0;
   border-radius: 0;
   padding: 0;
 }
 
+.qj-price .qj-price-head,
 .qj-price .ecd-line {
-  padding: 12px 2px;
-  border-bottom: 1px solid #eceff3;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1.15fr) minmax(0, 1.35fr) auto;
+  align-items: center;
+  column-gap: 12px;
+}
+
+.qj-price .ecd-quotes.no-select .qj-price-head,
+.qj-price .ecd-quotes.no-select .ecd-line {
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.35fr) auto;
+}
+
+.qj-price .qj-price-head {
+  padding: 0 12px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.qj-price .qj-price-head span:last-child,
+.qj-price .ecd-line b {
+  text-align: right;
+}
+
+.qj-price .ecd-line {
+  margin: 0;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: #f4f5f7;
 }
 
 .qj-price .ecd-line + .ecd-line {
   border-top: 0;
 }
 
-.qj-price .ecd-group-name {
-  margin-top: 8px;
+.ecd-total-note {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.qj-price .ecd-foot.is-paid {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #e6e8ec;
+}
+
+.ecd-paid-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ecd-paid-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ok, #1e7a46);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ecd-paid-flag i {
+  font-size: 16px;
+  color: inherit;
+}
+
+.ecd-btn.ecd-btn-invoice {
+  color: var(--maroon, #9a1e22);
+  border-color: #e7b4b8;
+  background: #fff;
+  min-width: 118px;
+}
+
+.ecd-btn.ecd-btn-invoice:hover {
+  color: var(--maroon, #9a1e22);
+  border-color: var(--maroon, #9a1e22);
+  background: #fff;
 }
 
 @media (max-width: 720px) {
@@ -393,6 +528,15 @@
 
   .qj-sub {
     font-size: 11px;
+  }
+
+  .qj-price .ecd-quotes {
+    overflow-x: auto;
+  }
+
+  .qj-price .qj-price-head,
+  .qj-price .ecd-line {
+    min-width: 520px;
   }
 
   .qj-dot {

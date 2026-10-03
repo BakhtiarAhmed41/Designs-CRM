@@ -135,45 +135,80 @@ export function OrderSteps({
   ready,
   total,
   delivered,
-  sizeDelivered,
-  sizeTotal,
 }: {
   ready: number;
   total: number;
   delivered: number;
-  sizeDelivered: number;
-  sizeTotal: number;
 }) {
+  const one = total === 1;
   const allReady = total > 0 && ready >= total;
   const allDelivered = total > 0 && delivered >= total;
+  const partial = delivered > 0 && !allDelivered;
+  const remaining = Math.max(total - delivered, 0);
   const lineReady = total > 0 ? Math.round((Math.min(ready, total) / total) * 100) : 0;
+  const deliveredLine = total > 0 ? Math.round((Math.min(delivered, total) / total) * 100) : 0;
   const copy = allDelivered
     ? {
         title: 'Your files are ready',
-        subtitle: 'Download them from Designs & files below.',
+        subtitle: 'View and download your completed files below.',
       }
+    : partial
+      ? {
+          title: `${delivered} of ${total} designs delivered`,
+          subtitle:
+            delivered === 1
+              ? `Your first design is ready. We're still working on the remaining ${remaining === 1 ? 'design' : 'designs'}.`
+              : `${delivered} designs are ready. We're still working on the remaining ${remaining === 1 ? 'design' : 'designs'}.`,
+        }
     : allReady
       ? {
-          title: 'Your designs are ready',
+          title: one ? 'Your design is ready' : 'Your designs are ready',
           subtitle: "We'll notify you when your files are delivered.",
         }
       : {
-          title: "We're working on your designs",
+          title: one ? "We're working on your design" : "We're working on your designs",
           subtitle: "We'll notify you when your files are ready.",
         };
   const steps = [
     {
-      title: allReady ? 'Designs ready' : 'Design in progress',
-      detail: allReady ? 'All designs prepared' : 'Creating your files',
-      state: allReady ? 'done' : 'current',
+      title: partial
+        ? 'Design in progress'
+        : allDelivered && one
+          ? 'Design in progress'
+          : allReady
+            ? one
+              ? 'Design ready'
+              : 'Designs ready'
+            : one
+              ? 'Design'
+              : 'Designs in progress',
+      detail: partial
+        ? remaining === 1
+          ? '1 design remaining'
+          : `${remaining} designs remaining`
+        : allDelivered && one
+          ? 'Design completed'
+          : allReady
+            ? one
+              ? 'Design prepared'
+              : 'All designs prepared'
+            : 'Creating your files',
+      state: partial ? 'current' : allReady || allDelivered ? 'done' : 'current',
     },
     {
       title: 'Files delivered',
-      detail: allDelivered ? 'Ready to download' : allReady ? 'In progress' : 'Ready to download',
-      state: allDelivered ? 'done' : allReady ? 'current' : 'upcoming',
+      detail: partial
+        ? delivered === 1
+          ? '1 design ready to download'
+          : `${delivered} designs ready to download`
+        : allDelivered
+          ? 'Ready to download'
+          : allReady
+            ? 'In progress'
+            : 'Ready to download',
+      state: partial ? 'marked' : allDelivered ? 'done' : allReady ? 'current' : 'upcoming',
     },
   ] as const;
-  const sizeLabel = sizeTotal === 1 ? 'size' : 'sizes';
 
   return (
     <div className="ojs">
@@ -181,7 +216,7 @@ export function OrderSteps({
       <p className="qj-lead">{copy.subtitle}</p>
       <ol
         className="qj-steps cols-2"
-        style={{ ['--line-ready' as string]: `${allReady ? 100 : lineReady}%` }}
+        style={{ ['--line-ready' as string]: `${allReady || allDelivered ? 100 : partial ? deliveredLine : lineReady}%` }}
       >
         {steps.map((step, index) => (
           <li
@@ -190,7 +225,7 @@ export function OrderSteps({
             aria-current={step.state === 'current' ? 'step' : undefined}
           >
             <div className="qj-node">
-              {step.state === 'current' && <span className="qj-flag">Current</span>}
+              {step.state === 'current' && !partial && <span className="qj-flag">Current</span>}
               <span className="qj-dot">
                 {step.state === 'done' ? <i className="ti ti-check" aria-hidden /> : index + 1}
               </span>
@@ -200,9 +235,9 @@ export function OrderSteps({
           </li>
         ))}
       </ol>
-      {sizeTotal > 0 && (
+      {total > 0 && (
         <p className="ojs-count">
-          {sizeDelivered} of {sizeTotal} {sizeLabel} delivered
+          {allDelivered && one ? 'Designs' : one ? 'Design' : 'Designs'} delivered: {delivered} of {total}
         </p>
       )}
     </div>
@@ -214,11 +249,13 @@ export function RevisionSteps({
   total,
   published,
   awaitingPayment = false,
+  progressLabel,
 }: {
   ready: number;
   total: number;
   published: number;
   awaitingPayment?: boolean;
+  progressLabel?: string;
 }) {
   const allReady = total > 0 && ready >= total;
   const allPublished = total > 0 && published >= total;
@@ -226,8 +263,8 @@ export function RevisionSteps({
   const many = total !== 1;
   const copy = allPublished
     ? {
-        title: 'Your revision files are ready',
-        subtitle: 'Download them from Revision requests below.',
+        title: 'Your revised files are ready',
+        subtitle: 'View your updated preview and download the latest files below.',
       }
     : awaitingPayment && !allReady
       ? {
@@ -240,27 +277,54 @@ export function RevisionSteps({
             subtitle: "We'll notify you when your files are delivered.",
           }
         : {
-            title: many ? "We're working on your revisions" : "We're working on your revision",
-            subtitle: "We'll notify you when your files are ready.",
+            title: many ? "We're updating your designs" : "We're updating your design",
+            subtitle: "We'll notify you when your revised files are ready.",
           };
-  const steps = [
-    {
-      title: allReady ? (many ? 'Revisions ready' : 'Revision ready') : 'Revision in progress',
-      detail: allReady
-        ? many
-          ? 'All revisions prepared'
-          : 'Revision prepared'
-        : awaitingPayment
-          ? 'Waiting for payment'
-          : 'Updating your files',
-      state: allReady ? 'done' : 'current',
-    },
-    {
-      title: 'Files delivered',
-      detail: allPublished ? 'Ready to download' : allReady ? 'In progress' : 'Ready to download',
-      state: allPublished ? 'done' : allReady ? 'current' : 'upcoming',
-    },
-  ] as const;
+  const working = !allPublished && !allReady && !awaitingPayment;
+  const steps = allPublished
+    ? ([
+        {
+          title: many ? 'Revisions completed' : 'Revision completed',
+          detail: 'Your requested changes are complete',
+          state: 'done',
+        },
+        {
+          title: 'Revised files delivered',
+          detail: 'Ready to view and download',
+          state: 'done',
+        },
+      ] as const)
+    : working
+    ? ([
+        {
+          title: 'Revision in progress',
+          detail: 'Making your requested changes',
+          state: 'current',
+        },
+        {
+          title: 'Revised files delivered',
+          detail: 'Awaiting updated files',
+          state: 'upcoming',
+        },
+      ] as const)
+    : ([
+        {
+          title: allReady ? (many ? 'Revisions ready' : 'Revision ready') : 'Revision in progress',
+          detail: allReady
+            ? many
+              ? 'All revisions prepared'
+              : 'Revision prepared'
+            : awaitingPayment
+              ? 'Waiting for payment'
+              : 'Updating your files',
+          state: allReady ? 'done' : 'current',
+        },
+        {
+          title: 'Files delivered',
+          detail: allPublished ? 'Ready to download' : allReady ? 'In progress' : 'Ready to download',
+          state: allPublished ? 'done' : allReady ? 'current' : 'upcoming',
+        },
+      ] as const);
   const noun = many ? 'revisions' : 'revision';
 
   return (
@@ -290,7 +354,7 @@ export function RevisionSteps({
       </ol>
       {total > 0 && (
         <p className="ojs-count">
-          {published} of {total} {noun} published
+          {(working || allPublished) && progressLabel ? progressLabel : `${published} of ${total} ${noun} published`}
         </p>
       )}
     </div>

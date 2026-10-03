@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { createOrder, getQuoteDraft, saveQuoteDraft, uploadAttachments } from '@/lib/orders';
-import { getErrorMessage } from '@/lib/api';
+import { friendlySubmitError } from '@/lib/api';
 import { getMyCustomer } from '@/lib/customers';
 import { invalidateWorkCaches } from '@/lib/queryCache';
 import { useDialog } from '@/components/ui/AppDialog';
@@ -203,8 +203,12 @@ export function QuoteFormPage() {
       await invalidateWorkCaches(qc);
       navigate(`/portal/quotes/${orderSlug(order.humanRef, order.id)}`);
     } catch (e) {
-      setError(getErrorMessage(e));
-      iframeRef.current?.contentWindow?.postMessage({ type: 'lvd-quote-submit-result', ok: false }, '*');
+      const message = friendlySubmitError(e);
+      setError(message);
+      iframeRef.current?.contentWindow?.postMessage(
+        { type: 'lvd-quote-submit-result', ok: false, message },
+        '*',
+      );
     } finally {
       setBusy(false);
     }
@@ -247,7 +251,11 @@ export function QuoteFormPage() {
               setToast('Draft saved. You’ll see it on Quotes.');
               void qc.invalidateQueries({ queryKey: ['my-quote-drafts'] });
             })
-            .catch((e) => setError(getErrorMessage(e)));
+            .catch((e) => {
+              const message = friendlySubmitError(e);
+              setError(message);
+              win?.postMessage({ type: 'lvd-form-error', message }, '*');
+            });
         }
       }
       if (data.type === 'lvd-open-messages') navigate('/portal/messages');
@@ -358,7 +366,7 @@ export function QuoteFormPage() {
             <h2>Need help?</h2>
             <p>Not sure what to select? Our team can help with artwork, sizing and file requirements.</p>
             <Link className="help-button" to="/portal/messages">
-              Chat with our team
+              Need help?
             </Link>
           </aside>
         )}

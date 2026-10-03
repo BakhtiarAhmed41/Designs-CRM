@@ -517,8 +517,8 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
       <span class="step-num">2</span>
       <div class="step-head">
         <div>
-          <h2>File Formats</h2>
-          <p>Choose the formats you need, or let us recommend the best options</p>
+          <h2>File Formats <span class="req" id="formatsReq" aria-hidden="true">*</span></h2>
+          <p id="formatsHint">Choose at least one file format for this request.</p>
         </div>
       </div>
       <div class="format-grid" id="formatGrid">
@@ -602,7 +602,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
       <p>Not sure what to select? Our team can help with artwork, color mode, and file requirements.</p>
       <button type="button" class="btn" id="messageUsBtn">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 6l9 6 9-6"/></svg>
-        Message us
+        Need help?
       </button>
     </div>
   </aside>
@@ -628,13 +628,13 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
           <div class="grid-2">
             <div class="field">
               <div class="dname-top">
-                <label class="flabel dname-label"><span class="design-num" data-design-num>${n}</span>Design Name <span class="opt">(optional)</span></label>
+                <label class="flabel dname-label"><span class="design-num" data-design-num>${n}</span>Design Name <span class="req" aria-hidden="true">*</span></label>
                 <button type="button" class="remove-design" data-remove-design style="${n === 1 ? 'display:none' : ''}">
                   <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
                   Remove design
                 </button>
               </div>
-              <input type="text" placeholder="e.g. Tractor logo, military design" data-design-name>
+              <input type="text" placeholder="e.g. Tractor logo, military design" data-design-name aria-required="true" autocomplete="off">
             </div>
             <div class="field">
               <label class="flabel">Services</label>
@@ -652,7 +652,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
           <div class="artwork">
             <div class="drop-row">
               <div class="field">
-                <label class="flabel">Artwork <span class="opt">(at least one file required)</span></label>
+                <label class="flabel">Artwork <span class="req" aria-hidden="true">*</span></label>
                 <div class="dropzone" data-dropzone>
                   <span class="dz-ico">${upIcon}</span>
                   <div class="dz-title">Upload your artwork</div>
@@ -836,14 +836,6 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
   addEventListener('resize', updateSteps);
   updateSteps();
 
-  function designHasArtwork(card){
-    const input = card.querySelector('[data-file-input]');
-    if(!input) return false;
-    const bag = input._lvdFiles && input._lvdFiles.length
-      ? input._lvdFiles
-      : (input.files ? Array.from(input.files) : []);
-    return bag.length > 0;
-  }
   document.getElementById('cancelBtn').addEventListener('click', () => {
     parent.postMessage({ type: 'lvd-quote-cancel' }, '*');
   });
@@ -853,12 +845,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
   document.getElementById('submitBtn').addEventListener('click', () => {
     const btn = document.getElementById('submitBtn');
     if(btn.dataset.busy === '1') return;
-    const cards = [...document.querySelectorAll('[data-design-card]')];
-    const missingArt = cards.some(card => !designHasArtwork(card));
-    if(missingArt){
-      alert('Upload at least one artwork file for each design.');
-      return;
-    }
+    if(window.LVD_VALIDATE && !window.LVD_VALIDATE()) return;
     btn.dataset.busy = '1';
     btn.disabled = true;
     parent.postMessage({ type: 'lvd-quote-submit' }, '*');

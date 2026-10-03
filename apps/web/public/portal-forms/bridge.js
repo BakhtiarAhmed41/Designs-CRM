@@ -1,6 +1,23 @@
 (function () {
   'use strict';
 
+  var style = document.createElement('style');
+  style.textContent = [
+    '.req{color:#c0392b;font-weight:700;margin-left:2px;}',
+    '.field.is-invalid input[type="text"],.field.is-invalid textarea,.field.is-invalid .csel-trigger,.dropzone.is-invalid{border-color:#c0392b !important;box-shadow:0 0 0 1px #c0392b;}',
+    '.format-grid.is-invalid{outline:1px solid #c0392b;outline-offset:4px;border-radius:12px;}',
+    '.field-error{margin:6px 0 0;color:#9b2330;font-size:12px;font-weight:500;line-height:1.45;}',
+    '#s-formats>.field-error{margin-top:10px;}',
+    '.form-alert{margin:0 0 18px;padding:12px 14px;border:1px solid #f0c2c6;background:#fdf2f3;color:#7c1f2b;border-radius:10px;font-size:13px;line-height:1.45;}',
+    '.form-alert strong{display:block;font-weight:600;margin-bottom:6px;}',
+    '.form-alert ul{margin:0;padding-left:18px;}',
+    '.form-alert li+li{margin-top:3px;}',
+    '[hidden]{display:none !important;}',
+  ].join('');
+  document.head.appendChild(style);
+
+  window.LVD_FORMATS_ON_PROFILE = false;
+
   function serviceKey() {
     var m = location.pathname.match(/\/([^/]+)\.html$/);
     return m ? m[1] : 'unknown';
@@ -485,10 +502,14 @@
   window.LVD_APPLY_PREFS = function (prefs) {
     if (!prefs || typeof prefs !== 'object') return;
     var svc = serviceKey();
-    applyFormats(formatsForService(prefs, svc));
+    var savedFormats = formatsForService(prefs, svc);
+    window.LVD_FORMATS_ON_PROFILE = savedFormats.length > 0;
+    applyFormats(savedFormats);
     applyPlacement(prefs.placement);
     applyHoops(prefs.hoops);
     if (svc === 'embroidery') applyUsualNotes(prefs);
+    syncFormatsRequirement();
+    if (!formatIssue()) clearFormatError();
   };
 
   window.LVD_COLLECT = function () {
@@ -949,6 +970,253 @@
         : titleBase;
   }
 
+  function syncFormatsRequirement() {
+    var star = document.getElementById('formatsReq');
+    var hint = document.getElementById('formatsHint');
+    if (star) star.hidden = false;
+    if (hint) {
+      hint.textContent = window.LVD_FORMATS_ON_PROFILE
+        ? 'Formats from the customer profile are already selected. Keep at least one, or choose different formats for this request.'
+        : 'Choose at least one file format for this request.';
+    }
+  }
+
+  function friendlyError(raw) {
+    var msg = String(raw || '').replace(/\s+/g, ' ').trim();
+    if (!msg || msg === 'Something went wrong') {
+      return "We couldn't submit this request. Please try again. If it continues, use Need help and we'll take it from here.";
+    }
+    if (/failed to fetch|networkerror|network request failed|load failed/i.test(msg)) {
+      return "We couldn't reach the server. Check your connection and try again.";
+    }
+    if (/session expired|unauthorized|not authorized|please log in|sign in to/i.test(msg)) {
+      return 'Your session has expired. Sign in again, then submit this request.';
+    }
+    if (/forbidden|permission/i.test(msg)) {
+      return "You don't have permission to submit this request.";
+    }
+    if (/too large|entity too large|payload/i.test(msg)) {
+      return 'One or more files are too large to upload. Use a smaller file and try again.';
+    }
+    if (/exception|prisma|stack|econn|syntaxerror/i.test(msg)) {
+      return "We couldn't submit this request. Please try again. If it continues, use Need help and we'll take it from here.";
+    }
+    return msg;
+  }
+
+  function renderAlert(title, items, scroll) {
+    var form = document.getElementById('quoteForm') || document.querySelector('form');
+    if (!form) return;
+    var box = document.getElementById('formAlert');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'formAlert';
+      box.className = 'form-alert';
+      box.setAttribute('role', 'alert');
+      form.insertBefore(box, form.firstChild);
+    }
+    while (box.firstChild) box.removeChild(box.firstChild);
+    var strong = document.createElement('strong');
+    strong.textContent = title;
+    box.appendChild(strong);
+    if (items && items.length) {
+      var ul = document.createElement('ul');
+      items.forEach(function (text) {
+        var li = document.createElement('li');
+        li.textContent = text;
+        ul.appendChild(li);
+      });
+      box.appendChild(ul);
+    }
+    if (window.LVD_REPORT_HEIGHT_SOON) window.LVD_REPORT_HEIGHT_SOON();
+    if (scroll) {
+      var banner = document.getElementById('formAlert');
+      var target = banner || document.querySelector('.field.is-invalid, #formatGrid.is-invalid');
+      if (target && target.scrollIntoView) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  function clearValidation() {
+    document.querySelectorAll('.is-invalid').forEach(function (el) {
+      el.classList.remove('is-invalid');
+    });
+    document.querySelectorAll('[aria-invalid]').forEach(function (el) {
+      el.removeAttribute('aria-invalid');
+    });
+    document.querySelectorAll('.field-error').forEach(function (el) {
+      el.remove();
+    });
+    var box = document.getElementById('formAlert');
+    if (box) box.remove();
+  }
+
+  function updateAlertFromErrors(scroll) {
+    var nodes = document.querySelectorAll('.field-error');
+    if (!nodes.length) {
+      var box = document.getElementById('formAlert');
+      if (box) box.remove();
+      if (window.LVD_REPORT_HEIGHT_SOON) window.LVD_REPORT_HEIGHT_SOON();
+      return;
+    }
+    var items = [];
+    nodes.forEach(function (el) {
+      items.push(el.getAttribute('data-summary') || el.textContent);
+    });
+    renderAlert('Please complete the required fields.', items, scroll);
+  }
+
+  function clearField(field) {
+    if (!field) return;
+    field.classList.remove('is-invalid');
+    field.querySelectorAll('.is-invalid').forEach(function (el) {
+      el.classList.remove('is-invalid');
+    });
+    field.querySelectorAll('[aria-invalid]').forEach(function (el) {
+      el.removeAttribute('aria-invalid');
+    });
+    field.querySelectorAll('.field-error').forEach(function (el) {
+      el.remove();
+    });
+    updateAlertFromErrors(false);
+  }
+
+  function clearFormatError() {
+    var section = document.getElementById('s-formats');
+    var grid = document.getElementById('formatGrid');
+    if (grid) grid.classList.remove('is-invalid');
+    if (section) {
+      section.querySelectorAll('.field-error').forEach(function (el) {
+        el.remove();
+      });
+    }
+    updateAlertFromErrors(false);
+  }
+
+  function markField(field, inline, summary) {
+    if (!field) return;
+    field.classList.add('is-invalid');
+    var box = field.querySelector('input[type="text"], textarea, select');
+    if (box) box.setAttribute('aria-invalid', 'true');
+    var drop = field.querySelector('[data-dropzone], .dropzone');
+    if (drop) drop.classList.add('is-invalid');
+    var trigger = field.querySelector('.csel-trigger');
+    if (trigger) {
+      trigger.classList.add('is-invalid');
+      trigger.setAttribute('aria-invalid', 'true');
+    }
+    var note = field.querySelector('.field-error');
+    if (!note) {
+      note = document.createElement('p');
+      note.className = 'field-error';
+      note.setAttribute('role', 'alert');
+      field.appendChild(note);
+    }
+    note.setAttribute('data-summary', summary);
+    note.textContent = inline;
+  }
+
+  function markFormat(issue) {
+    var grid = document.getElementById('formatGrid');
+    var section = document.getElementById('s-formats');
+    if (!section) return;
+    if (grid) grid.classList.add('is-invalid');
+    var note = section.querySelector('.field-error');
+    if (!note) {
+      note = document.createElement('p');
+      note.className = 'field-error';
+      note.setAttribute('role', 'alert');
+      section.appendChild(note);
+    }
+    note.setAttribute('data-summary', issue.summary);
+    note.textContent = issue.inline;
+  }
+
+  function artworkFiles(card) {
+    var input = card.querySelector('[data-file-input]');
+    if (!input) return null;
+    if (input._lvdFiles && input._lvdFiles.length) return input._lvdFiles;
+    return input.files ? Array.from(input.files) : [];
+  }
+
+  function formatIssue() {
+    var formats = collectFormats();
+    var otherCheck = document.getElementById('otherFormatCheck');
+    var otherInp = document.querySelector('#otherFormatField input, #otherFormatText');
+    var otherOn = !!(otherCheck && otherCheck.checked);
+    var otherEmpty = !otherInp || !String(otherInp.value || '').trim();
+    if (otherOn && otherEmpty) {
+      return {
+        inline: 'Enter the other file format, or uncheck "Need another format?".',
+        summary: 'Enter the other file format, or uncheck "Need another format?".',
+      };
+    }
+    if (!formats.length) {
+      return {
+        inline: 'Choose at least one file format.',
+        summary: 'File format is required. Choose at least one.',
+      };
+    }
+    return null;
+  }
+
+  function onUserEdit(e) {
+    var target = e && e.target;
+    if (!target || !target.closest) return;
+    if (target.matches && target.matches('[data-design-name]') && String(target.value || '').trim()) {
+      clearField(target.closest('.field'));
+      return;
+    }
+    if (target.matches && target.matches('[data-service]') && target.value) {
+      clearField(target.closest('.field'));
+      return;
+    }
+    if (target.matches && target.matches('[data-file-input]')) {
+      var bag = target._lvdFiles && target._lvdFiles.length ? target._lvdFiles : Array.from(target.files || []);
+      if (bag.length) clearField(target.closest('.field'));
+      return;
+    }
+    if (
+      target.name === 'format' ||
+      target.id === 'otherFormatCheck' ||
+      (target.closest && target.closest('#otherFormatField'))
+    ) {
+      if (!formatIssue()) clearFormatError();
+    }
+  }
+
+  window.LVD_VALIDATE = function () {
+    clearValidation();
+    document.querySelectorAll('[data-design-card]').forEach(function (card, index) {
+      var num = card.querySelector('[data-design-num]');
+      var label = 'Design ' + ((num && num.textContent.trim()) || index + 1);
+      var nameInp = card.querySelector('[data-design-name]');
+      if (nameInp && !String(nameInp.value || '').trim()) {
+        markField(nameInp.closest('.field'), 'Enter a design name.', label + ': design name is required.');
+      }
+      var svc = card.querySelector('select[data-service]');
+      if (svc && !String(svc.value || '').trim()) {
+        markField(svc.closest('.field'), 'Select a service.', label + ': service is required.');
+      }
+      var art = card.querySelector('[data-file-input]');
+      if (art && artworkFiles(card) && !artworkFiles(card).length) {
+        markField(
+          art.closest('.field'),
+          'Upload at least one artwork file.',
+          label + ': artwork is required. Upload at least one file.',
+        );
+      }
+    });
+    var fmt = formatIssue();
+    if (fmt) markFormat(fmt);
+    if (!document.querySelector('.field-error')) return true;
+    updateAlertFromErrors(true);
+    return false;
+  };
+
+  window.LVD_SHOW_FORM_ERROR = function (message) {
+    renderAlert(friendlyError(message), [], true);
+  };
+
   var lastSentHeight = 0;
 
   function contentHeight() {
@@ -1083,6 +1351,7 @@
       var idx = Array.prototype.indexOf.call(chip.parentNode.querySelectorAll('.file-chip'), chip);
       if (idx >= 0) input._lvdFiles.splice(idx, 1);
       syncInputFiles(input);
+      if (input.hasAttribute('data-file-input') && input._lvdFiles.length) clearField(field);
     },
     true,
   );
@@ -1114,11 +1383,14 @@
     });
     window.addEventListener('resize', positionOpenCselMenus);
     window.addEventListener('scroll', positionOpenCselMenus, true);
-    document.addEventListener('input', function () {
+    syncFormatsRequirement();
+    document.addEventListener('input', function (e) {
       parent.postMessage({ type: 'lvd-form-dirty' }, '*');
+      onUserEdit(e);
     });
-    document.addEventListener('change', function () {
+    document.addEventListener('change', function (e) {
       parent.postMessage({ type: 'lvd-form-dirty' }, '*');
+      onUserEdit(e);
     });
 
     document.querySelectorAll('.btn-p').forEach(function (btn) {
@@ -1184,8 +1456,13 @@
     if (data.type === 'lvd-request-height') {
       reportHeightSoon();
     }
-    if (data.type === 'lvd-quote-submit-result' && !data.ok && typeof window.LVD_RESET_SUBMIT === 'function') {
-      window.LVD_RESET_SUBMIT();
+    if (data.type === 'lvd-form-error') {
+      window.LVD_SHOW_FORM_ERROR(data.message);
+      return;
+    }
+    if (data.type === 'lvd-quote-submit-result' && !data.ok) {
+      if (typeof window.LVD_RESET_SUBMIT === 'function') window.LVD_RESET_SUBMIT();
+      window.LVD_SHOW_FORM_ERROR(data.message);
     }
     if (data.type === 'lvd-apply-theme' && typeof window.LVD_APPLY_THEME === 'function') {
       window.LVD_APPLY_THEME(data.colors);

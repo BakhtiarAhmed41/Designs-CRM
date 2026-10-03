@@ -115,6 +115,38 @@ export type PayLinkSummary = {
   stripeEnabled?: boolean;
 };
 
+export type CheckoutItem = {
+  name: string;
+  detail: string | null;
+  amountCents: number | null;
+};
+
+export type CheckoutGroup = {
+  orderRef: string | null;
+  orderName: string | null;
+  serviceLabel: string;
+  amountCents: number | null;
+  items: CheckoutItem[];
+};
+
+export type CheckoutSummary = {
+  title: string;
+  kind: InvoiceKind;
+  currency: string;
+  amountDueCents: number;
+  alreadyPaidCents: number;
+  groups: CheckoutGroup[];
+};
+
+export type CheckoutSession = {
+  clientSecret: string;
+  sessionId: string;
+  emailOnFile: boolean;
+  summary: CheckoutSummary;
+};
+
+export type CheckoutResult = CheckoutSession | { alreadyPaid: true };
+
 function pageOrigin() {
   if (typeof window !== 'undefined' && window.location?.origin) {
     return window.location.origin;
@@ -122,8 +154,19 @@ function pageOrigin() {
   return undefined;
 }
 
-function goToCheckout(url: string) {
-  window.location.assign(url);
+function checkoutHref(kind: 'order' | 'invoice', id: string, returnPath?: string) {
+  const params = new URLSearchParams();
+  if (returnPath) params.set('return', returnPath);
+  const query = params.toString();
+  return `/portal/checkout/${kind}/${encodeURIComponent(id)}${query ? `?${query}` : ''}`;
+}
+
+export function goToOrderCheckout(orderId: string, returnPath?: string) {
+  window.location.assign(checkoutHref('order', orderId, returnPath));
+}
+
+export function goToInvoiceCheckout(invoiceId: string, returnPath?: string) {
+  window.location.assign(checkoutHref('invoice', invoiceId, returnPath));
 }
 
 // --- admin ----------------------------------------------------------------
@@ -251,30 +294,31 @@ export function payMyInvoice(id: string, method: PayMethod) {
 export async function startMyInvoiceCheckout(
   id: string,
   returnPath?: string,
-) {
-  const res = await apiFetch<{ url?: string; alreadyPaid?: boolean }>(`/invoices/${id}/checkout`, {
+): Promise<CheckoutResult> {
+  const res = await apiFetch<CheckoutResult>(`/invoices/${id}/checkout`, {
     method: 'POST',
     body: JSON.stringify({
       returnOrigin: pageOrigin(),
       returnPath,
     }),
   });
-  if (res.alreadyPaid) return { alreadyPaid: true as const };
-  if (!res.url) throw new Error('Stripe did not return a checkout URL');
-  goToCheckout(res.url);
+  if ('alreadyPaid' in res && res.alreadyPaid) return { alreadyPaid: true };
+  return res;
 }
 
-export async function startMyOrderCheckout(orderId: string, returnPath?: string) {
-  const res = await apiFetch<{ url?: string; alreadyPaid?: boolean }>(
+export async function startMyOrderCheckout(
+  orderId: string,
+  returnPath?: string,
+): Promise<CheckoutResult> {
+  const res = await apiFetch<CheckoutResult>(
     `/invoices/by-order/${orderId}/checkout`,
     {
       method: 'POST',
       body: JSON.stringify({ returnOrigin: pageOrigin(), returnPath }),
     },
   );
-  if (res.alreadyPaid) return { alreadyPaid: true as const };
-  if (!res.url) throw new Error('Stripe did not return a checkout URL');
-  goToCheckout(res.url);
+  if ('alreadyPaid' in res && res.alreadyPaid) return { alreadyPaid: true };
+  return res;
 }
 
 export function confirmMyInvoice(id: string) {
@@ -325,13 +369,13 @@ export function payPayLink(token: string) {
   });
 }
 
-export async function startPayLinkCheckout(token: string) {
-  const res = await apiFetch<{ url: string }>(`/pay/${token}/checkout`, {
+export async function startPayLinkCheckout(token: string): Promise<CheckoutResult> {
+  const res = await apiFetch<CheckoutResult>(`/pay/${token}/checkout`, {
     method: 'POST',
     body: JSON.stringify({ returnOrigin: pageOrigin() }),
   });
-  if (!res.url) throw new Error('Stripe did not return a checkout URL');
-  goToCheckout(res.url);
+  if ('alreadyPaid' in res && res.alreadyPaid) return { alreadyPaid: true };
+  return res;
 }
 
 export function confirmPayLink(token: string) {

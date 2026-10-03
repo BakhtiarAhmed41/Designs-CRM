@@ -1,31 +1,35 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { CheckoutStatus } from '@/components/CheckoutStatus';
 import { confirmPayLink, getPayLinkSummary, startPayLinkCheckout } from '@/lib/billing';
 import { getErrorMessage } from '@/lib/api';
-import { dateShort, money } from '@/lib/format';
-import { ErrorBanner } from '@/components/ui/EmptyState';
+
+const CheckoutScreen = lazy(() =>
+  import('@/components/CheckoutScreen').then((m) => ({ default: m.CheckoutScreen })),
+);
 
 export function PayLink() {
   const { token = '' } = useParams();
   const [params] = useSearchParams();
-  const returning = params.get('status') === 'success' || params.get('paid') === '1';
-  const canceled = params.get('status') === 'canceled' || params.get('canceled') === '1';
-  const [error, setError] = useState<string | null>(null);
+  const returning = params.get('status') === 'success' || params.get('status') === 'return' || params.get('paid') === '1';
+  const [notice, setNotice] = useState<string | null>(null);
 
   const summaryQ = useQuery({
     queryKey: ['pay-link', token],
     queryFn: () => getPayLinkSummary(token),
-    enabled: token.length > 0,
+    enabled: token.length > 0 && returning,
     retry: false,
   });
 
   const confirmMut = useMutation({
     mutationFn: () => confirmPayLink(token),
-    onSuccess: () => {
+    onSuccess: (summary) => {
       void summaryQ.refetch();
+      if (summary.status !== 'PAID') {
+        setNotice('Payment was not completed. You can try again.');
+      }
     },
-    onError: (e) => setError(getErrorMessage(e)),
   });
 
   useEffect(() => {
@@ -35,121 +39,65 @@ export function PayLink() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, returning]);
 
-  const payMut = useMutation({
-    mutationFn: () => startPayLinkCheckout(token),
-    onError: (e) => setError(getErrorMessage(e)),
+  const checkoutQ = useQuery({
+    queryKey: ['pay-link-checkout', token],
+    queryFn: () => startPayLinkCheckout(token),
+    enabled: token.length > 0 && (!returning || confirmMut.isSuccess),
+    retry: false,
+    staleTime: Infinity,
   });
 
-  const s = confirmMut.data ?? summaryQ.data;
-  const alreadyPaid = s?.status === 'PAID';
-  const confirming = returning && !alreadyPaid && (confirmMut.isPending || confirmMut.isSuccess);
-  const due = s?.dueAt ? dateShort(s.dueAt) : '';
-  const paidSoFar = s?.amountPaidCents ?? 0;
+  const confirmed = confirmMut.data ?? summaryQ.data;
+  const alreadyPaid = confirmed?.status === 'PAID' || (checkoutQ.data && 'alreadyPaid' in checkoutQ.data);
+  const confirming = returning && !alreadyPaid && confirmMut.isPending;
+
+  if (!token) {
+    return <CheckoutStatus title="Link unavailable" message="This payment link is invalid or has expired." />;
+  }
+
+  if (confirming || (returning && summaryQ.isLoading && !confirmMut.isError)) {
+    return <CheckoutStatus title="Confirming payment" message="Checking this payment with Stripe." />;
+  }
+
+  if (alreadyPaid) {
+    return (
+      <CheckoutStatus
+        title="Paid"
+        message="This invoice is already paid. Thank you."
+      />
+    );
+  }
+
+  if (summaryQ.isError && returning) {
+    return <CheckoutStatus title="Link unavailable" message="This payment link is invalid or has expired." />;
+  }
+
+  if (checkoutQ.isLoading || (returning && !confirmMut.isSuccess && !confirmMut.isError)) {
+    return <CheckoutStatus title="Opening checkout" message="Gathering the order, service, and designs." />;
+  }
+
+  if (checkoutQ.isError || confirmMut.isError) {
+    return (
+      <CheckoutStatus
+        title="Could not open checkout"
+        message={getErrorMessage(checkoutQ.error ?? confirmMut.error)}
+      />
+    );
+  }
+
+  const session = checkoutQ.data;
+  if (!session || 'alreadyPaid' in session) {
+    return <CheckoutStatus title="Paid" message="This invoice is already paid. Thank you." />;
+  }
 
   return (
-    <div className="center-screen pay-page">
-      <div className="pay-card">
-        <header className="pay-brand">
-          <img src="/lvd-logo-full.png" alt="Las Vegas Designs USA" />
-          <p className="pay-kicker">Secure checkout</p>
-        </header>
-
-        <div className="pay-body">
-          {(summaryQ.isLoading || confirming) && (
-            <div className="pay-status">
-              <div className="spinner" />
-              <p>{confirming ? 'Confirming payment…' : 'Loading invoice…'}</p>
-            </div>
-          )}
-
-          {summaryQ.isError && !confirming && (
-            <div className="pay-status">
-              <div className="pay-status-icon">
-                <i className="ti ti-link-off" />
-              </div>
-              <h1>Link unavailable</h1>
-              <p>This payment link is invalid or has expired.</p>
-            </div>
-          )}
-
-          {error && <ErrorBanner>{error}</ErrorBanner>}
-
-          {s && !alreadyPaid && !confirming && (
-            <>
-              <div className="pay-hero">
-                <p className="pay-kicker">{s.status === 'PARTIAL' ? 'Balance due' : 'Amount due'}</p>
-                <div className="pay-amount">{money(s.amountCents, s.currency)}</div>
-              </div>
-
-              <ul className="pay-rows">
-                <li>
-                  <span>Billed to</span>
-                  <strong>{s.customerName ?? 'Customer'}</strong>
-                </li>
-                {s.coversText && (
-                  <li>
-                    <span>For</span>
-                    <strong>{s.coversText}</strong>
-                  </li>
-                )}
-                {due && (
-                  <li>
-                    <span>Due</span>
-                    <strong>{due}</strong>
-                  </li>
-                )}
-                {paidSoFar > 0 && (
-                  <li>
-                    <span>Already paid</span>
-                    <strong>{money(paidSoFar, s.currency)}</strong>
-                  </li>
-                )}
-              </ul>
-
-              {canceled && (
-                <ErrorBanner>
-                  Payment was canceled. You can try again when you are ready.
-                </ErrorBanner>
-              )}
-
-              {s.stripeEnabled === false ? (
-                <ErrorBanner>
-                  Card checkout is not configured yet. Please contact the studio.
-                </ErrorBanner>
-              ) : (
-                <button
-                  type="button"
-                  className="btn btn-primary pay-submit"
-                  disabled={payMut.isPending}
-                  onClick={() => {
-                    setError(null);
-                    payMut.mutate();
-                  }}
-                >
-                  <i className="ti ti-credit-card" />
-                  {payMut.isPending ? 'Opening checkout…' : 'Pay with card'}
-                </button>
-              )}
-
-              <p className="pay-secure">
-                <i className="ti ti-lock" />
-                Secure card payment
-              </p>
-            </>
-          )}
-
-          {s && alreadyPaid && (
-            <div className="pay-status pay-status-ok">
-              <div className="pay-status-icon">
-                <i className="ti ti-circle-check" />
-              </div>
-              <h1>Paid</h1>
-              <div className="pay-amount">{money(s.amountCents, s.currency)}</div>
-              <p>This invoice is already paid. Thank you.</p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+    <Suspense fallback={<CheckoutStatus title="Opening checkout" message="Loading the payment form." />}>
+      <CheckoutScreen
+        summary={session.summary}
+        clientSecret={session.clientSecret}
+        emailOnFile={session.emailOnFile}
+        banner={notice}
+      />
+    </Suspense>
   );
 }

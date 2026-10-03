@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
-import { listMyInvoices, openInvoicePrint, startMyOrderCheckout } from '@/lib/billing';
+import { goToOrderCheckout, listMyInvoices, openInvoicePrint } from '@/lib/billing';
 import { createOrder, getMyOrder, listMyOrders } from '@/lib/orders';
 import { listMyEdits, requestEdit } from '@/lib/edits';
 import { getMyCustomer } from '@/lib/customers';
@@ -12,7 +12,6 @@ import { serviceCategoryLabel, serviceThumbClass, serviceTi } from '@/lib/servic
 import { designStatusChipClass, designStatusLabel, type Design } from '@/lib/designs';
 import type { Order } from '@/lib/types';
 import { ListToolbar, PaginationBar } from '@/components/lists/ListToolbar';
-import { useDialog } from '@/components/ui/AppDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 import { invalidateWorkCaches } from '@/lib/queryCache';
@@ -327,7 +326,6 @@ function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
 }
 
 export function PortalOrders() {
-  const dialog = useDialog();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [month, setMonth] = useState<string>('all');
@@ -547,18 +545,10 @@ export function PortalOrders() {
                               className="btn btn-primary btn-sm"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                void startMyOrderCheckout(o.id)
-                                  .then((res) => {
-                                    if (res?.alreadyPaid) {
-                                      void invalidateWorkCaches(qc);
-                                    }
-                                  })
-                                  .catch((err) =>
-                                    void dialog.alert({
-                                      title: 'Could not start payment',
-                                      message: getErrorMessage(err),
-                                    }),
-                                  );
+                                goToOrderCheckout(
+                                  o.id,
+                                  `/portal/orders/${orderSlug(o.humanRef, o.id)}`,
+                                );
                               }}
                             >
                               <i className="ti ti-credit-card" /> Pay

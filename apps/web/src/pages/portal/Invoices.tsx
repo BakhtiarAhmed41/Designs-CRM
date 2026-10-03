@@ -9,7 +9,7 @@ import {
   listMyInvoices,
   openInvoicePrint,
   payMyInvoice,
-  startMyInvoiceCheckout,
+  goToInvoiceCheckout,
   type Invoice,
 } from '@/lib/billing';
 import { getMyCustomer } from '@/lib/customers';
@@ -118,10 +118,7 @@ export function PortalInvoices() {
           return;
         }
       }
-      const checkout = await startMyInvoiceCheckout(inv.id);
-      if (checkout?.alreadyPaid) {
-        await confirmMyInvoice(inv.id).catch(() => null);
-      }
+      goToInvoiceCheckout(inv.id, '/portal/invoices');
     },
     onSuccess: () => {
       setError(null);

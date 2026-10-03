@@ -32,42 +32,49 @@ export class StripeService {
   }
 
   async createInvoiceCheckout(input: {
-    amountCents: number;
     currency: string;
-    productName: string;
-    successUrl: string;
-    cancelUrl: string;
+    returnUrl: string;
     invoiceId: string;
     paymentId: string;
     customerEmail?: string | null;
+    lineItems: Array<{
+      name: string;
+      description?: string | null;
+      amountCents: number;
+    }>;
   }): Promise<Stripe.Checkout.Session> {
     const stripe = this.getClient();
     const currency = (input.currency || 'USD').toLowerCase();
+    const lineItems = input.lineItems.filter((item) => item.amountCents > 0);
+    if (lineItems.length === 0) {
+      throw new BadRequestException('This invoice has nothing left to charge');
+    }
     let session;
     try {
       session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      success_url: input.successUrl,
-      cancel_url: input.cancelUrl,
-      customer_email: input.customerEmail?.trim() || undefined,
-      client_reference_id: input.invoiceId,
-      metadata: {
-        invoiceId: input.invoiceId,
-        paymentId: input.paymentId,
-      },
-      line_items: [
-        {
+        mode: 'payment',
+        ui_mode: 'elements',
+        return_url: input.returnUrl,
+        customer_email: input.customerEmail?.trim() || undefined,
+        client_reference_id: input.invoiceId,
+        metadata: {
+          invoiceId: input.invoiceId,
+          paymentId: input.paymentId,
+        },
+        line_items: lineItems.map((item) => ({
           quantity: 1,
           price_data: {
             currency,
-            unit_amount: input.amountCents,
+            unit_amount: item.amountCents,
             product_data: {
-              name: input.productName.slice(0, 120) || 'Invoice',
+              name: item.name.slice(0, 250) || 'Design invoice',
+              ...(item.description?.trim()
+                ? { description: item.description.trim().slice(0, 500) }
+                : {}),
             },
           },
-        },
-      ],
-      integration_identifier: integrationLabel('invpay'),
+        })),
+        integration_identifier: integrationLabel('invpay'),
       });
     } catch (err) {
       const message =
@@ -77,8 +84,8 @@ export class StripeService {
         'Could not start card checkout. Check the Stripe keys and try again.',
       );
     }
-    if (!session.url) {
-      throw new BadRequestException('Stripe did not return a checkout URL');
+    if (!session.client_secret) {
+      throw new BadRequestException('Stripe did not return a checkout session');
     }
     return session;
   }

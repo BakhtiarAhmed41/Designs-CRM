@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { confirmMyOrder, startMyOrderCheckout } from '@/lib/billing';
+import { confirmMyOrder, goToOrderCheckout } from '@/lib/billing';
 import {
   acceptQuotation,
   getMyOrder,
@@ -178,21 +178,10 @@ export function PortalOrderDetail() {
     }
   }, [paidReturn, data?.order, searchParams, setSearchParams]);
 
-  async function handlePay(orderId: string) {
+  function handlePay(orderId: string) {
     setPayBusy(true);
     setActionError(null);
-    try {
-      const res = await startMyOrderCheckout(orderId);
-      if (res?.alreadyPaid) {
-        await confirmMyOrder(orderId).catch(() => null);
-        await invalidateWorkCaches(qc);
-        await qc.invalidateQueries({ queryKey: ['my-order', orderId] });
-      }
-    } catch (e) {
-      setActionError(getErrorMessage(e));
-    } finally {
-      setPayBusy(false);
-    }
+    goToOrderCheckout(orderId, `/portal/orders/${id}`);
   }
 
   const uploadRefs = useMutation({
@@ -322,11 +311,7 @@ export function PortalOrderDetail() {
             onClick={() => startChat.mutate()}
           >
             <i className="ti ti-message-circle" />
-            {startChat.isPending
-              ? 'Opening…'
-              : isPostDelivery
-                ? 'Help Request'
-                : 'Start Chat'}
+            {startChat.isPending ? 'Opening…' : 'Need help?'}
           </button>
           {canRequestRevision && (
             <button

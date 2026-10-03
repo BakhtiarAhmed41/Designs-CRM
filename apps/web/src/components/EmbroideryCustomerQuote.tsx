@@ -4,7 +4,7 @@ import { useTopbarLead } from '@/components/Shell';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { DesignNameTitle, DetailsSectionHead } from '@/components/DesignNameTitle';
 import { EmbroideryFileCard } from '@/components/EmbroideryFileCard';
-import { confirmMyOrder, startMyOrderCheckout } from '@/lib/billing';
+import { listMyInvoices, openInvoicePrint, goToOrderCheckout } from '@/lib/billing';
 import { getErrorMessage } from '@/lib/api';
 import { isAdminRecounter, isStaffCreatedOrder, lineTotal, quoteHistoryLabel, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
 import {
@@ -19,7 +19,10 @@ import {
   sizeDetail,
   turnaroundLabel,
   type EmbAttachment,
+  type EmbDesign,
+  type EmbSize,
 } from '@/lib/embroideryQuote';
+import type { QuotationLine } from '@/lib/designs';
 import { openLinkedChat } from '@/lib/messaging';
 import { acceptQuotation, myAttachmentUrl } from '@/lib/orders';
 import { applyOrderChange } from '@/lib/queryCache';
@@ -28,6 +31,44 @@ import { quoteJourneyPhase } from '@/lib/quoteJourney';
 import type { Order } from '@/lib/types';
 import { QuoteJourney, QuotePricingEmpty } from '@/components/QuoteJourney';
 import '@/styles/embroidery-quote.css';
+
+function serviceForDesign(kind: 'embroidery' | 'cutting' | 'vector', design?: EmbDesign) {
+  const picked = design?.service?.trim();
+  if (picked) return picked;
+  if (kind === 'cutting') return 'Cutting & Engraving';
+  if (kind === 'vector') return 'Vector & Print';
+  return 'Embroidery Digitizing';
+}
+
+function sizePlacement(size: EmbSize) {
+  const detail = size.detail?.trim() || '';
+  const measured = [size.w, size.h].filter(Boolean).join(' × ');
+  const sizeText = detail || (measured ? `${measured}${size.unit ? ` ${size.unit}` : ''}` : '');
+  const place = size.placement?.trim() || '';
+  if (sizeText && place) return `${sizeText} · ${place}`;
+  return sizeText || place;
+}
+
+function pricedSizes(design?: EmbDesign) {
+  return (design?.sizes ?? []).filter((size) => size.detail || size.placement || size.w || size.h);
+}
+
+function lineSizeLabel(line: QuotationLine, design: EmbDesign | undefined, index: number) {
+  const fromDesign = pricedSizes(design)[index];
+  const fromRequest = fromDesign ? sizePlacement(fromDesign) : '';
+  if (fromRequest) return fromRequest;
+  const fromQuote = (line.sizes ?? []).map((size) => size.label?.trim()).filter(Boolean);
+  if (fromQuote.length) return fromQuote.join(' · ');
+  return '—';
+}
+
+function selectionCaption(itemCount: number, designCount: number, picking: boolean) {
+  if (picking && itemCount === 0) return '0 items selected';
+  const items = itemCount === 1 ? '1 item' : `${itemCount} items`;
+  const selected = picking ? ' selected' : '';
+  if (designCount <= 1) return `${items}${selected} for 1 design`;
+  return `${items}${selected} across ${designCount} designs`;
+}
 
 export function EmbroideryCustomerQuote({
   order,
@@ -66,6 +107,7 @@ export function EmbroideryCustomerQuote({
   const [open, setOpen] = useState({ request: false, delivery: false, history: false });
   const [error, setError] = useState<string | null>(null);
   const [payBusy, setPayBusy] = useState(false);
+  const [invoiceBusy, setInvoiceBusy] = useState(false);
 
   useEffect(() => {
     setKept(null);
@@ -80,20 +122,10 @@ export function EmbroideryCustomerQuote({
   const quotePath = `/portal/quotes/${orderSlug(order.humanRef, order.id)}`;
   const orderPath = `/portal/orders/${orderSlug(order.humanRef, order.id)}`;
 
-  async function payQuote() {
+  function payQuote() {
     setPayBusy(true);
     setError(null);
-    try {
-      const pay = await startMyOrderCheckout(order.id, quotePath);
-      if (pay?.alreadyPaid) {
-        await confirmMyOrder(order.id).catch(() => null);
-        await qc.invalidateQueries({ queryKey: ['my-order'] });
-      }
-    } catch (e) {
-      setError(getErrorMessage(e));
-    } finally {
-      setPayBusy(false);
-    }
+    goToOrderCheckout(order.id, quotePath);
   }
 
   const acceptMut = useMutation({
@@ -102,17 +134,7 @@ export function EmbroideryCustomerQuote({
       void applyOrderChange(qc, res.order);
       if (res.order.status !== 'PENDING_PAYMENT') return;
       setPayBusy(true);
-      try {
-        const pay = await startMyOrderCheckout(res.order.id, quotePath);
-        if (pay?.alreadyPaid) {
-          await confirmMyOrder(res.order.id).catch(() => null);
-          await qc.invalidateQueries({ queryKey: ['my-order'] });
-        }
-      } catch (e) {
-        setError(getErrorMessage(e));
-      } finally {
-        setPayBusy(false);
-      }
+      goToOrderCheckout(res.order.id, quotePath);
     },
     onError: (e) => setError(getErrorMessage(e)),
   });
@@ -128,7 +150,29 @@ export function EmbroideryCustomerQuote({
     onError: (e) => setError(getErrorMessage(e)),
   });
 
+  async function openInvoice() {
+    setInvoiceBusy(true);
+    setError(null);
+    try {
+      const { invoices } = await listMyInvoices();
+      const matches = invoices.filter(
+        (item) => item.orderId === order.id || item.linkedOrderIds?.includes(order.id),
+      );
+      const invoice = matches.find((item) => item.status === 'PAID') ?? matches[0];
+      if (!invoice) {
+        setError('No invoice for this order yet.');
+        return;
+      }
+      await openInvoicePrint(invoice.id);
+    } catch (e) {
+      setError(getErrorMessage(e));
+    } finally {
+      setInvoiceBusy(false);
+    }
+  }
+
   const phase = quoteJourneyPhase(order);
+  const paid = phase === 'paid';
   const counterPending = order.status === 'WAITING_FOR_ADMIN_QUOTATION_APPROVAL';
   const status =
     phase === 'paid'
@@ -160,15 +204,16 @@ export function EmbroideryCustomerQuote({
 
   const history = [...quotations].sort((a, b) => a.version - b.version);
   const quoteNo = orderNumber(order.humanRef, order.id.slice(0, 6));
+  const serviceName = vector ? 'Vector' : cutting ? 'Cutting' : 'Embroidery';
   const topbarLead = useMemo(
     () => (
       <nav className="ecd-crumb" aria-label="Breadcrumb">
-        <Link to="/portal/quotes">Quotes</Link>
+        <Link to="/portal/quotes">Quote/{serviceName}</Link>
         <span aria-hidden="true">/</span>
         <b>{quoteNo}</b>
       </nav>
     ),
-    [quoteNo],
+    [quoteNo, serviceName],
   );
   useTopbarLead(topbarLead);
 
@@ -216,7 +261,18 @@ export function EmbroideryCustomerQuote({
       <div className="ecd-sheet">
         <section className="ecd-sec qj-price">
           <div className="ecd-sec-h">
-            <h2>Quote pricing</h2>
+            <div>
+              <h2>Quote pricing</h2>
+              {lines.length > 0 && (
+                <p className="qj-price-lead">
+                  {paid
+                    ? 'Items included in your paid order.'
+                    : canPick
+                      ? "Select the items you'd like to order."
+                      : 'Items quoted for this request.'}
+                </p>
+              )}
+            </div>
           </div>
           {lines.length === 0 && (
             <QuotePricingEmpty
@@ -228,56 +284,101 @@ export function EmbroideryCustomerQuote({
           {declined && lines.length > 0 && (
             <p className="ecd-wait">{order.rejectionReason || 'The team declined this request.'}</p>
           )}
-          {groups.map((group) => (
-            <div key={group.title} className="ecd-group">
-              <div className="ecd-group-name">{group.title}</div>
-              <div className="ecd-quotes">
-                {group.lines.map((line) => {
-                  const on = selected.includes(line.id);
-                  return (
-                    <label key={line.id} className="ecd-line">
-                      {canPick && (
-                        <input
-                          type="checkbox"
-                          checked={on}
-                          onChange={() => {
-                            setKept((prev) => {
-                              const current = prev ?? lines.map((item) => item.id);
-                              return on ? current.filter((id) => id !== line.id) : [...current, line.id];
-                            });
-                          }}
-                        />
-                      )}
-                      <span>{line.name}</span>
-                      <b>{money(lineTotal(line))}</b>
-                    </label>
-                  );
-                })}
+          {groups.map((group) => {
+            const design = designs[designLabels.indexOf(group.title)];
+            const serviceName = serviceForDesign(kind, design);
+            return (
+              <div key={group.title} className="ecd-group">
+                <div className="ecd-label">Design name</div>
+                <div className="ecd-group-name">{group.title}</div>
+                <div className={`ecd-quotes${canPick ? '' : ' no-select'}`}>
+                  <div className="qj-price-head">
+                    {canPick && <span>Select</span>}
+                    <span>{serviceName}</span>
+                    <span>Size & placement</span>
+                    <span>Price</span>
+                  </div>
+                  {group.lines.map((line, index) => {
+                    const on = selected.includes(line.id);
+                    const Row = canPick ? 'label' : 'div';
+                    return (
+                      <Row key={line.id} className="ecd-line">
+                        {canPick && (
+                          <input
+                            type="checkbox"
+                            checked={on}
+                            onChange={() => {
+                              setKept((prev) => {
+                                const current = prev ?? lines.map((item) => item.id);
+                                return on ? current.filter((id) => id !== line.id) : [...current, line.id];
+                              });
+                            }}
+                          />
+                        )}
+                        <span>{serviceName}</span>
+                        <span>{lineSizeLabel(line, design, index)}</span>
+                        <b>{money(lineTotal(line))}</b>
+                      </Row>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
-          {lines.length > 0 && <div className="ecd-perf" />}
+            );
+          })}
           {lines.length > 0 && (
-            <div className="ecd-foot">
+            <div className={`ecd-foot${paid ? ' is-paid' : ''}`}>
               <div>
-                <div className="ecd-total-label">{canPick ? 'Selected total' : 'Quoted total'}</div>
-                <div className="ecd-total">{money(canPick ? total : studio?.amountCents ?? total)}</div>
+                <div className="ecd-total-label">{paid ? 'Amount paid' : canPick ? 'Selected total' : 'Quoted total'}</div>
+                {paid ? (
+                  <div className="ecd-paid-row">
+                    <div className="ecd-total">{money(studio?.amountCents ?? total)}</div>
+                    <span className="ecd-paid-flag">
+                      <i className="ti ti-circle-check" /> Payment received
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="ecd-total">{money(canPick ? total : studio?.amountCents ?? total)}</div>
+                    <div className="ecd-total-note">
+                      {selectionCaption(
+                        canPick ? selected.length : lines.length,
+                        groups.filter((group) =>
+                          group.lines.some((line) => !canPick || selected.includes(line.id)),
+                        ).length,
+                        canPick,
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
-              {canDecide && (
-                <div className="ecd-foot-acts">
-                  <button type="button" className="ecd-btn" disabled={chatMut.isPending} onClick={() => chatMut.mutate()}>
-                    <i className="ti ti-message" /> Contact us
-                  </button>
+              <div className="ecd-foot-acts">
+                {paid ? (
                   <button
                     type="button"
-                    className="ecd-btn pri"
-                    disabled={acceptMut.isPending || payBusy || (canPick && selected.length === 0)}
-                    onClick={() => acceptMut.mutate()}
+                    className="ecd-btn ecd-btn-invoice"
+                    disabled={invoiceBusy}
+                    onClick={() => void openInvoice()}
                   >
-                    {acceptMut.isPending || payBusy ? 'Please wait…' : 'Accept & Pay'}
+                    {invoiceBusy ? 'Opening…' : 'View invoice'}
                   </button>
-                </div>
-              )}
+                ) : (
+                  <>
+                    <button type="button" className="ecd-btn" disabled={chatMut.isPending} onClick={() => chatMut.mutate()}>
+                      Need help?
+                    </button>
+                    {canDecide && (
+                      <button
+                        type="button"
+                        className="ecd-btn pri"
+                        disabled={acceptMut.isPending || payBusy || (canPick && selected.length === 0)}
+                        onClick={() => acceptMut.mutate()}
+                      >
+                        {acceptMut.isPending || payBusy ? 'Please wait…' : 'Accept & Pay'}
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           )}
         </section>

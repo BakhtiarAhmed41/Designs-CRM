@@ -35,6 +35,150 @@ function displayOrderNumber(ref?: string | null) {
   return digits.length === 10 ? `#${digits}` : ref?.trim() || '';
 }
 
+function serviceLabel(serviceType?: string | null): string {
+  const s = (serviceType ?? '').toLowerCase();
+  if (!s) return 'Design service';
+  if (s.includes('embroid')) return 'Embroidery';
+  if (s.includes('vector')) return 'Vector & Print';
+  if (s.includes('svg') || s.includes('cnc') || s.includes('laser')) return 'Cut, Print & Engraving';
+  return serviceType!
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function parseIdList(raw: unknown, fallback: string | null): string[] {
+  if (Array.isArray(raw)) {
+    return raw.filter((x): x is string => typeof x === 'string' && x.length > 0);
+  }
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed.filter((x): x is string => typeof x === 'string' && x.length > 0);
+      }
+    } catch {
+      /* stored as plain text */
+    }
+  }
+  return fallback ? [fallback] : [];
+}
+
+function withCheckoutSession(path: string) {
+  const join = path.includes('?') ? '&' : '?';
+  return `${path}${join}session_id={CHECKOUT_SESSION_ID}`;
+}
+
+function clip(value: string | null | undefined, max: number) {
+  const text = (value ?? '').replace(/\s+/g, ' ').trim();
+  if (!text) return null;
+  return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+}
+
+type CheckoutItem = {
+  name: string;
+  detail: string | null;
+  amountCents: number | null;
+};
+
+type CheckoutGroup = {
+  orderRef: string | null;
+  orderName: string | null;
+  serviceLabel: string;
+  amountCents: number | null;
+  items: CheckoutItem[];
+};
+
+export type CheckoutSummary = {
+  title: string;
+  kind: InvoiceKind;
+  currency: string;
+  amountDueCents: number;
+  alreadyPaidCents: number;
+  groups: CheckoutGroup[];
+};
+
+function sumCents(values: Array<number | null | undefined>) {
+  return values.reduce<number>((sum, value) => sum + (value ?? 0), 0);
+}
+
+function amountsMatch(values: Array<number | null>, target: number) {
+  return target > 0 && values.length > 0 && values.every((value) => value != null) && sumCents(values) === target;
+}
+
+function reconcileCheckoutGroups(groups: CheckoutGroup[], dueCents: number): CheckoutGroup[] {
+  const groupAmounts = groups.map((group) => group.amountCents);
+  const showGroupTotals = groups.length > 1 && amountsMatch(groupAmounts, dueCents);
+  return groups.map((group) => {
+    const target = groups.length === 1 ? dueCents : showGroupTotals ? group.amountCents : null;
+    const showItemPrices =
+      target != null && amountsMatch(group.items.map((item) => item.amountCents), target);
+    return {
+      ...group,
+      amountCents: showGroupTotals ? group.amountCents : null,
+      items: group.items.map((item) => ({
+        ...item,
+        amountCents: showItemPrices ? item.amountCents : null,
+      })),
+    };
+  });
+}
+
+function stripeLineItems(summary: CheckoutSummary) {
+  const fromItems = summary.groups.flatMap((group) =>
+    group.items
+      .filter((item) => (item.amountCents ?? 0) > 0)
+      .map((item) => ({
+        name: item.name,
+        description: [group.serviceLabel, group.orderRef ? `Order ${group.orderRef}` : null, item.detail]
+          .filter(Boolean)
+          .join(' · '),
+        amountCents: item.amountCents ?? 0,
+      })),
+  );
+  if (sumCents(fromItems.map((item) => item.amountCents)) === summary.amountDueCents && fromItems.length) {
+    return fromItems;
+  }
+
+  const fromGroups = summary.groups
+    .filter((group) => (group.amountCents ?? 0) > 0)
+    .map((group) => ({
+      name: group.orderName || (group.orderRef ? `Order ${group.orderRef}` : summary.title),
+      description: [
+        group.serviceLabel,
+        group.orderRef ? `Order ${group.orderRef}` : null,
+        group.items.map((item) => item.name).filter(Boolean).join(', ') || null,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+      amountCents: group.amountCents ?? 0,
+    }));
+  if (sumCents(fromGroups.map((item) => item.amountCents)) === summary.amountDueCents && fromGroups.length) {
+    return fromGroups;
+  }
+
+  const description = summary.groups
+    .map((group) =>
+      [
+        group.serviceLabel,
+        group.orderRef ? `Order ${group.orderRef}` : group.orderName,
+        group.items.map((item) => item.name).filter(Boolean).join(', ') || null,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    )
+    .filter(Boolean)
+    .join('; ');
+
+  return [
+    {
+      name: summary.title || 'Design invoice',
+      description,
+      amountCents: summary.amountDueCents,
+    },
+  ];
+}
+
 function isAdminRole(role: UserRole): boolean {
   return (
     role === UserRole.SUPER_ADMIN ||
@@ -1234,8 +1378,7 @@ export class BillingService {
     if (!invoice) throw new NotFoundException('Invoice not found');
     const web = this.resolveWebBase(returnOrigin);
     return this.startStripeCheckout(invoice, payment, {
-      successPath: `/pay/${token}?status=success`,
-      cancelPath: `/pay/${token}?status=canceled`,
+      successPath: `/pay/${token}?status=return`,
       web,
     });
   }
@@ -1256,10 +1399,221 @@ export class BillingService {
     return this.startCheckoutForPayLink(token, returnOrigin);
   }
 
+  private async checkoutItemsForOrder(orderId: string): Promise<CheckoutItem[]> {
+    const quoted = await this.db.query<{
+      id: string;
+      name: string;
+      note: string | null;
+      price_cents: number | null;
+      size_label: string | null;
+      size_price: number | null;
+      size_sort: number | null;
+    }>(
+      `SELECT ql.id, ql.name, ql.note, ql.price_cents,
+              qs.label AS size_label, qs.price_cents AS size_price, qs.sort_order AS size_sort
+         FROM quotation_lines ql
+         JOIN quotations q ON q.id = ql.quotation_id
+         LEFT JOIN quotation_line_sizes qs ON qs.line_id = ql.id
+        WHERE q.order_id = ?
+          AND q.status = 'APPROVED'
+          AND ql.client_decision <> 'DROPPED'
+          AND q.id = (
+            SELECT id FROM quotations
+             WHERE order_id = ? AND status = 'APPROVED'
+             ORDER BY version DESC LIMIT 1
+          )
+        ORDER BY ql.sort_order ASC, qs.sort_order ASC`,
+      [orderId, orderId],
+    );
+    if (quoted.length > 0) {
+      const lines = new Map<string, CheckoutItem & { sizePrices: number; note: string | null }>();
+      for (const row of quoted) {
+        const current = lines.get(row.id) ?? {
+          name: row.name?.trim() || 'Design',
+          detail: null,
+          amountCents: row.price_cents ?? 0,
+          sizePrices: 0,
+          note: row.note,
+        };
+        if (row.size_label) {
+          current.detail = current.detail ? `${current.detail}, ${row.size_label}` : row.size_label;
+          current.sizePrices += row.size_price ?? 0;
+        }
+        lines.set(row.id, current);
+      }
+      return [...lines.values()].map((line) => ({
+        name: line.name,
+        detail: line.detail || clip(line.note, 160),
+        amountCents: (line.amountCents ?? 0) + line.sizePrices,
+      }));
+    }
+
+    const designs = await this.db.query<{
+      name: string;
+      placement: string | null;
+      size: string | null;
+      price_cents: number | null;
+    }>(
+      `SELECT name, placement, size, price_cents
+         FROM order_designs
+        WHERE order_id = ?
+        ORDER BY sort_order ASC, created_at ASC`,
+      [orderId],
+    );
+    return designs.map((design) => ({
+      name: design.name?.trim() || 'Design',
+      detail: [design.placement, design.size].map((part) => part?.trim()).filter(Boolean).join(' · ') || null,
+      amountCents: design.price_cents,
+    }));
+  }
+
+  private async revisionItems(invoiceId: string): Promise<CheckoutItem[]> {
+    const edit = await this.db.queryOne<{
+      design_id: string | null;
+      design_ids: unknown;
+      note: string | null;
+    }>(
+      'SELECT design_id, design_ids, note FROM edit_requests WHERE invoice_id = ? LIMIT 1',
+      [invoiceId],
+    );
+    if (!edit) return [];
+    const ids = parseIdList(edit.design_ids, edit.design_id);
+    if (ids.length === 0) {
+      return [
+        {
+          name: 'Revision',
+          detail: clip(edit.note, 180),
+          amountCents: null,
+        },
+      ];
+    }
+    const designs = await this.db.query<{ id: string; name: string; placement: string | null; size: string | null }>(
+      `SELECT id, name, placement, size FROM order_designs WHERE id IN (${ids.map(() => '?').join(',')})`,
+      ids,
+    );
+    const byId = new Map(designs.map((design) => [design.id, design]));
+    const items = ids
+      .map((id) => byId.get(id))
+      .filter((design): design is NonNullable<typeof design> => Boolean(design))
+      .map((design) => ({
+        name: design.name?.trim() || 'Design',
+        detail: [design.placement, design.size].map((part) => part?.trim()).filter(Boolean).join(' · ') || null,
+        amountCents: null,
+      }));
+    return items.length
+      ? items
+      : [{ name: 'Revision', detail: clip(edit.note, 180), amountCents: null }];
+  }
+
+  private async buildCheckoutSummary(invoice: InvoiceRow): Promise<CheckoutSummary> {
+    const due = invoiceRemainingCents(invoice);
+    const lines =
+      invoice.kind === InvoiceKind.MONTHLY
+        ? await this.db.query<InvoiceLineRow>(
+            'SELECT * FROM invoice_lines WHERE invoice_id = ? ORDER BY created_at ASC',
+            [invoice.id],
+          )
+        : [];
+    const orderIds = new Set<string>();
+    if (invoice.order_id) orderIds.add(invoice.order_id);
+    for (const line of lines) {
+      if (line.order_id) orderIds.add(line.order_id);
+    }
+    const orders = orderIds.size
+      ? await this.db.query<{
+          id: string;
+          human_ref: string | null;
+          name: string | null;
+          service_type: string | null;
+        }>(
+          `SELECT id, human_ref, name, service_type FROM orders WHERE id IN (${[...orderIds].map(() => '?').join(',')})`,
+          [...orderIds],
+        )
+      : [];
+    const byId = new Map(orders.map((order) => [order.id, order]));
+
+    const groupForOrder = async (
+      orderId: string | null,
+      fallbackName: string,
+      amountCents: number | null,
+      items?: CheckoutItem[],
+    ): Promise<CheckoutGroup> => {
+      const order = orderId ? byId.get(orderId) : undefined;
+      const resolved =
+        items ??
+        (orderId ? await this.checkoutItemsForOrder(orderId) : []);
+      const list = resolved.length
+        ? resolved
+        : [{ name: fallbackName, detail: null, amountCents }];
+      return {
+        orderRef: displayOrderNumber(order?.human_ref) || null,
+        orderName: order?.name?.trim() || null,
+        serviceLabel: serviceLabel(order?.service_type),
+        amountCents,
+        items: list,
+      };
+    };
+
+    let groups: CheckoutGroup[] = [];
+    if (invoice.kind === InvoiceKind.MONTHLY && lines.length > 0) {
+      groups = await Promise.all(
+        lines.map((line) =>
+          groupForOrder(line.order_id, line.description, line.amount_cents),
+        ),
+      );
+    } else if (invoice.kind === InvoiceKind.ADD_ON) {
+      const revision = await this.revisionItems(invoice.id);
+      groups = [
+        await groupForOrder(
+          invoice.order_id,
+          invoice.covers_text?.trim() || 'Revision',
+          due,
+          revision.length ? revision : undefined,
+        ),
+      ];
+    } else if (invoice.order_id) {
+      groups = [
+        await groupForOrder(invoice.order_id, invoice.covers_text?.trim() || 'Design', due),
+      ];
+    }
+
+    if (groups.length === 0) {
+      groups = [
+        {
+          orderRef: null,
+          orderName: null,
+          serviceLabel: 'Design service',
+          amountCents: due,
+          items: [
+            {
+              name: invoice.covers_text?.trim() || 'Design invoice',
+              detail: null,
+              amountCents: due,
+            },
+          ],
+        },
+      ];
+    }
+
+    const title =
+      invoice.covers_text?.trim() ||
+      groups.find((group) => group.orderName)?.orderName ||
+      (groups[0]?.orderRef ? `Order ${groups[0].orderRef}` : 'Design invoice');
+
+    return {
+      title,
+      kind: invoice.kind,
+      currency: invoice.currency,
+      amountDueCents: due,
+      alreadyPaidCents: invoice.amount_paid_cents ?? 0,
+      groups: reconcileCheckoutGroups(groups, due),
+    };
+  }
+
   private async startStripeCheckout(
     invoice: InvoiceRow,
     payment: PaymentRow,
-    dest: { successPath: string; cancelPath: string; web: string },
+    dest: { successPath: string; web: string },
   ) {
     if (invoice.status === InvoiceStatus.PAID) {
       return { alreadyPaid: true as const };
@@ -1274,6 +1628,8 @@ export class BillingService {
     if (remaining <= 0) {
       return { alreadyPaid: true as const };
     }
+    const customer = await this.getCustomerRow(invoice.customer_id);
+    const emailOnFile = Boolean(customer?.email?.trim());
     if (payment.stripe_checkout_session_id) {
       try {
         const paidSession = await this.loadPaidStripeSession(
@@ -1288,32 +1644,42 @@ export class BillingService {
         );
         if (
           existing.status === 'open' &&
-          existing.url &&
+          existing.ui_mode === 'elements' &&
+          existing.client_secret &&
           existing.amount_total === remaining
         ) {
-          return { url: existing.url, sessionId: existing.id };
+          return {
+            clientSecret: existing.client_secret,
+            sessionId: existing.id,
+            emailOnFile,
+            summary: await this.buildCheckoutSummary(invoice),
+          };
         }
       } catch (err) {
         if (err instanceof BadRequestException) throw err;
       }
     }
 
-    const customer = await this.getCustomerRow(invoice.customer_id);
+    const summary = await this.buildCheckoutSummary(invoice);
+    const returnUrl = `${dest.web}${withCheckoutSession(dest.successPath)}`;
     const session = await this.stripe.createInvoiceCheckout({
-      amountCents: remaining,
       currency: invoice.currency,
-      productName: invoice.covers_text || 'Design invoice',
-      successUrl: `${dest.web}${dest.successPath}`,
-      cancelUrl: `${dest.web}${dest.cancelPath}`,
+      returnUrl,
       invoiceId: invoice.id,
       paymentId: payment.id,
       customerEmail: customer?.email,
+      lineItems: stripeLineItems(summary),
     });
     await this.db.execute(
       'UPDATE payments SET stripe_checkout_session_id = ? WHERE id = ?',
       [session.id, payment.id],
     );
-    return { url: session.url!, sessionId: session.id };
+    return {
+      clientSecret: session.client_secret!,
+      sessionId: session.id,
+      emailOnFile,
+      summary,
+    };
   }
 
   private stripeSessionIsPaid(session: {
@@ -1498,7 +1864,6 @@ export class BillingService {
     );
     return this.startStripeCheckout(invoice, payment, {
       successPath: `${returnPath}${returnPath.includes('?') ? '&' : '?'}paid=1`,
-      cancelPath: `${returnPath}${returnPath.includes('?') ? '&' : '?'}canceled=1`,
       web,
     });
   }
@@ -2631,8 +2996,8 @@ function buildInvoicePrintHtml(
 </head>
 <body>
   <div class="toolbar no-print">
-    <span>Use Print and choose “Save as PDF” for a clean copy.</span>
-    <button type="button" onclick="window.print()">Print</button>
+    <span>Choose “Save as PDF” in the print dialog.</span>
+    <button type="button" onclick="downloadPdf()">Download PDF</button>
   </div>
   <div class="page">
   <article class="sheet">
@@ -2743,11 +3108,9 @@ function buildInvoicePrintHtml(
   </article>
   </div>
   <script>
-    function go(){ window.print(); }
-    if (document.fonts && document.fonts.ready) {
-      document.fonts.ready.then(function(){ setTimeout(go, 60); });
-    } else {
-      window.addEventListener('load', go);
+    function downloadPdf() {
+      document.title = ${JSON.stringify(`Invoice-LVD-${ref}`)};
+      window.print();
     }
   </script>
 </body>

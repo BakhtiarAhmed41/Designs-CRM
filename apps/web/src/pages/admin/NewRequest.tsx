@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getErrorMessage } from '@/lib/api';
+import { friendlySubmitError } from '@/lib/api';
 import { getCustomer, listCustomers, type Customer } from '@/lib/customers';
 import { isUsualQuoteService, quoteFormatsFromPrefs } from '@/lib/customerPrefs';
 import { orderSlug } from '@/lib/format';
@@ -352,9 +352,10 @@ export function AdminNewRequest({ mode }: { mode: Mode }) {
           replace: true,
         });
       } catch (e) {
-        setError(getErrorMessage(e));
+        const message = friendlySubmitError(e);
+        setError(message);
         iframeRef.current?.contentWindow?.postMessage(
-          { type: 'lvd-quote-submit-result', ok: false },
+          { type: 'lvd-quote-submit-result', ok: false, message },
           '*',
         );
       } finally {

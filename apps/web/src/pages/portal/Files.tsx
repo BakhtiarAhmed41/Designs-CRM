@@ -161,10 +161,12 @@ function buildSections(order: FilesOrder | undefined, files: MyFile[]): DesignSe
     boxes: group.rows.map((row, index) => {
       const matched = portal.filter((file) => file.designId && file.designId === row.design?.id);
       matched.forEach((file) => used.add(file.fileId));
+      const spec = sizeSpec(group.title, index, group.rows.length, row.name, designs);
+      const severalSizes = group.rows.length > 1;
       return {
         key: row.key,
-        title: `Size ${index + 1}`,
-        spec: sizeSpec(group.title, index, group.rows.length, row.name, designs),
+        title: severalSizes ? `Size ${index + 1}` : spec || group.title,
+        spec: severalSizes ? spec : '',
         files: matched,
         emailed: batchEmailed(matched),
       };

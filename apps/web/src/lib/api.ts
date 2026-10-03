@@ -62,6 +62,30 @@ export function getErrorMessage(err: unknown): string {
   return 'Something went wrong';
 }
 
+/** Turn a failed quote submit into a message a customer can act on. */
+export function friendlySubmitError(err: unknown): string {
+  const raw = getErrorMessage(err).replace(/\s+/g, ' ').trim();
+  if (!raw || raw === 'Something went wrong') {
+    return "We couldn't submit this request. Please try again. If it continues, use Need help and we'll take it from here.";
+  }
+  if (/failed to fetch|networkerror|network request failed|load failed/i.test(raw)) {
+    return "We couldn't reach the server. Check your connection and try again.";
+  }
+  if (/session expired|unauthorized|not authorized|please log in|sign in/i.test(raw)) {
+    return 'Your session has expired. Sign in again, then submit this request.';
+  }
+  if (/forbidden|permission/i.test(raw)) {
+    return "You don't have permission to submit this request.";
+  }
+  if (/too large|entity too large|payload/i.test(raw)) {
+    return 'One or more files are too large to upload. Use a smaller file and try again.';
+  }
+  if (/exception|prisma|stack trace|econn|syntaxerror/i.test(raw)) {
+    return "We couldn't submit this request. Please try again. If it continues, use Need help and we'll take it from here.";
+  }
+  return raw;
+}
+
 async function parseError(res: Response): Promise<string> {
   try {
     const data = await res.json();
