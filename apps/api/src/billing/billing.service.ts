@@ -24,6 +24,7 @@ import { getEnv } from '../config/env';
 import { DbService, DbTransaction } from '../db/db.service';
 import { MailService } from '../mail/mail.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { LocalStorageService } from '../storage/local-storage.service';
 import { StripeService } from './stripe.service';
 
 function assertAuthUser(user: AuthUser | undefined): asserts user is AuthUser {
@@ -219,6 +220,29 @@ function netTermsDays(terms?: string | null) {
   return 30;
 }
 
+const INVOICE_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
+
+type UploadedImage = {
+  originalname: string;
+  mimetype?: string;
+  size: number;
+  buffer: Buffer;
+};
+
+function isInvoiceImage(file: { originalname: string; mimetype?: string }) {
+  if (/^image\/(jpeg|png|webp|gif)$/i.test(file.mimetype ?? '')) return true;
+  return /\.(png|jpe?g|gif|webp)$/i.test(file.originalname);
+}
+
+function imageContentType(mime: string | null | undefined, name: string | null | undefined) {
+  if (mime && /^image\/(jpeg|png|webp|gif)$/i.test(mime)) return mime;
+  const lower = (name ?? '').toLowerCase();
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.gif')) return 'image/gif';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  return 'image/jpeg';
+}
+
 function isValidPeriodMonth(value: string): boolean {
   return /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
 }
@@ -242,6 +266,9 @@ type InvoiceRow = {
   amount_paid_cents: number;
   currency: string;
   covers_text: string | null;
+  image_storage_key?: string | null;
+  image_name?: string | null;
+  image_mime?: string | null;
   status: InvoiceStatus;
   period_month: string | null;
   store_credit_applied_cents: number;
@@ -304,6 +331,7 @@ export class BillingService {
     private notifications: NotificationsService,
     private mail: MailService,
     private stripe: StripeService,
+    private storage: LocalStorageService,
   ) {}
 
   private webOrigins() {
@@ -350,6 +378,7 @@ export class BillingService {
       remainingCents: invoiceRemainingCents(i),
       currency: i.currency,
       coversText: i.covers_text,
+      imageName: i.image_name ?? null,
       status: i.status,
       periodMonth: i.period_month,
       storeCreditAppliedCents: i.store_credit_applied_cents,
@@ -611,7 +640,68 @@ export class BillingService {
          ORDER BY i.issued_at DESC`,
       params,
     );
-    return rows.map((r) => this.invoiceDto(r));
+    return Promise.all(rows.map((r) => this.presentInvoice(r)));
+  }
+
+  private async presentInvoice(
+    row: InvoiceRow & {
+      customer_name?: string | null;
+      order_ref?: string | null;
+      service_type?: string | null;
+    },
+  ) {
+    const dto = this.invoiceDto(row);
+    if (!row.image_storage_key) return { ...dto, imageUrl: null as string | null };
+    const imageUrl = await this.storage.createSignedUrl({
+      key: row.image_storage_key,
+      downloadAs: row.image_name || 'invoice-image',
+      inline: true,
+    });
+    return { ...dto, imageUrl };
+  }
+
+  private async attachInvoiceImage(invoiceId: string, file: UploadedImage) {
+    if (!isInvoiceImage(file)) {
+      throw new BadRequestException('Attach a PNG, JPG, WEBP, or GIF image');
+    }
+    const bytes = file.size || file.buffer.length;
+    if (!file.buffer?.length || bytes <= 0) {
+      throw new BadRequestException('Image file is empty');
+    }
+    if (bytes > INVOICE_IMAGE_MAX_BYTES) {
+      throw new BadRequestException('Image must be 8MB or smaller');
+    }
+    const previous = await this.getInvoiceRow(invoiceId);
+    const key = this.storage.newObjectKey(['invoices', invoiceId], file.originalname || 'image');
+    await this.storage.uploadObject({
+      key,
+      body: file.buffer,
+      contentType: imageContentType(file.mimetype, file.originalname),
+    });
+    await this.db.execute(
+      'UPDATE invoices SET image_storage_key = ?, image_name = ?, image_mime = ? WHERE id = ?',
+      [
+        key,
+        (file.originalname || 'image').slice(0, 255),
+        imageContentType(file.mimetype, file.originalname).slice(0, 120),
+        invoiceId,
+      ],
+    );
+    if (previous?.image_storage_key && previous.image_storage_key !== key) {
+      await this.storage.deleteObject(previous.image_storage_key);
+    }
+  }
+
+  private invoiceImageDataUri(invoice: InvoiceRow) {
+    if (!invoice.image_storage_key) return '';
+    try {
+      const path = this.storage.resolveExisting(invoice.image_storage_key);
+      const buf = readFileSync(path);
+      const type = imageContentType(invoice.image_mime, invoice.image_name);
+      return `data:${type};base64,${buf.toString('base64')}`;
+    } catch {
+      return '';
+    }
   }
 
   async createInvoice(
@@ -622,6 +712,7 @@ export class BillingService {
       amountCents: number;
       coversText?: string | null;
     },
+    image?: UploadedImage,
   ) {
     this.assertAdmin(user);
     const customer = await this.getCustomerRow(data.customerId);
@@ -650,6 +741,7 @@ export class BillingService {
             [data.amountCents, data.coversText?.trim() || null, existing.id],
           );
         }
+        if (image) await this.attachInvoiceImage(existing.id, image);
         return this.getInvoiceDetail(user, existing.id);
       }
     }
@@ -670,6 +762,13 @@ export class BillingService {
         InvoiceStatus.AWAITING,
       ],
     );
+
+    try {
+      if (image) await this.attachInvoiceImage(id, image);
+    } catch (err) {
+      await this.db.execute('DELETE FROM invoices WHERE id = ?', [id]);
+      throw err;
+    }
 
     await this.notifyCustomerUser(data.customerId, {
       title: 'New invoice',
@@ -988,7 +1087,7 @@ export class BillingService {
     );
     const customer = await this.getCustomerRow(invoice.customer_id);
     return {
-      ...this.invoiceDto(invoice),
+      ...(await this.presentInvoice(invoice)),
       customer: customer
         ? {
             id: customer.id,
@@ -1928,7 +2027,7 @@ export class BillingService {
     );
     if (payment) await this.confirmStripePayment(payment);
     const updated = await this.getInvoiceRow(invoiceId);
-    return { invoice: updated ? this.invoiceDto(updated) : null };
+    return { invoice: updated ? await this.presentInvoice(updated) : null };
   }
 
   // --- store credit (admin) ------------------------------------------------
@@ -2471,17 +2570,19 @@ export class BillingService {
         : 0;
 
     return {
-      invoices: invoices.map((r) => {
-        const linked = new Set<string>();
-        if (r.order_id) linked.add(r.order_id);
-        for (const id of (r.line_order_ids ?? '').split(',')) {
-          if (id) linked.add(id);
-        }
-        return {
-          ...this.invoiceDto(r),
-          linkedOrderIds: [...linked],
-        };
-      }),
+      invoices: await Promise.all(
+        invoices.map(async (r) => {
+          const linked = new Set<string>();
+          if (r.order_id) linked.add(r.order_id);
+          for (const id of (r.line_order_ids ?? '').split(',')) {
+            if (id) linked.add(id);
+          }
+          return {
+            ...(await this.presentInvoice(r)),
+            linkedOrderIds: [...linked],
+          };
+        }),
+      ),
       storeCreditCents: customer.store_credit_cents,
       unbilledMonthCents,
     };
@@ -2526,7 +2627,7 @@ export class BillingService {
         WHERE i.id = ? LIMIT 1`,
       [invoiceId],
     );
-    return { invoice: updated ? this.invoiceDto(updated) : null };
+    return { invoice: updated ? await this.presentInvoice(updated) : null };
   }
 
   async getMyStoreCredit(user: AuthUser | undefined) {
@@ -2590,7 +2691,13 @@ export class BillingService {
       [invoiceId],
     );
 
-    return buildInvoicePrintHtml(invoice, payments, invoiceLogoSrc(), lines);
+    return buildInvoicePrintHtml(
+      invoice,
+      payments,
+      invoiceLogoSrc(),
+      lines,
+      this.invoiceImageDataUri(invoice),
+    );
   }
 }
 
@@ -2669,6 +2776,7 @@ function buildInvoicePrintHtml(
   payments: PaymentRow[],
   logoSrc = '',
   lines: InvoiceLineRow[] = [],
+  imageSrc = '',
 ) {
   const ref = invoice.id.slice(0, 8).toUpperCase();
   const money = (cents: number) => formatInvoiceMoney(cents, invoice.currency);
@@ -2937,6 +3045,16 @@ function buildInvoicePrintHtml(
     font-size: 13px;
     color: var(--navy-d);
   }
+  .shot { margin-top: 28px; }
+  .shot img {
+    display: block;
+    margin-top: 10px;
+    max-width: 100%;
+    max-height: 320px;
+    object-fit: contain;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
   .pay { margin-top: 36px; }
   .pay table { margin-top: 8px; }
   .pay th {
@@ -3081,6 +3199,11 @@ function buildInvoicePrintHtml(
           : invoice.status === InvoiceStatus.AWAITING
             ? `<p class="note">${dueOn ? `Payment is due by ${escapeHtml(dueOn)}.` : 'Payment is due upon receipt.'} Pay by card from your client portal or the payment link we sent.</p>`
             : ''
+    }
+    ${
+      imageSrc
+        ? `<section class="shot"><div class="k">Attached image</div><img src="${imageSrc}" alt="${escapeHtml(invoice.image_name || 'Invoice image')}"/></section>`
+        : ''
     }
     ${
       paymentRows

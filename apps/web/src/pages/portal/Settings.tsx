@@ -28,8 +28,8 @@ const SERVICE_CHIPS = [
 
 /** Same choices as the embroidery / vector / cutting quote forms. */
 const EMB_FORMATS = ['DST', 'PES', 'EXP', 'HUS', 'SEW', 'JEF', 'VP3', 'XXX', 'Others'];
-const DIG_FORMATS = ['AI', 'EPS', 'SVG', 'PDF', 'CDR', 'PNG', 'JPEG', 'Proof Preview', 'Others'];
-const CNC_FORMATS = ['AI', 'SVG', 'DXF', 'CDR', 'EPS', 'Proof Preview', 'PDF', 'PNG', 'Others'];
+const DIG_FORMATS = ['AI', 'EPS', 'SVG', 'PDF', 'CDR', 'PNG', 'JPEG', 'Others'];
+const CNC_FORMATS = ['AI', 'SVG', 'DXF', 'CDR', 'EPS', 'PDF', 'PNG', 'Others'];
 const PLACEMENTS = ['Hat', 'Cap', 'Visor', 'Jacket/Fleece', 'Polo', 'Bag', 'Other'];
 
 const DEFAULT_PREFS: Prefs = {
@@ -283,7 +283,7 @@ export function PortalSettings() {
               <input
                 value={embOther}
                 onChange={(e) => setEmbOther(e.target.value)}
-                placeholder="Need another format? e.g. EMB, TAP"
+                placeholder="Other format e.g. EMB, TAP"
                 aria-label="Other embroidery formats"
               />
               <p className="profile-hint">You can add more than one. Separate them with a comma. PDF and PNG previews are always included.</p>
@@ -308,7 +308,7 @@ export function PortalSettings() {
               <input
                 value={digOther}
                 onChange={(e) => setDigOther(e.target.value)}
-                placeholder="Need another format?"
+                placeholder="Other format"
                 aria-label="Other vector formats"
               />
               <p className="profile-hint">You can add more than one. Separate them with a comma.</p>
@@ -333,7 +333,7 @@ export function PortalSettings() {
               <input
                 value={cncOther}
                 onChange={(e) => setCncOther(e.target.value)}
-                placeholder="Need another format?"
+                placeholder="Other format"
                 aria-label="Other cutting formats"
               />
               <p className="profile-hint">You can add more than one. Separate them with a comma.</p>

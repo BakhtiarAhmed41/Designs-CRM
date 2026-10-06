@@ -14,6 +14,17 @@ export function serviceCategoryLabel(serviceType?: string | null): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+/** Longer service names for admin work tables. */
+export function serviceWorkLabel(serviceType?: string | null): string {
+  const s = (serviceType ?? '').toLowerCase();
+  if (s.includes('embroid') || s.includes('digit')) return 'Embroidery Digitizing';
+  if (s.includes('vector') || s.includes('print')) return 'Vector & Print Artwork';
+  if (s.includes('svg') || s.includes('cricut') || s.includes('cnc') || s.includes('laser')) {
+    return 'Cutting & Engraving Files';
+  }
+  return serviceCategoryLabel(serviceType);
+}
+
 export function serviceTi(serviceType?: string | null): string {
   const s = (serviceType ?? '').toLowerCase();
   if (s.includes('embroid') || s.includes('dst') || s.includes('pes')) {

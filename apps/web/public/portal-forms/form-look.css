@@ -290,15 +290,19 @@ textarea {
   max-width: 100%;
   flex: 0 0 auto;
   justify-self: start;
-  background: #f7ecec;
-  color: #7c1f2b;
+  background: #eef2f6;
+  color: #3d4a5c;
   font-size: 11px;
   line-height: 1.5;
   padding: 12px 14px;
   border-radius: 10px;
 }
+.note-banner {
+  background: #eef2f6;
+  color: #3d4a5c;
+}
 .note-banner svg {
-  color: #7c1f2b;
+  color: #3d4a5c;
 }
 
 .btn {

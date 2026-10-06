@@ -244,6 +244,12 @@
         card.querySelector('.grid-2 [data-csel-input]') ||
         card.querySelector('[data-design-service]') ||
         card.querySelector('select[data-service]');
+      var serviceVal = svcInp ? String(svcInp.value || '').trim() : '';
+      var otherSvcInp = card.querySelector('[data-service-other]');
+      if (otherSvcInp && /^other$/i.test(serviceVal)) {
+        var otherTxt = String(otherSvcInp.value || '').trim();
+        if (otherTxt) serviceVal = 'Other: ' + otherTxt;
+      }
       var artworkNames = [];
       var referenceNames = [];
       var fileNames = [];
@@ -268,7 +274,7 @@
       }
       designs.push({
         name: displayDesignName(nameInp ? nameInp.value : '', designs.length),
-        service: svcInp ? svcInp.value : '',
+        service: serviceVal,
         placement: sizeRows[0] ? sizeRows[0].placement : '',
         size: size,
         colors: radioValue(card, 'cmode-') || radioValue(card, 'cm-'),
@@ -530,7 +536,7 @@
         if (d.background) bits.push('Background: ' + d.background);
         if (d.colors) bits.push('Color: ' + d.colors);
         if (d.dpi300) bits.push('300 DPI');
-        if (d.keepProportional) bits.push('Keep proportional');
+        if (d.keepProportional) bits.push('Keep original proportions');
         if (d.notes) bits.push(d.notes);
         if (!bits.length) return '';
         return (d.name || 'Design') + ': ' + bits.join(' — ');
@@ -973,11 +979,11 @@
   function syncFormatsRequirement() {
     var star = document.getElementById('formatsReq');
     var hint = document.getElementById('formatsHint');
-    if (star) star.hidden = false;
+    // Formats are only required when the customer has no saved preferences.
+    if (star) star.hidden = !!window.LVD_FORMATS_ON_PROFILE;
     if (hint) {
-      hint.textContent = window.LVD_FORMATS_ON_PROFILE
-        ? 'Formats from the customer profile are already selected. Keep at least one, or choose different formats for this request.'
-        : 'Choose at least one file format for this request.';
+      hint.textContent =
+        'Your saved file preferences will be applied automatically. If you have not saved any preferences, please select the required formats below.';
     }
   }
 
@@ -1146,8 +1152,8 @@
     var otherEmpty = !otherInp || !String(otherInp.value || '').trim();
     if (otherOn && otherEmpty) {
       return {
-        inline: 'Enter the other file format, or uncheck "Need another format?".',
-        summary: 'Enter the other file format, or uncheck "Need another format?".',
+        inline: 'Enter the other file format, or uncheck "Other format".',
+        summary: 'Enter the other file format, or uncheck "Other format".',
       };
     }
     if (!formats.length) {
@@ -1173,6 +1179,14 @@
     if (target.matches && target.matches('[data-file-input]')) {
       var bag = target._lvdFiles && target._lvdFiles.length ? target._lvdFiles : Array.from(target.files || []);
       if (bag.length) clearField(target.closest('.field'));
+      return;
+    }
+    if (target.matches && target.matches('[data-size-input]') && String(target.value || '').trim()) {
+      clearField(target.closest('.field'));
+      return;
+    }
+    if (target.matches && target.matches('[data-service-other]') && String(target.value || '').trim()) {
+      clearField(target.closest('.field'));
       return;
     }
     if (
@@ -1203,6 +1217,27 @@
           art.closest('.field'),
           'Upload at least one artwork file.',
           label + ': artwork is required. Upload at least one file.',
+        );
+      }
+      // Embroidery / cutting size details are mandatory when the field is marked required.
+      card.querySelectorAll('[data-size-input][aria-required="true"]').forEach(function (sizeInp) {
+        if (!String(sizeInp.value || '').trim()) {
+          markField(
+            sizeInp.closest('.field'),
+            'Enter size or placement details.',
+            label + ': size or placement details are required.',
+          );
+        }
+      });
+      var otherSvc = card.querySelector('[data-service-other]');
+      var svcHidden = card.querySelector('[data-csel-input]');
+      var svcSelect = card.querySelector('select[data-service]');
+      var svcVal = (svcHidden && svcHidden.value) || (svcSelect && svcSelect.value) || '';
+      if (otherSvc && /^other$/i.test(String(svcVal || '').trim()) && !String(otherSvc.value || '').trim()) {
+        markField(
+          otherSvc.closest('.field'),
+          'Tell us which service you need.',
+          label + ': describe the other service.',
         );
       }
     });

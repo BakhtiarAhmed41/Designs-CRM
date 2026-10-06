@@ -390,6 +390,7 @@ body {
   margin-inline: auto;
   min-width: 0;
 }
+.main:not(.main-messaging) > div.dash,
 .main:not(.main-messaging) > div.portal-quotes-page,
 .main:not(.main-messaging) > div.portal-orders-page,
 .main:not(.main-messaging) > div.portal-invoices-page,
@@ -398,6 +399,7 @@ body {
   max-width: none;
   margin-inline: 0;
 }
+.app-frame .main:has(.dash),
 .app-frame .main:has(.portal-quotes-page),
 .app-frame .main:has(.portal-orders-page),
 .app-frame .main:has(.portal-invoices-page),
@@ -1551,6 +1553,9 @@ select, textarea {
   .date-range-select { width: 100%; }
   .date-range-select select { flex: 1; min-width: 0; }
   .dash-tab-link { margin-left: 0; }
+  .dash-work-bar { width: 100%; }
+  .dash-work-filter { width: 100%; }
+  .dash-work-filter .select-menu-wrap { max-width: none; }
 }
 @media (max-width: 720px) {
   .pulse-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -2201,6 +2206,41 @@ button.primary i,
 }
 .panel-head h3 { margin: 0; font-size: 16px; }
 .panel-sub { margin: 4px 0 0; color: var(--dash-muted); font-size: 13px; }
+.dash-work-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 8px;
+  flex-wrap: wrap;
+}
+.dash-work-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--dash-muted);
+  min-width: 0;
+}
+.dash-work-filter > span { white-space: nowrap; }
+.dash-work-filter .select-menu-wrap {
+  flex: 1 1 180px;
+  min-width: 160px;
+  max-width: 240px;
+}
+.dash-work-filter .select-menu-btn { width: 100%; min-width: 0; }
+.dash-work-foot {
+  padding: 12px 18px 16px;
+  font-size: 13px;
+  color: var(--dash-muted);
+}
+.dash-ref {
+  color: var(--brand, var(--maroon));
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.dash-ref:hover { color: var(--brand-d, var(--maroon-d)); }
 .dash-table-wrap {
   width: 100%;
   overflow-x: auto;
@@ -2240,6 +2280,7 @@ button.primary i,
   padding-right: 18px;
 }
 .dash-col-icon { width: 52px; }
+.dash-col-customer { width: 16%; }
 .dash-col-project { width: 20%; }
 .dash-table td.dash-project { max-width: 0; }
 .dash-table td.dash-project .on {
@@ -2250,6 +2291,7 @@ button.primary i,
 .dash-col-id { width: 16%; }
 .dash-col-cat { width: 14%; }
 .dash-col-status { width: 22%; }
+.dash-col-date { width: 12%; }
 .dash-col-amount { width: 12%; }
 .dash-col-activity { width: 24%; }
 .dash-col-detail { width: 36%; }

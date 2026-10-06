@@ -256,7 +256,7 @@ export function FormPreferencesDisplay({
   }
 
   const skipField =
-    /^(how many designs|measurement unit|form mode|turnaround|keep proportional|sizing)\??$/i;
+    /^(how many designs|measurement unit|units|form mode|turnaround|keep proportional|keep original proportions|sizing)\??$/i;
   const extraRows = (p.fields ?? [])
     .map((f) => ({
       label: tidyLabel(f.label),
@@ -314,7 +314,7 @@ export function FormPreferencesDisplay({
               extras.length > 0 && { label: extras.length > 1 ? 'Sizes' : 'Size details', value: extras.join(' · ') },
               d.colors && { label: 'Color mode', value: d.colors },
               d.background && { label: 'Background', value: d.background },
-              d.keepProportional && { label: 'Keep proportional', value: 'Yes' },
+              d.keepProportional && { label: 'Keep original proportions', value: 'Yes' },
               d.dpi300 && { label: '300 DPI', value: 'Yes' },
               d.notes && { label: 'Notes', value: d.notes },
             ].filter(Boolean) as Array<{ label: string; value: string }>;

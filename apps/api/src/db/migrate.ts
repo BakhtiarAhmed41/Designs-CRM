@@ -369,6 +369,18 @@ export async function runMigrations() {
     console.log('Adding invoices.due_at column ...');
     await conn.query('ALTER TABLE invoices ADD COLUMN due_at DATETIME NULL');
   }
+  if (!(await columnExists('invoices', 'image_storage_key'))) {
+    console.log('Adding invoices.image_storage_key column ...');
+    await conn.query('ALTER TABLE invoices ADD COLUMN image_storage_key VARCHAR(500) NULL');
+  }
+  if (!(await columnExists('invoices', 'image_name'))) {
+    console.log('Adding invoices.image_name column ...');
+    await conn.query('ALTER TABLE invoices ADD COLUMN image_name VARCHAR(255) NULL');
+  }
+  if (!(await columnExists('invoices', 'image_mime'))) {
+    console.log('Adding invoices.image_mime column ...');
+    await conn.query('ALTER TABLE invoices ADD COLUMN image_mime VARCHAR(120) NULL');
+  }
 
   const [invLineTables] = await conn.query<mysql.RowDataPacket[]>(
     `SELECT COUNT(*) AS cnt FROM information_schema.TABLES

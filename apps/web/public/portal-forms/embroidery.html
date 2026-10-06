@@ -229,8 +229,8 @@ input[type="text"]:focus,select:focus,textarea:focus{border-color:var(--ink);box
 .page-id p a{color:#7C1F2B}
 .segmented input:checked+label{background:#7C1F2B;color:#fff}
 .format-chip input:checked+span,.format-chip input:checked:hover+span{background:#7C1F2B;border-color:#7C1F2B;color:#fff}
-.note-banner{background:#F7ECEC;color:#7C1F2B}
-.note-banner svg{color:#7C1F2B}
+.note-banner{background:#EEF2F6;color:#3D4A5C}
+.note-banner svg{color:#3D4A5C}
 .step:last-of-type{padding-bottom:0}
 .step:last-of-type::before,#s-turn::before{display:none}
 .form-actions{margin-top:36px;padding-top:20px;border-top:1px solid var(--border);display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-end;gap:10px}
@@ -447,7 +447,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
       </div>
       <div>
         <h1>Embroidery Digitizing Quote</h1>
-        <p>Tell us about your design and we'll get back to you with pricing. Not sure about something?</p>
+        <p>Please upload your artwork and provide your design specifications to receive a quote.</p>
       </div>
     </div>
     <div class="top-right">
@@ -477,12 +477,12 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
       <div class="step-head">
         <div>
           <h2>Designs</h2>
-          <p>Include artwork, sizing, and placement for each design</p>
+          <p>Add artwork, size, and placement for each design.</p>
         </div>
       </div>
       <div class="unit-row">
         <div class="unit-item">
-          <label class="flabel" for="unitSelect">Measurement Unit</label>
+          <label class="flabel" for="unitSelect">Units</label>
           <select id="unitSelect"><option value="in" selected>in</option><option value="cm">cm</option><option value="mm">mm</option></select>
         </div>
         <div class="unit-item">
@@ -498,7 +498,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
       <div class="step-head">
         <div>
           <h2>File formats <span class="req" id="formatsReq" aria-hidden="true">*</span></h2>
-          <p id="formatsHint">Choose at least one file format for this request.</p>
+          <p id="formatsHint">Your saved file preferences will be applied automatically. If you have not saved any preferences, please select the required formats below.</p>
         </div>
       </div>
       <div class="format-grid" id="formatGrid">
@@ -513,14 +513,14 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
         <label class="format-chip"><input type="checkbox" name="format" value="XXX"><span>XXX</span></label>
         </div>
         <div class="other-format-inline">
-          <label class="check-row other-check" id="otherFormatRow"><input type="checkbox" id="otherFormatCheck">Need another format?</label>
+          <label class="check-row other-check" id="otherFormatRow"><input type="checkbox" id="otherFormatCheck">Other format</label>
           <div class="format-other" id="otherFormatField" style="display:none;">
-            <input type="text" aria-label="Another format" autocomplete="off">
+            <input type="text" aria-label="Other format" placeholder="Tell us the format you need" autocomplete="off">
           </div>
         </div>
         <div class="note-banner">
           <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
-          Production Sheet (PDF) and Design Preview (PNG) are always included.
+          A production sheet (PDF) and design preview (PNG) are included with every order.
         </div>
       </div>
     </section>
@@ -530,7 +530,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
       <div class="step-head">
         <div>
           <h2>Turnaround time</h2>
-          <p>Choose how quickly you need this order back</p>
+          <p>Select your preferred turnaround time.</p>
         </div>
       </div>
       <div class="turn-grid">
@@ -542,7 +542,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
               <span class="badge included">Included</span>
             </div>
             <div class="turn-time">12 to 36 hours</div>
-            <div class="turn-desc">Our regular digitizing queue. Fits most orders without extra cost.</div>
+            <div class="turn-desc">Standard turnaround at no additional charge.</div>
           </div>
         </label>
         <label class="turn-option">
@@ -553,13 +553,17 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
               <span class="badge priority">Priority</span>
             </div>
             <div class="turn-time">4 to 8 hours</div>
-            <div class="turn-desc">We'll contact you first to confirm availability.</div>
+            <div class="turn-desc">Subject to availability. Additional charges may apply.</div>
           </div>
         </label>
       </div>
       <div class="note-banner">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
-        Complex designs may take up to 3 business days. We'll confirm the turnaround before starting.
+        Turnaround begins once payment is received and all required design details are confirmed.
+      </div>
+      <div class="note-banner">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+        Complex designs may require more time than indicated. The estimated turnaround will be confirmed in your quote.
       </div>
     </section>
 
@@ -619,16 +623,16 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
         </div>
         <div class="grid-2">
           <div class="field">
-            <label class="flabel">Size or Placement Details</label>
-            <input type="text" placeholder="${sizePh()}" data-size-input>
+            <label class="flabel">Size or Placement Details <span class="req" aria-hidden="true">*</span></label>
+            <input type="text" placeholder="${sizePh()}" data-size-input aria-required="true" autocomplete="off">
           </div>
           <div class="field">
-            <label class="flabel">Design Placement</label>
+            <label class="flabel">Design Placement <span class="opt">(recommended)</span></label>
             <select>${placementOptions()}</select>
           </div>
         </div>
         <div class="size-foot">
-          <label class="check-row"><input type="checkbox" checked>Keep proportional</label>
+          <label class="check-row"><input type="checkbox" checked>Keep original proportions</label>
         </div>
       </div>`;
   }
@@ -652,7 +656,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
             <div class="dropzone" data-dropzone-ref>
               <span class="dz-ico">${upIcon}</span>
               <div class="dz-title">Upload reference images</div>
-              <div class="dz-sub">Add one or more photos showing how it should look</div>
+              <div class="dz-sub">Upload examples of how you’d like the design to look.</div>
               <input type="file" multiple data-file-input-ref>
             </div>
             <div class="file-list" data-file-list-ref></div>
@@ -676,14 +680,14 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
                 Remove design
               </button>
             </div>
-            <input type="text" placeholder="e.g. Front logo, left chest" data-design-name aria-required="true" autocomplete="off">
+            <input type="text" placeholder="e.g. Business logo, Family name sign, or Floral design" data-design-name aria-required="true" autocomplete="off">
           </div>
 
           <div data-artworks>${artworkTemplate()}</div>
 
           <div class="field notes">
             <label class="flabel">Anything else we should know? <span class="opt">(optional)</span></label>
-            <textarea placeholder="Share placement notes, thread colors, or any other details that will help us get it right."></textarea>
+            <textarea placeholder="Tell us about thread colors, special instructions, or anything else we should know."></textarea>
           </div>
         </div>
       </div>`;
@@ -803,7 +807,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
     addBtn.type = 'button';
     addBtn.className = 'add-btn';
     addBtn.setAttribute('data-add-size', '');
-    addBtn.innerHTML = `${plusIcon}Add Size`;
+    addBtn.innerHTML = `${plusIcon}Add another size`;
     function placeAddBtn(){
       sizeContainer.lastElementChild.querySelector('.size-foot').appendChild(addBtn);
     }

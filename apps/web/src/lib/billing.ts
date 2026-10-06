@@ -1,4 +1,4 @@
-import { apiFetch } from './api';
+import { apiFetch, apiFetchForm } from './api';
 import { authorizationHeader } from './session';
 
 // --- shared types ---------------------------------------------------------
@@ -21,6 +21,8 @@ export type Invoice = {
   remainingCents?: number;
   currency: string;
   coversText: string | null;
+  imageName?: string | null;
+  imageUrl?: string | null;
   status: InvoiceStatus;
   periodMonth: string | null;
   storeCreditAppliedCents: number;
@@ -193,10 +195,25 @@ export function createInvoice(data: {
   orderId?: string | null;
   amountCents: number;
   coversText?: string | null;
+  image?: File | null;
 }) {
+  if (data.image) {
+    const form = new FormData();
+    form.append('customerId', data.customerId);
+    if (data.orderId) form.append('orderId', data.orderId);
+    form.append('amountCents', String(data.amountCents));
+    if (data.coversText) form.append('coversText', data.coversText);
+    form.append('image', data.image);
+    return apiFetchForm<{ invoice: InvoiceDetail }>('/admin/invoices', form);
+  }
   return apiFetch<{ invoice: InvoiceDetail }>('/admin/invoices', {
     method: 'POST',
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      customerId: data.customerId,
+      orderId: data.orderId,
+      amountCents: data.amountCents,
+      coversText: data.coversText,
+    }),
   });
 }
 

@@ -36,6 +36,7 @@ import { dateShort, money, statusChipClass, statusLabel, orderNumber, orderSlug 
 import { useDialog } from '@/components/ui/AppDialog';
 import { canFeature } from '@/lib/permissions';
 import { EmptyState, ErrorBanner } from '@/components/ui/EmptyState';
+import { CreateInvoiceModal } from '@/components/CreateInvoiceModal';
 import { RevisionModal } from '@/components/RevisionModal';
 import { createAdminEdit } from '@/lib/edits';
 import { getAdminOrder } from '@/lib/orders';
@@ -136,6 +137,7 @@ export function AdminCustomerMessages() {
     canFeature(user?.permissions, 'messages_customer_start', user?.role) ||
     canFeature(user?.permissions, 'messages', user?.role);
   const hideCustomerDetails = user?.role === 'DESIGNER';
+  const canBill = canFeature(user?.permissions, 'billing', user?.role);
 
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState<FilterKey>('all');
@@ -147,6 +149,7 @@ export function AdminCustomerMessages() {
   const [peerTyping, setPeerTyping] = useState(false);
   const [revisionOpen, setRevisionOpen] = useState(false);
   const [revisionToast, setRevisionToast] = useState<string | null>(null);
+  const [invoiceOpen, setInvoiceOpen] = useState(false);
   const startMenuRef = useRef<HTMLDivElement>(null);
 
   const listFilters = useMemo(() => {
@@ -225,6 +228,7 @@ export function AdminCustomerMessages() {
   useEffect(() => {
     setNotesDraft(active?.privateNotes ?? '');
     setRevisionOpen(false);
+    setInvoiceOpen(false);
   }, [active?.id, active?.privateNotes]);
 
   useEffect(() => {
@@ -509,6 +513,18 @@ export function AdminCustomerMessages() {
                       : 'Create revision'}
                   </button>
                 )}
+                {canBill && customerId && customerId !== 'unknown' && !hideCustomerDetails && (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      setError(null);
+                      setInvoiceOpen(true);
+                    }}
+                  >
+                    <i className="ti ti-file-invoice" /> Generate invoice
+                  </button>
+                )}
                 {canStart && customerId && (
                   <div ref={startMenuRef} style={{ position: 'relative' }}>
                     <button
@@ -772,6 +788,17 @@ export function AdminCustomerMessages() {
               void qc.invalidateQueries({ queryKey: ['admin-order-edits', orderChatId] });
               void qc.invalidateQueries({ queryKey: ['admin-order', orderChatId] });
             }}
+          />
+        )}
+        {invoiceOpen && customerId && customerId !== 'unknown' && (
+          <CreateInvoiceModal
+            lockedCustomer={{
+              id: customerId,
+              name: displayName,
+              email: active?.customerEmail ?? contextQuery.data?.customer.email ?? null,
+            }}
+            onClose={() => setInvoiceOpen(false)}
+            onCreated={() => setRevisionToast('Invoice created')}
           />
         )}
       </div>

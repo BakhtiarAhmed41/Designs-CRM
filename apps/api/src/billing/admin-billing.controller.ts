@@ -6,9 +6,13 @@ import {
   Post,
   Query,
   Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
+import { memoryStorage } from 'multer';
 import { z } from 'zod';
 import type { AuthUser } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -18,12 +22,17 @@ import { FeaturesGuard } from '../auth/guards/features.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { UserRole } from '../common/enums';
+import { MESSAGE_UPLOAD, mapMulterFiles } from '../common/multer-errors';
 import { BillingService } from './billing.service';
 
 const createInvoiceSchema = z.object({
   customerId: z.string().min(1),
-  orderId: z.string().min(1).optional().nullable(),
-  amountCents: z.number().int().positive(),
+  orderId: z
+    .string()
+    .optional()
+    .nullable()
+    .transform((value) => (value && value.trim() ? value.trim() : null)),
+  amountCents: z.coerce.number().int().positive(),
   coversText: z.string().optional().nullable(),
 });
 
@@ -73,12 +82,20 @@ export class AdminBillingController {
   }
 
   @Post('invoices')
+  @UseInterceptors(
+    FileInterceptor('image', {
+      storage: memoryStorage(),
+      limits: { fileSize: MESSAGE_UPLOAD.maxFileSize },
+    }),
+  )
   async createInvoice(
     @CurrentUser() user: AuthUser | undefined,
     @Body() body: unknown,
+    @UploadedFile() image?: Express.Multer.File,
   ) {
     const data = createInvoiceSchema.parse(body);
-    const invoice = await this.billing.createInvoice(user, data);
+    const [file] = image ? mapMulterFiles([image]) : [];
+    const invoice = await this.billing.createInvoice(user, data, file);
     return { invoice };
   }
 

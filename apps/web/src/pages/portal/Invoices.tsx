@@ -13,7 +13,7 @@ import {
   type Invoice,
 } from '@/lib/billing';
 import { getMyCustomer } from '@/lib/customers';
-import { getErrorMessage } from '@/lib/api';
+import { getErrorMessage, resolveFileUrl } from '@/lib/api';
 import { invalidateWorkCaches } from '@/lib/queryCache';
 import { freshOnOpen } from '@/lib/queryRefresh';
 import { money, dateShort } from '@/lib/format';
@@ -273,7 +273,20 @@ export function PortalInvoices() {
                 return (
                   <tr key={inv.id}>
                     <td className="inv-id">{invId}</td>
-                    <td>{inv.coversText ?? (inv.kind === 'MONTHLY' ? 'Monthly statement' : 'Invoice')}</td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {inv.imageUrl && (
+                          <a href={resolveFileUrl(inv.imageUrl)} target="_blank" rel="noreferrer" title={inv.imageName || 'Invoice image'}>
+                            <img
+                              src={resolveFileUrl(inv.imageUrl)}
+                              alt={inv.imageName || 'Invoice image'}
+                              style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 8, flexShrink: 0, display: 'block' }}
+                            />
+                          </a>
+                        )}
+                        <span>{inv.coversText ?? (inv.kind === 'MONTHLY' ? 'Monthly statement' : 'Invoice')}</span>
+                      </div>
+                    </td>
                     <td className="muted">{inv.orderRef ?? '—'}</td>
                     <td className="muted">
                       {inv.serviceType ? serviceCategoryLabel(inv.serviceType) : '—'}

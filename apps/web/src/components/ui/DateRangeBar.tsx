@@ -1,6 +1,7 @@
 import type { RangePreset } from '@/lib/dateRange';
+import { SelectMenu } from '@/components/ui/SelectMenu';
 
-const PRESETS: Array<{ id: RangePreset; label: string }> = [
+const OPTIONS: Array<{ id: RangePreset; label: string }> = [
   { id: 'week', label: '7 days' },
   { id: 'month', label: '30 days' },
   { id: 'thisMonth', label: 'This month' },
@@ -24,18 +25,16 @@ export function DateRangeBar({
 }) {
   return (
     <div className="dash-range">
-      <div className="range" role="group" aria-label="Date range">
-        {PRESETS.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            className={preset === p.id ? 'on' : ''}
-            onClick={() => onPreset(p.id)}
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
+      <label className="date-range-select">
+        <span>Date range</span>
+        <SelectMenu
+          size="compact"
+          ariaLabel="Date range"
+          value={preset}
+          onChange={(value) => onPreset(value as RangePreset)}
+          options={OPTIONS.map((o) => ({ value: o.id, label: o.label }))}
+        />
+      </label>
       {preset === 'custom' && (
         <div className="pulse-dates">
           <input

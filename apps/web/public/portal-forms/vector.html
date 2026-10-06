@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Vector &amp; Print Quote Request</title>
+<title>Vector &amp; Print Artwork Quote Request</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -229,8 +229,8 @@ input[type="text"]:focus,select:focus,textarea:focus{border-color:var(--ink);box
 .page-id p a{color:#7C1F2B}
 .segmented input:checked+label{background:#7C1F2B;color:#fff}
 .format-chip input:checked+span,.format-chip input:checked:hover+span{background:#7C1F2B;border-color:#7C1F2B;color:#fff}
-.note-banner{background:#F7ECEC;color:#7C1F2B}
-.note-banner svg{color:#7C1F2B}
+.note-banner{background:#EEF2F6;color:#3D4A5C}
+.note-banner svg{color:#3D4A5C}
 .step:last-of-type{padding-bottom:0}
 .step:last-of-type::before,#s-turn::before{display:none}
 .form-actions{margin-top:36px;padding-top:20px;border-top:1px solid var(--border);display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-end;gap:10px}
@@ -435,6 +435,11 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
 .pref-dpi .dpi-check{margin:0;font-size:11.5px;font-weight:500;white-space:nowrap}
 .size-field{margin-top:12px}
 .size-field input{width:100%}
+.size-section{margin-top:12px}
+.size-section .size-row:first-child{margin-top:6px}
+.size-foot{display:flex;align-items:center;justify-content:flex-end;gap:12px;margin-top:10px}
+.size-foot .add-btn{width:fit-content;margin:0}
+.size-row{border:none;background:transparent;padding-left:0;padding-right:0;padding-bottom:8px}
 </style>
 <link rel="stylesheet" href="form-look.css">
 </head>
@@ -476,8 +481,8 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="14" r="2"/><circle cx="19" cy="14" r="2"/><circle cx="12" cy="7" r="2"/><path d="M6.8 13 10.5 8.4M13.5 8.4 17.2 13"/></svg>
       </div>
       <div>
-        <h1>Vector &amp; Print Quote</h1>
-        <p>Tell us about your design. If you're unsure about anything, we'll help.</p>
+        <h1>Vector &amp; Print Artwork Quote</h1>
+        <p>Please upload your artwork and provide your design specifications to receive a quote.</p>
       </div>
     </div>
     <div class="top-right">
@@ -507,7 +512,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
       <div class="step-head">
         <div>
           <h2>Designs</h2>
-          <p>Tell us what you need converted or recreated, one design at a time</p>
+          <p>Select the required service and add artwork, size, and requirements for each design.</p>
         </div>
       </div>
       <div id="designsContainer"></div>
@@ -517,8 +522,8 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
       <span class="step-num">2</span>
       <div class="step-head">
         <div>
-          <h2>File Formats <span class="req" id="formatsReq" aria-hidden="true">*</span></h2>
-          <p id="formatsHint">Choose at least one file format for this request.</p>
+          <h2>File formats <span class="req" id="formatsReq" aria-hidden="true">*</span></h2>
+          <p id="formatsHint">Your saved file preferences will be applied automatically. If you have not saved any preferences, please select the required formats below.</p>
         </div>
       </div>
       <div class="format-grid" id="formatGrid">
@@ -530,13 +535,16 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
         <label class="format-chip"><input type="checkbox" name="format" value="CDR"><span>CDR</span></label>
         <label class="format-chip"><input type="checkbox" name="format" value="PNG"><span>PNG</span></label>
         <label class="format-chip"><input type="checkbox" name="format" value="JPEG"><span>JPEG</span></label>
-        <label class="format-chip"><input type="checkbox" name="format" value="Proof Preview"><span>Proof Preview</span></label>
         </div>
         <div class="other-format-inline">
-        <label class="check-row other-check" id="otherFormatRow"><input type="checkbox" id="otherFormatCheck">Need another format?</label>
+        <label class="check-row other-check" id="otherFormatRow"><input type="checkbox" id="otherFormatCheck">Other format</label>
         <div class="format-other" id="otherFormatField" style="display:none;">
-          <input type="text" placeholder="Tell us the format you need">
+          <input type="text" placeholder="Tell us the format you need" aria-label="Other format">
         </div>
+        </div>
+        <div class="note-banner">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+          A design preview is included with every order.
         </div>
       </div>
     </section>
@@ -545,8 +553,8 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
       <span class="step-num">3</span>
       <div class="step-head">
         <div>
-          <h2>Turnaround Time</h2>
-          <p>Choose how quickly you need this order back</p>
+          <h2>Turnaround time</h2>
+          <p>Select your preferred turnaround time.</p>
         </div>
       </div>
       <div class="turn-grid">
@@ -558,24 +566,28 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
               <span class="badge included">Included</span>
             </div>
             <div class="turn-time">12 to 36 hours</div>
-            <div class="turn-desc">Our regular queue. Fits most orders without extra cost.</div>
+            <div class="turn-desc">Standard turnaround at no additional charge.</div>
           </div>
         </label>
         <label class="turn-option">
           <input type="radio" name="turnaround" value="urgent">
           <div class="turn-inner">
             <div class="turn-top">
-              <div class="turn-left"><span class="turn-radio"></span><span class="turn-name">Rush</span></div>
+              <div class="turn-left"><span class="turn-radio"></span><span class="turn-name">Urgent</span></div>
               <span class="badge priority">Priority</span>
             </div>
             <div class="turn-time">4 to 8 hours</div>
-            <div class="turn-desc">We'll contact you first to confirm availability.</div>
+            <div class="turn-desc">Subject to availability. Additional charges may apply.</div>
           </div>
         </label>
       </div>
       <div class="note-banner">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
-        Complex designs may take up to 3 business days. We'll confirm the turnaround before starting.
+        Turnaround begins once payment is received and all required design details are confirmed.
+      </div>
+      <div class="note-banner">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+        Complex designs may require more time than indicated. The estimated turnaround will be confirmed in your quote.
       </div>
     </section>
 
@@ -590,8 +602,8 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
   <aside class="rail">
     <nav class="steps" aria-label="Form sections">
       <a class="on" href="#s-designs"><b>1</b>Designs</a>
-      <a href="#s-formats"><b>2</b>File Formats</a>
-      <a href="#s-turn"><b>3</b>Turnaround Time</a>
+      <a href="#s-formats"><b>2</b>File formats</a>
+      <a href="#s-turn"><b>3</b>Turnaround time</a>
     </nav>
 
     <div class="help">
@@ -621,6 +633,24 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
     return services.map((s,i) => `<div class="csel-option${i===0?' is-selected':''}" data-csel-option data-value="${s}">${s}</div>`).join("");
   }
 
+  function sizeRowTemplate(sizeIndex){
+    return `
+      <div class="size-row" data-size-row>
+        <div class="size-row-head">
+          <span class="stag">Size ${sizeIndex}</span>
+          <button type="button" class="remove-size" data-remove-size style="${sizeIndex === 1 ? 'display:none' : ''}">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            Remove
+          </button>
+        </div>
+        <div class="field">
+          <label class="flabel">Design size <span class="opt">(optional)</span></label>
+          <input type="text" data-size-input placeholder="e.g. 12 inches wide" autocomplete="off">
+        </div>
+        <div class="size-foot"></div>
+      </div>`;
+  }
+
   function designCardTemplate(n){
     return `
       <div class="design-card" data-design-card>
@@ -634,7 +664,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
                   Remove design
                 </button>
               </div>
-              <input type="text" placeholder="e.g. Tractor logo, military design" data-design-name aria-required="true" autocomplete="off">
+              <input type="text" placeholder="Company logo or Custom artwork." data-design-name aria-required="true" autocomplete="off">
             </div>
             <div class="field">
               <label class="flabel">Services</label>
@@ -646,6 +676,10 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
                 <div class="csel-menu" data-csel-menu>${serviceOptions()}</div>
                 <input type="hidden" data-csel-input value="${services[0]}">
               </div>
+              <div class="field service-other" data-service-other-wrap style="display:none;margin-top:8px;">
+                <label class="flabel">Other service <span class="req" aria-hidden="true">*</span></label>
+                <input type="text" data-service-other placeholder="Tell us which service you need" autocomplete="off">
+              </div>
             </div>
           </div>
 
@@ -656,24 +690,24 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
                 <div class="dropzone" data-dropzone>
                   <span class="dz-ico">${upIcon}</span>
                   <div class="dz-title">Upload your artwork</div>
-                  <div class="dz-sub">PNG, JPG, PDF, AI, EPS or SVG — add as many files as you need</div>
+                  <div class="dz-sub">PNG, JPG, PDF, AI, EPS, or SVG.</div>
                   <input type="file" multiple data-file-input>
                 </div>
                 <div class="file-list" data-file-list></div>
               </div>
               <div class="field">
-                <label class="flabel">Reference <span class="opt">(optional)</span></label>
+                <label class="flabel">Reference images <span class="opt">(optional)</span></label>
                 <div class="dropzone" data-dropzone-ref>
                   <span class="dz-ico">${upIcon}</span>
-                  <div class="dz-title">Add a reference</div>
-                  <div class="dz-sub">Upload an example of the style or result you want</div>
+                  <div class="dz-title">Upload reference images</div>
+                  <div class="dz-sub">Upload examples of your preferred style or result.</div>
                   <input type="file" multiple data-file-input-ref>
                 </div>
                 <div class="file-list" data-file-list-ref></div>
               </div>
             </div>
             <div class="field notes">
-              <label class="flabel pref-title">Artwork Preferences</label>
+              <label class="flabel pref-title">Artwork preferences</label>
               <div class="pref-grid">
                 <div class="pref-section">
                   <label class="flabel">Background</label>
@@ -693,18 +727,17 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
                   <label class="check-row dpi-check"><input type="checkbox" checked>Prepare at 300 DPI</label>
                 </div>
               </div>
-              <p class="hint-text">Not sure? Leave the default options selected and our team will prepare the correct settings.</p>
+              <p class="hint-text">If unsure, our team will select the appropriate settings.</p>
             </div>
           </div>
 
-          <div class="field size-field" data-size-row>
-            <label class="flabel">Size</label>
-            <input type="text" data-size-input placeholder="e.g. 12 in wide">
+          <div class="size-section">
+            <div data-size-container>${sizeRowTemplate(1)}</div>
           </div>
 
           <div class="field notes">
-            <label class="flabel">Tell Us About Your Project <span class="opt">(optional)</span></label>
-            <textarea placeholder="Example: Recreate this as clean vector artwork, keep the original colors, and make the background transparent."></textarea>
+            <label class="flabel">Anything else we should know? <span class="opt">(optional)</span></label>
+            <textarea placeholder="Provide color preferences, special instructions, or additional requirements."></textarea>
           </div>
         </div>
       </div>`;
@@ -729,6 +762,16 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
       const menu = csel.querySelector('[data-csel-menu]');
       const valueEl = csel.querySelector('[data-csel-value]');
       const hiddenInput = csel.querySelector('[data-csel-input]');
+      const otherWrap = el.querySelector('[data-service-other-wrap]');
+      function syncOther(val){
+        if(!otherWrap) return;
+        const show = /^other$/i.test(String(val || '').trim());
+        otherWrap.style.display = show ? '' : 'none';
+        if(!show){
+          const inp = otherWrap.querySelector('[data-service-other]');
+          if(inp) inp.value = '';
+        }
+      }
       trigger.addEventListener('click', (e) => {
         e.stopPropagation();
         const willOpen = !csel.classList.contains('is-open');
@@ -741,9 +784,11 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
           opt.classList.add('is-selected');
           valueEl.textContent = opt.dataset.value;
           if(hiddenInput) hiddenInput.value = opt.dataset.value;
+          syncOther(opt.dataset.value);
           csel.classList.remove('is-open');
         });
       });
+      syncOther(hiddenInput ? hiddenInput.value : '');
     });
   }
   document.addEventListener('click', () => {
@@ -766,6 +811,49 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
     });
   }
 
+  function attachSizeHandlers(el){
+    const sizeContainer = el.querySelector('[data-size-container]');
+    if(!sizeContainer) return;
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'add-btn';
+    addBtn.setAttribute('data-add-size', '');
+    addBtn.innerHTML = `${plusIcon}Add another size`;
+    function placeAddBtn(){
+      const foot = sizeContainer.lastElementChild && sizeContainer.lastElementChild.querySelector('.size-foot');
+      if(foot) foot.appendChild(addBtn);
+    }
+    addBtn.addEventListener('click', () => {
+      const count = sizeContainer.querySelectorAll('[data-size-row]').length + 1;
+      sizeContainer.insertAdjacentHTML('beforeend', sizeRowTemplate(count));
+      updateRemoveSizeVisibility(sizeContainer);
+      attachRemoveSizeHandlers(sizeContainer, placeAddBtn);
+      placeAddBtn();
+    });
+    placeAddBtn();
+    attachRemoveSizeHandlers(sizeContainer, placeAddBtn);
+  }
+
+  function attachRemoveSizeHandlers(c, placeAddBtn){
+    c.querySelectorAll('[data-remove-size]').forEach(btn => {
+      btn.onclick = () => {
+        btn.closest('[data-size-row]').remove();
+        renumberSizes(c);
+        updateRemoveSizeVisibility(c);
+        if(placeAddBtn) placeAddBtn();
+      };
+    });
+  }
+
+  function renumberSizes(c){
+    c.querySelectorAll('[data-size-row]').forEach((row, i) => { row.querySelector('.stag').textContent = `Size ${i + 1}`; });
+  }
+
+  function updateRemoveSizeVisibility(c){
+    const rows = c.querySelectorAll('[data-size-row]');
+    rows.forEach(row => { row.querySelector('[data-remove-size]').style.display = rows.length > 1 ? '' : 'none'; });
+  }
+
   function renumberDesigns(){
     designsContainer.querySelectorAll('[data-design-card]').forEach((card, i) => {
       card.querySelector('[data-design-num]').textContent = i + 1;
@@ -785,6 +873,7 @@ select option:checked,select option:hover{background:#F0F0F1;color:var(--ink)}
     addBtn ? designsContainer.insertBefore(card, addBtn) : designsContainer.appendChild(card);
     attachFileHandlers(card);
     initCustomSelects(card);
+    attachSizeHandlers(card);
     card.querySelector('[data-remove-design]').addEventListener('click', () => { card.remove(); renumberDesigns(); });
     renumberDesigns();
   }
