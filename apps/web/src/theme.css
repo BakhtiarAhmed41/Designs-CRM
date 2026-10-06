@@ -2205,6 +2205,7 @@ button.primary i,
   padding: 16px 16px 0;
 }
 .panel-head h3 { margin: 0; font-size: 16px; }
+.panel-head h3.dash-work-title { font-size: 18px; }
 .panel-sub { margin: 4px 0 0; color: var(--dash-muted); font-size: 13px; }
 .dash-work-bar {
   display: flex;

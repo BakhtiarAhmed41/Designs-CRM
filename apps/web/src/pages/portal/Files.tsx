@@ -725,7 +725,7 @@ function OrderFileDetail({
           disabled={helpMut.isPending}
           onClick={() => helpMut.mutate()}
         >
-          <i className="ti ti-help-circle" aria-hidden />
+          <i className="ti ti-help" aria-hidden />
           {helpMut.isPending ? 'Opening…' : 'Need help?'}
         </button>
       </div>

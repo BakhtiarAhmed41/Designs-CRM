@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { DateRangeBar } from '@/components/ui/DateRangeBar';
-import { SelectMenu } from '@/components/ui/SelectMenu';
 import { getDashboardStats } from '@/lib/dashboard';
 import { datesForPreset, inDateRange, type RangePreset } from '@/lib/dateRange';
 import { listAdminEdits } from '@/lib/edits';
@@ -237,29 +236,29 @@ export function AdminDashboard() {
         <section className="panel">
           <div className="panel-head">
             <div>
-              <h3>Active work</h3>
+              <h3 className="dash-work-title">Active work</h3>
               <p className="panel-sub">
                 Manage your active orders, quotes, and revisions.
               </p>
             </div>
           </div>
 
-          <div className="dash-work-bar">
-            <label className="dash-work-filter">
-              <span>Filter</span>
-              <SelectMenu
-                size="compact"
-                ariaLabel="Active work filter"
-                value={activeTab}
-                onChange={(value) => setTab(value as WorkTab)}
-                options={tabs.map((t) => ({
-                  value: t.id,
-                  label: `${t.label} (${t.count})`,
-                }))}
-              />
-            </label>
+          <div className="dash-tabs" role="tablist">
+            {tabs.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === t.id}
+                className={activeTab === t.id ? 'on' : ''}
+                onClick={() => setTab(t.id)}
+              >
+                {t.label}
+                <span className="dash-tab-count">{t.count}</span>
+              </button>
+            ))}
             {activeMeta && (
-              <Link to={activeMeta.to} className="btn btn-ghost btn-sm">
+              <Link to={activeMeta.to} className="btn btn-ghost btn-sm dash-tab-link">
                 {activeMeta.viewAll}
               </Link>
             )}
