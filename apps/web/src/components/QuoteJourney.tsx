@@ -60,18 +60,16 @@ function staffStepDetail(
 ) {
   if (index === 0) {
     if (phase === 'preparing') return 'Needs pricing';
-    if (opts?.revised && (phase === 'review' || phase === 'pay')) return 'Revised quote sent';
-    if (phase === 'review' || phase === 'pay') return 'Sent to customer';
-    return '';
+    if (phase === 'paid' || phase === 'accepted') return '';
+    if (opts?.revised) return 'Revised quote sent';
+    return 'Sent to customer';
   }
   if (index === 1) {
-    // Status badge already shows awaiting approval — avoid repeating it under the step.
-    if (phase === 'preparing') return '';
-    if (phase === 'review') return '';
+    if (phase === 'preparing') return 'Not sent yet';
+    if (phase === 'review') return 'Awaiting approval';
     return '';
   }
   if (phase === 'paid' || phase === 'accepted') return '';
-  if (phase === 'pay') return 'Pending';
   return 'Pending';
 }
 
@@ -79,7 +77,7 @@ function staffCopy(phase: LivePhase, opts?: { revised?: boolean }) {
   if (phase === 'preparing') {
     return {
       title: 'Quote request received',
-      subtitle: '',
+      subtitle: 'Review the design details and prepare your quote.',
     };
   }
   if (phase === 'review') {
@@ -149,6 +147,7 @@ export function QuoteJourney({
   subtitle,
   audience = 'customer',
   revised = false,
+  meta,
 }: {
   phase: LivePhase;
   orderTo?: string;
@@ -157,6 +156,8 @@ export function QuoteJourney({
   onPay?: () => void;
   title?: string;
   subtitle?: string;
+  /** Extra line under the subtitle, such as the paid date and version. */
+  meta?: string;
   audience?: 'customer' | 'staff';
   /** Staff: whether the latest sent quote is a revision (v2+). */
   revised?: boolean;
@@ -174,6 +175,7 @@ export function QuoteJourney({
         <div>
           <h2>{title ?? copy.title}</h2>
           {lead ? <p className="qj-lead">{lead}</p> : null}
+          {meta ? <p className="qj-meta">{meta}</p> : null}
         </div>
         {finished && orderTo && (
           <div className="qj-actions qj-actions-inline">
@@ -226,11 +228,14 @@ export function OrderSteps({
   ready,
   total,
   delivered,
+  audience = 'customer',
 }: {
   ready: number;
   total: number;
   delivered: number;
+  audience?: 'customer' | 'staff';
 }) {
+  const staff = audience === 'staff';
   const one = total === 1;
   const allReady = total > 0 && ready >= total;
   const allDelivered = total > 0 && delivered >= total;
@@ -240,25 +245,46 @@ export function OrderSteps({
   const deliveredLine = total > 0 ? Math.round((Math.min(delivered, total) / total) * 100) : 0;
   const copy = allDelivered
     ? {
-        title: 'Your files are ready',
-        subtitle: 'View and download your completed files below.',
+        title: staff ? 'Files delivered' : 'Your files are ready',
+        subtitle: staff
+          ? 'The customer can view and download the completed files.'
+          : 'View and download your completed files below.',
       }
     : partial
       ? {
           title: `${delivered} of ${total} designs delivered`,
-          subtitle:
-            delivered === 1
+          subtitle: staff
+            ? delivered === 1
+              ? `The first design is delivered. ${remaining === 1 ? '1 design is' : `${remaining} designs are`} still in progress.`
+              : `${delivered} designs are delivered. ${remaining === 1 ? '1 design is' : `${remaining} designs are`} still in progress.`
+            : delivered === 1
               ? `Your first design is ready. We're still working on the remaining ${remaining === 1 ? 'design' : 'designs'}.`
               : `${delivered} designs are ready. We're still working on the remaining ${remaining === 1 ? 'design' : 'designs'}.`,
         }
     : allReady
       ? {
-          title: one ? 'Your design is ready' : 'Your designs are ready',
-          subtitle: "We'll notify you when your files are delivered.",
+          title: staff
+            ? one
+              ? 'Design ready to send'
+              : 'Designs ready to send'
+            : one
+              ? 'Your design is ready'
+              : 'Your designs are ready',
+          subtitle: staff
+            ? 'Publish the files when you are ready to deliver.'
+            : "We'll notify you when your files are delivered.",
         }
       : {
-          title: one ? "We're working on your design" : "We're working on your designs",
-          subtitle: "We'll notify you when your files are ready.",
+          title: staff
+            ? one
+              ? 'Working on this design'
+              : 'Working on these designs'
+            : one
+              ? "We're working on your design"
+              : "We're working on your designs",
+          subtitle: staff
+            ? 'Mark the work ready, then deliver the files.'
+            : "We'll notify you when your files are ready.",
         };
   const steps = [
     {
@@ -280,10 +306,16 @@ export function OrderSteps({
         : allDelivered && one
           ? 'Design completed'
           : allReady
-            ? one
-              ? 'Design prepared'
-              : 'All designs prepared'
-            : 'Creating your files',
+            ? staff
+              ? one
+                ? 'Ready to send'
+                : 'All designs prepared'
+              : one
+                ? 'Design prepared'
+                : 'All designs prepared'
+            : staff
+              ? 'Creating the files'
+              : 'Creating your files',
       state: partial ? 'current' : allReady || allDelivered ? 'done' : 'current',
     },
     {
@@ -293,10 +325,14 @@ export function OrderSteps({
           ? '1 design ready to download'
           : `${delivered} designs ready to download`
         : allDelivered
-          ? 'Ready to download'
+          ? staff
+            ? 'Sent to the customer'
+            : 'Ready to download'
           : allReady
             ? 'In progress'
-            : 'Ready to download',
+            : staff
+              ? 'Not delivered yet'
+              : 'Ready to download',
       state: partial ? 'marked' : allDelivered ? 'done' : allReady ? 'current' : 'upcoming',
     },
   ] as const;
@@ -316,7 +352,7 @@ export function OrderSteps({
             aria-current={step.state === 'current' ? 'step' : undefined}
           >
             <div className="qj-node">
-              {step.state === 'current' && !partial && <span className="qj-flag">Current</span>}
+              {step.state === 'current' && !partial && !staff && <span className="qj-flag">Current</span>}
               <span className="qj-dot">
                 {step.state === 'done' ? <i className="ti ti-check" aria-hidden /> : index + 1}
               </span>
@@ -341,35 +377,68 @@ export function RevisionSteps({
   published,
   awaitingPayment = false,
   progressLabel,
+  audience = 'customer',
 }: {
   ready: number;
   total: number;
   published: number;
   awaitingPayment?: boolean;
   progressLabel?: string;
+  audience?: 'customer' | 'staff';
 }) {
+  const staff = audience === 'staff';
   const allReady = total > 0 && ready >= total;
   const allPublished = total > 0 && published >= total;
   const lineReady = total > 0 ? Math.round((Math.min(ready, total) / total) * 100) : 0;
   const many = total !== 1;
   const copy = allPublished
     ? {
-        title: 'Your revised files are ready',
-        subtitle: 'View your updated preview and download the latest files below.',
+        title: staff ? 'Revised files delivered' : 'Your revised files are ready',
+        subtitle: staff
+          ? 'The customer can view the updated preview and download the latest files.'
+          : 'View your updated preview and download the latest files below.',
       }
     : awaitingPayment && !allReady
       ? {
-          title: many ? 'Your revisions are waiting for payment' : 'Your revision is waiting for payment',
-          subtitle: many ? "We'll start each revision once it's paid." : "We'll start as soon as it's paid.",
+          title: staff
+            ? many
+              ? 'Revisions waiting for payment'
+              : 'Revision waiting for payment'
+            : many
+              ? 'Your revisions are waiting for payment'
+              : 'Your revision is waiting for payment',
+          subtitle: staff
+            ? many
+              ? 'Each revision starts once the customer pays.'
+              : 'This revision starts once the customer pays.'
+            : many
+              ? "We'll start each revision once it's paid."
+              : "We'll start as soon as it's paid.",
         }
       : allReady
         ? {
-            title: many ? 'Your revisions are ready' : 'Your revision is ready',
-            subtitle: "We'll notify you when your files are delivered.",
+            title: staff
+              ? many
+                ? 'Revisions ready to send'
+                : 'Revision ready to send'
+              : many
+                ? 'Your revisions are ready'
+                : 'Your revision is ready',
+            subtitle: staff
+              ? 'Publish the revised files when you are ready.'
+              : "We'll notify you when your files are delivered.",
           }
         : {
-            title: many ? "We're updating your designs" : "We're updating your design",
-            subtitle: "We'll notify you when your revised files are ready.",
+            title: staff
+              ? many
+                ? 'Revisions in progress'
+                : 'Revision in progress'
+              : many
+                ? "We're updating your designs"
+                : "We're updating your design",
+            subtitle: staff
+              ? 'The requested changes are underway.'
+              : "We'll notify you when your revised files are ready.",
           };
   const working = !allPublished && !allReady && !awaitingPayment;
   const steps = allPublished
@@ -433,7 +502,7 @@ export function RevisionSteps({
             aria-current={step.state === 'current' ? 'step' : undefined}
           >
             <div className="qj-node">
-              {step.state === 'current' && <span className="qj-flag">Current</span>}
+              {step.state === 'current' && !staff && <span className="qj-flag">Current</span>}
               <span className="qj-dot">
                 {step.state === 'done' ? <i className="ti ti-check" aria-hidden /> : index + 1}
               </span>

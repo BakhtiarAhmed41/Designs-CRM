@@ -60,6 +60,7 @@ import { FormPreferencesDisplay, hasFormPreferences } from '@/components/FormPre
 import { MessageAttachments } from '@/components/MessageAttachments';
 import { QuoteHistory } from '@/components/QuoteHistory';
 import { useCanonicalOrderUrl } from '@/lib/useCanonicalOrderUrl';
+import { OrderSteps, RevisionSteps } from '@/components/QuoteJourney';
 import { ServiceAdminOrder } from '@/components/ServiceAdminOrder';
 import { serviceOrderKind } from '@/lib/embroideryQuote';
 import {
@@ -802,6 +803,22 @@ export function AdminOrderDetail() {
     );
   })();
   const readyCount = designs.filter((d) => d.status === 'DONE' || d.status === 'DELIVERED').length;
+  const deliveredCount = designs.filter((d) => d.status === 'DELIVERED').length;
+  const orderEdits = editsQ.data?.edits ?? [];
+  const revisionReadyCount = orderEdits.filter((edit) => edit.status === 'DONE' || Boolean(edit.readyAt)).length;
+  const revisionPublishedCount = orderEdits.filter((edit) => edit.status === 'DONE').length;
+  const originalsDelivered = designs.length > 0 && deliveredCount >= designs.length;
+  const showDesignProgress = designs.length > 0 && !(originalsDelivered && orderEdits.length > 0);
+  const awaitingRevisionPayment =
+    orderEdits.length > 0 &&
+    revisionReadyCount === 0 &&
+    orderEdits.every(
+      (edit) =>
+        edit.kind === 'PAID' &&
+        (edit.priceCents ?? 0) > 0 &&
+        edit.invoiceStatus !== 'PAID' &&
+        edit.status !== 'DONE',
+    );
   const progCount = designs.filter((d) => d.status === 'IN_PROGRESS').length;
   const deliveryFiles = (order.deliveries ?? []).flatMap((batch) =>
     batch.files.map((f) => ({
@@ -931,6 +948,28 @@ export function AdminOrderDetail() {
           </button>
         </div>
       </div>
+
+      {(showDesignProgress || orderEdits.length > 0) && (
+        <section className="qj qj-staff" aria-label="Order progress" style={{ marginBottom: 16 }}>
+          {showDesignProgress && (
+            <OrderSteps
+              audience="staff"
+              ready={readyCount}
+              total={designs.length}
+              delivered={deliveredCount}
+            />
+          )}
+          {orderEdits.length > 0 && (
+            <RevisionSteps
+              audience="staff"
+              ready={revisionReadyCount}
+              total={orderEdits.length}
+              published={revisionPublishedCount}
+              awaitingPayment={awaitingRevisionPayment}
+            />
+          )}
+        </section>
+      )}
 
       {error && <div className="alert-error" style={{ marginBottom: 12 }}>{error}</div>}
 

@@ -506,6 +506,11 @@ export async function runMigrations() {
     }
   }
 
+  if (!(await columnExists('notifications', 'dismissed_at'))) {
+    console.log('Adding notifications.dismissed_at column ...');
+    await conn.query('ALTER TABLE notifications ADD COLUMN dismissed_at DATETIME NULL');
+  }
+
   await conn.query(
     `UPDATE notifications
         SET title = 'New quote request',

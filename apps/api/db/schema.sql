@@ -425,13 +425,14 @@ CREATE TABLE IF NOT EXISTS message_templates (
 -- Notifications & activity log
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS notifications (
-  id         CHAR(36) NOT NULL,
-  user_id    CHAR(36) NOT NULL,
-  title      VARCHAR(255) NOT NULL,
-  body       TEXT NULL,
-  link       VARCHAR(500) NULL,
-  read_at    DATETIME NULL,
-  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  id           CHAR(36) NOT NULL,
+  user_id      CHAR(36) NOT NULL,
+  title        VARCHAR(255) NOT NULL,
+  body         TEXT NULL,
+  link         VARCHAR(500) NULL,
+  read_at      DATETIME NULL,
+  dismissed_at DATETIME NULL,
+  created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_notif_user_created (user_id, created_at),
   KEY idx_notif_user_read (user_id, read_at),

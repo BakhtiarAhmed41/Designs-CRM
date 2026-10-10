@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EmbroideryFileCard } from '@/components/EmbroideryFileCard';
+import { OrderSteps, RevisionSteps } from '@/components/QuoteJourney';
 import { ImageLightbox } from '@/components/FilePreview';
 import { useTopbarLead } from '@/components/Shell';
 import { useDialog } from '@/components/ui/AppDialog';
@@ -64,6 +65,7 @@ import { deliveryCounts, orderDeliveryGroups, type DeliveryRow } from '@/lib/ser
 import { assignOrder, listTeam, unassignOrder } from '@/lib/team';
 import type { Order } from '@/lib/types';
 import '@/styles/embroidery-quote.css';
+import '@/styles/quote-journey.css';
 
 type AdminOrder = Order & {
   designs?: Design[];
@@ -519,6 +521,31 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
   });
   const revisionRequested =
     order.status === 'REVISION_REQUESTED' || edits.some((edit) => edit.status === 'PENDING');
+  const designCount = groups.length || requestDesigns.length;
+  const rowReady = (row: DeliveryRow) =>
+    row.design?.status === 'DONE' || row.design?.status === 'DELIVERED' || hasReleasedFiles(row);
+  const rowDelivered = (row: DeliveryRow) =>
+    row.design?.status === 'DELIVERED' || hasReleasedFiles(row);
+  const readyDesignCount = groups.length
+    ? groups.filter((group) => group.rows.length > 0 && group.rows.every(rowReady)).length
+    : 0;
+  const deliveredDesignCount = groups.length
+    ? groups.filter((group) => group.rows.length > 0 && group.rows.every(rowDelivered)).length
+    : 0;
+  const originalsDelivered = designCount > 0 && deliveredDesignCount >= designCount;
+  const showDesignProgress = designCount > 0 && !(originalsDelivered && edits.length > 0);
+  const revisionReadyCount = edits.filter((edit) => edit.status === 'DONE' || Boolean(edit.readyAt)).length;
+  const revisionPublishedCount = edits.filter((edit) => edit.status === 'DONE').length;
+  const awaitingRevisionPayment =
+    edits.length > 0 &&
+    revisionReadyCount === 0 &&
+    edits.every(
+      (edit) =>
+        edit.kind === 'PAID' &&
+        (edit.priceCents ?? 0) > 0 &&
+        edit.invoiceStatus !== 'PAID' &&
+        edit.status !== 'DONE',
+    );
   const headerLabel = unpriced
     ? 'Needs your price'
     : order.status === 'PENDING_PAYMENT'
@@ -684,6 +711,28 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
           </button>
         </div>
       </div>
+
+      {(showDesignProgress || edits.length > 0) && (
+        <section className="qj qj-staff" aria-label="Order progress">
+          {showDesignProgress && (
+            <OrderSteps
+              audience="staff"
+              ready={readyDesignCount}
+              total={designCount}
+              delivered={deliveredDesignCount}
+            />
+          )}
+          {edits.length > 0 && (
+            <RevisionSteps
+              audience="staff"
+              ready={revisionReadyCount}
+              total={edits.length}
+              published={revisionPublishedCount}
+              awaitingPayment={awaitingRevisionPayment}
+            />
+          )}
+        </section>
+      )}
 
       <dl className="ead-spec">
         <div>

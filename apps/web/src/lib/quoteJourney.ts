@@ -38,3 +38,37 @@ export function quoteJourneyPhase(order: {
 
   return 'preparing';
 }
+
+/** Date and total line under the staff quote stepper. */
+export function staffJourneyLines(input: {
+  phase: Exclude<QuoteJourneyPhase, 'closed'>;
+  revised?: boolean;
+  version?: number | null;
+  sentAt?: string | null;
+  paidAt?: string | null;
+  totalLabel?: string | null;
+}) {
+  const { phase, revised, version, sentAt, paidAt, totalLabel } = input;
+  if (phase === 'review') {
+    const bits = [
+      sentAt ? `Sent ${sentAt}` : null,
+      revised && version ? `Version ${version}` : null,
+      totalLabel ? `Quote total: ${totalLabel}` : null,
+    ].filter(Boolean);
+    return { subtitle: bits.join(' · ') || undefined };
+  }
+  if (phase === 'pay') {
+    return { subtitle: totalLabel ? `Quote total: ${totalLabel}` : undefined };
+  }
+  if (phase === 'paid' || phase === 'accepted') {
+    const bits = [
+      paidAt ? `Paid ${paidAt}` : null,
+      version ? `Version ${version}` : null,
+    ].filter(Boolean);
+    return {
+      subtitle: 'This quote has been converted to an order.',
+      meta: bits.join(' · ') || undefined,
+    };
+  }
+  return {};
+}

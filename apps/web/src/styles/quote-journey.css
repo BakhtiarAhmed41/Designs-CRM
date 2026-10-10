@@ -29,6 +29,17 @@
   line-height: 1.45;
 }
 
+.qj-meta {
+  margin: 2px 0 0;
+  color: #8b919a;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.ead > .qj {
+  margin-bottom: 14px;
+}
+
 .qj-staff {
   border-color: #d0d3d8;
   box-shadow: 0 1px 3px rgba(27, 29, 34, 0.06);

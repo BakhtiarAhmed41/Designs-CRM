@@ -2238,8 +2238,7 @@ button.primary i,
 .dash-ref {
   color: var(--brand, var(--maroon));
   font-weight: 600;
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  text-decoration: none;
 }
 .dash-ref:hover { color: var(--brand-d, var(--maroon-d)); }
 .dash-table-wrap {
@@ -2296,13 +2295,15 @@ button.primary i,
 .dash-col-amount { width: 12%; }
 .dash-col-activity { width: 24%; }
 .dash-col-detail { width: 36%; }
-.dash-col-time { width: 16%; }
-.dash-col-action { width: 16%; }
-.activity-table { min-width: 800px; }
+.dash-col-update { width: 22%; }
+.dash-col-design { width: 18%; }
+.dash-col-ref { width: 18%; }
+.dash-col-time { width: 14%; }
+.dash-col-action { width: 28%; }
+.activity-table { min-width: 860px; }
 .activity-scroll {
   width: 100%;
-  max-height: 252px;
-  overflow: auto;
+  overflow-x: auto;
 }
 .activity-scroll .activity-table {
   border-collapse: separate;
@@ -2372,6 +2373,151 @@ button.primary i,
   background: var(--tint);
   display: grid;
   place-items: center;
+}
+.activity-panel .panel-head h3 {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #1b2a4a;
+}
+.activity-kicker {
+  width: 28px;
+  height: 3px;
+  border-radius: 2px;
+  background: #d23b3b;
+  margin-bottom: 10px;
+}
+.activity-dismissed-link {
+  border: 0;
+  background: none;
+  color: #7b8494;
+  font-size: 13.5px;
+  cursor: pointer;
+  padding: 4px 0;
+  white-space: nowrap;
+}
+.activity-dismissed-link:hover { color: #1b2a4a; }
+.activity-table thead th {
+  color: #8b93a3;
+  font-weight: 600;
+}
+.activity-table th:last-child {
+  text-align: right;
+}
+.activity-table td:last-child {
+  overflow: visible;
+}
+.activity-table td {
+  vertical-align: middle;
+  color: #24324a;
+}
+.activity-update {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.activity-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}
+.activity-dot.amber { background: #e39b2b; }
+.activity-dot.red { background: #c0392b; }
+.activity-dot.green { background: #2e9d57; }
+.activity-dot.slate { background: #8d939c; }
+.activity-update-label {
+  font-weight: 600;
+  color: #1b2a4a;
+  white-space: nowrap;
+}
+.activity-table tr.is-unread .activity-update-label { font-weight: 700; }
+.activity-design,
+.activity-ref,
+.activity-time {
+  color: #5c6b82;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.activity-design {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.activity-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.activity-act {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid #d5d8de;
+  background: #fff;
+  color: #24324a;
+  font-size: 13.5px;
+  font-weight: 650;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.activity-act:hover { background: #f7f8fa; color: #24324a; }
+.activity-act.solid {
+  background: #1e2a44;
+  border-color: #1e2a44;
+  color: #fff;
+}
+.activity-act.solid:hover { background: #162033; color: #fff; }
+.activity-x {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  background: transparent;
+  color: #9aa1ab;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  padding: 0;
+}
+.activity-x:hover { background: #f3f4f6; color: #24324a; }
+.activity-x i { font-size: 16px; }
+.activity-toast-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}
+.activity-toast {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  background: #fff;
+  border: 1px solid #e6e8ee;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(20, 30, 50, 0.12);
+  padding: 12px 16px;
+  font-size: 14px;
+  color: #24324a;
+}
+.activity-toast-rule {
+  width: 1px;
+  height: 16px;
+  background: #e1e4ea;
+}
+.activity-toast button {
+  border: 0;
+  background: none;
+  color: #2563eb;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
 }
 .activity-link {
   color: var(--brand, #9A1E22);

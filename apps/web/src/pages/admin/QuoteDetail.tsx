@@ -26,7 +26,7 @@ import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
 import { getCustomer } from '@/lib/customers';
 import { getErrorMessage } from '@/lib/api';
 import { clipDesignLabel, money, dateShort, quoteLifecycleChip, friendlyFileName, orderNumber, orderSlug } from '@/lib/format';
-import { quoteJourneyPhase } from '@/lib/quoteJourney';
+import { quoteJourneyPhase, staffJourneyLines } from '@/lib/quoteJourney';
 import { QuoteJourney } from '@/components/QuoteJourney';
 import { isCuttingRequest, isEmbroideryRequest, isVectorRequest } from '@/lib/embroideryQuote';
 import { isAdminRecounter, isStaffCreatedOrder, lineTotal, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
@@ -334,7 +334,20 @@ export function AdminQuoteDetail() {
             </div>
           </div>
         </div>
-        <QuoteJourney phase={shown} orderTo={orderTo} audience="staff" />
+        <QuoteJourney
+          phase={shown}
+          orderTo={orderTo}
+          audience="staff"
+          revised={(studioQuote?.version ?? 0) > 1}
+          {...staffJourneyLines({
+            phase: shown,
+            revised: (studioQuote?.version ?? 0) > 1,
+            version: studioQuote?.version,
+            sentAt: studioQuote?.createdAt ? dateShort(studioQuote.createdAt) : null,
+            paidAt: order.updatedAt ? dateShort(order.updatedAt) : null,
+            totalLabel: studioQuote?.amountCents != null ? money(studioQuote.amountCents, studioQuote.currency) : money(order.priceCents, order.currency),
+          })}
+        />
         <div className="card card-pad qj-price-card">
           <h2 className="qj-price-title">Quote pricing</h2>
           {priced.length === 0 && (
@@ -370,6 +383,9 @@ export function AdminQuoteDetail() {
   const studioQuote = studioQuotation(quotations);
   const latestQuote = [...quotations].sort((a, b) => b.version - a.version)[0];
   const studioLines = studioQuote?.lines ?? [];
+  const quotePhase = quoteJourneyPhase(order);
+  const sentQuote = studioQuote ?? latestQuote;
+  const quoteRevised = (sentQuote?.version ?? 0) > 1;
   const project = clipDesignLabel(order.name ?? 'Quote request');
 
   function startRevise() {
@@ -429,6 +445,24 @@ export function AdminQuoteDetail() {
       </div>
 
       {error && <div className="alert-error" style={{ marginBottom: 12 }}>{error}</div>}
+      {quotePhase !== 'closed' && (
+        <div style={{ marginBottom: 16 }}>
+          <QuoteJourney
+            phase={quotePhase}
+            orderTo={`/admin/orders/${orderSlug(order.humanRef, order.id)}`}
+            audience="staff"
+            revised={quoteRevised}
+            {...staffJourneyLines({
+              phase: quotePhase,
+              revised: quoteRevised,
+              version: sentQuote?.version,
+              sentAt: sentQuote?.createdAt ? dateShort(sentQuote.createdAt) : null,
+              paidAt: order.updatedAt ? dateShort(order.updatedAt) : null,
+              totalLabel: money(sentQuote?.amountCents ?? order.priceCents, order.currency),
+            })}
+          />
+        </div>
+      )}
       {toast && (
         <div className="alert-success" style={{ marginBottom: 12 }}>
           <i className="ti ti-circle-check" /> {toast}

@@ -176,4 +176,6 @@ export type Notification = {
   link: string | null;
   readAt: string | null;
   createdAt: string;
+  designName?: string | null;
+  humanRef?: string | null;
 };

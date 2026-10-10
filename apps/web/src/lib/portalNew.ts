@@ -79,3 +79,111 @@ export function portalActivityAction(title: string, link: string | null) {
   if (link) return { label: 'View', to: link };
   return null;
 }
+
+export type ActivityTone = 'amber' | 'red' | 'green' | 'slate';
+
+export function portalActivityRow(title: string, link: string | null): {
+  update: string;
+  tone: ActivityTone;
+  actionLabel: string | null;
+  to: string | null;
+  primary: boolean;
+} {
+  const t = title.toLowerCase();
+  const dest = portalActivityAction(title, link);
+  if (t.includes('message')) {
+    return {
+      update: 'New message',
+      tone: 'amber',
+      actionLabel: 'Reply',
+      to: dest?.to ?? link,
+      primary: true,
+    };
+  }
+  if (t.includes('payment received') || t.includes('partial payment')) {
+    return {
+      update: t.includes('partial') ? 'Partial payment' : 'Payment received',
+      tone: 'green',
+      actionLabel: 'View receipt',
+      to: dest?.to ?? '/portal/invoices',
+      primary: false,
+    };
+  }
+  if (t.includes('revision started') || t.includes('revision requested')) {
+    return {
+      update: 'Revision started',
+      tone: 'slate',
+      actionLabel: 'View revision',
+      to: dest?.to ?? link,
+      primary: false,
+    };
+  }
+  if (t.includes('revised') && (t.includes('file') || t.includes('ready'))) {
+    return {
+      update: 'Revised files ready',
+      tone: 'green',
+      actionLabel: 'Download files',
+      to: dest?.to ?? filesSectionPath(link),
+      primary: false,
+    };
+  }
+  if (
+    t.includes('invoice') ||
+    t.includes('ready to pay') ||
+    t.includes('payment reminder') ||
+    t.includes('revision payment') ||
+    t.includes('price updated')
+  ) {
+    return {
+      update: 'Invoice ready',
+      tone: 'red',
+      actionLabel: 'Pay now',
+      to: dest?.to ?? '/portal/invoices',
+      primary: true,
+    };
+  }
+  if (t.includes('quote') || t.includes('quotation')) {
+    const declined = t.includes('declin') || t.includes('reject');
+    return {
+      update: declined ? 'Quote declined' : t.includes('updated') ? 'Quote updated' : 'Quote ready',
+      tone: declined ? 'red' : 'amber',
+      actionLabel: declined ? 'View quote' : 'Review quote',
+      to: dest?.to ?? '/portal/quotes',
+      primary: !declined,
+    };
+  }
+  if (t.includes('preview')) {
+    return {
+      update: 'Preview ready',
+      tone: 'green',
+      actionLabel: 'View preview',
+      to: dest?.to ?? link,
+      primary: false,
+    };
+  }
+  if (t.includes('file') || t.includes('deliver')) {
+    return {
+      update: 'Files ready',
+      tone: 'green',
+      actionLabel: 'Download files',
+      to: dest?.to ?? filesSectionPath(link),
+      primary: false,
+    };
+  }
+  if (t.includes('started') || t.includes('now an order')) {
+    return {
+      update: 'Order started',
+      tone: 'slate',
+      actionLabel: 'View order',
+      to: dest?.to ?? link,
+      primary: false,
+    };
+  }
+  return {
+    update: title,
+    tone: 'slate',
+    actionLabel: dest?.label ?? null,
+    to: dest?.to ?? null,
+    primary: false,
+  };
+}

@@ -19,25 +19,35 @@ export class NotificationsController {
     @CurrentUser() user: AuthUser | undefined,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
+    @Query('dismissed') dismissed?: string,
   ) {
-    const out = await this.notifications.list(user, {
+    return this.notifications.list(user, {
       page: page ? Number(page) : undefined,
       pageSize: pageSize ? Number(pageSize) : undefined,
+      dismissed: dismissed === '1' || dismissed === 'true',
     });
-    return out;
   }
 
   @Patch('read-all')
   async readAll(@CurrentUser() user: AuthUser | undefined) {
-    const out = await this.notifications.markAllRead(user);
-    return out;
+    return this.notifications.markAllRead(user);
   }
 
   @Patch(':id/read')
   async readOne(@CurrentUser() user: AuthUser | undefined, @Param('id') id: string) {
     const { id: parsed } = markReadSchema.parse({ id });
-    const out = await this.notifications.markRead(user, parsed);
-    return out;
+    return this.notifications.markRead(user, parsed);
+  }
+
+  @Patch(':id/dismiss')
+  async dismiss(@CurrentUser() user: AuthUser | undefined, @Param('id') id: string) {
+    const { id: parsed } = markReadSchema.parse({ id });
+    return this.notifications.dismiss(user, parsed);
+  }
+
+  @Patch(':id/restore')
+  async restore(@CurrentUser() user: AuthUser | undefined, @Param('id') id: string) {
+    const { id: parsed } = markReadSchema.parse({ id });
+    return this.notifications.restore(user, parsed);
   }
 }
-

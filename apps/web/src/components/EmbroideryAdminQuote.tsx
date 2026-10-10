@@ -38,7 +38,7 @@ import {
 } from '@/lib/orders';
 import { applyOrderChange, invalidateWorkCaches } from '@/lib/queryCache';
 import { canSupport } from '@/lib/permissions';
-import { quoteJourneyPhase } from '@/lib/quoteJourney';
+import { quoteJourneyPhase, staffJourneyLines } from '@/lib/quoteJourney';
 import { isStaffCreatedOrder, lineTotal, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
 import type { Order } from '@/lib/types';
 import '@/styles/embroidery-quote.css';
@@ -387,29 +387,16 @@ export function EmbroideryAdminQuote({
           ? { text: 'Awaiting approval', cls: 'ead-pill review' }
           : { text: 'Needs pricing', cls: 'ead-pill' };
 
-  const journeySubtitle = (() => {
-    if (!livePhase || livePhase === 'preparing') return undefined;
-    if (livePhase === 'review') {
-      const bits = [
-        studio?.createdAt ? `Sent ${dateShort(studio.createdAt)}` : null,
-        revised ? `Version ${studio?.version}` : null,
-        `Quote total: ${money(quotedTotal)}`,
-      ].filter(Boolean);
-      return bits.join(' · ');
-    }
-    if (livePhase === 'pay') {
-      return `Quote total: ${money(quotedTotal)}`;
-    }
-    if (livePhase === 'paid' || livePhase === 'accepted') {
-      const bits = [
-        'This quote has been converted to an order.',
-        order.updatedAt ? `Paid ${dateShort(order.updatedAt)}` : null,
-        studio?.version ? `Version ${studio.version}` : null,
-      ].filter(Boolean);
-      return bits.join(' ');
-    }
-    return undefined;
-  })();
+  const journeyLines = livePhase
+    ? staffJourneyLines({
+        phase: livePhase,
+        revised,
+        version: studio?.version,
+        sentAt: studio?.createdAt ? dateShort(studio.createdAt) : null,
+        paidAt: order.updatedAt ? dateShort(order.updatedAt) : null,
+        totalLabel: money(quotedTotal),
+      })
+    : {};
 
   function saveDraft() {
     try {
@@ -491,7 +478,8 @@ export function EmbroideryAdminQuote({
           orderTo={orderTo}
           audience="staff"
           revised={revised}
-          subtitle={journeySubtitle}
+          subtitle={journeyLines.subtitle}
+          meta={journeyLines.meta}
         />
       )}
 
