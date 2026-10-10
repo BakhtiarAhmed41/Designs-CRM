@@ -2557,7 +2557,7 @@ button.activity-link {
 }
 .portal-look {
   display: contents;
-  --side-w: 272px;
+  --side-w: 250px;
 }
 .portal-look .main {
   background: var(--portal-page-bg, transparent);
@@ -4973,28 +4973,28 @@ form.card-pad > .btn {
   border-top-color: rgba(255, 255, 255, 0.18);
 }
 .portal-side .brand img {
-  width: 46px;
-  height: 46px;
+  width: 44px;
+  height: 44px;
 }
 .portal-side .brand .bt { font-size: 15px; }
 .portal-side .brand .bs { font-size: 12.5px; }
 .portal-side .nav-label { font-size: 11.5px; }
 .portal-side .nav a,
 .portal-side .logout-link {
-  font-size: 15.5px;
+  font-size: 14px;
 }
 .portal-side .nav a i,
 .portal-side .logout-link i,
 .portal-side .service-nav i {
-  font-size: 21px;
+  font-size: 20px;
 }
 .portal-side .service-nav a,
 .portal-side .service-nav button {
-  font-size: 15px;
+  font-size: 14px;
 }
 .portal-side .nav a .cnt,
 .portal-side .nav-new {
-  font-size: 11px;
+  font-size: 10px;
 }
 .cr-modal .select-menu-wrap.is-ead .select-menu-btn {
   min-height: 34px;
