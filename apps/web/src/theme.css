@@ -4919,6 +4919,58 @@ form.card-pad > .btn {
 }
 .date-range-select .select-menu-wrap { flex: 1 1 160px; min-width: 160px; }
 .date-range-select .select-menu-btn { width: 100%; min-width: 0; }
+
+/* Experiment: customer portal sidebar in brand navy, white type */
+.app-frame .side.portal-side {
+  background: #143F65 !important;
+  background-color: #143F65 !important;
+  color: #fff;
+  border-right-color: #0E2E4A;
+}
+.portal-side .brand .bt,
+.portal-side .brand .bs,
+.portal-side .nav-label,
+.portal-side .nav a,
+.portal-side .nav a i,
+.portal-side .service-nav a,
+.portal-side .service-nav button,
+.portal-side .service-nav i,
+.portal-side .logout-link,
+.portal-side .logout-link i {
+  color: #fff;
+}
+.portal-side .nav a:hover,
+.portal-side .service-nav a:hover,
+.portal-side .service-nav button:hover,
+.portal-side .logout-link:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+.portal-side .logout-link:hover i,
+.portal-side .nav a:hover i {
+  color: #fff;
+}
+.portal-side .nav a.on {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  box-shadow: inset 2px 0 0 #fff;
+}
+.portal-side .nav a.on i {
+  color: #fff;
+  background: transparent;
+  box-shadow: none;
+}
+.portal-side .nav a .cnt,
+.portal-side .nav a.on .cnt {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+.portal-side .nav a .dot {
+  background: #fff;
+}
+.portal-side .foot {
+  border-top-color: rgba(255, 255, 255, 0.18);
+}
 .cr-modal .select-menu-wrap.is-ead .select-menu-btn {
   min-height: 34px;
   padding: 7px 32px 7px 10px;
