@@ -413,6 +413,30 @@ export async function runMigrations() {
     );
   }
 
+  if (!(await columnExists('order_designs', 'assigned_designer_id'))) {
+    // eslint-disable-next-line no-console
+    console.log('Adding order_designs.assigned_designer_id column ...');
+    await conn.query(
+      'ALTER TABLE order_designs ADD COLUMN assigned_designer_id CHAR(36) NULL',
+    );
+    try {
+      await conn.query(
+        'ALTER TABLE order_designs ADD KEY idx_designs_designer (assigned_designer_id)',
+      );
+    } catch {
+      /* index may already exist */
+    }
+    try {
+      await conn.query(
+        `ALTER TABLE order_designs
+           ADD CONSTRAINT fk_designs_designer
+           FOREIGN KEY (assigned_designer_id) REFERENCES users (id) ON DELETE SET NULL`,
+      );
+    } catch {
+      /* FK may already exist or engine may not support it */
+    }
+  }
+
   if (!(await columnExists('deliveries', 'kind'))) {
     // eslint-disable-next-line no-console
     console.log('Adding deliveries.kind column ...');

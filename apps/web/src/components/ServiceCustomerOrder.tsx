@@ -64,11 +64,11 @@ function designForTitle(title: string, designs: EmbDesign[]) {
   return designs.find((item, itemIndex) => designOptionLabel(itemIndex, item.name) === title);
 }
 
-function placementLabel(size: EmbSize) {
-  const place = size.placement?.trim();
+function placementParts(size: EmbSize) {
+  const place = size.placement?.trim() || '';
   const detail = sizeDetail(size);
-  const parts = [detail && detail !== 'Size' ? detail : '', place].filter(Boolean);
-  return parts.join(' · ');
+  const sizeText = detail && detail !== 'Size' ? detail : '';
+  return { sizeText, place };
 }
 
 function libraryLines(group: { title: string; rows: DeliveryRow[] }, designs: EmbDesign[]) {
@@ -77,16 +77,23 @@ function libraryLines(group: { title: string; rows: DeliveryRow[] }, designs: Em
     return group.rows.map((row) => ({
       key: row.key,
       item: row.name.trim() || group.title,
+      sizeText: '',
+      place: '',
       placement: '—',
       row,
     }));
   }
-  return sizes.map((size, index) => ({
-    key: `${group.rows[index]?.key ?? group.title}-size-${index}`,
-    item: group.title,
-    placement: placementLabel(size) || '—',
-    row: group.rows[index] ?? group.rows[0],
-  }));
+  return sizes.map((size, index) => {
+    const { sizeText, place } = placementParts(size);
+    return {
+      key: `${group.rows[index]?.key ?? group.title}-size-${index}`,
+      item: group.title,
+      sizeText,
+      place,
+      placement: [sizeText, place].filter(Boolean).join(' · ') || '—',
+      row: group.rows[index] ?? group.rows[0],
+    };
+  });
 }
 
 function revisionCoversDesign(edit: EditRequest, designId?: string) {
@@ -633,7 +640,8 @@ export function ServiceCustomerOrder({
               <div className="cop-table">
                 <div className="cop-thead">
                   <span>Item</span>
-                  <span>Size & placement</span>
+                  <span>Size</span>
+                  <span>Placement</span>
                   <span>Status</span>
                   <span>Actions</span>
                 </div>
@@ -690,7 +698,8 @@ export function ServiceCustomerOrder({
                           </span>
                         )}
                       </div>
-                      <div className="cop-place">{line.placement}</div>
+                      <div className="cop-size">{line.sizeText || '—'}</div>
+                      <div className="cop-place">{line.place || '—'}</div>
                       <div className="cop-status-cell">
                         <span className={`cop-badge ${status.tone}`}>
                           {status.tone === 'done' ? (

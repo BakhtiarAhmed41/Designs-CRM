@@ -165,6 +165,7 @@ type DesignRow = {
   status: DesignStatus;
   price_cents: number | null;
   requested_formats: unknown;
+  assigned_designer_id?: string | null;
   sort_order: number;
   created_at: Date;
 };
@@ -1018,6 +1019,7 @@ export class OrdersService {
       status: d.status,
       priceCents: d.price_cents,
       requestedFormats: d.requested_formats ?? null,
+      assignedDesignerId: d.assigned_designer_id ?? null,
       sortOrder: d.sort_order,
       createdAt: d.created_at,
     };
@@ -3543,6 +3545,7 @@ export class OrdersService {
       size?: string | null;
       status?: DesignStatus | null;
       priceCents?: number | null;
+      assignedDesignerId?: string | null;
     },
   ) {
     this.assertAdmin(user);
@@ -3573,6 +3576,20 @@ export class OrdersService {
     if (input.priceCents !== undefined) {
       sets.push('price_cents = ?');
       params.push(typeof input.priceCents === 'number' ? input.priceCents : null);
+    }
+    if (input.assignedDesignerId !== undefined) {
+      const nextDesigner = input.assignedDesignerId?.trim() || null;
+      if (nextDesigner) {
+        const staff = await this.db.queryOne<{ id: string; role: string }>(
+          'SELECT id, role FROM users WHERE id = ? LIMIT 1',
+          [nextDesigner],
+        );
+        if (!staff || staff.role === UserRole.CLIENT) {
+          throw new NotFoundException('Team member not found');
+        }
+      }
+      sets.push('assigned_designer_id = ?');
+      params.push(nextDesigner);
     }
     if (sets.length) {
       params.push(designId);

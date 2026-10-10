@@ -45,6 +45,7 @@ import {
 import { useDialog } from '@/components/ui/AppDialog';
 import { apiFetch, downloadSignedFile, getErrorMessage, resolveFileUrl } from '@/lib/api';
 import {
+  clipDesignLabel,
   money,
   dateShort,
   deliveredViaFromFlags,
@@ -854,6 +855,8 @@ export function AdminOrderDetail() {
       order.status === 'CLOSED' ||
       order.status === 'REVISION_REQUESTED');
 
+  const project = clipDesignLabel(order.name ?? 'Order');
+
   return (
     <div>
       <div className="ph">
@@ -867,8 +870,8 @@ export function AdminOrderDetail() {
               <span>{orderNumber(order.humanRef, order.id.slice(0, 6))}</span>
             </span>
           </nav>
-          <h1>
-            {orderNumber(order.humanRef, order.id.slice(0, 6))} · {order.name ?? 'Order'}
+          <h1 title={project.full}>
+            {orderNumber(order.humanRef, order.id.slice(0, 6))} · {project.text}
           </h1>
           <div style={{ marginTop: 8 }}>
             <span className={orderChip.cls}>{orderChip.label}</span>

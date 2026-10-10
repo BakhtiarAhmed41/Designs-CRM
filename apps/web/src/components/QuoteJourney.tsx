@@ -10,11 +10,27 @@ const STEPS = [
   { title: 'Pay your invoice' },
 ] as const;
 
-const STAFF_STEPS = [
-  { title: 'Prepare quote' },
-  { title: 'Customer review' },
-  { title: 'Payment' },
-] as const;
+function staffSteps(phase: LivePhase) {
+  if (phase === 'preparing') {
+    return [
+      { title: 'Prepare quote' },
+      { title: 'Customer approval' },
+      { title: 'Payment' },
+    ] as const;
+  }
+  if (phase === 'paid' || phase === 'accepted') {
+    return [
+      { title: 'Quote prepared' },
+      { title: 'Customer approved' },
+      { title: 'Payment received' },
+    ] as const;
+  }
+  return [
+    { title: 'Quote prepared' },
+    { title: 'Customer approval' },
+    { title: 'Payment' },
+  ] as const;
+}
 
 function stepIndex(phase: LivePhase) {
   if (phase === 'preparing') return 0;
@@ -37,29 +53,38 @@ function stepDetail(index: number, phase: LivePhase) {
   return 'Payment confirms your order';
 }
 
-function staffStepDetail(index: number, phase: LivePhase) {
-  if (index === 0) return phase === 'preparing' ? 'In progress' : 'Complete';
-  if (index === 1) {
-    if (phase === 'preparing') return 'Not sent';
-    if (phase === 'review') return 'With customer';
-    return 'Accepted';
+function staffStepDetail(
+  index: number,
+  phase: LivePhase,
+  opts?: { revised?: boolean },
+) {
+  if (index === 0) {
+    if (phase === 'preparing') return 'Needs pricing';
+    if (opts?.revised && (phase === 'review' || phase === 'pay')) return 'Revised quote sent';
+    if (phase === 'review' || phase === 'pay') return 'Sent to customer';
+    return '';
   }
-  if (phase === 'paid') return 'Received';
-  if (phase === 'accepted') return 'On account';
-  if (phase === 'pay') return 'Awaiting';
-  return 'Not due';
+  if (index === 1) {
+    // Status badge already shows awaiting approval — avoid repeating it under the step.
+    if (phase === 'preparing') return '';
+    if (phase === 'review') return '';
+    return '';
+  }
+  if (phase === 'paid' || phase === 'accepted') return '';
+  if (phase === 'pay') return 'Pending';
+  return 'Pending';
 }
 
-function staffCopy(phase: LivePhase) {
+function staffCopy(phase: LivePhase, opts?: { revised?: boolean }) {
   if (phase === 'preparing') {
     return {
-      title: 'Preparing quote',
-      subtitle: 'Pricing has not been sent to the customer.',
+      title: 'Quote request received',
+      subtitle: '',
     };
   }
   if (phase === 'review') {
     return {
-      title: 'With customer',
+      title: opts?.revised ? 'Revised quote sent to customer' : 'Quote sent to customer',
       subtitle: 'Waiting for the customer to review this quote.',
     };
   }
@@ -71,13 +96,13 @@ function staffCopy(phase: LivePhase) {
   }
   if (phase === 'paid') {
     return {
-      title: 'Paid',
-      subtitle: 'Payment is in. Continue on the order.',
+      title: 'Payment received',
+      subtitle: 'This quote has been converted to an order.',
     };
   }
   return {
-    title: 'Confirmed',
-    subtitle: 'This quote is confirmed. Continue on the order.',
+    title: 'Payment received',
+    subtitle: 'This quote has been converted to an order.',
   };
 }
 
@@ -123,6 +148,7 @@ export function QuoteJourney({
   title,
   subtitle,
   audience = 'customer',
+  revised = false,
 }: {
   phase: LivePhase;
   orderTo?: string;
@@ -132,49 +158,58 @@ export function QuoteJourney({
   title?: string;
   subtitle?: string;
   audience?: 'customer' | 'staff';
+  /** Staff: whether the latest sent quote is a revision (v2+). */
+  revised?: boolean;
 }) {
   const staff = audience === 'staff';
-  const copy = staff ? staffCopy(phase) : defaultCopy(phase, canChoose);
-  const steps = staff ? STAFF_STEPS : STEPS;
+  const copy = staff ? staffCopy(phase, { revised }) : defaultCopy(phase, canChoose);
+  const steps = staff ? staffSteps(phase) : STEPS;
   const current = stepIndex(phase);
   const finished = phase === 'paid' || phase === 'accepted';
+  const lead = subtitle ?? copy.subtitle;
 
   return (
-    <section className="qj" aria-label="Quote progress">
-      <h2>{title ?? copy.title}</h2>
-      <p className="qj-lead">{subtitle ?? copy.subtitle}</p>
+    <section className={`qj${staff ? ' qj-staff' : ''}`} aria-label="Quote progress">
+      <div className="qj-top">
+        <div>
+          <h2>{title ?? copy.title}</h2>
+          {lead ? <p className="qj-lead">{lead}</p> : null}
+        </div>
+        {finished && orderTo && (
+          <div className="qj-actions qj-actions-inline">
+            <Link className="qj-cta" to={orderTo}>
+              <i className="ti ti-external-link" aria-hidden /> View order
+            </Link>
+          </div>
+        )}
+      </div>
       <ol className="qj-steps">
         {steps.map((step, index) => {
-          const state = index < current ? 'done' : index === current ? 'current' : 'upcoming';
+          const state =
+            finished || index < current ? 'done' : index === current ? 'current' : 'upcoming';
+          const detail = staff
+            ? staffStepDetail(index, phase, { revised })
+            : stepDetail(index, phase);
           return (
             <li
-              key={step.title}
+              key={`${step.title}-${index}`}
               className={`qj-step is-${state}`}
               aria-current={state === 'current' ? 'step' : undefined}
             >
               <div className="qj-node">
-                {state === 'current' && <span className="qj-flag">Current</span>}
+                {state === 'current' && !staff && <span className="qj-flag">Current</span>}
                 <span className="qj-dot">
                   {state === 'done' ? <i className="ti ti-check" aria-hidden /> : index + 1}
                 </span>
               </div>
               <strong className="qj-name">{step.title}</strong>
-              <span className="qj-sub">{staff ? staffStepDetail(index, phase) : stepDetail(index, phase)}</span>
+              {detail ? <span className="qj-sub">{detail}</span> : null}
             </li>
           );
         })}
       </ol>
-      {!finished && (
-        <p className="qj-note">
-          {staff ? 'The order opens after the customer pays.' : "After payment, you'll be taken to your Order page."}
-        </p>
-      )}
-      {finished && orderTo && (
-        <div className="qj-actions">
-          <Link className="qj-cta" to={orderTo}>
-            View order
-          </Link>
-        </div>
+      {!finished && !staff && (
+        <p className="qj-note">After payment, you'll be taken to your Order page.</p>
       )}
       {!finished && phase === 'pay' && onPay && (
         <div className="qj-actions">

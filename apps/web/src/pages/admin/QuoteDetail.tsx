@@ -25,7 +25,7 @@ import { applyOrderChange, invalidateWorkCaches } from '@/lib/queryCache';
 import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
 import { getCustomer } from '@/lib/customers';
 import { getErrorMessage } from '@/lib/api';
-import { money, dateShort, quoteLifecycleChip, friendlyFileName, orderNumber, orderSlug } from '@/lib/format';
+import { clipDesignLabel, money, dateShort, quoteLifecycleChip, friendlyFileName, orderNumber, orderSlug } from '@/lib/format';
 import { quoteJourneyPhase } from '@/lib/quoteJourney';
 import { QuoteJourney } from '@/components/QuoteJourney';
 import { isCuttingRequest, isEmbroideryRequest, isVectorRequest } from '@/lib/embroideryQuote';
@@ -295,6 +295,18 @@ export function AdminQuoteDetail() {
       </div>
     );
   }
+  if (isEmbroideryRequest(order)) {
+    return <EmbroideryAdminQuote order={order} customer={customerQ.data?.customer} />;
+  }
+
+  if (isCuttingRequest(order)) {
+    return <EmbroideryAdminQuote order={order} customer={customerQ.data?.customer} kind="cutting" />;
+  }
+
+  if (isVectorRequest(order)) {
+    return <EmbroideryAdminQuote order={order} customer={customerQ.data?.customer} kind="vector" />;
+  }
+
   if (order.type === 'ORDER') {
     const phase = quoteJourneyPhase(order);
     const shown =
@@ -306,6 +318,7 @@ export function AdminQuoteDetail() {
     const orderTo = `/admin/orders/${orderSlug(order.humanRef, order.id)}`;
     const studioQuote = studioQuotation(order.quotations as QuoteWithLines[] | undefined);
     const priced = studioQuote?.lines ?? [];
+    const project = clipDesignLabel(order.name ?? 'Quote');
     return (
       <div className="qd-page">
         <div className="ph">
@@ -315,7 +328,7 @@ export function AdminQuoteDetail() {
               <span>/</span>
               <span>{orderNumber(order.humanRef, 'Quote')}</span>
             </div>
-            <h1>{order.name ?? 'Quote'}</h1>
+            <h1 title={project.full}>{project.text}</h1>
             <div className="muted" style={{ marginTop: 4 }}>
               {orderNumber(order.humanRef, order.id.slice(0, 6))} · {dateShort(order.createdAt)}
             </div>
@@ -357,22 +370,11 @@ export function AdminQuoteDetail() {
   const studioQuote = studioQuotation(quotations);
   const latestQuote = [...quotations].sort((a, b) => b.version - a.version)[0];
   const studioLines = studioQuote?.lines ?? [];
+  const project = clipDesignLabel(order.name ?? 'Quote request');
 
   function startRevise() {
     setLines(linesFromQuote(studioQuote));
     setRevising(true);
-  }
-
-  if (isEmbroideryRequest(order)) {
-    return <EmbroideryAdminQuote order={order} customer={customerQ.data?.customer} />;
-  }
-
-  if (isCuttingRequest(order)) {
-    return <EmbroideryAdminQuote order={order} customer={customerQ.data?.customer} kind="cutting" />;
-  }
-
-  if (isVectorRequest(order)) {
-    return <EmbroideryAdminQuote order={order} customer={customerQ.data?.customer} kind="vector" />;
   }
 
   return (
@@ -387,9 +389,7 @@ export function AdminQuoteDetail() {
             </span>
           </nav>
           <div>
-            <h1>
-              {order.name ?? 'Quote request'}
-            </h1>
+            <h1 title={project.full}>{project.text}</h1>
             <div className="sub">
               {statusChip.label} · requested {dateShort(order.createdAt)}
               {isStaffCreatedOrder(order) ? ' · Created by admin' : ''}

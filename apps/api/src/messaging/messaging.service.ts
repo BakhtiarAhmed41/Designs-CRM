@@ -501,6 +501,11 @@ export class MessagingService {
       params.push(filters.orderId);
     }
 
+    // Hide drafts until the customer (or staff) sends the first message.
+    where.push(
+      'EXISTS (SELECT 1 FROM messages m0 WHERE m0.conversation_id = c.id AND m0.deleted_at IS NULL)',
+    );
+
     const q = filters.q?.trim();
     if (q) {
       const like = `%${q}%`;
@@ -1370,7 +1375,7 @@ export class MessagingService {
     await this.db.execute(
       `INSERT INTO conversations
          (id, customer_id, order_id, chat_type, status, subject, label, source, last_message_at)
-       VALUES (?, ?, ?, ?, 'OPEN', ?, ?, ?, NOW())`,
+       VALUES (?, ?, ?, ?, 'OPEN', ?, ?, ?, NULL)`,
       [
         id,
         customerId,
@@ -1382,9 +1387,7 @@ export class MessagingService {
       ],
     );
     const row = await this.getConversationRow(id);
-    this.gateway?.server?.emit('conversation:updated', {
-      conversation: this.conversationDto(row!, true),
-    });
+    // Do not notify admin until the first message is sent.
     return this.conversationDto(row!, true);
   }
 

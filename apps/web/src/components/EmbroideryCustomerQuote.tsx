@@ -32,34 +32,27 @@ import type { Order } from '@/lib/types';
 import { QuoteJourney, QuotePricingEmpty } from '@/components/QuoteJourney';
 import '@/styles/embroidery-quote.css';
 
-function serviceForDesign(kind: 'embroidery' | 'cutting' | 'vector', design?: EmbDesign) {
-  const picked = design?.service?.trim();
-  if (picked) return picked;
-  if (kind === 'cutting') return 'Cutting & Engraving';
-  if (kind === 'vector') return 'Vector & Print';
-  return 'Embroidery Digitizing';
-}
-
-function sizePlacement(size: EmbSize) {
-  const detail = size.detail?.trim() || '';
-  const measured = [size.w, size.h].filter(Boolean).join(' × ');
-  const sizeText = detail || (measured ? `${measured}${size.unit ? ` ${size.unit}` : ''}` : '');
-  const place = size.placement?.trim() || '';
-  if (sizeText && place) return `${sizeText} · ${place}`;
-  return sizeText || place;
-}
-
 function pricedSizes(design?: EmbDesign) {
   return (design?.sizes ?? []).filter((size) => size.detail || size.placement || size.w || size.h);
 }
 
-function lineSizeLabel(line: QuotationLine, design: EmbDesign | undefined, index: number) {
+function sizeParts(size: EmbSize) {
+  const detail = size.detail?.trim() || '';
+  const measured = [size.w, size.h].filter(Boolean).join(' × ');
+  const sizeText = detail || (measured ? `${measured}${size.unit ? ` ${size.unit}` : ''}` : '');
+  const place = size.placement?.trim() || '';
+  return { sizeText, place };
+}
+
+function lineSizePlace(line: QuotationLine, design: EmbDesign | undefined, index: number) {
   const fromDesign = pricedSizes(design)[index];
-  const fromRequest = fromDesign ? sizePlacement(fromDesign) : '';
-  if (fromRequest) return fromRequest;
+  if (fromDesign) return sizeParts(fromDesign);
   const fromQuote = (line.sizes ?? []).map((size) => size.label?.trim()).filter(Boolean);
-  if (fromQuote.length) return fromQuote.join(' · ');
-  return '—';
+  if (fromQuote.length === 1) return { sizeText: fromQuote[0], place: '' };
+  if (fromQuote.length > 1) {
+    return { sizeText: fromQuote[0], place: fromQuote.slice(1).join(', ') };
+  }
+  return { sizeText: '', place: '' };
 }
 
 function selectionCaption(itemCount: number, designCount: number, picking: boolean) {
@@ -293,7 +286,6 @@ export function EmbroideryCustomerQuote({
           )}
           {groups.map((group) => {
             const design = designs[designLabels.indexOf(group.title)];
-            const serviceName = serviceForDesign(kind, design);
             return (
               <div key={group.title} className="ecd-group">
                 <div className="ecd-label">Design name</div>
@@ -302,13 +294,15 @@ export function EmbroideryCustomerQuote({
                   <div className="qj-price-head">
                     {showSelect && <span>Select</span>}
                     <span>Quoted item</span>
-                    <span className="qj-col-place">Size & placement</span>
+                    <span className="qj-col-size">Size</span>
+                    <span className="qj-col-place">Placement</span>
                     <span className="qj-col-price">Price</span>
                   </div>
                   {group.lines.map((line, index) => {
                     const on = selected.includes(line.id);
                     const included = line.clientDecision !== 'DROPPED';
                     const Row = canPick ? 'label' : 'div';
+                    const { sizeText, place } = lineSizePlace(line, design, index);
                     return (
                       <Row key={line.id} className="ecd-line">
                         {showSelect && (
@@ -325,8 +319,9 @@ export function EmbroideryCustomerQuote({
                             }}
                           />
                         )}
-                        <span>{serviceName}</span>
-                        <span className="qj-col-place">{lineSizeLabel(line, design, index)}</span>
+                        <span>{line.name?.trim() || '—'}</span>
+                        <span className="qj-col-size">{sizeText || '—'}</span>
+                        <span className="qj-col-place">{place || '—'}</span>
                         <span className="qj-col-price">{money(lineTotal(line))}</span>
                       </Row>
                     );

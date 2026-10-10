@@ -9,6 +9,7 @@ import { adminCreateOrder, adminUploadAttachments } from '@/lib/orders';
 import { invalidateWorkCaches } from '@/lib/queryCache';
 import { filesFromQuoteForm } from '@/lib/quoteFiles';
 import { postThemeToWindow } from '@/lib/theme';
+import { QuoteSubmitMask } from '@/components/QuoteSubmitMask';
 import { useTopbarLead } from '@/components/Shell';
 import { useDialog } from '@/components/ui/AppDialog';
 import { useTheme } from '@/context/ThemeContext';
@@ -667,9 +668,14 @@ export function AdminNewRequest({ mode }: { mode: Mode }) {
         )}
       </div>
       {busy && (
-        <div className="quote-submit-mask">
-          {mode === 'ORDER' ? 'Creating the order…' : 'Creating the quote…'}
-        </div>
+        <QuoteSubmitMask
+          title={mode === 'ORDER' ? 'Creating the order' : 'Creating the quote'}
+          subtitle={
+            mode === 'ORDER'
+              ? 'Saving details and opening the new order.'
+              : 'Saving details and opening the new quote.'
+          }
+        />
       )}
     </div>
   );

@@ -80,6 +80,7 @@ const updateDesignSchema = z.object({
     .optional()
     .nullable(),
   priceCents: z.number().int().nonnegative().optional().nullable(),
+  assignedDesignerId: z.string().min(1).optional().nullable(),
 });
 
 const duplicateOrderSchema = z.object({

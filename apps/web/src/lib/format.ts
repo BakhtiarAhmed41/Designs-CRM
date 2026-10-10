@@ -62,25 +62,35 @@ export function orderSlug(ref?: string | null, id?: string | null): string {
   return id ?? '';
 }
 
-const DESIGN_NAME_LIMIT = 42;
+const DESIGN_NAME_LIMIT = 36;
+const DESIGN_NAME_MAX_PARTS = 2;
 
-/** Joined design names stay on one line. Extra names end with an ellipsis. */
+/** Joined design names stay compact. Extra names end with an ellipsis. */
 export function clipDesignLabel(name: string) {
   const full = name.trim();
   const parts = full.split(/\s*\/\s*/).map((part) => part.trim()).filter(Boolean);
-  if (parts.length <= 1) return { text: full, full };
+  if (parts.length === 0) return { text: full, full };
+
+  const joined = parts.join(' / ');
+  const shown = parts.slice(0, DESIGN_NAME_MAX_PARTS);
   let text = '';
-  for (const part of parts) {
+  for (const part of shown) {
     const next = text ? `${text} / ${part}` : part;
     if (next.length > DESIGN_NAME_LIMIT) {
       return {
-        text: `${text || part.slice(0, DESIGN_NAME_LIMIT).trimEnd()}…`,
-        full: parts.join(' / '),
+        text: `${(text || part.slice(0, DESIGN_NAME_LIMIT)).trimEnd()}…`,
+        full: joined,
       };
     }
     text = next;
   }
-  return { text, full: parts.join(' / ') };
+  if (parts.length > DESIGN_NAME_MAX_PARTS) {
+    return { text: `${text}…`, full: joined };
+  }
+  if (text.length > DESIGN_NAME_LIMIT) {
+    return { text: `${text.slice(0, DESIGN_NAME_LIMIT).trimEnd()}…`, full: joined };
+  }
+  return { text, full: joined };
 }
 
 export function orderNumber(ref?: string | null, fallback?: string | null): string {

@@ -37,6 +37,7 @@ import {
   deliveredViaFromFlags,
   deliveryMethodLabel,
   isImageFile,
+  clipDesignLabel,
   money,
   orderDeliveredVia,
   orderNumber,
@@ -283,6 +284,26 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
       designerId ? assignOrder(designerId, order.id) : unassignOrder(order.id),
     onSuccess: () => refresh(),
     onError: (e) => setError(getErrorMessage(e)),
+  });
+
+  const [sizeAssignKey, setSizeAssignKey] = useState<string | null>(null);
+  const assignSize = useMutation({
+    mutationFn: async ({ row, designerId: next }: { row: DeliveryRow; designerId: string }) => {
+      setSizeAssignKey(row.key);
+      const designId = await ensureDesign(row);
+      return updateDesign(order.id, designId, {
+        assignedDesignerId: next.trim() ? next : null,
+      });
+    },
+    onSuccess: () => {
+      setError(null);
+      setSizeAssignKey(null);
+      refresh();
+    },
+    onError: (e) => {
+      setSizeAssignKey(null);
+      setError(getErrorMessage(e));
+    },
   });
 
   const saveNotes = useMutation({
@@ -590,12 +611,14 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
     );
   }
 
+  const project = clipDesignLabel(order.name?.trim() || 'Order');
+
   return (
     <div className="ead">
       {error && <ErrorBanner>{error}</ErrorBanner>}
       <div className="ead-head">
         <div>
-          <h1>{order.name?.trim() || 'Order'}</h1>
+          <h1 title={project.full}>{project.text}</h1>
           <div className="ead-meta">
             <span className={headerLabel === 'Delivered' ? 'ead-pill ok' : 'ead-pill'}>
               {headerLabel}
@@ -705,12 +728,41 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
               {groups.map((group, groupIndex) => (
                 <div key={group.title} className="sod-group" style={groupIndex === 0 ? { marginTop: 0 } : undefined}>
                   <h3>{group.title}</h3>
-                  {group.rows.map((row) => (
-                    <div key={row.key} className="sod-line">
-                      <b>{row.name}</b>
-                      <div className="sod-acts">{lineActions(row)}</div>
-                    </div>
-                  ))}
+                  {group.rows.map((row) => {
+                    const sizeDesignerId = row.design?.assignedDesignerId ?? '';
+                    const orderDesigner = designerOptions.find((m) => m.id === order.assignedDesignerId);
+                    const orderDefaultLabel = order.assignedDesignerId
+                      ? `Order default (${orderDesigner ? personName(orderDesigner) : 'assigned'})`
+                      : 'Order default (unassigned)';
+                    return (
+                      <div key={row.key} className="sod-line sod-line-stack">
+                        <div className="sod-line-main">
+                          <b>{row.name}</b>
+                          <div className="sod-acts">{lineActions(row)}</div>
+                        </div>
+                        <div className="sod-assign">
+                          <label className="sod-assign-label" htmlFor={`size-assign-${row.key}`}>
+                            Assign size
+                          </label>
+                          <SelectMenu
+                            id={`size-assign-${row.key}`}
+                            size="ead"
+                            ariaLabel={`Assign designer for ${row.name}`}
+                            value={sizeDesignerId}
+                            disabled={assignSize.isPending && sizeAssignKey === row.key}
+                            onChange={(value) => assignSize.mutate({ row, designerId: value })}
+                            options={[
+                              { value: '', label: orderDefaultLabel },
+                              ...designerOptions.map((member) => ({
+                                value: member.id,
+                                label: personName(member),
+                              })),
+                            ]}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               ))}
             </div>
@@ -1041,6 +1093,9 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
           <section className="ead-card">
             <div className="ead-card-h"><h2>Designer</h2></div>
             <div className="ead-b">
+              <p className="ead-he-sub" style={{ marginTop: 0, marginBottom: 10 }}>
+                Assign the whole order here, or assign individual sizes in Delivery. Size picks override the order designer.
+              </p>
               <SelectMenu
                 size="ead"
                 ariaLabel="Assign designer"

@@ -42,6 +42,8 @@ export type Design = {
   status: DesignStatus;
   priceCents: number | null;
   requestedFormats: string[] | null;
+  /** Size-level override. Null means inherit the order designer. */
+  assignedDesignerId?: string | null;
   sortOrder: number;
   createdAt: string;
 };
@@ -124,6 +126,7 @@ export function updateDesign(
     size?: string | null;
     status?: DesignStatus;
     priceCents?: number | null;
+    assignedDesignerId?: string | null;
   },
 ) {
   return apiFetch<{ design: Design }>(

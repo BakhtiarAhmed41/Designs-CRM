@@ -152,19 +152,22 @@ CREATE TABLE IF NOT EXISTS orders (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS order_designs (
-  id                CHAR(36) NOT NULL,
-  order_id          CHAR(36) NOT NULL,
-  name              VARCHAR(255) NOT NULL,
-  placement         VARCHAR(120) NULL,
-  size              VARCHAR(120) NULL,
-  status            ENUM('WAITING','IN_PROGRESS','DONE','DELIVERED') NOT NULL DEFAULT 'WAITING',
-  price_cents       INT NULL,
-  requested_formats JSON NULL,
-  sort_order        INT NOT NULL DEFAULT 0,
-  created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  id                   CHAR(36) NOT NULL,
+  order_id             CHAR(36) NOT NULL,
+  name                 VARCHAR(255) NOT NULL,
+  placement            VARCHAR(120) NULL,
+  size                 VARCHAR(120) NULL,
+  status               ENUM('WAITING','IN_PROGRESS','DONE','DELIVERED') NOT NULL DEFAULT 'WAITING',
+  price_cents          INT NULL,
+  requested_formats    JSON NULL,
+  assigned_designer_id CHAR(36) NULL,
+  sort_order           INT NOT NULL DEFAULT 0,
+  created_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_designs_order (order_id),
-  CONSTRAINT fk_designs_order FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE
+  KEY idx_designs_designer (assigned_designer_id),
+  CONSTRAINT fk_designs_order FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE,
+  CONSTRAINT fk_designs_designer FOREIGN KEY (assigned_designer_id) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS order_attachments (

@@ -2645,8 +2645,94 @@ button.activity-link {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.72);
-  font-weight: 700;
+  padding: 24px;
+  background: rgba(248, 249, 251, 0.78);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: quote-submit-fade 0.28s ease both;
+}
+.quote-submit-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  min-width: min(100%, 280px);
+  padding: 28px 32px;
+  border-radius: 18px;
+  background: #fff;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+  box-shadow: 0 18px 48px rgba(17, 24, 39, 0.12);
+  text-align: center;
+  animation: quote-submit-rise 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.quote-submit-spinner {
+  position: relative;
+  width: 44px;
+  height: 44px;
+}
+.quote-submit-spinner::before,
+.quote-submit-spinner::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2.5px solid transparent;
+}
+.quote-submit-spinner::before {
+  border-top-color: #7c1f2b;
+  border-right-color: rgba(124, 31, 43, 0.25);
+  animation: quote-submit-spin 0.85s linear infinite;
+}
+.quote-submit-spinner::after {
+  inset: 7px;
+  border-bottom-color: #1f3a6b;
+  border-left-color: rgba(31, 58, 107, 0.2);
+  animation: quote-submit-spin 1.15s linear infinite reverse;
+}
+.quote-submit-copy {
+  display: grid;
+  gap: 4px;
+}
+.quote-submit-copy strong {
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: var(--ink, #111827);
+}
+.quote-submit-copy span {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted, #666);
+}
+.quote-submit-dots {
+  display: inline-flex;
+  gap: 5px;
+  margin-top: 2px;
+}
+.quote-submit-dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #7c1f2b;
+  opacity: 0.35;
+  animation: quote-submit-dot 1.2s ease-in-out infinite;
+}
+.quote-submit-dots i:nth-child(2) { animation-delay: 0.15s; }
+.quote-submit-dots i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes quote-submit-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes quote-submit-rise {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes quote-submit-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes quote-submit-dot {
+  0%, 80%, 100% { opacity: 0.3; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-2px); }
 }
 .nq-radio-hi {
   background: #e8f1ff;

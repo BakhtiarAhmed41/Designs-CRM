@@ -3,19 +3,18 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AdminCounterDecision } from '@/components/AdminCounterDecision';
 import { EmbroideryFileCard } from '@/components/EmbroideryFileCard';
+import { QuoteJourney } from '@/components/QuoteJourney';
 import { useDialog } from '@/components/ui/AppDialog';
 import { SelectMenu } from '@/components/ui/SelectMenu';
 import { useAuth } from '@/context/AuthContext';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import type { CustomerDetail } from '@/lib/customers';
 import { submitQuoteBuilder } from '@/lib/designs';
-import { money, orderNumber, orderSlug } from '@/lib/format';
+import { clipDesignLabel, dateShort, money, orderNumber, orderSlug } from '@/lib/format';
 import {
   asEmbroideryPrefs,
   backgroundLabel,
   colorModeLabel,
-  colorSelectedLabel,
-  cuttingServiceLabel,
   designCountLabel,
   customerDesignTitle,
   designNote,
@@ -26,8 +25,6 @@ import {
   resolutionLabel,
   sizeDetail,
   turnaroundLabel,
-  unitLabel,
-  vectorServiceLabel,
   type EmbAttachment,
 } from '@/lib/embroideryQuote';
 import { createAdminConversation, listAdminConversations } from '@/lib/messaging';
@@ -41,9 +38,15 @@ import {
 } from '@/lib/orders';
 import { applyOrderChange, invalidateWorkCaches } from '@/lib/queryCache';
 import { canSupport } from '@/lib/permissions';
-import { isStaffCreatedOrder, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
+import { quoteJourneyPhase } from '@/lib/quoteJourney';
+import { isStaffCreatedOrder, lineTotal, studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
 import type { Order } from '@/lib/types';
 import '@/styles/embroidery-quote.css';
+import '@/styles/quote-journey.css';
+
+function draftStorageKey(orderId: string) {
+  return `admin-quote-draft:${orderId}`;
+}
 
 type PriceRow = { key: string; description: string; price: string };
 type DesignBlock = { key: string; designKey: string; rows: PriceRow[] };
@@ -145,19 +148,36 @@ export function EmbroideryAdminQuote({
   const [blocks, setBlocks] = useState<DesignBlock[]>(() => blocksFromQuote(studio, options));
   const [notes, setNotes] = useState(order.internalNotes ?? '');
   const [notesSaved, setNotesSaved] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(Boolean(order.internalNotes?.trim()));
   const [ordersOpen, setOrdersOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [messaging, setMessaging] = useState(false);
 
   useEffect(() => {
     setNotes(order.internalNotes ?? '');
+    setNotesOpen(Boolean(order.internalNotes?.trim()));
   }, [order.internalNotes, order.id]);
 
   useEffect(() => {
     setBlocks(blocksFromQuote(studio, options));
+    setEditing(false);
     // Refill when a newly sent quote comes back on this order.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studio?.id]);
+
+  useEffect(() => {
+    if (studio?.id) return;
+    try {
+      const raw = window.localStorage.getItem(draftStorageKey(order.id));
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as DesignBlock[];
+      if (Array.isArray(parsed) && parsed.length) setBlocks(parsed);
+    } catch {
+      /* ignore bad draft */
+    }
+  }, [order.id, studio?.id]);
 
   const totalCents = useMemo(() => {
     let total = 0;
@@ -227,6 +247,12 @@ export function EmbroideryAdminQuote({
     },
     onSuccess: (res) => {
       setError(null);
+      setEditing(false);
+      try {
+        window.localStorage.removeItem(draftStorageKey(order.id));
+      } catch {
+        /* ignore */
+      }
       const revising = sentVersion > 0;
       void applyOrderChange(qc, res.order);
       void dialog.alert({
@@ -322,157 +348,219 @@ export function EmbroideryAdminQuote({
     }
   }
 
-  const nextQuoteVersion = (latest?.version ?? 0) + 1;
-  const sendLabel = sendQuote.isPending
-    ? 'Sending…'
-    : nextQuoteVersion > 1
-      ? `Send revised quote v${nextQuoteVersion}`
-      : 'Send Quote for Per-Design Approval';
+  const isOrder = order.type === 'ORDER';
+  const phaseRaw = quoteJourneyPhase(order);
+  const livePhase =
+    phaseRaw === 'closed'
+      ? null
+      : isOrder
+        ? order.paymentStatus === 'PAID'
+          ? ('paid' as const)
+          : phaseRaw === 'pay'
+            ? ('pay' as const)
+            : ('accepted' as const)
+        : phaseRaw;
+  const revised = (studio?.version ?? 0) > 1;
+  const showBuilder = !isOrder && !declined && (sentVersion === 0 || editing);
+  const orderTo = `/admin/orders/${orderSlug(order.humanRef, order.id)}`;
+  const serviceCrumb = vector
+    ? 'Vector & Print Artwork'
+    : cutting
+      ? 'CNC Laser Cutting'
+      : 'Embroidery Digitizing';
+  const project = clipDesignLabel(
+    order.name?.trim() || designs[0]?.name?.trim() || (vector ? 'Vector quote' : cutting ? 'Cutting quote' : 'Embroidery quote'),
+  );
+  const quoteNo = orderNumber(order.humanRef, order.id.slice(0, 6));
+  const studioLines = studio?.lines ?? [];
+  const quotedTotal = studio?.amountCents ?? order.priceCents ?? totalCents;
+  const sendLabel = sendQuote.isPending ? 'Sending…' : 'Send quote';
+  const approved = isOrder || livePhase === 'paid' || livePhase === 'accepted';
 
-  const pill =
-    sentVersion > 0
-      ? { text: `Quote Sent · v${sentVersion}`, ok: true }
-      : declined
-        ? { text: 'Declined', ok: false }
-        : awaitingCounter
-          ? { text: 'Counter to review', ok: false }
-          : { text: 'Needs Your Price', ok: false };
+  const pill = declined
+    ? { text: 'Declined', cls: 'ead-pill' }
+    : awaitingCounter
+      ? { text: 'Counter to review', cls: 'ead-pill' }
+      : approved
+        ? { text: 'Approved', cls: 'ead-pill ok' }
+        : sentVersion > 0
+          ? { text: 'Awaiting approval', cls: 'ead-pill review' }
+          : { text: 'Needs pricing', cls: 'ead-pill' };
+
+  const journeySubtitle = (() => {
+    if (!livePhase || livePhase === 'preparing') return undefined;
+    if (livePhase === 'review') {
+      const bits = [
+        studio?.createdAt ? `Sent ${dateShort(studio.createdAt)}` : null,
+        revised ? `Version ${studio?.version}` : null,
+        `Quote total: ${money(quotedTotal)}`,
+      ].filter(Boolean);
+      return bits.join(' · ');
+    }
+    if (livePhase === 'pay') {
+      return `Quote total: ${money(quotedTotal)}`;
+    }
+    if (livePhase === 'paid' || livePhase === 'accepted') {
+      const bits = [
+        'This quote has been converted to an order.',
+        order.updatedAt ? `Paid ${dateShort(order.updatedAt)}` : null,
+        studio?.version ? `Version ${studio.version}` : null,
+      ].filter(Boolean);
+      return bits.join(' ');
+    }
+    return undefined;
+  })();
+
+  function saveDraft() {
+    try {
+      window.localStorage.setItem(draftStorageKey(order.id), JSON.stringify(blocks));
+      setDraftSaved(true);
+      window.setTimeout(() => setDraftSaved(false), 1600);
+    } catch (e) {
+      setError(getErrorMessage(e));
+    }
+  }
+
+  function startEdit() {
+    setBlocks(blocksFromQuote(studio, options));
+    setEditing(true);
+  }
 
   return (
-    <div className="ead">
+    <div className="ead ead-desk">
+      <nav className="ead-crumb" aria-label="Breadcrumb">
+        <Link to="/admin/quotes">Quotes</Link>
+        <span aria-hidden>/</span>
+        <span>{serviceCrumb}</span>
+        <span aria-hidden>/</span>
+        <b>{quoteNo}</b>
+      </nav>
+
       <div className="ead-head">
-        <div>
-          <h1>
-            {vector
-              ? 'Vector Quote Request'
-              : cutting
-                ? 'Cutting Quote Request'
-                : 'Embroidery Quote Request'}
-          </h1>
-          <p className="ead-meta">
-            <span className={pill.ok ? 'ead-pill ok' : 'ead-pill'}>{pill.text}</span>
-            <span>{dateStamp(order.createdAt)}</span>
-          </p>
+        <div className="ead-head-copy">
+          <h1 title={project.full}>{project.text}</h1>
+          <div className="ead-meta">
+            <span className={pill.cls}>{pill.text}</span>
+            <span className="ead-sep" />
+            <span>Requested {dateShort(order.createdAt)}</span>
+            <span className="ead-sep" />
+            <span>{designCountLabel(designs.length).toLowerCase()}</span>
+            {isStaffCreatedOrder(order) && (
+              <>
+                <span className="ead-sep" />
+                <span>Created by admin</span>
+              </>
+            )}
+          </div>
         </div>
         <div className="ead-acts">
           <button type="button" className="ead-btn pri" disabled={messaging} onClick={() => void messageCustomer()}>
             <i className="ti ti-message" /> {messaging ? 'Opening…' : 'Contact Customer'}
           </button>
-          <button
-            type="button"
-            className="ead-btn icon"
-            title="Delete Request"
-            aria-label="Delete Request"
-            disabled={deleteMut.isPending}
-            onClick={() => {
-              void dialog
-                .confirm({
-                  title: 'Delete this quote?',
-                  message: 'This cannot be undone.',
-                  confirmLabel: 'Delete',
-                  danger: true,
-                })
-                .then((ok) => {
-                  if (ok) deleteMut.mutate();
-                });
-            }}
-          >
-            <i className="ti ti-trash" />
-          </button>
+          {!isOrder && (
+            <button
+              type="button"
+              className="ead-btn icon"
+              title="Delete Request"
+              aria-label="Delete Request"
+              disabled={deleteMut.isPending}
+              onClick={() => {
+                void dialog
+                  .confirm({
+                    title: 'Delete this quote?',
+                    message: 'This cannot be undone.',
+                    confirmLabel: 'Delete',
+                    danger: true,
+                  })
+                  .then((ok) => {
+                    if (ok) deleteMut.mutate();
+                  });
+              }}
+            >
+              <i className="ti ti-trash" />
+            </button>
+          )}
         </div>
       </div>
 
       {error && <div className="ead-banner">{error}</div>}
 
-      <dl className="ead-spec">
-        <div>
-          <dt>{vector ? 'Services Requested' : 'Service Requested'}</dt>
-          <dd>
-            {vector
-              ? vectorServiceLabel(designs)
-              : cutting
-                ? cuttingServiceLabel(designs)
-                : 'Embroidery Digitizing'}
-          </dd>
-        </div>
-        <div>
-          <dt>Designs</dt>
-          <dd>{designCountLabel(designs.length)}</dd>
-        </div>
-        <div>
-          <dt>{vector ? 'Color Selected' : 'Measurement Unit'}</dt>
-          <dd>{vector ? colorSelectedLabel(designs) : unitLabel(prefs?.unit)}</dd>
-        </div>
-      </dl>
+      {livePhase && (
+        <QuoteJourney
+          phase={livePhase}
+          orderTo={orderTo}
+          audience="staff"
+          revised={revised}
+          subtitle={journeySubtitle}
+        />
+      )}
 
       <div className="ead-grid">
         <div className="ead-col">
           <section className="ead-card">
+            <div className="ead-card-h">
+              <h2>Customer request details</h2>
+            </div>
             {designs.map((design, index) => {
               const files = designFiles[index] ?? { artwork: [], references: [] };
               const all = [...files.artwork, ...files.references];
               const sizes = (design.sizes ?? []).filter((s) => s.detail || s.placement || s.w || s.h);
+              const gallery = [
+                ...files.artwork.map((file, fileIndex) => ({
+                  file,
+                  label: cutting || vector || fileIndex === 0 ? 'Main artwork' : 'Alternate artwork',
+                })),
+                ...files.references.map((file, fileIndex) => ({
+                  file,
+                  label: `Reference ${fileIndex + 1}`,
+                })),
+              ];
               return (
-                <div key={`${design.name ?? 'design'}-${index}`}>
-                  <div className="ead-dh" style={index > 0 ? { borderTop: '1px solid #e4e5e8' } : undefined}>
-                    <h3>
-                      {designOptionLabel(index, design.name)}
-                    </h3>
+                <div key={`${design.name ?? 'design'}-${index}`} className="ead-design-block">
+                  <div className="ead-dh">
+                    <div>
+                      <h3>{designOptionLabel(index, design.name)}</h3>
+                      <p className="ead-he-sub" style={{ margin: '4px 0 0' }}>
+                        {sizes.length === 1 ? '1 size requested' : `${sizes.length} sizes requested`}
+                      </p>
+                    </div>
                     <button
                       type="button"
                       className="ead-btn"
                       disabled={all.length === 0}
                       onClick={() => void downloadAll(all)}
                     >
-                      <i className="ti ti-download" /> Download All Files
+                      <i className="ti ti-download" /> Download all files
                     </button>
                   </div>
-                  <div className="ead-b" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div className="ead-b" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                     <div>
-                      <div className="ead-kicker">Artworks</div>
-                      {files.artwork.length === 0 && <div className="ead-he-sub">No artwork uploaded.</div>}
+                      <div className="ead-kicker">Artwork & references</div>
+                      {gallery.length === 0 && <div className="ead-he-sub">No artwork uploaded.</div>}
                       <div className="ead-files">
-                        {files.artwork.map((file, fileIndex) => (
+                        {gallery.map(({ file, label }) => (
                           <EmbroideryFileCard
                             key={file.id}
                             name={file.name}
                             mimeType={file.mimeType}
                             previewUrl={file.previewUrl}
                             signedUrlPath={adminAttachmentUrl(order.id, file.id)}
-                            label={cutting || vector || fileIndex === 0 ? 'Main Artwork' : 'Alternate Artwork'}
+                            label={label}
                             onError={setError}
                           />
                         ))}
                       </div>
                     </div>
-                    {files.references.length > 0 && (
-                      <div>
-                        <div className="ead-kicker">Reference Images ({files.references.length})</div>
-                        <div className="ead-files">
-                          {files.references.map((file) => (
-                            <EmbroideryFileCard
-                              key={file.id}
-                              name={file.name}
-                              mimeType={file.mimeType}
-                              previewUrl={file.previewUrl}
-                              signedUrlPath={adminAttachmentUrl(order.id, file.id)}
-                              label="Reference Image"
-                              onError={setError}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
                     {vector ? (
                       <div>
-                        <div className="ead-kicker">Artwork Preferences</div>
+                        <div className="ead-kicker">Artwork preferences</div>
                         <dl className="ead-prefs">
                           <div>
                             <dt>Background</dt>
                             <dd>{backgroundLabel(design.background)}</dd>
                           </div>
                           <div>
-                            <dt>Color Mode</dt>
+                            <dt>Color mode</dt>
                             <dd>{colorModeLabel(design.colors)}</dd>
                           </div>
                           <div>
@@ -482,51 +570,39 @@ export function EmbroideryAdminQuote({
                         </dl>
                       </div>
                     ) : (
-                    <div>
-                      <div className="ead-kicker">Requested Sizes and Placements ({sizes.length})</div>
-                      <table className={cutting ? 'ead-table ead-table-cut' : 'ead-table'}>
-                        <thead>
-                        <tr>
-                          <th>Size or Placement</th>
-                          {!cutting && <th><span>Embroidered on</span></th>}
-                          <th><span>Proportional</span></th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                          {sizes.length === 0 && (
+                      <div>
+                        <table className={cutting ? 'ead-table ead-table-cut' : 'ead-table'}>
+                          <thead>
                             <tr>
-                              <td colSpan={cutting ? 2 : 3}>No sizes added.</td>
+                              <th>Size</th>
+                              {!cutting && <th>Placement</th>}
+                              <th>Proportional</th>
                             </tr>
-                          )}
-                          {sizes.map((size, sizeIndex) => (
-                            <tr key={`${size.detail ?? 'size'}-${sizeIndex}`}>
-                              <td>
-                              <span className="ecd-size-n">{sizeIndex + 1}</span>
-                              {sizeDetail(size)}
-                            </td>
-                              {!cutting && <td><span>{size.placement || '—'}</span></td>}
-                              <td>
-                                {size.keepProportional === false ? (
-                                  <span>No</span>
-                                ) : (
-                                  <span className="ead-yes">
-                                    <i className="ti ti-check" /> Yes
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                          </thead>
+                          <tbody>
+                            {sizes.length === 0 && (
+                              <tr>
+                                <td colSpan={cutting ? 2 : 3}>No sizes added.</td>
+                              </tr>
+                            )}
+                            {sizes.map((size, sizeIndex) => (
+                              <tr key={`${size.detail ?? 'size'}-${sizeIndex}`}>
+                                <td>{sizeDetail(size)}</td>
+                                {!cutting && <td>{size.placement || '—'}</td>}
+                                <td>{size.keepProportional === false ? 'No' : 'Yes'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                    {design.notes?.trim() && (
+                      <div className="ead-instruct">
+                        <b>Customer instructions</b>
+                        <p>{design.notes.trim()}</p>
+                      </div>
                     )}
                   </div>
-                  {design.notes?.trim() && (
-                    <div className="ead-note">
-                      <b>{vector ? "Customer's Project Notes" : "Customer's Design Instructions"}</b>
-                      <span>{design.notes.trim()}</span>
-                    </div>
-                  )}
                 </div>
               );
             })}
@@ -534,13 +610,12 @@ export function EmbroideryAdminQuote({
 
           <section className="ead-card">
             <div className="ead-card-h">
-              <span className="ead-ic"><i className="ti ti-package" /></span>
-              <h2>Delivery Preferences</h2>
+              <h2>Delivery preferences</h2>
             </div>
             <div className="ead-b">
               <dl className="ead-prefs">
                 <div>
-                  <dt>Requested File Formats</dt>
+                  <dt>Requested formats</dt>
                   <dd>
                     {(prefs?.formats ?? []).length === 0 && 'None selected'}
                     {(prefs?.formats ?? []).map((fmt) => (
@@ -549,11 +624,20 @@ export function EmbroideryAdminQuote({
                   </dd>
                 </div>
                 <div>
-                  <dt>Preview Files Included</dt>
-                  <dd>{cutting ? 'Proof Preview' : 'PDF and PNG'}</dd>
+                  <dt>Preview files</dt>
+                  <dd>
+                    {cutting ? (
+                      <span className="ead-chip">Proof</span>
+                    ) : (
+                      <>
+                        <span className="ead-chip">PDF</span>
+                        <span className="ead-chip">PNG</span>
+                      </>
+                    )}
+                  </dd>
                 </div>
                 <div>
-                  <dt>Turnaround Requested</dt>
+                  <dt>Turnaround</dt>
                   <dd>{turnaroundLabel(prefs?.turnaround)}</dd>
                 </div>
               </dl>
@@ -562,10 +646,15 @@ export function EmbroideryAdminQuote({
         </div>
 
         <aside className="ead-rail">
-          <section className="ead-card" style={sentVersion === 0 ? { borderColor: 'var(--navy)' } : undefined}>
+          <section className="ead-card ead-quote-panel">
             <div className="ead-card-h">
               <span className="ead-ic"><i className="ti ti-currency-dollar" /></span>
-              <h2>{sentVersion > 0 ? 'Update quote' : 'Enter quote prices'}</h2>
+              <h2>
+                {approved ? 'Approved quote' : showBuilder ? 'Prepare quote' : 'Sent quote'}
+              </h2>
+              {(studio?.version ?? 0) > 0 && (isOrder || sentVersion > 0) && (
+                <span className="ead-ver-pill">Version {studio?.version}</span>
+              )}
             </div>
             <div className="ead-b">
               {awaitingCounter ? (
@@ -582,68 +671,64 @@ export function EmbroideryAdminQuote({
                   }}
                   onError={setError}
                 />
-              ) : (
+              ) : showBuilder ? (
                 <>
-                  {sentVersion === 0 && (
-                    <p className="ead-he-sub" style={{ marginTop: 0 }}>
-                      {isStaffCreatedOrder(order)
-                        ? 'The customer sees this quote after you send it. They can accept it like a normal quote.'
-                        : 'Price the request, then send it so the customer can accept.'}
-                    </p>
-                  )}
-                  <div className="ead-kicker">Quote Designs</div>
                   {blocks.map((block) => (
                     <div key={block.key} className="ead-ql">
+                      <label className="ead-ql-t">Design</label>
                       <div className="ead-ql-top">
-                        <span className="ead-ql-t">Select Design</span>
-                        <button
-                          type="button"
-                          className="ead-linkish"
-                          style={{ visibility: blocks.length > 1 ? 'visible' : 'hidden' }}
-                          onClick={() => setBlocks((prev) => prev.filter((b) => b.key !== block.key))}
-                        >
-                          Remove
-                        </button>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <SelectMenu
+                            size="ead"
+                            ariaLabel="Design"
+                            value={block.designKey}
+                            onChange={(value) =>
+                              setBlocks((prev) =>
+                                prev.map((b) => (b.key === block.key ? { ...b, designKey: value } : b)),
+                              )
+                            }
+                            options={[
+                              { value: '', label: 'Select design' },
+                              ...options.map((option) => ({ value: option, label: option })),
+                            ]}
+                          />
+                        </div>
+                        {blocks.length > 1 && (
+                          <button
+                            type="button"
+                            className="ead-linkish"
+                            onClick={() => setBlocks((prev) => prev.filter((b) => b.key !== block.key))}
+                          >
+                            Remove
+                          </button>
+                        )}
                       </div>
-                      <SelectMenu
-                        size="ead"
-                        ariaLabel="Select Design"
-                        value={block.designKey}
-                        onChange={(value) =>
-                          setBlocks((prev) =>
-                            prev.map((b) => (b.key === block.key ? { ...b, designKey: value } : b)),
-                          )
-                        }
-                        options={[
-                          { value: '', label: 'Select Design' },
-                          ...options.map((option) => ({ value: option, label: option })),
-                        ]}
-                      />
                       {block.rows.map((row) => (
                         <div key={row.key} className="ead-art">
                           <div className="ead-ql-top">
-                            <span className="ead-ql-t">Artworks</span>
-                            <button
-                              type="button"
-                              className="ead-linkish"
-                              style={{ visibility: block.rows.length > 1 ? 'visible' : 'hidden' }}
-                              onClick={() =>
-                                setBlocks((prev) =>
-                                  prev.map((b) =>
-                                    b.key === block.key
-                                      ? { ...b, rows: b.rows.filter((r) => r.key !== row.key) }
-                                      : b,
-                                  ),
-                                )
-                              }
-                            >
-                              Remove
-                            </button>
+                            <label className="ead-ql-t">Item name</label>
+                            {block.rows.length > 1 && (
+                              <button
+                                type="button"
+                                className="ead-linkish"
+                                onClick={() =>
+                                  setBlocks((prev) =>
+                                    prev.map((b) =>
+                                      b.key === block.key
+                                        ? { ...b, rows: b.rows.filter((r) => r.key !== row.key) }
+                                        : b,
+                                    ),
+                                  )
+                                }
+                              >
+                                Remove
+                              </button>
+                            )}
                           </div>
                           <input
                             className="ead-field"
-                            placeholder="Describe this item"
-                            aria-label="Item description"
+                            placeholder="e.g. Vector artwork"
+                            aria-label="Item name"
                             value={row.description}
                             onChange={(e) =>
                               setBlocks((prev) =>
@@ -660,13 +745,14 @@ export function EmbroideryAdminQuote({
                               )
                             }
                           />
+                          <label className="ead-ql-t" style={{ marginTop: 8 }}>Price (USD)</label>
                           <input
                             className="ead-field"
                             type="number"
                             min="0"
                             step="0.01"
-                            placeholder="Price"
-                            aria-label="Price"
+                            placeholder="0.00"
+                            aria-label="Price (USD)"
                             value={row.price}
                             onChange={(e) =>
                               setBlocks((prev) =>
@@ -694,7 +780,7 @@ export function EmbroideryAdminQuote({
                           )
                         }
                       >
-                        <i className="ti ti-plus" /> Add Price
+                        <i className="ti ti-plus" /> Add another item
                       </button>
                     </div>
                   ))}
@@ -712,7 +798,7 @@ export function EmbroideryAdminQuote({
                       ])
                     }
                   >
-                    <i className="ti ti-plus" /> Add Another Design
+                    <i className="ti ti-plus" /> Add another design
                   </button>
                   <div className="ead-total">
                     <span>Total</span>
@@ -725,9 +811,16 @@ export function EmbroideryAdminQuote({
                       disabled={sendQuote.isPending || declined}
                       onClick={() => sendQuote.mutate()}
                     >
-                      <i className="ti ti-send" />
                       {sendLabel}
                     </button>
+                    <button type="button" className="ead-draft" onClick={saveDraft}>
+                      {draftSaved ? 'Draft saved' : 'Save draft'}
+                    </button>
+                    {editing && (
+                      <button type="button" className="ead-btn blk" onClick={() => setEditing(false)}>
+                        Cancel edit
+                      </button>
+                    )}
                     {sentVersion > 0 && isStaffCreatedOrder(order) && (
                       <button
                         type="button"
@@ -750,25 +843,82 @@ export function EmbroideryAdminQuote({
                         {approveForCustomer.isPending ? 'Approving…' : 'Approve for customer'}
                       </button>
                     )}
-                    <button
-                      type="button"
-                      className="ead-btn blk"
-                      disabled={declineMut.isPending || declined}
-                      onClick={() => {
-                        void dialog
-                          .confirm({
-                            title: 'Decline this request?',
-                            message: 'The customer will see this quote as declined.',
-                            confirmLabel: 'Decline',
-                            danger: true,
-                          })
-                          .then((ok) => {
-                            if (ok) declineMut.mutate();
-                          });
-                      }}
-                    >
-                      <i className="ti ti-x" /> {declineMut.isPending ? 'Declining…' : 'Decline This Request'}
-                    </button>
+                    {sentVersion === 0 && (
+                      <button
+                        type="button"
+                        className="ead-btn blk"
+                        disabled={declineMut.isPending || declined}
+                        onClick={() => {
+                          void dialog
+                            .confirm({
+                              title: 'Decline this request?',
+                              message: 'The customer will see this quote as declined.',
+                              confirmLabel: 'Decline',
+                              danger: true,
+                            })
+                            .then((ok) => {
+                              if (ok) declineMut.mutate();
+                            });
+                        }}
+                      >
+                        <i className="ti ti-x" /> {declineMut.isPending ? 'Declining…' : 'Decline'}
+                      </button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="ead-sent">
+                    <div className="ead-sent-row">
+                      <span className="ead-ql-t">Design</span>
+                      <strong title={project.full}>{project.text}</strong>
+                    </div>
+                    <div className="ead-kicker" style={{ marginTop: 14 }}>Quoted item</div>
+                    {studioLines.length === 0 && <div className="ead-he-sub">No priced items.</div>}
+                    {studioLines.map((line) => (
+                      <div key={line.id} className="ead-sent-line">
+                        <span>{line.name}</span>
+                        <b>{money(lineTotal(line))}</b>
+                      </div>
+                    ))}
+                    <div className={`ead-total${approved ? ' paid' : ''}`}>
+                      <span>{approved ? 'Total paid' : 'Total'}</span>
+                      <b>{money(quotedTotal)}</b>
+                    </div>
+                  </div>
+                  <div className="ead-stack">
+                    {!isOrder && !declined && (
+                      <button type="button" className="ead-btn blk" onClick={startEdit}>
+                        <i className="ti ti-pencil" /> Edit quote
+                      </button>
+                    )}
+                    {approved && (
+                      <Link className="ead-btn blk" to={orderTo}>
+                        <i className="ti ti-file-invoice" /> View invoice
+                      </Link>
+                    )}
+                    {sentVersion > 0 && isStaffCreatedOrder(order) && !isOrder && (
+                      <button
+                        type="button"
+                        className="ead-btn blk"
+                        disabled={approveForCustomer.isPending}
+                        onClick={() => {
+                          void dialog
+                            .confirm({
+                              title: 'Approve for the customer?',
+                              message:
+                                'You created this quote, so you can accept it on their behalf. It becomes an order and they get an invoice to pay.',
+                              confirmLabel: 'Approve quote',
+                            })
+                            .then((ok) => {
+                              if (ok) approveForCustomer.mutate();
+                            });
+                        }}
+                      >
+                        <i className="ti ti-check" />{' '}
+                        {approveForCustomer.isPending ? 'Approving…' : 'Approve for customer'}
+                      </button>
+                    )}
                   </div>
                 </>
               )}
@@ -776,29 +926,38 @@ export function EmbroideryAdminQuote({
           </section>
 
           <section className="ead-card">
-            <div className="ead-card-h">
+            <button
+              type="button"
+              className={notesOpen ? 'ead-notes-tog open' : 'ead-notes-tog'}
+              onClick={() => setNotesOpen((open) => !open)}
+            >
               <span className="ead-ic"><i className="ti ti-notes" /></span>
-              <h2>Internal Notes</h2>
-              <span className="ead-sub">Only your team</span>
-            </div>
-            <div className="ead-b">
-              <textarea
-                className="ead-field"
-                placeholder="Notes about this order..."
-                style={{ minHeight: 90, resize: 'vertical' }}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
-              <button
-                type="button"
-                className="ead-btn"
-                style={{ marginTop: 10 }}
-                disabled={notesMut.isPending}
-                onClick={() => notesMut.mutate()}
-              >
-                {notesSaved ? 'Saved ✓' : notesMut.isPending ? 'Saving…' : 'Save Notes'}
-              </button>
-            </div>
+              <span className="ead-notes-copy">
+                <strong>Internal Notes</strong>
+                <small>Only your team</small>
+              </span>
+              <i className="ti ti-chevron-down" aria-hidden />
+            </button>
+            {notesOpen && (
+              <div className="ead-b" style={{ paddingTop: 0 }}>
+                <textarea
+                  className="ead-field"
+                  placeholder="Notes about this order..."
+                  style={{ minHeight: 90, resize: 'vertical' }}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="ead-btn"
+                  style={{ marginTop: 10 }}
+                  disabled={notesMut.isPending}
+                  onClick={() => notesMut.mutate()}
+                >
+                  {notesSaved ? 'Saved ✓' : notesMut.isPending ? 'Saving…' : 'Save Notes'}
+                </button>
+              </div>
+            )}
           </section>
 
           <section className="ead-card">

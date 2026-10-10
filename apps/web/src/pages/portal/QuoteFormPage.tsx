@@ -11,6 +11,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { postThemeToWindow } from '@/lib/theme';
 import { filesFromQuoteForm } from '@/lib/quoteFiles';
 import { isUsualQuoteService, quoteFormatsFromPrefs } from '@/lib/customerPrefs';
+import { QuoteSubmitMask } from '@/components/QuoteSubmitMask';
 import { RequestQuoteMenu } from '@/components/RequestQuoteMenu';
 import { orderSlug } from '@/lib/format';
 
@@ -371,7 +372,12 @@ export function QuoteFormPage() {
           </aside>
         )}
       </div>
-      {busy && <div className="quote-submit-mask">Submitting your quote…</div>}
+      {busy && (
+        <QuoteSubmitMask
+          title="Submitting your quote"
+          subtitle="Uploading details and preparing your request."
+        />
+      )}
       {toast && <div className="toast show">{toast}</div>}
     </div>
   );
