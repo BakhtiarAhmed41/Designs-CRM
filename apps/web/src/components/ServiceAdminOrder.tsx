@@ -742,7 +742,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
                         </div>
                         <div className="sod-assign">
                           <label className="sod-assign-label" htmlFor={`size-assign-${row.key}`}>
-                            Assign size
+                            Assign designer
                           </label>
                           <SelectMenu
                             id={`size-assign-${row.key}`}
