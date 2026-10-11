@@ -39,7 +39,7 @@ const ACTIVE_QUOTE = new Set([
   'QUOTATION_PROVIDED',
   'WAITING_FOR_ADMIN_QUOTATION_APPROVAL',
 ]);
-const ACTIVITY_PAGE_SIZE = 10;
+const ACTIVITY_PAGE_SIZE = 5;
 
 function isQuote(o: Order) {
   return (
@@ -141,7 +141,7 @@ export function PortalDashboard() {
     ...freshOnOpen,
   });
   const { data: activityData, isLoading: activityLoading } = useQuery({
-    queryKey: ['my-activity', activityPage, showDismissed],
+    queryKey: ['my-activity', activityPage, ACTIVITY_PAGE_SIZE, showDismissed],
     queryFn: () =>
       listNotifications({
         page: activityPage,
@@ -211,9 +211,10 @@ export function PortalDashboard() {
   const isFirstTimeCustomer = !everWorkLoading && (everWorkData?.total ?? 0) === 0;
   const welcomeNotice = activities.find((n) => isAccountApprovedNotice(n.title, n.link));
   const showWelcomeCard = isFirstTimeCustomer;
-  const tableActivities = showWelcomeCard
+  const tableActivities = (showWelcomeCard
     ? activities.filter((n) => !isAccountApprovedNotice(n.title, n.link))
-    : activities;
+    : activities
+  ).slice(0, ACTIVITY_PAGE_SIZE);
 
   function refreshActivity() {
     void qc.invalidateQueries({ queryKey: ['my-activity'] });
