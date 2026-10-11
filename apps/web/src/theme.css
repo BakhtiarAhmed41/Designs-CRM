@@ -2300,7 +2300,12 @@ button.primary i,
 .dash-col-ref { width: 18%; }
 .dash-col-time { width: 14%; }
 .dash-col-action { width: 28%; }
-.activity-table { min-width: 860px; }
+.activity-table { min-width: 880px; }
+.activity-table .dash-col-update { width: 200px; }
+.activity-table .dash-col-design { width: auto; }
+.activity-table .dash-col-ref { width: 168px; }
+.activity-table .dash-col-time { width: 120px; }
+.activity-table .dash-col-action { width: 212px; }
 .activity-scroll {
   width: 100%;
   overflow-x: auto;
@@ -2374,6 +2379,23 @@ button.primary i,
   display: grid;
   place-items: center;
 }
+.activity-panel .panel-head {
+  padding-left: 20px;
+  padding-right: 20px;
+}
+.activity-panel .welcome-card {
+  margin-left: 20px;
+  margin-right: 20px;
+}
+.activity-table th:first-child,
+.activity-table td:first-child {
+  padding-left: 20px;
+}
+.activity-table th:last-child,
+.activity-table td:last-child {
+  padding-right: 20px;
+  padding-left: 8px;
+}
 .activity-panel .panel-head h3 {
   font-size: 22px;
   font-weight: 700;
@@ -2401,8 +2423,15 @@ button.primary i,
   color: #8b93a3;
   font-weight: 600;
 }
-.activity-table th:last-child {
-  text-align: center;
+.activity-table th.activity-th-action {
+  text-align: right;
+}
+.activity-th-action span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 148px;
+  margin-right: 36px;
 }
 .activity-table td:last-child {
   overflow: visible;
@@ -2441,14 +2470,13 @@ button.primary i,
   white-space: nowrap;
 }
 .activity-design {
-  max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .activity-actions {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   gap: 8px;
 }
 .activity-act {
@@ -2689,7 +2717,7 @@ button.activity-link {
     flex-direction: column;
     align-items: stretch;
     gap: 12px;
-    padding: 14px 16px 16px;
+    padding: 14px 20px 16px;
   }
   .activity-pager-nav {
     justify-content: space-between;

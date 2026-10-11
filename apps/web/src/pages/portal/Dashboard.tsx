@@ -379,7 +379,7 @@ export function PortalDashboard() {
                   <th>Design</th>
                   <th>Reference No</th>
                   <th>Time</th>
-                  <th>Action</th>
+                  <th className="activity-th-action"><span>Action</span></th>
                 </tr>
               </thead>
               <tbody>
