@@ -444,25 +444,25 @@ export function PortalDashboard() {
         )}
         {tableActivities.length > 0 && (
           <div className="activity-pager">
-            <span>
-              Showing {activityFrom}–{activityTo} of {activityTotal} {activityTotal === 1 ? 'update' : 'updates'}.
+            <span className="activity-pager-count">
+              Showing {activityFrom}–{activityTo} of {activityTotal} {activityTotal === 1 ? 'update' : 'updates'}
             </span>
             {activityPages > 1 && (
               <div className="activity-pager-nav">
                 <button
                   type="button"
-                  className="btn btn-ghost btn-sm"
+                  className="activity-pager-btn"
                   disabled={activityPage <= 1}
                   onClick={() => setActivityPage((p) => Math.max(1, p - 1))}
                 >
                   <i className="ti ti-chevron-left" /> Previous
                 </button>
-                <span>
+                <span className="activity-pager-page">
                   Page {activityPage} of {activityPages}
                 </span>
                 <button
                   type="button"
-                  className="btn btn-ghost btn-sm"
+                  className="activity-pager-btn"
                   disabled={activityPage >= activityPages}
                   onClick={() => setActivityPage((p) => p + 1)}
                 >
