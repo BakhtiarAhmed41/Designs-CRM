@@ -1,71 +1,62 @@
-import { useEffect, useMemo, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTopbarLead } from '@/components/Shell';
-import { SelectMenu } from '@/components/ui/SelectMenu';
-import { listMyFiles, type Design, type MyFile } from '@/lib/designs';
-import { listMyEdits, type EditRequest } from '@/lib/edits';
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTopbarLead } from "@/components/Shell";
+import { SelectMenu } from "@/components/ui/SelectMenu";
+import { PaginationBar } from "@/components/lists/ListToolbar";
+import { listMyFiles, type Design, type MyFile } from "@/lib/designs";
+import { listMyEdits, type EditRequest } from "@/lib/edits";
+import { freshOnOpen, whenVisible } from "@/lib/queryRefresh";
 import {
-  designOptionLabel,
-  embroideryDesigns,
-  sizeDetail,
-  type EmbDesign,
-} from '@/lib/embroideryQuote';
-import { freshOnOpen, whenVisible } from '@/lib/queryRefresh';
-import { myDeliveryFilePreviewUrl, myDeliveryFileUrl, getMyOrder } from '@/lib/orders';
-import { downloadSignedFile, getErrorMessage, resolveFileUrl } from '@/lib/api';
-import { dateShort, isImageFile, mergeDeliveredVia, money, orderNumber } from '@/lib/format';
-import { openLinkedChat } from '@/lib/messaging';
-import { studioQuotation, type QuoteWithLines } from '@/lib/quoteHelpers';
-import { serviceWorkLabel } from '@/lib/serviceIcon';
-import { orderDeliveryGroups } from '@/lib/serviceOrderView';
-import type { Order } from '@/lib/types';
-import '@/styles/my-files.css';
+  myDeliveryFilePreviewUrl,
+  myDeliveryFileUrl,
+  getMyOrder,
+} from "@/lib/orders";
+import {
+  apiFetch,
+  downloadSignedFile,
+  getErrorMessage,
+  resolveFileUrl,
+} from "@/lib/api";
+import {
+  dateShort,
+  isImageFile,
+  mergeDeliveredVia,
+  money,
+  orderNumber,
+} from "@/lib/format";
+import { openLinkedChat } from "@/lib/messaging";
+import { serviceWorkLabel } from "@/lib/serviceIcon";
+import type { Order } from "@/lib/types";
+import {
+  buildSections,
+  groupFileEntries,
+  downloadableFiles,
+  isPreviewFile,
+  portalFiles,
+  revisionsForScope,
+  type FileEntry,
+  type DesignSection,
+} from "@/lib/fileGroups";
+import "@/styles/my-files.css";
 
 type FilesOrder = Order & { designs?: Design[] };
-
-type SizeBox = {
-  key: string;
-  title: string;
-  spec: string;
-  files: MyFile[];
-  emailed: boolean;
-};
-
-type DesignSection = {
-  name: string;
-  boxes: SizeBox[];
-};
-
-type FileEntry = {
-  key: string;
-  orderId: string;
-  designId: string | null;
-  designName: string;
-  orderName: string | null;
-  humanRef: string | null;
-  serviceType: string | null;
-  deliveredAt: string;
-  deliveredVia: string | null;
-  files: MyFile[];
-  thumbUrl: string | null;
-};
 
 const EMPTY_FILES: MyFile[] = [];
 
 function fileCount(files: MyFile[]) {
-  const listed = files.filter((file) => !file.emailNotice);
+  const listed = downloadableFiles(files);
   if (listed.length) return listed.length;
   return files.filter((file) => file.emailNotice).length;
 }
 
 function countLabel(count: number) {
-  return `${count} file${count === 1 ? '' : 's'}`;
+  return `${count} file${count === 1 ? "" : "s"}`;
 }
 
 function fileSizeLabel(bytes?: number | null) {
-  if (bytes == null || bytes <= 0) return '';
+  if (bytes == null || bytes <= 0) return "";
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
@@ -75,23 +66,10 @@ function isZipFile(file: MyFile) {
   if (file.isBundle) return true;
   const name = file.originalName.toLowerCase();
   return (
-    name.endsWith('.zip') ||
-    file.mimeType === 'application/zip' ||
-    file.mimeType === 'application/x-zip-compressed'
+    name.endsWith(".zip") ||
+    file.mimeType === "application/zip" ||
+    file.mimeType === "application/x-zip-compressed"
   );
-}
-
-function isPreviewFile(file: MyFile) {
-  if (file.emailNotice || file.isBundle) return false;
-  return file.kind === 'PREVIEW' || isImageFile(file.originalName, file.mimeType);
-}
-
-function portalFiles(files: MyFile[]) {
-  return files.filter((file) => !file.emailNotice);
-}
-
-function downloadableFiles(files: MyFile[]) {
-  return portalFiles(files).filter((file) => file.kind !== 'PREVIEW' && file.canDownload !== false);
 }
 
 function splitBundle(files: MyFile[]) {
@@ -99,23 +77,33 @@ function splitBundle(files: MyFile[]) {
   const preview = real.filter(isPreviewFile);
   const previewIds = new Set(preview.map((file) => file.fileId));
   const zip = real.filter(
-    (file) => isZipFile(file) && file.kind !== 'PREVIEW' && !previewIds.has(file.fileId),
+    (file) =>
+      isZipFile(file) &&
+      file.kind !== "PREVIEW" &&
+      !previewIds.has(file.fileId),
   );
   const zipIds = new Set(zip.map((file) => file.fileId));
-  const other = real.filter((file) => !previewIds.has(file.fileId) && !zipIds.has(file.fileId));
+  const other = real.filter(
+    (file) => !previewIds.has(file.fileId) && !zipIds.has(file.fileId),
+  );
   return { preview, zip, other };
 }
 
 function batchEmailed(files: MyFile[]) {
   return files.some(
-    (file) => file.emailNotice || file.batchVia === 'EMAIL' || file.batchVia === 'BOTH',
+    (file) =>
+      file.emailNotice || file.batchVia === "EMAIL" || file.batchVia === "BOTH",
   );
 }
 
-function entryKey(orderId: string, designId: string | null, designName: string) {
+function entryKey(
+  orderId: string,
+  designId: string | null,
+  designName: string,
+) {
   if (designId) return `${orderId}:d:${designId}`;
   const name = designName.trim().toLowerCase();
-  if (name && name !== 'files') return `${orderId}:n:${name}`;
+  if (name && name !== "files") return `${orderId}:n:${name}`;
   return `${orderId}:all`;
 }
 
@@ -127,150 +115,29 @@ function pickThumb(files: MyFile[]) {
 }
 
 function fileExt(name: string) {
-  const part = name.split('.').pop()?.trim().toLowerCase() ?? '';
-  return /^[a-z0-9]{1,8}$/.test(part) ? part : '';
+  const part = name.split(".").pop()?.trim().toLowerCase() ?? "";
+  return /^[a-z0-9]{1,8}$/.test(part) ? part : "";
 }
 
 function fileTypeMeta(file: MyFile) {
   const label = (file.formatLabel ?? fileExt(file.originalName)).toUpperCase();
   const ext = fileExt(file.originalName);
-  if (isZipFile(file)) return { label: label || 'ZIP', icon: 'ti-file-zip', tone: 'zip' as const };
-  if (ext === 'pdf' || file.mimeType === 'application/pdf') {
-    return { label: label || 'PDF', icon: 'ti-file-type-pdf', tone: 'pdf' as const };
+  if (isZipFile(file))
+    return { label: label || "ZIP", icon: "ti-file-zip", tone: "zip" as const };
+  if (ext === "pdf" || file.mimeType === "application/pdf") {
+    return {
+      label: label || "PDF",
+      icon: "ti-file-type-pdf",
+      tone: "pdf" as const,
+    };
   }
-  if (ext === 'svg' || file.mimeType === 'image/svg+xml') {
-    return { label: label || 'SVG', icon: 'ti-vector', tone: 'svg' as const };
+  if (ext === "svg" || file.mimeType === "image/svg+xml") {
+    return { label: label || "SVG", icon: "ti-vector", tone: "svg" as const };
   }
   if (isImageFile(file.originalName, file.mimeType)) {
-    return { label: label || 'IMG', icon: 'ti-photo', tone: 'img' as const };
+    return { label: label || "IMG", icon: "ti-photo", tone: "img" as const };
   }
-  return { label: label || 'FILE', icon: 'ti-file', tone: 'file' as const };
-}
-
-function sizeSpec(title: string, index: number, rowCount: number, rowName: string, designs: EmbDesign[]) {
-  const design = designs.find((item, itemIndex) => designOptionLabel(itemIndex, item.name) === title);
-  const sizes = (design?.sizes ?? []).filter((size) => size.detail || size.placement || size.w || size.h);
-  if (design && sizes.length === rowCount) {
-    const size = sizes[index];
-    const place = size?.placement?.trim();
-    const detail = size ? sizeDetail(size) : '';
-    const parts = [place, detail && detail !== 'Size' ? detail : ''].filter(Boolean);
-    if (parts.length) return parts.join(' · ');
-  }
-  const name = rowName.trim();
-  if (!name || name === title) return '';
-  return name;
-}
-
-function groupByDesignName(files: MyFile[]): DesignSection[] {
-  const map = new Map<string, MyFile[]>();
-  for (const file of files) {
-    const name = file.designName?.trim() || 'Files';
-    const list = map.get(name) ?? [];
-    list.push(file);
-    map.set(name, list);
-  }
-  return [...map.entries()].map(([name, items]) => ({
-    name,
-    boxes: [
-      {
-        key: name,
-        title: items.length && name !== 'Files' ? name : 'Files',
-        spec: '',
-        files: items,
-        emailed: batchEmailed(items),
-      },
-    ],
-  }));
-}
-
-function buildSections(order: FilesOrder | undefined, files: MyFile[]): DesignSection[] {
-  const originals = files.filter((file) => !file.editId);
-  const portal = portalFiles(originals);
-  const looseEmail = originals.some((file) => file.emailNotice);
-
-  if (!order) {
-    if (portal.length) return groupByDesignName(portal);
-    if (looseEmail) {
-      return [{ name: 'Files', boxes: [{ key: 'email', title: 'Files', spec: '', files: [], emailed: true }] }];
-    }
-    return [];
-  }
-
-  const designs = embroideryDesigns(order.preferences, order.name);
-  const lines = studioQuotation((order.quotations ?? []) as QuoteWithLines[])?.lines ?? [];
-  const groups = orderDeliveryGroups(order, lines);
-  const used = new Set<string>();
-
-  let sections: DesignSection[] = groups.map((group) => ({
-    name: group.title,
-    boxes: group.rows.map((row, index) => {
-      const matched = portal.filter((file) => file.designId && file.designId === row.design?.id);
-      matched.forEach((file) => used.add(file.fileId));
-      const spec = sizeSpec(group.title, index, group.rows.length, row.name, designs);
-      const severalSizes = group.rows.length > 1;
-      return {
-        key: row.key,
-        title: severalSizes ? `Size ${index + 1}` : spec || group.title,
-        spec: severalSizes ? spec : '',
-        files: matched,
-        emailed: batchEmailed(matched),
-      };
-    }),
-  }));
-
-  if (looseEmail) {
-    const filled = sections.flatMap((section) => section.boxes).filter((box) => box.files.length);
-    const targets = filled.length ? filled : sections.flatMap((section) => section.boxes);
-    targets.forEach((box) => {
-      box.emailed = true;
-    });
-  }
-
-  const leftover = portal.filter((file) => !used.has(file.fileId));
-  const assigned = sections.some((section) => section.boxes.some((box) => box.files.length > 0 || box.emailed));
-
-  if (!assigned) {
-    if (leftover.length) return groupByDesignName(leftover);
-    if (looseEmail && sections.length) return sections;
-    if (looseEmail) {
-      return [{ name: 'Files', boxes: [{ key: 'email', title: 'Files', spec: '', files: [], emailed: true }] }];
-    }
-    return sections;
-  }
-
-  sections = sections
-    .map((section) => ({
-      ...section,
-      boxes: section.boxes.filter((box) => box.files.length > 0 || box.emailed),
-    }))
-    .filter((section) => section.boxes.length > 0);
-
-  for (const extra of groupByDesignName(leftover)) {
-    const existing = sections.find((section) => section.name === extra.name);
-    if (existing) existing.boxes.push(...extra.boxes);
-    else sections.push(extra);
-  }
-  return sections;
-}
-
-function designSizeLabel(
-  order: FilesOrder | undefined,
-  designId: string | null,
-  designName: string,
-  sections: DesignSection[] | null,
-) {
-  const fromDesign =
-    order?.designs?.find((item) => item.id === designId) ??
-    order?.designs?.find((item) => item.name.trim() === designName.trim());
-  if (fromDesign?.size?.trim()) return `Size: ${fromDesign.size.trim()}`;
-  if (fromDesign?.placement?.trim()) return fromDesign.placement.trim();
-
-  const box = sections?.flatMap((section) => section.boxes).find((item) => item.spec.trim());
-  if (box?.spec.trim()) return box.spec.startsWith('Size') ? box.spec : `Size: ${box.spec}`;
-
-  if (order?.size?.trim()) return `Size: ${order.size.trim()}`;
-  return '';
+  return { label: label || "FILE", icon: "ti-file", tone: "file" as const };
 }
 
 function PreviewModal({
@@ -286,21 +153,41 @@ function PreviewModal({
   label: string;
   busy: boolean;
   onClose: () => void;
-  onDownload: () => void;
+  onDownload: (file: MyFile) => void;
 }) {
-  const file = files[index];
-  const src = file?.previewUrl ? resolveFileUrl(file.previewUrl) : null;
+  const [currentIndex, setCurrentIndex] = useState(index);
+  const file = files[currentIndex];
+  const [src, setSrc] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
+  useEffect(() => {
+    let active = true;
+    setZoom(1);
+    setSrc(file?.previewUrl ? resolveFileUrl(file.previewUrl) : null);
+    if (file)
+      void apiFetch<{ url: string }>(
+        myDeliveryFilePreviewUrl(file.orderId, file.fileId),
+      )
+        .then(({ url }) => {
+          if (active) setSrc(resolveFileUrl(url));
+        })
+        .catch(() => {
+          /* Keep the supplied preview URL when refreshing is unavailable. */
+        });
+    return () => {
+      active = false;
+    };
+  }, [file?.fileId, file?.orderId, file?.previewUrl]);
 
   useEffect(() => {
     const previous = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    document.body.style.overflow = "hidden";
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === "Escape") onClose();
     };
-    window.addEventListener('keydown', onKey);
+    window.addEventListener("keydown", onKey);
     return () => {
       document.body.style.overflow = previous;
-      window.removeEventListener('keydown', onKey);
+      window.removeEventListener("keydown", onKey);
     };
   }, [onClose]);
 
@@ -312,22 +199,102 @@ function PreviewModal({
         className="mf-modal"
         role="dialog"
         aria-modal="true"
-        aria-label={`Preview ${index + 1} of ${files.length}`}
+        aria-label={`Preview ${currentIndex + 1} of ${files.length}`}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="mf-mh">
           <h2>
-            Preview {index + 1} of {files.length}
+            Preview {currentIndex + 1} of {files.length}
           </h2>
-          <button type="button" className="mf-x" onClick={onClose} aria-label="Close">
+          <button
+            type="button"
+            className="mf-x"
+            onClick={onClose}
+            aria-label="Close"
+          >
             ×
           </button>
         </div>
-        {src ? <img src={src} alt={`Preview ${index + 1}`} /> : <div className="mf-none">{file.originalName}</div>}
+        <div className="mf-zoom-controls" aria-label="Preview zoom controls">
+          {files.length > 1 && (
+            <button
+              type="button"
+              className="mf-dl-outline"
+              aria-label="Previous preview"
+              disabled={currentIndex === 0}
+              onClick={() => setCurrentIndex((value) => value - 1)}
+            >
+              <i className="ti ti-chevron-left" aria-hidden />
+            </button>
+          )}
+          <button
+            type="button"
+            className="mf-dl-outline"
+            aria-label="Zoom out"
+            disabled={zoom <= 1}
+            onClick={() => setZoom((value) => Math.max(1, value - 0.5))}
+          >
+            −
+          </button>
+          <span aria-live="polite">{Math.round(zoom * 100)}%</span>
+          <button
+            type="button"
+            className="mf-dl-outline"
+            aria-label="Zoom in"
+            disabled={zoom >= 4 || !src}
+            onClick={() => setZoom((value) => Math.min(4, value + 0.5))}
+          >
+            +
+          </button>
+          <button
+            type="button"
+            className="mf-dl-outline"
+            onClick={() => setZoom(1)}
+          >
+            Fit preview
+          </button>
+          {files.length > 1 && (
+            <button
+              type="button"
+              className="mf-dl-outline"
+              aria-label="Next preview"
+              disabled={currentIndex === files.length - 1}
+              onClick={() => setCurrentIndex((value) => value + 1)}
+            >
+              <i className="ti ti-chevron-right" aria-hidden />
+            </button>
+          )}
+        </div>
+        <div className="mf-zoom-stage">
+          {src ? (
+            <img
+              src={src}
+              alt={`Preview ${currentIndex + 1}`}
+              style={{
+                width: `${zoom * 100}%`,
+                height: `calc(min(60vh, 560px) * ${zoom})`,
+                objectPosition: "left top",
+              }}
+              onError={() => setSrc(null)}
+            />
+          ) : (
+            <div className="mf-none">
+              Preview unavailable. Download the preview file to inspect it.
+            </div>
+          )}
+        </div>
         <div className="mf-modal-sub">{label}</div>
         <div className="mf-modal-foot">
-          <button type="button" className="mf-dl" disabled={busy} onClick={onDownload}>
-            <i className="ti ti-download" aria-hidden /> Download
+          <button
+            type="button"
+            className="mf-dl"
+            disabled={busy}
+            onClick={() => onDownload(file)}
+          >
+            <i className="ti ti-download" aria-hidden /> Download preview
+          </button>
+          <button type="button" className="mf-dl-outline" onClick={onClose}>
+            Close
           </button>
         </div>
       </div>
@@ -357,11 +324,15 @@ function RevisionFileRows({
 }) {
   const parts = splitBundle(files);
   const loose = parts.zip.some((file) => file.isBundle) ? [] : parts.other;
-  if (parts.preview.length + parts.zip.length + loose.length === 0 && !emailed) {
-    return <div className="mf-none">{empty}</div>;
+  if (
+    parts.preview.length + parts.zip.length + loose.length === 0 &&
+    !emailed
+  ) {
+    return <div className="mf-none mf-revision-empty">{empty}</div>;
   }
 
-  const zipLabel = parts.zip.length === 1 ? fileSizeLabel(parts.zip[0].byteSize) : '';
+  const zipLabel =
+    parts.zip.length === 1 ? fileSizeLabel(parts.zip[0].byteSize) : "";
 
   return (
     <>
@@ -375,7 +346,9 @@ function RevisionFileRows({
             <span>{countLabel(parts.preview.length)}</span>
             <div className="mf-thumbs">
               {parts.preview.map((file, index) => {
-                const src = file.previewUrl ? resolveFileUrl(file.previewUrl) : null;
+                const src = file.previewUrl
+                  ? resolveFileUrl(file.previewUrl)
+                  : null;
                 return (
                   <button
                     key={file.fileId}
@@ -384,7 +357,11 @@ function RevisionFileRows({
                     aria-label={`View preview ${index + 1}`}
                     onClick={() => onPreview(parts.preview, index, label)}
                   >
-                    {src ? <img src={src} alt={`Preview ${index + 1}`} /> : <i className="ti ti-photo" aria-hidden />}
+                    {src ? (
+                      <img src={src} alt={`Preview ${index + 1}`} />
+                    ) : (
+                      <i className="ti ti-photo" aria-hidden />
+                    )}
                   </button>
                 );
               })}
@@ -407,7 +384,11 @@ function RevisionFileRows({
           </span>
           <div className="mf-fm">
             <b>ZIP file</b>
-            <span>{zipLabel ? `${countLabel(parts.zip.length)} · ${zipLabel}` : countLabel(parts.zip.length)}</span>
+            <span>
+              {zipLabel
+                ? `${countLabel(parts.zip.length)} · ${zipLabel}`
+                : countLabel(parts.zip.length)}
+            </span>
           </div>
           <button
             type="button"
@@ -428,7 +409,7 @@ function RevisionFileRows({
             </span>
             <div className="mf-fm">
               <b>{file.originalName}</b>
-              <span>{size || file.formatLabel || 'Design file'}</span>
+              <span>{size || file.formatLabel || "Design file"}</span>
             </div>
             <button
               type="button"
@@ -448,7 +429,7 @@ function RevisionFileRows({
           </span>
           <div className="mf-fm">
             <b>Sent by email</b>
-            <span>ZIP with all files</span>
+            <span>Delivered to your email address</span>
           </div>
           <span className="mf-ok">✓ Sent</span>
         </div>
@@ -458,112 +439,158 @@ function RevisionFileRows({
 }
 
 function DesignDetailCards({
-  title,
-  sizeText,
-  files,
-  emailed,
+  section,
   busyKey,
   onDownload,
   onPreview,
 }: {
-  title: string;
-  sizeText: string;
-  files: MyFile[];
-  emailed: boolean;
+  section: DesignSection;
   busyKey: string | null;
   onDownload: (key: string, files: MyFile[]) => void;
   onPreview: (files: MyFile[], index: number, label: string) => void;
 }) {
-  const previews = splitBundle(files).preview;
+  const files = [
+    ...new Map(
+      section.boxes
+        .flatMap((box) => box.files)
+        .map((file) => [file.fileId, file]),
+    ).values(),
+  ];
+  const previews = files.filter(isPreviewFile);
   const downloads = downloadableFiles(files);
-  const hero = previews[0];
+  const hero = previews.find((file) => file.previewUrl);
   const heroSrc = hero?.previewUrl ? resolveFileUrl(hero.previewUrl) : null;
   const [broken, setBroken] = useState(false);
-
+  useEffect(() => setBroken(false), [heroSrc]);
   return (
-    <div className="mf-split">
-      <section className="mf-panel mf-preview-panel">
-        <h3>Design preview</h3>
-        <div className="mf-preview-frame">
-          {heroSrc && !broken ? (
-            <img src={heroSrc} alt={`${title} preview`} onError={() => setBroken(true)} />
-          ) : (
-            <div className="mf-preview-empty">
-              <i className="ti ti-photo" aria-hidden />
-              <span>No preview available</span>
-            </div>
-          )}
-        </div>
-        <div className="mf-preview-foot">
-          <span>Preview only</span>
-          {previews.length > 0 && (
-            <button
-              type="button"
-              className="mf-enlarge"
-              onClick={() => onPreview(previews, 0, [title, sizeText].filter(Boolean).join(' · '))}
-            >
-              <i className="ti ti-zoom-in" aria-hidden /> Enlarge preview
-            </button>
-          )}
-        </div>
-      </section>
-
-      <section className="mf-panel mf-files-panel">
-        <div className="mf-files-head">
-          <h3>Your files</h3>
-          <p>Download the files you need.</p>
-        </div>
-        <div className="mf-file-list">
-          {downloads.length === 0 && !emailed && (
-            <div className="mf-none">Files will appear here once they are published.</div>
-          )}
-          {downloads.map((file) => {
-            const meta = fileTypeMeta(file);
-            return (
-              <div key={file.fileId} className="mf-file-row">
-                <span className={`mf-ftype ${meta.tone}`}>
-                  <i className={`ti ${meta.icon}`} aria-hidden />
-                </span>
-                <div className="mf-file-meta">
-                  <b>{file.originalName}</b>
-                  <span>{meta.label}</span>
-                </div>
-                <button
-                  type="button"
-                  className="mf-dl-outline"
-                  disabled={busyKey != null}
-                  onClick={() => onDownload(`file:${file.fileId}`, [file])}
-                >
-                  <i className="ti ti-download" aria-hidden /> Download
-                </button>
-              </div>
-            );
-          })}
-          {emailed && downloads.length === 0 && (
-            <div className="mf-file-row">
-              <span className="mf-ftype email">
-                <i className="ti ti-mail" aria-hidden />
-              </span>
-              <div className="mf-file-meta">
-                <b>Sent by email</b>
-                <span>ZIP with all files</span>
-              </div>
-              <span className="mf-ok">✓ Sent</span>
-            </div>
-          )}
-        </div>
+    <section className="mf-design-section">
+      <header className="mf-design-section-head">
+        <h2>{section.name}</h2>
         {downloads.length > 0 && (
           <button
             type="button"
-            className="mf-dl-all"
+            className="mf-download-design"
             disabled={busyKey != null}
-            onClick={() => onDownload('all', downloads)}
+            onClick={() => onDownload("design:" + section.name, downloads)}
           >
-            <i className="ti ti-download" aria-hidden /> Download all files
+            <i className="ti ti-download" aria-hidden /> Download design
           </button>
         )}
-      </section>
-    </div>
+      </header>
+      <div className="mf-split">
+        <section className="mf-panel mf-preview-panel">
+          <h3>Design preview</h3>
+          <button
+            type="button"
+            className="mf-preview-frame"
+            disabled={!heroSrc || broken}
+            aria-label={"Enlarge preview for " + section.name}
+            onClick={() =>
+              onPreview(
+                previews,
+                Math.max(
+                  0,
+                  previews.findIndex((file) => file.fileId === hero?.fileId),
+                ),
+                section.name,
+              )
+            }
+          >
+            {heroSrc && !broken ? (
+              <img
+                src={heroSrc}
+                alt={section.name + " preview"}
+                onError={() => setBroken(true)}
+              />
+            ) : (
+              <div className="mf-preview-empty">
+                <i className="ti ti-photo" aria-hidden />
+                <span>No preview available</span>
+              </div>
+            )}
+          </button>
+          <div className="mf-preview-foot">
+            {heroSrc && !broken ? (
+              <button
+                type="button"
+                className="mf-enlarge"
+                onClick={() =>
+                  onPreview(
+                    previews,
+                    Math.max(
+                      0,
+                      previews.findIndex(
+                        (file) => file.fileId === hero?.fileId,
+                      ),
+                    ),
+                    section.name,
+                  )
+                }
+              >
+                <i className="ti ti-zoom-in" aria-hidden /> Enlarge preview
+              </button>
+            ) : (
+              <span>Preview only</span>
+            )}
+            {hero && (
+              <button
+                type="button"
+                className="mf-dl-outline"
+                disabled={busyKey != null}
+                onClick={() => onDownload("preview:" + hero.fileId, [hero])}
+              >
+                <i className="ti ti-download" aria-hidden /> Download preview
+              </button>
+            )}
+          </div>
+        </section>
+        <section className="mf-panel mf-files-panel">
+          <h3>Your files</h3>
+          {section.boxes.map((box) => {
+            const production = downloadableFiles(box.files);
+            return (
+              <section className="mf-size-group" key={box.key}>
+                <h4>{box.spec || box.title}</h4>
+                <div className="mf-file-list">
+                  {production.map((file) => {
+                    const meta = fileTypeMeta(file);
+                    return (
+                      <div className="mf-file-row" key={file.fileId}>
+                        <span className={"mf-ftype " + meta.tone}>
+                          <i className={"ti " + meta.icon} aria-hidden />
+                        </span>
+                        <div className="mf-file-meta">
+                          <b>{file.originalName}</b>
+                          <span>{meta.label}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="mf-dl-outline"
+                          aria-label={"Download " + file.originalName}
+                          disabled={busyKey != null}
+                          onClick={() =>
+                            onDownload("file:" + file.fileId, [file])
+                          }
+                        >
+                          <i className="ti ti-download" aria-hidden /> Download
+                        </button>
+                      </div>
+                    );
+                  })}
+                  {production.length === 0 && (
+                    <p className="mf-none">
+                      {box.emailed
+                        ? "Files sent by email."
+                        : "Production files have not been published for this size yet."}
+                    </p>
+                  )}
+                </div>
+              </section>
+            );
+          })}
+        </section>
+      </div>
+    </section>
   );
 }
 
@@ -585,19 +612,23 @@ function OrderFileDetail({
   onError: (message: string) => void;
 }) {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<'files' | 'revs'>('files');
+  const [tab, setTab] = useState<"files" | "revs">("files");
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [toast, setToast] = useState('');
+  const [toast, setToast] = useState("");
   const [toastOn, setToastOn] = useState(false);
-  const [light, setLight] = useState<{ files: MyFile[]; index: number; label: string } | null>(null);
+  const [light, setLight] = useState<{
+    files: MyFile[];
+    index: number;
+    label: string;
+  } | null>(null);
 
   const orderQ = useQuery({
-    queryKey: ['order', orderId],
+    queryKey: ["order", orderId],
     queryFn: () => getMyOrder(orderId),
     ...freshOnOpen,
   });
   const editsQ = useQuery({
-    queryKey: ['my-order-edits', orderId],
+    queryKey: ["my-order-edits", orderId],
     queryFn: () => listMyEdits(orderId),
     ...freshOnOpen,
   });
@@ -606,18 +637,28 @@ function OrderFileDetail({
   const allFiles = entry?.files ?? EMPTY_FILES;
   const focusFiles = useMemo(() => {
     if (!designId) return allFiles;
-    const matched = allFiles.filter((file) => file.designId === designId);
-    return matched.length ? matched : allFiles;
+    return allFiles.filter(
+      (file) => file.designId === designId || !file.designId,
+    );
   }, [allFiles, designId]);
 
-  const number = orderNumber(order?.humanRef ?? entry?.humanRef, orderId.slice(0, 6));
-  const serviceLabel = serviceWorkLabel(order?.serviceType ?? entry?.serviceType);
+  const number = orderNumber(
+    order?.humanRef ?? entry?.humanRef,
+    orderId.slice(0, 6),
+  );
+  const serviceLabel = serviceWorkLabel(
+    order?.serviceType ?? entry?.serviceType,
+  );
   const designName =
+    (designId
+      ? order?.designs?.find((item) => item.id === designId)?.name
+      : order?.name
+    )?.trim() ||
     entry?.designName?.trim() ||
     focusFiles.find((file) => file.designName?.trim())?.designName?.trim() ||
     order?.name?.trim() ||
     entry?.orderName?.trim() ||
-    'Order';
+    "Order";
 
   const lead = useMemo(
     () => (
@@ -634,7 +675,7 @@ function OrderFileDetail({
   useTopbarLead(lead);
 
   useEffect(() => {
-    document.querySelector('.workspace-col .main')?.scrollTo({ top: 0 });
+    document.querySelector(".workspace-col .main")?.scrollTo({ top: 0 });
   }, [orderId, designId]);
 
   useEffect(() => {
@@ -645,41 +686,50 @@ function OrderFileDetail({
 
   const sections = useMemo(() => {
     if ((orderQ.isLoading && !order) || (listLoading && !entry)) return null;
-    return buildSections(order, focusFiles);
-  }, [orderQ.isLoading, order, listLoading, entry, focusFiles]);
-
-  const sizeText = designSizeLabel(order, designId ?? entry?.designId ?? null, designName, sections);
-  const emailed = batchEmailed(focusFiles);
+    return buildSections(order, focusFiles, designId);
+  }, [orderQ.isLoading, order, listLoading, entry, focusFiles, designId]);
 
   const edits = useMemo(
     () =>
-      [...(editsQ.data?.edits ?? [])].sort(
-        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      revisionsForScope(editsQ.data?.edits ?? [], orderId, designId).sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
       ),
-    [editsQ.data?.edits],
+    [editsQ.data?.edits, orderId, designId],
   );
-  const pending = edits.some((edit) => edit.status !== 'DONE');
+  useEffect(() => {
+    if (!editsQ.isLoading && edits.length === 0) setTab("files");
+  }, [editsQ.isLoading, edits.length]);
+  const displayedFiles =
+    tab === "revs"
+      ? focusFiles.filter((file) =>
+          edits.some((edit) => edit.id === file.editId),
+        )
+      : focusFiles.filter((file) => !file.editId);
+  const emailed = batchEmailed(displayedFiles);
+  const pending = edits.some((edit) => edit.status !== "DONE");
 
   const helpMut = useMutation({
     mutationFn: () =>
       openLinkedChat({
         orderId,
-        chatType: 'ORDER',
-        label: 'HELP',
-        subject: number ? `Order ${number} Chat` : 'Order Chat',
+        chatType: "ORDER",
+        label: "HELP",
+        subject: number ? `Order ${number} Chat` : "Order Chat",
       }),
     onSuccess: (convo) => navigate(`/portal/messages?c=${convo.id}`),
     onError: (err) => onError(getErrorMessage(err)),
   });
 
-  async function downloadFiles(key: string, batch: MyFile[]) {
+  async function downloadFiles(key: string, batch: MyFile[], preview = false) {
     if (!batch.length || busyKey) return;
     setBusyKey(key);
-    setToast('Preparing download…');
+    setToast("Preparing download…");
     setToastOn(true);
     try {
       for (const file of batch) {
-        const previewOnly = file.kind === 'PREVIEW' || file.canDownload === false;
+        const previewOnly =
+          preview || isPreviewFile(file) || file.canDownload === false;
         await downloadSignedFile(
           previewOnly
             ? myDeliveryFilePreviewUrl(file.orderId, file.fileId)
@@ -688,7 +738,7 @@ function OrderFileDetail({
           { stayOnPage: true },
         );
       }
-      setToast('Download started');
+      setToast("Download started");
       setToastOn(true);
       onDownloaded();
     } catch (err) {
@@ -712,12 +762,6 @@ function OrderFileDetail({
       <div className="mf-od-head">
         <div className="mf-od-title">
           <h1>{designName}</h1>
-          {sizeText && (
-            <>
-              <span className="mf-vsep" aria-hidden />
-              <span className="mf-size">{sizeText}</span>
-            </>
-          )}
         </div>
         <button
           type="button"
@@ -726,15 +770,15 @@ function OrderFileDetail({
           onClick={() => helpMut.mutate()}
         >
           <i className="ti ti-message" aria-hidden />
-          {helpMut.isPending ? 'Opening…' : 'Need help?'}
+          {helpMut.isPending ? "Opening…" : "Need help?"}
         </button>
       </div>
 
       {orderQ.isError && (
         <div className="alert-error" style={{ marginTop: 16 }}>
           {entry
-            ? 'Order details could not be loaded. Delivered files are still listed below.'
-            : 'This order could not be opened.'}
+            ? "Order details could not be loaded. Delivered files are still listed below."
+            : "This order could not be opened."}
         </div>
       )}
 
@@ -742,32 +786,34 @@ function OrderFileDetail({
         <div className="mf-tabs" role="tablist" aria-label="Order files">
           <button
             type="button"
-            className={`mf-tab${tab === 'files' ? ' on' : ''}`}
+            className={`mf-tab${tab === "files" ? " on" : ""}`}
             role="tab"
-            aria-selected={tab === 'files'}
-            onClick={() => setTab('files')}
+            aria-selected={tab === "files"}
+            onClick={() => setTab("files")}
           >
             Order files
           </button>
           <button
             type="button"
-            className={`mf-tab${tab === 'revs' ? ' on' : ''}`}
+            className={`mf-tab${tab === "revs" ? " on" : ""}`}
             role="tab"
-            aria-selected={tab === 'revs'}
-            onClick={() => setTab('revs')}
+            aria-selected={tab === "revs"}
+            onClick={() => setTab("revs")}
           >
             Revisions
             <em>{edits.length}</em>
-            {pending && <span className="mf-pend" title="Revision in progress" />}
+            {pending && (
+              <span className="mf-pend" title="Revision in progress" />
+            )}
           </button>
         </div>
       )}
 
-      {tab === 'revs' && edits.length > 0 ? (
+      {tab === "revs" && edits.length > 0 ? (
         <div className="mf-grid">
           {edits.map((edit, index) => {
-            const charged = edit.kind === 'PAID' && (edit.priceCents ?? 0) > 0;
-            const paid = edit.invoiceStatus === 'PAID';
+            const charged = edit.kind === "PAID" && (edit.priceCents ?? 0) > 0;
+            const paid = edit.invoiceStatus === "PAID";
             const batch = revisionFiles(edit);
             const label = `${designName} revision ${index + 1}`;
             return (
@@ -780,14 +826,26 @@ function OrderFileDetail({
                   <div className="mf-act">
                     {charged ? (
                       <>
-                        <b className="mf-price">{money(edit.priceCents, edit.currency ?? 'USD')}</b>
-                        <span className={paid ? 'mf-pill paid' : 'mf-pill unpaid'}>{paid ? 'Paid' : 'Unpaid'}</span>
+                        <b className="mf-price">
+                          {money(edit.priceCents, edit.currency ?? "USD")}
+                        </b>
+                        <span
+                          className={paid ? "mf-pill paid" : "mf-pill unpaid"}
+                        >
+                          {paid ? "Paid" : "Unpaid"}
+                        </span>
                       </>
                     ) : (
                       <span className="mf-free">Free revision</span>
                     )}
-                    <span className={edit.status === 'DONE' ? 'mf-st done' : 'mf-st wait'}>
-                      {edit.status === 'DONE' ? '✓ Delivered' : '● Revision requested'}
+                    <span
+                      className={
+                        edit.status === "DONE" ? "mf-st done" : "mf-st wait"
+                      }
+                    >
+                      {edit.status === "DONE"
+                        ? "✓ Delivered"
+                        : "● Revision requested"}
                     </span>
                   </div>
                 </div>
@@ -798,9 +856,15 @@ function OrderFileDetail({
                   rowKey={edit.id}
                   empty="Files will appear here once this revision is published."
                   busyKey={busyKey}
-                  onDownload={(key, batchFiles) => void downloadFiles(key, batchFiles)}
+                  onDownload={(key, batchFiles) =>
+                    void downloadFiles(key, batchFiles)
+                  }
                   onPreview={(previewFiles, previewIndex, previewLabel) =>
-                    setLight({ files: previewFiles, index: previewIndex, label: previewLabel })
+                    setLight({
+                      files: previewFiles,
+                      index: previewIndex,
+                      label: previewLabel,
+                    })
                   }
                 />
               </section>
@@ -810,7 +874,11 @@ function OrderFileDetail({
       ) : (
         <>
           {(listLoading || orderQ.isLoading) && !sections && (
-            <div className="mf-split-skel" aria-busy="true" aria-label="Loading files">
+            <div
+              className="mf-split-skel"
+              aria-busy="true"
+              aria-label="Loading files"
+            >
               <div className="mf-box-skel" />
               <div className="mf-box-skel" />
             </div>
@@ -822,32 +890,41 @@ function OrderFileDetail({
               </section>
             </div>
           )}
-          {sections && sections.length > 0 && (
+          {sections?.map((section) => (
             <DesignDetailCards
-              title={designName}
-              sizeText={sizeText}
-              files={focusFiles.filter((file) => !file.editId)}
-              emailed={emailed}
+              key={section.name}
+              section={section}
               busyKey={busyKey}
-              onDownload={(key, batchFiles) => void downloadFiles(key, batchFiles)}
+              onDownload={(key, batchFiles) =>
+                void downloadFiles(key, batchFiles)
+              }
               onPreview={(previewFiles, previewIndex, previewLabel) =>
-                setLight({ files: previewFiles, index: previewIndex, label: previewLabel })
+                setLight({
+                  files: previewFiles,
+                  index: previewIndex,
+                  label: previewLabel,
+                })
               }
             />
-          )}
+          ))}
         </>
       )}
 
       <div className="mf-foot">
-        <label className={`mf-email-flag${emailed ? ' on' : ''}`}>
-          <input type="checkbox" checked={emailed} readOnly tabIndex={-1} />
-          Files also sent by email
-        </label>
+        {emailed && (
+          <span className="mf-email-status">
+            <i className="ti ti-mail-check" aria-hidden /> Files sent by email
+          </span>
+        )}
         <p>
-          Questions about your design? Contact us through{' '}
-          <button type="button" className="mf-inline-link" onClick={() => helpMut.mutate()}>
+          Questions about your design? Contact us through{" "}
+          <button
+            type="button"
+            className="mf-inline-link"
+            onClick={() => helpMut.mutate()}
+          >
             Help Request
-          </button>{' '}
+          </button>{" "}
           or <Link to="/portal/messages">Messages</Link>.
         </p>
       </div>
@@ -859,140 +936,133 @@ function OrderFileDetail({
           label={light.label}
           busy={busyKey != null}
           onClose={() => setLight(null)}
-          onDownload={() => {
-            const file = light.files[light.index];
-            if (file) void downloadFiles(`light:${file.fileId}`, [file]);
+          onDownload={(file) => {
+            if (file) void downloadFiles(`light:${file.fileId}`, [file], true);
           }}
         />
       )}
-      <div className={`mf-toast${toastOn ? ' show' : ''}`} role="status">
+      <div className={`mf-toast${toastOn ? " show" : ""}`} role="status">
         {toast}
       </div>
     </div>
   );
 }
 
-function DesignThumb({ src, name }: { src: string | null; name: string }) {
+function DesignThumb({
+  src,
+  name,
+  count = 1,
+}: {
+  src: string | null;
+  name: string;
+  count?: number;
+}) {
   const [broken, setBroken] = useState(false);
   const resolved = src ? resolveFileUrl(src) : null;
   return (
-    <span className="mf-design-thumb">
-      {resolved && !broken ? (
-        <img src={resolved} alt="" onError={() => setBroken(true)} />
-      ) : (
-        <i className="ti ti-photo" aria-hidden title={name} />
-      )}
+    <span className="mf-design-thumb-wrap">
+      <span className="mf-design-thumb">
+        {resolved && !broken ? (
+          <img src={resolved} alt="" onError={() => setBroken(true)} />
+        ) : (
+          <i className="ti ti-photo" aria-hidden title={name} />
+        )}
+      </span>
+      {count > 1 && <span className="mf-thumb-count">+{count - 1}</span>}
     </span>
   );
 }
 
 export function PortalFiles() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const focusOrder = searchParams.get('order');
-  const focusDesign = searchParams.get('design');
-  const [q, setQ] = useState('');
-  const [service, setService] = useState('all');
-  const [sort, setSort] = useState<'latest' | 'oldest'>('latest');
+  const focusOrder = searchParams.get("order");
+  const focusDesign = searchParams.get("design");
+  const [q, setQ] = useState("");
+  const [service, setService] = useState("all");
+  const [sort, setSort] = useState<"latest" | "oldest">("latest");
+  const [page, setPage] = useState(1);
+  const pageSize = 6;
   const [fileError, setFileError] = useState<string | null>(null);
   const qc = useQueryClient();
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['my-files'],
+    queryKey: ["my-files"],
     queryFn: listMyFiles,
     ...freshOnOpen,
     refetchInterval: whenVisible(30_000),
   });
 
-  const entries = useMemo<FileEntry[]>(() => {
-    const byKey = new Map<string, FileEntry>();
-    for (const file of data?.files ?? []) {
-      const designName = file.designName?.trim() || file.orderName?.trim() || 'Order';
-      const key = entryKey(file.orderId, file.designId ?? null, designName);
-      const existing = byKey.get(key);
-      if (existing) {
-        existing.files.push(file);
-        existing.deliveredVia = mergeDeliveredVia([existing.deliveredVia, file.deliveredVia]);
-        if (new Date(file.deliveredAt).getTime() > new Date(existing.deliveredAt).getTime()) {
-          existing.deliveredAt = file.deliveredAt;
-        }
-        if (!existing.thumbUrl) existing.thumbUrl = pickThumb([file]);
-        if (!existing.designId && file.designId) existing.designId = file.designId;
-        if (file.designName?.trim()) existing.designName = file.designName.trim();
-      } else {
-        byKey.set(key, {
-          key,
-          orderId: file.orderId,
-          designId: file.designId ?? null,
-          designName,
-          orderName: file.orderName,
-          humanRef: file.humanRef,
-          serviceType: file.serviceType ?? null,
-          deliveredAt: file.deliveredAt,
-          deliveredVia: file.deliveredVia ?? null,
-          files: [file],
-          thumbUrl: pickThumb([file]),
-        });
-      }
-    }
-    return Array.from(byKey.values());
-  }, [data]);
+  const entries = useMemo(() => groupFileEntries(data?.files ?? []), [data]);
 
   const serviceOptions = useMemo(() => {
     const map = new Map<string, string>();
     for (const entry of entries) {
       const label = serviceWorkLabel(entry.serviceType);
-      if (label && label !== '—') map.set(label, label);
+      if (label && label !== "—") map.set(label, label);
     }
     return [
-      { value: 'all', label: 'All services' },
+      { value: "all", label: "All services" },
       ...[...map.keys()].sort().map((label) => ({ value: label, label })),
     ];
   }, [entries]);
 
   const visible = useMemo(() => {
-    const term = q.trim().toLowerCase().replace(/^#/, '');
+    const term = q.trim().toLowerCase().replace(/^#/, "");
     let list = entries.filter((entry) => {
-      if (service !== 'all' && serviceWorkLabel(entry.serviceType) !== service) return false;
+      if (service !== "all" && serviceWorkLabel(entry.serviceType) !== service)
+        return false;
       if (!term) return true;
       const hay = [
         entry.designName,
         entry.orderName,
         entry.humanRef,
         entry.orderId,
-        orderNumber(entry.humanRef, ''),
+        orderNumber(entry.humanRef, ""),
         serviceWorkLabel(entry.serviceType),
         ...entry.files.map((file) => file.originalName),
       ]
         .filter(Boolean)
-        .join(' ')
+        .join(" ")
         .toLowerCase();
       return hay.includes(term);
     });
     list = [...list].sort((a, b) => {
-      const diff = new Date(b.deliveredAt).getTime() - new Date(a.deliveredAt).getTime();
-      return sort === 'latest' ? diff : -diff;
+      const diff =
+        new Date(b.deliveredAt).getTime() - new Date(a.deliveredAt).getTime();
+      return sort === "latest" ? diff : -diff;
     });
     return list;
   }, [entries, q, service, sort]);
+  useEffect(() => setPage(1), [q, service, sort]);
+  const totalPages = Math.max(1, Math.ceil(visible.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const paged = visible.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
 
   const selected = focusOrder
-    ? entries.find((entry) => {
+    ? (entries.find((entry) => {
         if (entry.orderId !== focusOrder) return false;
         if (!focusDesign) return true;
-        return entry.designId === focusDesign || entry.key === entryKey(focusOrder, focusDesign, entry.designName);
-      }) ??
-      entries.find((entry) => entry.orderId === focusOrder)
+        return (
+          entry.designId === focusDesign ||
+          entry.key === entryKey(focusOrder, focusDesign, entry.designName)
+        );
+      }) ?? entries.find((entry) => entry.orderId === focusOrder))
     : undefined;
 
   const selectedFiles = useMemo(() => {
     if (!focusOrder) return undefined;
     if (selected && focusDesign) return selected;
-    const orderFiles = (data?.files ?? []).filter((file) => file.orderId === focusOrder);
+    const orderFiles = (data?.files ?? []).filter(
+      (file) => file.orderId === focusOrder,
+    );
     if (!orderFiles.length && !selected) return selected;
     const designName =
       selected?.designName ||
       orderFiles.find((file) => file.designName?.trim())?.designName?.trim() ||
       orderFiles[0]?.orderName?.trim() ||
-      'Order';
+      "Order";
     return {
       key: entryKey(focusOrder, focusDesign, designName),
       orderId: focusOrder,
@@ -1001,10 +1071,12 @@ export function PortalFiles() {
       orderName: selected?.orderName ?? orderFiles[0]?.orderName ?? null,
       humanRef: selected?.humanRef ?? orderFiles[0]?.humanRef ?? null,
       serviceType: selected?.serviceType ?? orderFiles[0]?.serviceType ?? null,
-      deliveredAt: selected?.deliveredAt ?? orderFiles[0]?.deliveredAt ?? '',
+      deliveredAt: selected?.deliveredAt ?? orderFiles[0]?.deliveredAt ?? "",
       deliveredVia: selected?.deliveredVia ?? null,
       files: focusDesign
-        ? orderFiles.filter((file) => file.designId === focusDesign || !file.designId)
+        ? orderFiles.filter(
+            (file) => file.designId === focusDesign || !file.designId,
+          )
         : orderFiles,
       thumbUrl: selected?.thumbUrl ?? pickThumb(orderFiles),
     } satisfies FileEntry;
@@ -1013,7 +1085,6 @@ export function PortalFiles() {
   function openEntry(entry: FileEntry) {
     setFileError(null);
     const next: Record<string, string> = { order: entry.orderId };
-    if (entry.designId) next.design = entry.designId;
     setSearchParams(next);
   }
 
@@ -1032,7 +1103,7 @@ export function PortalFiles() {
 
       {focusOrder ? (
         <OrderFileDetail
-          key={`${focusOrder}:${focusDesign ?? ''}`}
+          key={`${focusOrder}:${focusDesign ?? ""}`}
           orderId={focusOrder}
           designId={focusDesign}
           entry={selectedFiles}
@@ -1043,9 +1114,9 @@ export function PortalFiles() {
           }}
           onDownloaded={() => {
             setFileError(null);
-            void qc.invalidateQueries({ queryKey: ['my-files'] });
-            void qc.invalidateQueries({ queryKey: ['my-activity'] });
-            void qc.invalidateQueries({ queryKey: ['notifications'] });
+            void qc.invalidateQueries({ queryKey: ["my-files"] });
+            void qc.invalidateQueries({ queryKey: ["my-activity"] });
+            void qc.invalidateQueries({ queryKey: ["notifications"] });
           }}
           onError={setFileError}
         />
@@ -1054,7 +1125,9 @@ export function PortalFiles() {
           <div className="mf-headbar">
             <div>
               <h1>My Files</h1>
-              <p className="mf-sub">View your design previews and download your files.</p>
+              <p className="mf-sub">
+                View your design previews and download your files.
+              </p>
             </div>
             <label className="mf-search-wrap">
               <i className="ti ti-search" aria-hidden />
@@ -1081,10 +1154,10 @@ export function PortalFiles() {
               size="compact"
               ariaLabel="Sort files"
               value={sort}
-              onChange={(value) => setSort(value as 'latest' | 'oldest')}
+              onChange={(value) => setSort(value as "latest" | "oldest")}
               options={[
-                { value: 'latest', label: 'Latest first' },
-                { value: 'oldest', label: 'Oldest first' },
+                { value: "latest", label: "Latest first" },
+                { value: "oldest", label: "Oldest first" },
               ]}
             />
           </div>
@@ -1110,24 +1183,43 @@ export function PortalFiles() {
                   </div>
                   {visible.length === 0 && (
                     <div className="mf-empty">
-                      {q.trim() || service !== 'all'
-                        ? 'No files found.'
-                        : 'No delivered files yet. Files appear here once an order is completed.'}
+                      {q.trim() || service !== "all"
+                        ? "No files found."
+                        : "No delivered files yet. Files appear here once an order is completed."}
                     </div>
                   )}
-                  {visible.map((entry) => {
-                    const number = orderNumber(entry.humanRef, entry.orderId.slice(0, 6));
+                  {paged.map((entry) => {
+                    const number = orderNumber(
+                      entry.humanRef,
+                      entry.orderId.slice(0, 6),
+                    );
                     const count = fileCount(entry.files);
                     return (
                       <div key={entry.key} className="mf-row">
                         <div className="mf-design-cell">
-                          <DesignThumb src={entry.thumbUrl} name={entry.designName} />
+                          <DesignThumb
+                            src={entry.thumbUrl}
+                            name={entry.designName}
+                            count={entry.designNames?.length}
+                          />
                           <b className="mf-pn">{entry.designName}</b>
                         </div>
                         <span className="mf-onum">{number}</span>
-                        <span className="mf-service">{serviceWorkLabel(entry.serviceType)}</span>
-                        <span className="mf-mute">{countLabel(count)}</span>
-                        <span className="mf-mute">{dateShort(entry.deliveredAt)}</span>
+                        <span className="mf-service">
+                          <span className="mf-service-pill">
+                            {serviceWorkLabel(entry.serviceType)}
+                          </span>
+                        </span>
+                        <button
+                          type="button"
+                          className="mf-files-link"
+                          onClick={() => openEntry(entry)}
+                        >
+                          {countLabel(count)}
+                        </button>
+                        <span className="mf-mute">
+                          {dateShort(entry.deliveredAt)}
+                        </span>
                         <div className="mf-actions">
                           <button
                             type="button"
@@ -1146,8 +1238,18 @@ export function PortalFiles() {
           </div>
           {!isLoading && (
             <p className="mf-count">
-              Showing {visible.length} delivered order{visible.length === 1 ? '' : 's'}.
+              Showing {visible.length ? (currentPage - 1) * pageSize + 1 : 0}–
+              {Math.min(currentPage * pageSize, visible.length)} of{" "}
+              {visible.length} delivered order{visible.length === 1 ? "" : "s"}.
             </p>
+          )}
+          {!isLoading && totalPages > 1 && (
+            <PaginationBar
+              page={currentPage}
+              totalPages={totalPages}
+              total={visible.length}
+              onPage={setPage}
+            />
           )}
         </>
       )}

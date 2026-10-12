@@ -26,6 +26,8 @@ import { MailService } from '../mail/mail.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { LocalStorageService } from '../storage/local-storage.service';
 import { StripeService } from './stripe.service';
+import { ThemeService } from '../settings/theme.service';
+import { DEFAULT_THEME_COLORS, type ThemeColors } from '../settings/theme';
 
 function assertAuthUser(user: AuthUser | undefined): asserts user is AuthUser {
   if (!user) throw new ForbiddenException();
@@ -39,9 +41,9 @@ function displayOrderNumber(ref?: string | null) {
 function serviceLabel(serviceType?: string | null): string {
   const s = (serviceType ?? '').toLowerCase();
   if (!s) return 'Design service';
-  if (s.includes('embroid')) return 'Embroidery';
-  if (s.includes('vector')) return 'Vector & Print';
-  if (s.includes('svg') || s.includes('cnc') || s.includes('laser')) return 'Cut, Print & Engraving';
+  if (s.includes('embroid')) return 'Embroidery Digitizing';
+  if (s.includes('vector')) return 'Vector & Print Files';
+  if (s.includes('svg') || s.includes('cnc') || s.includes('laser')) return 'CNC, Laser & 3D Files';
   return serviceType!
     .replace(/_/g, ' ')
     .toLowerCase()
@@ -78,6 +80,8 @@ function clip(value: string | null | undefined, max: number) {
 
 type CheckoutItem = {
   name: string;
+  size?: string | null;
+  placement?: string | null;
   detail: string | null;
   amountCents: number | null;
 };
@@ -1499,6 +1503,13 @@ export class BillingService {
   }
 
   private async checkoutItemsForOrder(orderId: string): Promise<CheckoutItem[]> {
+    const order = await this.db.queryOne<{ name: string | null; preferences: unknown }>(
+      'SELECT name, preferences FROM orders WHERE id = ? LIMIT 1', [orderId],
+    );
+    const preferences = order?.preferences && typeof order.preferences === 'object'
+      ? order.preferences as { designs?: Array<{ name?: string; sizes?: Array<{ detail?: string; label?: string; placement?: string; w?: string; h?: string; unit?: string }> }> }
+      : null;
+    const designTitle = (name: string) => name.replace(/^Design\s+\d+\s*[-–—·:]\s*/i, '').trim();
     const quoted = await this.db.query<{
       id: string;
       name: string;
@@ -1540,11 +1551,23 @@ export class BillingService {
         }
         lines.set(row.id, current);
       }
-      return [...lines.values()].map((line) => ({
-        name: line.name,
-        detail: line.detail || clip(line.note, 160),
-        amountCents: (line.amountCents ?? 0) + line.sizePrices,
-      }));
+      return [...lines.values()].map((line) => {
+        const label = line.note?.startsWith('design:') ? designTitle(line.note.slice(7)) : null;
+        const design = preferences?.designs?.find((item) => designTitle(item.name || '') === label);
+        const requestedSize = design?.sizes?.find((size) => [size.detail, size.label].some((value) => value?.trim().toLowerCase() === line.name.toLowerCase()))
+          ?? (design?.sizes?.length === 1 ? design.sizes[0] : null);
+        const dimensions = requestedSize?.w || requestedSize?.h
+          ? [requestedSize.w, requestedSize.h].filter(Boolean).join(' × ') + ' ' + (requestedSize.unit === 'cm' ? 'cm' : requestedSize.unit === 'mm' ? 'mm' : 'inch')
+          : null;
+        const size = requestedSize?.detail || dimensions || line.detail || (label ? line.name : null);
+        return {
+          name: label || line.name,
+          size,
+          placement: requestedSize?.placement || null,
+          detail: [size, requestedSize?.placement].filter(Boolean).join(' · ') || (line.note?.startsWith('design:') ? null : clip(line.note, 160)),
+          amountCents: (line.amountCents ?? 0) + line.sizePrices,
+        };
+      });
     }
 
     const designs = await this.db.query<{
@@ -1561,6 +1584,8 @@ export class BillingService {
     );
     return designs.map((design) => ({
       name: design.name?.trim() || 'Design',
+      size: design.size,
+      placement: design.placement,
       detail: [design.placement, design.size].map((part) => part?.trim()).filter(Boolean).join(' · ') || null,
       amountCents: design.price_cents,
     }));
@@ -1604,8 +1629,8 @@ export class BillingService {
       : [{ name: 'Revision', detail: clip(edit.note, 180), amountCents: null }];
   }
 
-  private async buildCheckoutSummary(invoice: InvoiceRow): Promise<CheckoutSummary> {
-    const due = invoiceRemainingCents(invoice);
+  private async buildCheckoutSummary(invoice: InvoiceRow, displayAmount = invoiceRemainingCents(invoice)): Promise<CheckoutSummary> {
+    const due = displayAmount;
     const lines =
       invoice.kind === InvoiceKind.MONTHLY
         ? await this.db.query<InvoiceLineRow>(
@@ -2697,6 +2722,8 @@ export class BillingService {
       invoiceLogoSrc(),
       lines,
       this.invoiceImageDataUri(invoice),
+      (await this.buildCheckoutSummary(invoice, invoice.amount_cents)).groups,
+      await new ThemeService(this.db).get(),
     );
   }
 }
@@ -2765,7 +2792,7 @@ function paymentMethodLabel(method: PaymentMethod) {
   return 'Card';
 }
 
-function buildInvoicePrintHtml(
+export function buildInvoicePrintHtml(
   invoice: InvoiceRow & {
     customer_name: string | null;
     customer_email: string | null;
@@ -2777,6 +2804,8 @@ function buildInvoicePrintHtml(
   logoSrc = '',
   lines: InvoiceLineRow[] = [],
   imageSrc = '',
+  groups: CheckoutGroup[] = [],
+  theme: ThemeColors = DEFAULT_THEME_COLORS,
 ) {
   const ref = invoice.id.slice(0, 8).toUpperCase();
   const money = (cents: number) => formatInvoiceMoney(cents, invoice.currency);
@@ -2840,25 +2869,21 @@ function buildInvoicePrintHtml(
     })
     .join('');
 
-  const itemRows =
-    lines.length > 0
-      ? lines
-          .map(
-            (l) => `<tr>
-          <td>
-            <div class="item-name">${escapeHtml(l.description)}</div>
-          </td>
-          <td class="num">${escapeHtml(money(l.amount_cents))}</td>
-        </tr>`,
-          )
-          .join('')
-      : `<tr>
-          <td>
-            <div class="item-name">${escapeHtml(description)}</div>
-            ${orderHint ? `<div class="item-sub">${escapeHtml(orderHint)}</div>` : ''}
-          </td>
-          <td class="num">${escapeHtml(money(invoice.amount_cents))}</td>
-        </tr>`;
+  const itemRows = groups.length > 0
+    ? groups.map((group) => {
+        let previous = '';
+        return group.items.map((item) => {
+          const repeated = previous === item.name;
+          previous = item.name;
+          return '<tr><td class="item-name">' + escapeHtml(repeated ? '' : item.name) +
+            (groups.length > 1 && !repeated && group.orderRef ? '<small class="item-sub">Order ' + escapeHtml(group.orderRef) + '</small>' : '') +
+            '</td><td>' + escapeHtml(item.size || item.detail || '—') + '</td><td>' + escapeHtml(item.placement || '—') +
+            '</td><td class="num">' + escapeHtml(item.amountCents == null ? '—' : money(item.amountCents)) + '</td></tr>';
+        }).join('');
+      }).join('')
+    : (lines.length ? lines : [{ description, amount_cents: invoice.amount_cents }]).map((line) =>
+        '<tr><td class="item-name">' + escapeHtml(line.description) + '</td><td>—</td><td>—</td><td class="num">' + escapeHtml(money(line.amount_cents)) + '</td></tr>',
+      ).join('');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -2867,250 +2892,53 @@ function buildInvoicePrintHtml(
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <meta name="color-scheme" content="light only"/>
 <title>Invoice LVD-${ref}</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap"/>
 <style>
-  :root {
-    color-scheme: light only;
-    --navy: #143F65;
-    --navy-d: #0E2E4A;
-    --ink: #16202a;
-    --muted: #6b7380;
-    --line: #e4e7ec;
-    --paper: #ffffff;
-    --ok: #1e5c38;
-    --due: #8a5a10;
-    --off: #5c6570;
-  }
+  :root { color-scheme: light only; --ink: ${theme.mainText}; --muted: ${theme.secondaryText}; --line: ${theme.formBorder}; --paper: ${theme.cardBg}; --accent: ${theme.buttonBg}; --tint: ${theme.hoverBg}; --ok: ${theme.success}; --due: ${theme.warning}; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { background: #eceff3; color: var(--ink); }
-  body {
-    font-family: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    line-height: 1.45;
-  }
-  .toolbar {
-    max-width: 760px;
-    margin: 20px auto 0;
-    padding: 0 8px;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 12px;
-  }
-  .toolbar button {
-    font: inherit;
-    font-weight: 600;
-    font-size: 12.5px;
-    color: #fff;
-    background: var(--navy);
-    border: 0;
-    border-radius: 8px;
-    padding: 8px 14px;
-    cursor: pointer;
-  }
-  .sheet {
-    width: 8.5in;
-    min-height: 11in;
-    margin: 16px auto 40px;
-    background: var(--paper);
-    padding: 0.72in 0.78in 0.64in;
-    box-shadow: 0 18px 50px rgba(14, 46, 74, 0.10);
-    display: flex;
-    flex-direction: column;
-  }
-  .brand {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 28px;
-  }
-  .mark {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-  .logo {
-    height: 52px;
-    width: auto;
-    max-width: 260px;
-    object-fit: contain;
-    flex-shrink: 0;
-    background: #fff;
-    border-radius: 0;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-    color-adjust: exact;
-  }
-  .studio {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--navy);
-  }
-  .place { margin-top: 4px; font-size: 12.5px; color: var(--muted); }
-  .doc-title {
-    text-align: right;
-  }
-  .doc-title h1 {
-    font-family: Palatino, "Palatino Linotype", Georgia, serif;
-    font-size: 40px;
-    font-weight: 400;
-    letter-spacing: 0.04em;
-    color: var(--navy-d);
-    line-height: 1;
-  }
-  .doc-title .no {
-    margin-top: 8px;
-    font-size: 13px;
-    color: var(--muted);
-    letter-spacing: 0.04em;
-  }
-  .stamp {
-    display: inline-block;
-    margin-top: 10px;
-    padding: 3px 9px;
-    border: 1px solid currentColor;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-  }
-  .stamp.ok { color: var(--ok); }
-  .stamp.due { color: var(--due); }
-  .stamp.off { color: var(--off); }
-  .rule {
-    height: 5px;
-    margin: 28px 0 32px;
-    border-top: 1px solid var(--navy);
-    border-bottom: 2.5px solid var(--navy);
-  }
-  .meta {
-    display: grid;
-    grid-template-columns: 1.2fr 1fr;
-    gap: 36px 48px;
-  }
-  .k {
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 8px;
-  }
-  .who { font-size: 16px; font-weight: 600; color: var(--navy-d); }
-  .soft { font-size: 13px; color: var(--muted); margin-top: 3px; }
-  .facts { display: grid; grid-template-columns: 92px 1fr; gap: 7px 14px; font-size: 13.5px; }
-  .facts dt { color: var(--muted); }
-  .facts dd { color: var(--ink); }
+  html, body { background: var(--tint); color: var(--ink); }
+  body { font-family: 'Inter', system-ui, -apple-system, sans-serif; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+  .toolbar { max-width: 816px; margin: 20px auto 0; display: flex; justify-content: flex-end; }
+  .toolbar button { font: inherit; font-size: 13px; border: 0; border-radius: 8px; padding: 9px 16px; color: ${theme.buttonText}; background: var(--accent); cursor: pointer; }
+  .sheet { width: 8.5in; min-height: 11in; background: var(--paper); margin: 16px auto 40px; padding: .58in .62in .5in; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,.08); }
+  .brand { display: flex; justify-content: space-between; align-items: flex-start; gap: 28px; }
+  .mark { max-width: 60%; }
+  .logo { width: 290px; max-width: 100%; height: auto; max-height: 78px; object-fit: contain; object-position: left center; }
+  .place { margin-top: 8px; font-size: 12px; color: var(--muted); }
+  .doc-title { text-align: right; }
+  .doc-title h1 { font: inherit; font-size: 44px; font-weight: 700; color: var(--accent); line-height: 1.1; }
+  .no { margin-top: 6px; font-size: 14px; color: var(--muted); }
+  .stamp { display: inline-block; margin-top: 8px; padding: 4px 13px; border-radius: 4px; font-size: 15px; font-weight: 700; text-transform: uppercase; color: ${theme.buttonText}; background: var(--due); }
+  .stamp.ok { background: var(--ok); color: #fff; } .stamp.off { background: var(--muted); color: #fff; }
+  .rule { border-top: 1px solid var(--line); margin: 26px 0 22px; }
+  .meta { display: grid; grid-template-columns: 1.2fr 1fr; gap: 32px; }
+  .k { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+  .who { font-size: 20px; font-weight: 600; } .soft { font-size: 14px; margin-top: 2px; overflow-wrap: anywhere; }
+  .facts { display: grid; grid-template-columns: 76px minmax(0,1fr); gap: 6px 14px; font-size: 13px; }
+  .facts dt { color: var(--muted); } .facts dd { overflow-wrap: anywhere; }
   table { width: 100%; border-collapse: collapse; }
-  .items { margin-top: 40px; }
-  .items th {
-    text-align: left;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--muted);
-    padding: 0 0 10px;
-    border-bottom: 1px solid var(--navy);
-  }
-  .items th.num, .pay th.num { text-align: right; }
-  .items td {
-    padding: 16px 0;
-    border-bottom: 1px solid var(--line);
-    vertical-align: top;
-    font-size: 14px;
-  }
-  .item-name { font-weight: 600; color: var(--ink); }
-  .item-sub { margin-top: 3px; font-size: 12.5px; color: var(--muted); }
-  .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .totals {
-    width: 280px;
-    margin: 8px 0 0 auto;
-  }
-  .totals tr td { padding: 7px 0; font-size: 13.5px; color: var(--muted); }
-  .totals tr td.num { color: var(--ink); }
-  .totals .grand td {
-    padding-top: 12px;
-    border-top: 2px solid var(--navy);
-    font-family: Palatino, "Palatino Linotype", Georgia, serif;
-    font-size: 20px;
-    color: var(--navy-d);
-  }
-  .note {
-    margin-top: 28px;
-    padding: 14px 16px;
-    background: #f4f7fa;
-    font-size: 13px;
-    color: var(--navy-d);
-  }
-  .shot { margin-top: 28px; }
-  .shot img {
-    display: block;
-    margin-top: 10px;
-    max-width: 100%;
-    max-height: 320px;
-    object-fit: contain;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-  }
-  .pay { margin-top: 36px; }
-  .pay table { margin-top: 8px; }
-  .pay th {
-    text-align: left;
-    font-size: 10px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--muted);
-    padding: 0 0 8px;
-    border-bottom: 1px solid var(--line);
-  }
-  .pay td { padding: 9px 0; font-size: 13px; border-bottom: 1px solid var(--line); }
-  .foot {
-    margin-top: auto;
-    padding-top: 20px;
-    border-top: 1px solid var(--line);
-    display: flex;
-    justify-content: space-between;
-    gap: 24px;
-    font-size: 11.5px;
-    color: var(--muted);
-    line-height: 1.55;
-  }
-  .foot strong { display: block; color: var(--navy); font-size: 12px; margin-bottom: 2px; }
-  /* Browser “Margins: None” drops @page margins. Keep space on the page itself. */
-  @page { size: A4; margin: 0; }
-  @media print {
-    html {
-      background: #fff !important;
-      margin: 0 !important;
-      padding: 0 !important;
-    }
-    body {
-      background: #fff !important;
-      margin: 0 !important;
-      padding: 18mm 16mm 16mm !important;
-    }
-    .toolbar { display: none !important; }
-    .page {
-      padding: 0 !important;
-    }
-    .sheet {
-      width: auto !important;
-      min-height: 0 !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      box-shadow: none !important;
-      display: block !important;
-    }
-    .foot { margin-top: 48px; }
-    html, body, img, .logo, .note, .stamp, .mono {
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-      color-adjust: exact !important;
-    }
-  }
+  .items { margin-top: 26px; table-layout: fixed; }
+  .items th, .pay th { background: var(--tint); color: var(--accent); text-align: left; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  .items th, .items td, .pay th, .pay td { border: 1px solid var(--line); padding: 10px 12px; }
+  .items th:first-child { width: 30%; } .items th:last-child { width: 22%; }
+  .items td { font-size: 13px; vertical-align: top; overflow-wrap: anywhere; }
+  .item-name { font-weight: 500; } .item-sub { display: block; color: var(--muted); margin-top: 3px; }
+  .num, .items th.num, .pay th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .totals { width: 46%; margin: 22px 0 0 auto; border-top: 1px solid var(--line); }
+  .totals td { padding: 9px 6px; font-size: 14px; } .totals td:first-child { color: var(--muted); }
+  .totals .grand td { background: var(--tint); border-top: 1px solid var(--line); color: var(--accent); font-size: 22px; font-weight: 700; }
+  .totals .balance td { border-top: 1px solid var(--line); color: var(--ink); font-weight: 700; }
+  .note { margin-top: 14px; font-size: 12px; color: var(--muted); }
+  .pay { margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--line); }
+  .pay td { font-size: 13px; }
+  .shot { margin-top: 20px; } .shot img { max-width: 100%; max-height: 250px; object-fit: contain; }
+  .foot { margin-top: auto; padding-top: 20px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 24px; font-size: 12px; color: var(--muted); }
+  .foot strong { display: block; font-size: 14px; color: var(--accent); margin-bottom: 3px; }
+  .foot-spacer { min-height: 24px; }
+  tr, .meta, .brand, .totals, .foot { break-inside: avoid; }
+  @page { size: letter; margin: 12mm; }
+  @media print { html, body { background: #fff; } .toolbar { display: none; } .sheet { width: auto; min-height: 0; padding: 0; margin: 0; box-shadow: none; } .foot { margin-top: 24px; } * { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  @media screen and (max-width: 850px) { .sheet { width: calc(100% - 24px); min-height: 0; padding: 24px; } .logo { width: 220px; } .doc-title h1 { font-size: 32px; } .meta { gap: 18px; } .totals { width: 60%; } .toolbar { margin-right: 12px; } }
 </style>
 </head>
 <body>
@@ -3126,7 +2954,7 @@ function buildInvoicePrintHtml(
             ? `<img class="logo" src="${logoSrc}" alt="Las Vegas Designs USA" />`
             : `<div class="logo" aria-hidden="true"></div>`
         }
-        <div class="place">USA · Custom embroidery &amp; design</div>
+        <div class="place">Embroidery Digitizing · Vector &amp; Print Files · CNC, Laser &amp; 3D Files</div>
       </div>
       <div class="doc-title">
         <h1>Invoice</h1>
@@ -3143,19 +2971,22 @@ function buildInvoicePrintHtml(
       <div>
         <div class="k">Details</div>
         <dl class="facts">
+          ${invoice.order_ref ? `<dt>Order no</dt><dd>${escapeHtml(displayOrderNumber(invoice.order_ref))}</dd>` : ''}
           <dt>Issued</dt><dd>${escapeHtml(issued || '-')}</dd>
           ${dueOn ? `<dt>Due</dt><dd>${escapeHtml(dueOn)}</dd>` : ''}
           ${paidOn ? `<dt>Paid</dt><dd>${escapeHtml(paidOn)}</dd>` : ''}
           ${period ? `<dt>Period</dt><dd>${escapeHtml(period)}</dd>` : ''}
-          <dt>Type</dt><dd>${escapeHtml(kindLabel)}</dd>
+          <dt>Type</dt><dd>${escapeHtml([...new Set(groups.map(group => group.serviceLabel))].join(', ') || kindLabel)}</dd>
         </dl>
       </div>
     </section>
     <table class="items">
       <thead>
         <tr>
-          <th>Description</th>
-          <th class="num">Amount</th>
+          <th>Design</th>
+          <th>Size</th>
+          <th>Placement</th>
+          <th class="num">Price</th>
         </tr>
       </thead>
       <tbody>
@@ -3164,42 +2995,12 @@ function buildInvoicePrintHtml(
     </table>
     <table class="totals">
       <tr><td>Subtotal</td><td class="num">${escapeHtml(money(invoice.amount_cents))}</td></tr>
-      ${
-        paidCents > 0
-          ? `<tr><td>Paid</td><td class="num">−${escapeHtml(money(paidCents))}</td></tr>`
-          : ''
-      }
-      ${
-        refundedCents > 0
-          ? `<tr><td>Refunded</td><td class="num">−${escapeHtml(money(refundedCents))}</td></tr>`
-          : ''
-      }
-      <tr class="grand">
-        <td>${invoice.status === InvoiceStatus.PAID ? 'Total paid' : invoice.status === InvoiceStatus.CANCELLED ? 'Cancelled' : 'Amount due'}</td>
-        <td class="num">${escapeHtml(
-          money(
-            invoice.status === InvoiceStatus.CANCELLED
-              ? 0
-              : invoice.status === InvoiceStatus.PAID
-                ? invoice.amount_cents
-                : remainingCents,
-          ),
-        )}</td>
-      </tr>
+      <tr class="grand"><td>Total</td><td class="num">${escapeHtml(money(invoice.amount_cents))}</td></tr>
+      <tr><td>Amount paid</td><td class="num">${escapeHtml(money(paidCents))}</td></tr>
+      ${refundedCents > 0 ? '<tr><td>Refunded</td><td class="num">' + escapeHtml(money(refundedCents)) + '</td></tr>' : ''}
+      <tr class="balance"><td>Balance due</td><td class="num">${escapeHtml(money(invoice.status === InvoiceStatus.CANCELLED ? 0 : remainingCents))}</td></tr>
     </table>
-    ${
-      invoice.status === InvoiceStatus.PAID
-        ? `<p class="note">${
-            refundedCents > 0 && refundedCents >= chargedCents
-              ? 'This invoice was paid and later refunded in full.'
-              : `Paid in full${paidOn ? ` on ${escapeHtml(paidOn)}` : ''}. Thank you.`
-          }</p>`
-        : invoice.status === InvoiceStatus.PARTIAL
-          ? `<p class="note">Partially paid. ${escapeHtml(money(remainingCents))} remains due${dueOn ? ` by ${escapeHtml(dueOn)}` : ''}.</p>`
-          : invoice.status === InvoiceStatus.AWAITING
-            ? `<p class="note">${dueOn ? `Payment is due by ${escapeHtml(dueOn)}.` : 'Payment is due upon receipt.'} Pay by card from your client portal or the payment link we sent.</p>`
-            : ''
-    }
+    ${invoice.status === InvoiceStatus.CANCELLED ? '<p class="note">This invoice has been cancelled.</p>' : refundedCents >= chargedCents && refundedCents > 0 ? '<p class="note">This invoice was paid and later refunded in full.</p>' : ''}
     ${
       imageSrc
         ? `<section class="shot"><div class="k">Attached image</div><img src="${imageSrc}" alt="${escapeHtml(invoice.image_name || 'Invoice image')}"/></section>`
@@ -3216,13 +3017,14 @@ function buildInvoicePrintHtml(
       </section>`
         : ''
     }
+    <div class="foot-spacer"></div>
     <footer class="foot">
       <div>
         <strong>Las Vegas Designs USA</strong>
-        Embroidery digitizing, vector art, and custom design.
+        sales@lasvegasdesignsusa.com<br/>lasvegasdesignsusa.com
       </div>
       <div style="text-align:right">
-        Questions about this invoice?<br/>
+        <strong>Thank you for your order.</strong>Questions?
         Message us from your client portal.
       </div>
     </footer>
@@ -3230,7 +3032,7 @@ function buildInvoicePrintHtml(
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
   <script>
-    function downloadPdf() {
+    async function downloadPdf() {
       var button = document.getElementById('download-pdf');
       if (!window.html2pdf) {
         button.textContent = 'PDF download unavailable';
@@ -3239,6 +3041,7 @@ function buildInvoicePrintHtml(
       var label = button.textContent;
       button.disabled = true;
       button.textContent = 'Preparing PDF…';
+      if (document.fonts) await document.fonts.ready;
       html2pdf().set({
         margin: 0,
         filename: ${JSON.stringify(`Invoice-LVD-${ref}.pdf`)},

@@ -14,9 +14,9 @@ import { RequestQuoteMenu } from '@/components/RequestQuoteMenu';
 
 const DRAFT_LABELS: Record<string, string> = {
   embroidery: 'Embroidery Digitizing',
-  svg: 'Cut, Print & Engraving',
-  vector: 'Vector & Print',
-  laser: 'Cut, Print & Engraving',
+  svg: 'CNC, Laser & 3D Files',
+  vector: 'Vector & Print Files',
+  laser: 'CNC, Laser & 3D Files',
 };
 
 const DRAFT_ICONS: Record<string, string> = {

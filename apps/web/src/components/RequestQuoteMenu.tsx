@@ -15,7 +15,7 @@ const SERVICES = [
   },
   {
     key: 'vector',
-    title: 'Vector & Print',
+    title: 'Vector & Print Files',
     desc: 'Logo redraws and print-ready color separations.',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -28,7 +28,7 @@ const SERVICES = [
   },
   {
     key: 'laser',
-    title: 'Cut, Print & Engraving',
+    title: 'CNC, Laser & 3D Files',
     desc: 'Cutting, engraving, print files and plasma files.',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

@@ -119,6 +119,8 @@ export type PayLinkSummary = {
 
 export type CheckoutItem = {
   name: string;
+  size?: string | null;
+  placement?: string | null;
   detail: string | null;
   amountCents: number | null;
 };

@@ -180,10 +180,10 @@ export function PortalShell() {
           <i className="ti ti-needle-thread" /> Embroidery Digitizing
         </button>
         <button type="button" onClick={() => openRequestQuote('vector')}>
-          <i className="ti ti-vector-bezier" /> Vector &amp; Print Artwork
+          <i className="ti ti-vector-bezier" /> Vector &amp; Print Files
         </button>
         <button type="button" onClick={() => openRequestQuote('laser')}>
-          <i className="ti ti-router" /> Cutting &amp; Engraving Files
+          <i className="ti ti-router" /> CNC, Laser &amp; 3D Files
         </button>
       </nav>
       <NavGroup label="Account" items={account} />

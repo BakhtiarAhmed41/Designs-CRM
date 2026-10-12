@@ -1,0 +1,337 @@
+.profile-elegant.portal-account {
+  max-width: 1080px;
+}
+.profile-elegant.account-settings {
+  max-width: 1180px;
+}
+.account-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.account-fields:disabled {
+  opacity: 0.7;
+}
+.account-identity {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 4px 0 8px;
+}
+.account-identity h1 {
+  margin: 0 0 4px;
+}
+.account-avatar {
+  width: 82px;
+  height: 82px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--hover-bg, var(--tint-hover));
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 28px;
+  flex-shrink: 0;
+}
+.portal-account .profile-card-head {
+  border: 0;
+  margin-bottom: 0;
+}
+.account-section-heading {
+  border-top: 1px solid var(--line);
+  margin-top: 22px;
+  padding: 20px 0 12px;
+}
+.account-full {
+  grid-column: 1 / -1;
+}
+.portal-account .account-actions {
+  justify-content: flex-end;
+  gap: 10px;
+}
+.account-security,
+.account-info-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding-top: 20px;
+}
+.account-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin: 14px 0;
+}
+.account-info dt {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+.account-info dd {
+  margin: 0;
+}
+.settings-services {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.settings-service {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  min-width: 0;
+}
+.settings-service-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+}
+.settings-service-heading label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 13px;
+}
+.settings-help {
+  color: var(--muted);
+}
+.settings-service input[type='checkbox'] {
+  accent-color: var(--maroon);
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+.settings-format input[type='checkbox'] {
+  accent-color: var(--navy);
+  width: 13px;
+  height: 13px;
+}
+.settings-formats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.settings-format {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.settings-other {
+  margin-top: 20px;
+}
+.settings-other input {
+  width: 100%;
+}
+.settings-explainer {
+  display: grid;
+  gap: 4px;
+  margin: 14px 0 0;
+  font-size: 12px;
+}
+.settings-placement {
+  margin-top: 14px;
+  font-size: 12px;
+}
+.settings-placement summary,
+.settings-custom summary {
+  cursor: pointer;
+  color: var(--muted);
+}
+.settings-placement .pf {
+  margin-top: 8px;
+  max-width: 300px;
+}
+.settings-appearance {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 26px;
+  margin-top: 16px;
+}
+.settings-look {
+  min-width: 0;
+}
+.settings-live {
+  border-left: 1px solid var(--line);
+  padding: 20px 0 0 24px;
+  min-width: 0;
+}
+.settings-swatches {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.settings-swatch {
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  font-size: 11px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.settings-swatch > span {
+  display: block;
+  position: relative;
+  height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 5px;
+}
+.settings-swatch.selected > span {
+  outline: 2px solid var(--form-focus, var(--navy));
+  outline-offset: 2px;
+}
+.settings-swatch i {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  color: var(--maroon);
+  background: var(--card);
+  border-radius: 50%;
+}
+.settings-custom {
+  margin-bottom: 14px;
+  font-size: 12px;
+}
+.settings-custom .pf {
+  margin-top: 10px;
+}
+.settings-preview {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 12px;
+  box-shadow: var(--shadow-sec);
+}
+.preview-browser {
+  background: var(--tint-hover);
+  color: var(--muted);
+  font-size: 9px;
+  padding: 4px 8px;
+}
+.preview-portal {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  min-height: 190px;
+}
+.preview-portal aside {
+  background: #143F65;
+  color: #fff;
+  padding: 10px 6px;
+  font-size: 10px;
+}
+.preview-portal aside img {
+  width: 25px;
+  height: 25px;
+  object-fit: contain;
+}
+.preview-portal aside small {
+  display: block;
+  font-size: 8px;
+  margin-bottom: 10px;
+}
+.preview-portal aside div {
+  padding: 7px 4px;
+}
+.preview-portal aside .active {
+  background: var(--sidebar-active-bg, var(--tint-hover));
+  border-radius: 4px;
+}
+.preview-content {
+  min-width: 0;
+}
+.preview-topbar {
+  background: var(--topbar-bg);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  font-size: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.preview-activity {
+  margin: 12px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 10px;
+}
+.preview-activity h4 {
+  font-size: 12px;
+  margin: 0 0 10px;
+}
+.preview-activity > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 9px;
+}
+.preview-action {
+  border: 1px solid var(--line);
+  padding: 4px;
+  border-radius: 4px;
+  font-size: 8px;
+}
+.settings-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+.settings-reset {
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: underline;
+  cursor: pointer;
+}
+@media (max-width: 1000px) {
+  .settings-services {
+    grid-template-columns: 1fr;
+  }
+  .settings-appearance {
+    grid-template-columns: 1fr;
+  }
+  .settings-live {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    padding: 18px 0 0;
+  }
+}
+@media (max-width: 600px) {
+  .portal-account .pform {
+    grid-template-columns: 1fr;
+  }
+  .account-security,
+  .account-info-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .account-info {
+    grid-template-columns: 1fr;
+  }
+  .account-avatar {
+    width: 64px;
+    height: 64px;
+    font-size: 22px;
+  }
+}

@@ -67,6 +67,7 @@ export type QuotationLine = {
 };
 
 export type MyFile = {
+  orderDesignNames?: string[];
   orderId: string;
   orderName: string | null;
   humanRef: string | null;

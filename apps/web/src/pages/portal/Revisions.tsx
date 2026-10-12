@@ -19,7 +19,7 @@ export function PortalRevisions() {
     <div>
       <PageHeader
         title="Revisions"
-        subtitle="Track changes you have requested on your orders."
+        subtitle="Track revisions managed by our team."
       />
       <div className="card">
         {isLoading && <SkeletonRows rows={4} />}
@@ -27,7 +27,7 @@ export function PortalRevisions() {
           <EmptyState
             icon="ti-refresh"
             title="No revisions yet"
-            description="When you ask for a change on an order, it will show up here."
+            description="Revisions created by our team will appear here."
           />
         )}
         {edits.map((e) => (

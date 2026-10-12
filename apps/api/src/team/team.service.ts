@@ -289,9 +289,12 @@ export class TeamService {
               o.due_date, o.created_at, c.name AS customer_name
          FROM orders o
          LEFT JOIN customers c ON c.id = o.customer_id
-        WHERE o.assigned_designer_id = ? AND o.status IN (?, ?, ?)
+        WHERE (o.assigned_designer_id = ? OR EXISTS (
+          SELECT 1 FROM edit_requests e
+           WHERE e.order_id = o.id AND e.assigned_designer_id = ? AND e.status = 'PENDING'
+        )) AND o.status IN (?, ?, ?)
         ORDER BY (o.due_date IS NULL), o.due_date ASC, o.created_at ASC`,
-      [userId, ...ACTIVE_STATUSES],
+      [userId, userId, ...ACTIVE_STATUSES],
     );
     return rows.map((o) => ({
       id: o.id,

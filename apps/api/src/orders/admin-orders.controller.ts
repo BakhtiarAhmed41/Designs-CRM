@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -446,6 +447,16 @@ export class AdminOrdersController {
       }
     }
     const via = body?.deliveredVia;
+    let savedDeliveryIds: string[] | undefined;
+    if (body?.savedDeliveryIds) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(body.savedDeliveryIds);
+      } catch {
+        throw new BadRequestException('Saved delivery IDs must be a JSON array.');
+      }
+      savedDeliveryIds = z.array(z.string().uuid()).min(1).parse(parsed);
+    }
     return this.orders.deliverOrder(user, id, uploaded?.files ?? [], {
       deliveredVia:
         via === DeliveredVia.EMAIL
@@ -455,6 +466,7 @@ export class AdminOrdersController {
             : DeliveredVia.PORTAL,
       zip: uploaded?.zip ?? [],
       designIds,
+      savedDeliveryIds,
       notifyEmail: parseBool(body?.notifyEmail, true),
       notifySms: parseBool(body?.notifySms, true),
       complete: parseBool(body?.complete, true),

@@ -543,6 +543,9 @@
 }
 .rev-row:last-child { border-bottom: 0; }
 .rev-note { font-size: 13.5px; font-weight: 500; min-width: 0; }
+.rev-note { flex: 1; }
+.rev-assign { margin-top: 12px; min-width: min(100%, 300px); }
+.sod-saved { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-bottom: 16px; font-size: 12px; color: var(--muted); }
 .rev-chip {
   display: inline-block;
   max-width: 220px;
@@ -1359,7 +1362,7 @@
 .sod-mo-h h3 { margin: 0; font-size: 16px; }
 .sod-mo-h button { border: 0; background: transparent; cursor: pointer; font-size: 16px; }
 .sod-mo p { margin: 0 0 12px; color: var(--muted); font-size: 12.5px; }
-.sod-mo-f { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.sod-mo-f { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .sod-drop-sm { min-height: 48px; margin-top: 4px; }
 .sod-check {
   display: flex;

@@ -41,7 +41,13 @@ function DueAmount({ currency, cents }: { currency: string; cents: number }) {
   return <>{money(cents, currency)}</>;
 }
 
-function PaymentColumn({ emailOnFile, banner }: { emailOnFile: boolean; banner?: string | null }) {
+function PaymentColumn({
+  emailOnFile,
+  banner,
+}: {
+  emailOnFile: boolean;
+  banner?: string | null;
+}) {
   const state = useCheckoutElements();
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -79,17 +85,23 @@ function PaymentColumn({ emailOnFile, banner }: { emailOnFile: boolean; banner?:
   return (
     <div className="cko-pay">
       <h2>Payment</h2>
-      <p className="cko-lead">Pay with a wallet, or enter a card. Stripe handles the payment.</p>
+      <p className="cko-lead">
+        Pay with a wallet, or enter a card. Stripe handles the payment.
+      </p>
       {banner && <p className="cko-error">{banner}</p>}
       <form className="cko-form" onSubmit={(event) => void pay(event)}>
         <ExpressCheckoutElement
           onReady={(event) => {
             const methods = event.availablePaymentMethods;
-            setWallets(Boolean(methods && Object.values(methods).some(Boolean)));
+            setWallets(
+              Boolean(methods && Object.values(methods).some(Boolean)),
+            );
           }}
           onConfirm={async (event) => {
             setMessage(null);
-            const result = await checkout.confirm({ expressCheckoutConfirmEvent: event });
+            const result = await checkout.confirm({
+              expressCheckoutConfirmEvent: event,
+            });
             if (result.type === 'error') setMessage(result.error.message);
           }}
         />
@@ -114,23 +126,34 @@ function PaymentColumn({ emailOnFile, banner }: { emailOnFile: boolean; banner?:
   );
 }
 
-function SummaryColumn({
+export function CheckoutSummaryColumn({
   summary,
   backHref,
+  total,
 }: {
   summary: CheckoutSummary;
   backHref?: string | null;
+  total?: React.ReactNode;
 }) {
   const single = summary.groups.length === 1 ? summary.groups[0] : null;
-  const onlyDesign = single?.items.length === 1 ? single.items[0] : null;
-  const heading = single?.orderRef ? `Order ${single.orderRef}` : summary.title;
-  const sub =
-    single?.orderName && single.orderName !== onlyDesign?.name ? single.orderName : null;
-  const note =
-    summary.title !== heading && summary.title !== sub && summary.title !== onlyDesign?.name
-      ? summary.title
-      : null;
-
+  const heading = single?.orderRef ? 'Order ' + single.orderRef : summary.title;
+  const monthly = summary.kind === 'MONTHLY';
+  const nextSteps = monthly
+    ? [
+        ['ti-check', 'Payment confirmed'],
+        ['ti-receipt', 'Account balance updated'],
+        ['ti-file-check', 'Invoice marked paid'],
+      ]
+    : [
+        ['ti-check', 'Payment confirmed'],
+        [
+          'ti-pencil',
+          summary.kind === 'ADD_ON'
+            ? 'We start your revision'
+            : 'We start your design',
+        ],
+        ['ti-folder', 'Files ready in your portal'],
+      ];
   return (
     <aside className="cko-summary">
       <div className="cko-brand">
@@ -138,42 +161,64 @@ function SummaryColumn({
         {backHref && (
           <Link className="cko-back" to={backHref}>
             <i className="ti ti-arrow-left" />
-            Back
+            Back to {backHref.includes('/orders/') ? 'order' : 'invoice'}
           </Link>
         )}
       </div>
-      <p className="cko-kicker">Order summary</p>
-      <h1>{heading}</h1>
-      {sub && <p className="cko-sub">{sub}</p>}
-      {note && <p className="cko-note">{note}</p>}
-
-      <div className="cko-groups">
+      <p className="cko-kicker">
+        {monthly ? 'Invoice summary' : 'Order summary'}
+      </p>
+      <div className="cko-heading">
+        <h1>{heading}</h1>
+        {single && (
+          <span className="cko-service-pill">{single.serviceLabel}</span>
+        )}
+      </div>
+      <div className="cko-summary-card">
         {summary.groups.map((group, index) => (
-          <section className="cko-group" key={`${group.orderRef ?? group.orderName ?? 'order'}-${index}`}>
-            {summary.groups.length > 1 && (group.orderRef || group.orderName) && (
-              <h2 className="cko-sub" style={{ marginBottom: 10 }}>
-                {group.orderRef ? `Order ${group.orderRef}` : group.orderName}
-                {group.orderRef && group.orderName ? ` · ${group.orderName}` : ''}
-              </h2>
+          <section className="cko-table-group" key={index}>
+            {!single && (
+              <div className="cko-group-heading">
+                <h2>
+                  {group.orderRef
+                    ? 'Order ' + group.orderRef
+                    : group.orderName || 'Design services'}
+                </h2>
+                <span className="cko-service-pill">{group.serviceLabel}</span>
+              </div>
             )}
-            <div className="cko-service">
-              <span>Service</span>
-              <strong>{group.serviceLabel}</strong>
+            <div className="cko-table-scroll">
+              <table className="cko-items">
+                <thead>
+                  <tr>
+                    <th>Design</th>
+                    <th>Size</th>
+                    <th>Placement</th>
+                    <th className="num">Price</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {group.items.map((item, itemIndex) => (
+                    <tr key={itemIndex}>
+                      <td>
+                        {itemIndex > 0 &&
+                        group.items[itemIndex - 1].name === item.name
+                          ? ''
+                          : item.name}
+                      </td>
+                      <td>{item.size || item.detail || '—'}</td>
+                      <td>{item.placement || '—'}</td>
+                      <td className="num">
+                        {item.amountCents == null
+                          ? '—'
+                          : money(item.amountCents, summary.currency)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <span className="cko-label">{group.items.length === 1 ? 'Design' : 'Designs'}</span>
-            <ul className="cko-designs">
-              {group.items.map((item, itemIndex) => (
-                <li key={`${item.name}-${itemIndex}`}>
-                  <span className="cko-mark">{itemIndex + 1}</span>
-                  <div>
-                    <strong>{item.name}</strong>
-                    {item.detail && <small>{item.detail}</small>}
-                  </div>
-                  {item.amountCents != null && <b>{money(item.amountCents, summary.currency)}</b>}
-                </li>
-              ))}
-            </ul>
-            {group.amountCents != null && (
+            {group.amountCents != null && !single && (
               <div className="cko-subtotal">
                 <span>Order total</span>
                 <strong>{money(group.amountCents, summary.currency)}</strong>
@@ -181,21 +226,54 @@ function SummaryColumn({
             )}
           </section>
         ))}
-      </div>
-
-      <div className="cko-totals">
-        {summary.alreadyPaidCents > 0 && (
+        <div className="cko-totals">
           <div className="cko-row">
-            <span>Already paid</span>
-            <span>{money(summary.alreadyPaidCents, summary.currency)}</span>
+            <span>Subtotal</span>
+            <span>
+              {money(
+                summary.amountDueCents + summary.alreadyPaidCents,
+                summary.currency,
+              )}
+            </span>
           </div>
-        )}
-        <div className="cko-row due">
-          <span>Due today</span>
-          <strong>
-            <DueAmount currency={summary.currency} cents={summary.amountDueCents} />
-          </strong>
+          {summary.alreadyPaidCents > 0 && (
+            <div className="cko-row">
+              <span>Already paid</span>
+              <span>{money(summary.alreadyPaidCents, summary.currency)}</span>
+            </div>
+          )}
+          <div className="cko-row due">
+            <span>Total due</span>
+            <strong>
+              {total ?? money(summary.amountDueCents, summary.currency)}
+            </strong>
+          </div>
         </div>
+      </div>
+      <section className="cko-next">
+        <h2>What happens next</h2>
+        <ol>
+          {nextSteps.map(([icon, label]) => (
+            <li key={label}>
+              <span className="cko-next-icon">
+                <i className={'ti ' + icon} aria-hidden />
+              </span>
+              <span>{label}</span>
+            </li>
+          ))}
+        </ol>
+      </section>
+      <div className="cko-support">
+        {!monthly && (
+          <span>
+            <i className="ti ti-refresh" aria-hidden />
+            Free revisions included
+          </span>
+        )}
+        <span>
+          <i className="ti ti-message-circle" aria-hidden />
+          Questions? <Link to="/portal/messages">Message us</Link>
+        </span>
       </div>
     </aside>
   );
@@ -240,10 +318,18 @@ export function CheckoutScreen({
       options={{ clientSecret, elementsOptions: { appearance } }}
     >
       <div className="cko-page">
-        <SummaryColumn summary={summary} backHref={backHref} />
+        <CheckoutSummaryColumn
+          summary={summary}
+          backHref={backHref}
+          total={
+            <DueAmount
+              currency={summary.currency}
+              cents={summary.amountDueCents}
+            />
+          }
+        />
         <PaymentColumn emailOnFile={emailOnFile} banner={banner} />
       </div>
     </CheckoutElementsProvider>
   );
 }
-

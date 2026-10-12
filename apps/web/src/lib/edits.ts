@@ -107,13 +107,6 @@ export function listAdminOrderEdits(orderId: string) {
   return apiFetch<{ edits: EditRequest[] }>(`/admin/orders/${orderId}/edits`);
 }
 
-export function requestEdit(orderId: string, note: string, designIds?: string[]) {
-  return apiFetch<{ edit: EditRequest }>(`/orders/${orderId}/request-edit`, {
-    method: 'POST',
-    body: JSON.stringify({ note, designIds }),
-  });
-}
-
 export function listMyEdits(orderId: string) {
   return apiFetch<{ edits: EditRequest[] }>(`/orders/${orderId}/edits`);
 }

@@ -297,6 +297,7 @@ export function deliverOrder(
     release?: boolean;
     kind?: 'FINAL' | 'PREVIEW';
     editId?: string | null;
+    savedDeliveryIds?: string[];
   },
 ) {
   const form = new FormData();
@@ -318,6 +319,8 @@ export function deliverOrder(
   if (options?.release !== undefined) form.append('release', String(options.release));
   if (options?.kind) form.append('kind', options.kind);
   if (options?.editId) form.append('editId', options.editId);
+  if (options?.savedDeliveryIds?.length)
+    form.append('savedDeliveryIds', JSON.stringify(options.savedDeliveryIds));
   return apiFetchForm<{ order: Order; partial?: boolean }>(
     `/admin/orders/${orderId}/deliveries`,
     form,

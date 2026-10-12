@@ -3,9 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { goToOrderCheckout, listMyInvoices, openInvoicePrint } from '@/lib/billing';
 import { createOrder, getMyOrder, listMyOrders } from '@/lib/orders';
-import { listMyEdits, requestEdit } from '@/lib/edits';
+import { listMyEdits } from '@/lib/edits';
 import { getMyCustomer } from '@/lib/customers';
-import { RevisionRequestForm } from '@/components/RevisionRequestForm';
 import { getErrorMessage } from '@/lib/api';
 import { clipDesignLabel, money, dateShort, customerOrderChip, deliveryMethodLabel, orderNumber, orderSlug } from '@/lib/format';
 import { serviceCategoryLabel, serviceThumbClass, serviceTi } from '@/lib/serviceIcon';
@@ -78,9 +77,6 @@ function designChip(status: Design['status']) {
 function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [revOpen, setRevOpen] = useState(false);
-  const [revNote, setRevNote] = useState('');
-  const [revDesignIds, setRevDesignIds] = useState<string[]>([]);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
 
@@ -96,29 +92,11 @@ function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
     enabled: open,
   });
 
-  const revMut = useMutation({
-    mutationFn: (designIds: string[]) => requestEdit(orderId, revNote.trim(), designIds),
-    onSuccess: () => {
-      setRevOpen(false);
-      setRevNote('');
-      setRevDesignIds([]);
-      setActionError(null);
-      void invalidateWorkCaches(qc);
-      void qc.invalidateQueries({ queryKey: ['my-order-edits', orderId] });
-    },
-    onError: (e) => setActionError(getErrorMessage(e)),
-  });
-
   const designs = (data?.order as { designs?: Design[] } | undefined)?.designs ?? [];
   const order = data?.order;
   const isDelivered = DONE.includes(order?.status ?? '');
   const openRevision = (editsQ.data?.edits ?? []).find((e) => e.status === 'PENDING');
   const revisionIds = openRevision?.designIds ?? [];
-  const canRequestRevision =
-    isDelivered ||
-    order?.status === 'REVISION_REQUESTED' ||
-    designs.some((d) => d.status === 'DELIVERED');
-
   async function handleReorder() {
     if (!order?.serviceType) return;
     setActionError(null);
@@ -225,7 +203,7 @@ function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
     );
   }
 
-  const deliveredActions = canRequestRevision ? (
+  const deliveredActions = (isDelivered || designs.some((d) => d.status === 'DELIVERED')) ? (
     <>
       <div
         style={{
@@ -241,16 +219,6 @@ function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
             <i className="ti ti-download" /> Download files
           </Link>
         )}
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            setRevOpen(true);
-          }}
-        >
-          <i className="ti ti-edit" /> Request revision
-        </button>
         {isDelivered && (
           <button
             type="button"
@@ -265,26 +233,6 @@ function OrderBatch({ orderId, open }: { orderId: string; open: boolean }) {
           </button>
         )}
       </div>
-      {revOpen && (
-        <RevisionRequestForm
-          designs={designs}
-          note={revNote}
-          onNote={setRevNote}
-          selectedIds={revDesignIds}
-          onToggle={(id) =>
-            setRevDesignIds((prev) =>
-              prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-            )
-          }
-          onCancel={() => {
-            setRevOpen(false);
-            setRevNote('');
-            setRevDesignIds([]);
-          }}
-          onSubmit={(ids) => revMut.mutate(ids)}
-          pending={revMut.isPending}
-        />
-      )}
     </>
   ) : null;
 

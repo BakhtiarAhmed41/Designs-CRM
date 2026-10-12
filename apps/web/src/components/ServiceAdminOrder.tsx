@@ -127,7 +127,6 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
   const dialog = useDialog();
   const prefs = asEmbroideryPrefs(order.preferences);
   const requestedFormats = (prefs?.formats ?? []).filter((fmt) => !/preview/i.test(fmt));
-  const wantsPreview = (prefs?.formats ?? []).some((fmt) => /preview/i.test(fmt));
   const requestDesigns = embroideryDesigns(order.preferences, order.name);
   const quotations = (order.quotations ?? []) as QuoteWithLines[];
   const studio = studioQuotation(quotations);
@@ -247,25 +246,40 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
       files,
       zip,
       emailed,
+      release = true,
+      targets = uploadRows.length > 0 ? uploadRows : [row],
+      editId = uploadEditId,
+      savedDeliveryIds,
     }: {
       row: DeliveryRow;
       files: File[];
       zip?: File[];
       emailed: boolean;
+      release?: boolean;
+      targets?: DeliveryRow[];
+      editId?: string | null;
+      savedDeliveryIds?: string[];
     }) => {
-      const targets = uploadRows.length > 0 ? uploadRows : [row];
       const designIds: string[] = [];
       for (const item of targets) designIds.push(await ensureDesign(item));
       const bundles = zip ?? [];
-      const hasPortal = files.length > 0 || bundles.length > 0;
+      const savedIds = savedDeliveryIds ?? (release
+        ? (order.deliveries ?? []).filter((batch) =>
+            !batch.releasedAt && batch.kind !== 'PREVIEW' && (batch.editId ?? null) === editId &&
+            batch.files.some((file) => designIds.includes(file.designId ?? '') || (file.isBundle && !file.designId)),
+          ).map((batch) => batch.id)
+        : []);
+      const hasPortal = files.length > 0 || bundles.length > 0 || savedIds.length > 0;
       return deliverOrder(order.id, files, {
         designIds,
         deliveredVia: deliveredViaFromFlags(hasPortal, emailed),
         zip: bundles,
-        notifyEmail: hasPortal,
-        release: true,
+        notifyEmail: release && hasPortal,
+        notifySms: release,
+        release,
         kind: 'FINAL',
-        editId: uploadEditId,
+        editId,
+        savedDeliveryIds: savedIds,
       });
     },
     onSuccess: () => {
@@ -387,6 +401,16 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
     onError: (e) => setError(getErrorMessage(e)),
   });
 
+  const assignRevision = useMutation({
+    mutationFn: ({ id, designerId }: { id: string; designerId: string }) =>
+      updateAdminEdit(id, { assignedDesignerId: designerId || null }),
+    onSuccess: () => {
+      setError(null);
+      refresh();
+    },
+    onError: (e) => setError(getErrorMessage(e)),
+  });
+
   const removeRevision = useMutation({
     mutationFn: (id: string) => deleteAdminEdit(id),
     onSuccess: async () => {
@@ -479,6 +503,25 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
   const editDesignIds = (edit: { designIds?: string[]; designId?: string | null }) =>
     edit.designIds?.length ? edit.designIds : edit.designId ? [edit.designId] : [];
   const allRows = groups.flatMap((group) => group.rows);
+  const savedDeliveries = (editId: string | null) =>
+    (order.deliveries ?? []).filter((batch) =>
+      !batch.releasedAt && batch.kind !== 'PREVIEW' &&
+      (batch.editId ?? null) === editId && batch.files.length > 0,
+    );
+  function publishSaved(editId: string | null) {
+    const saved = savedDeliveries(editId);
+    const ids = new Set(saved.flatMap((batch) => batch.files.map((file) => file.designId)));
+    const sharedPackage = saved.some((batch) => batch.files.some((file) => file.isBundle && !file.designId));
+    const edit = edits.find((item) => item.id === editId);
+    const targets = sharedPackage
+      ? edit ? rowsForEdit(edit) : allRows
+      : allRows.filter((row) => row.design && ids.has(row.design.id));
+    if (!targets[0]) return;
+    publish.mutate({
+      row: targets[0], targets, files: [], emailed: saved.some((batch) => batch.deliveredVia !== 'PORTAL'),
+      editId, savedDeliveryIds: saved.map((batch) => batch.id),
+    });
+  }
   const rowsForEdit = (edit: { designIds?: string[]; designId?: string | null }) => {
     const ids = editDesignIds(edit);
     if (ids.length === 0) return allRows;
@@ -577,6 +620,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
   }
 
   function openPublish(row: DeliveryRow, editId: string | null = null, rows: DeliveryRow[] = [row]) {
+    setError(null);
     setUploadEditId(editId);
     setUploadFor(row);
     setUploadRows(rows);
@@ -594,7 +638,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
       <button
         type="button"
         className="sod-eye"
-        title="View delivered files"
+        title="View saved or delivered files"
         onClick={() => setFilesFor({ row, editId: null })}
       >
         <i className="ti ti-eye" />
@@ -767,6 +811,14 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
               </span>
             </div>
             <div className="ead-b">
+              {savedDeliveries(null).length > 0 && (
+                <div className="sod-saved">
+                  <span>{savedDeliveries(null).reduce((sum, batch) => sum + batch.files.length, 0)} files saved · Customer cannot see them yet</span>
+                  <button type="button" className="ead-btn sm pri" disabled={publish.isPending} onClick={() => publishSaved(null)}>
+                    {publish.isPending ? 'Publishing…' : 'Publish saved files together'}
+                  </button>
+                </div>
+              )}
               {groups.length === 0 && (
                 <div className="ead-he-sub">
                   {unpriced
@@ -837,6 +889,22 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
                     {names.map((name, index) => (
                       <span key={`${name}-${index}`} className="rev-chip" title={name}>{name}</span>
                     ))}
+                    <div className="sod-assign rev-assign">
+                      <label className="sod-assign-label" htmlFor={`revision-assign-${edit.id}`}>Assign designer</label>
+                      <SelectMenu
+                        id={`revision-assign-${edit.id}`}
+                        size="ead"
+                        ariaLabel={`Assign designer for revision: ${edit.note}`}
+                        value={edit.assignedDesignerId ?? ''}
+                        disabled={phase === 'published' || (assignRevision.isPending && assignRevision.variables?.id === edit.id)}
+                        onChange={(designerId) => assignRevision.mutate({ id: edit.id, designerId })}
+                        options={[
+                          { value: '', label: 'Unassigned' },
+                          ...designerOptions.map((member) => ({ value: member.id, label: personName(member) })),
+                        ]}
+                      />
+                    </div>
+                    {savedDeliveries(edit.id).length > 0 && <div className="ead-he-sub">Files saved · Customer cannot see them yet</div>}
                   </div>
                   <div className="rev-acts">
                     {paid ? (
@@ -865,6 +933,11 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
                     )}
                     {phase !== 'published' && (
                       <>
+                        {savedDeliveries(edit.id).length > 0 && (
+                          <button type="button" className="ead-btn sm pri" disabled={publish.isPending} onClick={() => publishSaved(edit.id)}>
+                            Publish saved files
+                          </button>
+                        )}
                         <button
                           type="button"
                           className="ead-btn sm pri"
@@ -900,12 +973,12 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
                         </button>
                       </>
                     )}
-                    {phase === 'published' && covered[0] && (
+                    {revisionFiles(edit.id).length > 0 && covered[0] && (
                       <button
                         type="button"
                         className="ead-btn sm icon"
-                        title="View delivered files"
-                        aria-label="View delivered files"
+                        title="View revision files"
+                        aria-label="View revision files"
                         onClick={() => setFilesFor({ row: covered[0], editId: edit.id })}
                       >
                         <i className="ti ti-eye" />
@@ -1282,6 +1355,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
               <h3>Upload design</h3>
               <button
                 type="button"
+                disabled={publish.isPending}
                 onClick={() => {
                   setUploadFor(null);
                   setPendingFiles([]);
@@ -1293,14 +1367,16 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
                 <i className="ti ti-x" />
               </button>
             </div>
-            <p>Add up to 10 files, then select Publish files.</p>
+            {error && <ErrorBanner>{error}</ErrorBanner>}
+            <p>Save files for each design, then publish the saved files together when everything is ready.</p>
             {requestedFormats.length > 0 && (
               <p>
                 <b>Requested formats: </b>
                 {requestedFormats.join(', ')}
               </p>
             )}
-            {wantsPreview && <p>For Preview Purpose</p>}
+            <div className="sod-label">Design preview only</div>
+            <p>Upload images for the customer to preview this design. Add production files below.</p>
             <button type="button" className="sod-drop" onClick={() => openFilePicker('sod-files')}>
               <i className="ti ti-upload" /> Choose files
             </button>
@@ -1308,6 +1384,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
               id="sod-files"
               type="file"
               multiple
+              accept="image/*"
               hidden
               onChange={(e) => {
                 const next = [...pendingFiles, ...Array.from(e.target.files ?? [])].slice(0, 10);
@@ -1332,8 +1409,8 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
             <div className="ead-he-sub">
               {pendingFiles.length} {pendingFiles.length === 1 ? 'file' : 'files'} attached
             </div>
-            <div className="sod-label">All designs files (optional)</div>
-            <p>Upload files that apply to every design in this order.</p>
+            <div className="sod-label">Production files / all designs files (optional)</div>
+            <p>Upload the finished design files or a package containing all designs.</p>
             <button type="button" className="sod-drop sod-drop-sm" onClick={() => openFilePicker('sod-zip')}>
               <i className="ti ti-upload" /> Choose files
             </button>
@@ -1374,6 +1451,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
               <button
                 type="button"
                 className="ead-btn"
+                disabled={publish.isPending}
                 onClick={() => {
                   setUploadFor(null);
                   setPendingFiles([]);
@@ -1382,6 +1460,17 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
                 }}
               >
                 Cancel
+              </button>
+              <button
+                type="button"
+                className="ead-btn"
+                disabled={publish.isPending || (pendingFiles.length === 0 && pendingBundles.length === 0)}
+                onClick={() => {
+                  if (suppressPublishClick.current) return;
+                  publish.mutate({ row: uploadFor, files: pendingFiles, zip: pendingBundles, emailed: deliveredOnEmail, release: false });
+                }}
+              >
+                {publish.isPending && publish.variables?.release === false ? 'Saving…' : 'Save files'}
               </button>
               <button
                 type="button"
@@ -1400,7 +1489,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
                   });
                 }}
               >
-                {publish.isPending ? 'Publishing…' : 'Publish files'}
+                {publish.isPending && publish.variables?.release !== false ? 'Publishing…' : 'Publish files'}
               </button>
             </div>
           </div>
@@ -1411,7 +1500,7 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
         <div className="sod-ov" role="presentation" onClick={() => setFilesFor(null)}>
           <div className="sod-mo" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className="sod-mo-h">
-              <h3>{filesFor.editId ? 'Revision files' : 'Delivered files'}</h3>
+              <h3>{filesFor.editId ? 'Revision files' : 'Design files'}</h3>
               <button type="button" onClick={() => setFilesFor(null)} aria-label="Close">
                 <i className="ti ti-x" />
               </button>
@@ -1419,17 +1508,20 @@ export function ServiceAdminOrder({ order }: { order: AdminOrder }) {
             <p>
               {filesFor.editId
                 ? 'These files belong to this revision.'
-                : 'Preview or download the original delivered files.'}
+                : 'Preview or download files for this design. Saved files stay private until published.'}
             </p>
             <div className="sod-flist">
               {(() => {
                 const shown = filesFor.editId
                   ? revisionFiles(filesFor.editId)
                   : [...scopedDeliveryFiles(filesFor.row, null), ...scopedBundleFiles(null)];
-                if (shown.length === 0) return <div>No files published for this item yet.</div>;
+                if (shown.length === 0) return <div>No files saved or published for this item yet.</div>;
                 return shown.map((file) => (
                   <div key={file.id} className="sod-file">
-                    <span>{file.originalName}{file.isBundle ? ' (all designs)' : ''}</span>
+                    <span>
+                      {file.originalName}{file.isBundle ? ' (all designs)' : ''}
+                      {(order.deliveries ?? []).some((batch) => !batch.releasedAt && batch.files.some((item) => item.id === file.id)) ? ' · Saved (private)' : ''}
+                    </span>
                     <span className="sod-file-acts">
                       {!file.isBundle && (
                         <button

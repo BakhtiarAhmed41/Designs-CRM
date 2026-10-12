@@ -1884,6 +1884,9 @@ export class OrdersService {
     input: { decision: PreviewStatus; note?: string | null },
   ) {
     assertAuthUser(user);
+    if (user.role === UserRole.CLIENT && input.decision === PreviewStatus.CHANGES_REQUESTED) {
+      throw new ForbiddenException('Revision requests are managed by our team.');
+    }
     if (user.role !== UserRole.CLIENT) throw new ForbiddenException();
     const order = await this.getOrderRow(orderId);
     if (!order || order.client_user_id !== user.id)
@@ -3077,6 +3080,7 @@ export class OrdersService {
       release?: boolean;
       kind?: DeliveryKind;
       editId?: string | null;
+      savedDeliveryIds?: string[];
     },
   ) {
     this.assertAdmin(user);
@@ -3121,6 +3125,15 @@ export class OrdersService {
       );
     }
     const existing = await this.getDeliveries(orderId);
+    const savedIds = [...new Set(options?.savedDeliveryIds ?? [])];
+    const saved = existing.filter((d) => savedIds.includes(d.id));
+    if (savedIds.length > 0 && (
+      !release || isPreview || saved.length !== savedIds.length ||
+      saved.some((d) => d.releasedAt || d.kind === DeliveryKind.PREVIEW ||
+        (d.editId ?? null) !== (options?.editId ?? null))
+    )) {
+      throw new BadRequestException('These saved files are no longer available. Refresh the order and try again.');
+    }
     if (incoming.length > 10 || bundleFiles.length > 10) {
       throw new BadRequestException('Upload at most 10 files at a time');
     }
@@ -3135,7 +3148,7 @@ export class OrdersService {
         'Preview files must be images (PNG, JPG, or WebP)',
       );
     }
-    const hasPortalFiles = incoming.length > 0 || bundleFiles.length > 0;
+    const hasPortalFiles = incoming.length > 0 || bundleFiles.length > 0 || saved.some((d) => d.files.length > 0);
     const emailed =
       options?.deliveredVia === DeliveredVia.EMAIL ||
       options?.deliveredVia === DeliveredVia.BOTH;
@@ -3149,18 +3162,21 @@ export class OrdersService {
     }
 
     const deliveredVia = this.resolveDeliveredVia(options?.deliveredVia, hasPortalFiles);
-    const designIds = (options?.designIds ?? []).filter(Boolean);
+    const designIds = [...new Set([
+      ...(options?.designIds ?? []).filter(Boolean),
+      ...saved.flatMap((d) => d.files.map((f) => f.designId).filter((id): id is string => Boolean(id))),
+    ])];
     const notifyEmail = options?.notifyEmail !== false;
     const notifySms = options?.notifySms !== false;
 
-    if (incoming.length > 0 && designIds.length > 0) {
+    if (release && savedIds.length === 0 && incoming.length > 0 && designIds.length > 0) {
       await this.clearDesignDeliveryFiles(
         orderId,
         designIds,
         isPreview ? DeliveryKind.PREVIEW : DeliveryKind.FINAL,
       );
     }
-    if (bundleFiles.length > 0 && !isPreview) {
+    if (release && savedIds.length === 0 && bundleFiles.length > 0 && !isPreview) {
       await this.clearBundleFiles(orderId);
     }
 
@@ -3191,7 +3207,7 @@ export class OrdersService {
     let deliveryId: string | null = null;
     let nextVersion = existing[0]?.version ?? 0;
     const recordDelivery =
-      hasPortalFiles || (emailed && release && !isPreview);
+      incoming.length > 0 || bundleFiles.length > 0 || (emailed && release && !isPreview && savedIds.length === 0);
 
     if (recordDelivery) {
       const latest = await this.db.queryOne<{ version: number }>(
@@ -3259,7 +3275,14 @@ export class OrdersService {
     }
 
     if (release && !isPreview) {
-      if (designIds.length > 0) {
+      if (savedIds.length > 0) {
+        const ids = deliveryId ? [...savedIds, deliveryId] : savedIds;
+        await this.db.execute(
+          `UPDATE deliveries SET released_at = COALESCE(released_at, NOW())
+            WHERE order_id = ? AND id IN (${this.sqlIn(ids)})`,
+          [orderId, ...ids],
+        );
+      } else if (designIds.length > 0) {
         await this.db.execute(
           `UPDATE deliveries
               SET released_at = COALESCE(released_at, NOW())
@@ -3293,7 +3316,7 @@ export class OrdersService {
     const alreadyReleased = existing.some(
       (d) => Boolean(d.releasedAt) && d.kind !== DeliveryKind.PREVIEW,
     );
-    const isNewUpload = incoming.length > 0 || bundleFiles.length > 0;
+    const isNewUpload = incoming.length > 0 || bundleFiles.length > 0 || savedIds.length > 0;
     const submittedIds = new Set(
       (await this.getDeliveries(orderId)).flatMap((d) =>
         d.files.map((f) => f.designId).filter((x): x is string => !!x),
@@ -3397,9 +3420,9 @@ export class OrdersService {
       (isNewUpload || !alreadyReleased)
     ) {
       const email = await this.customerEmailForOrder(order);
-      const fileNames = (await this.getDeliveries(orderId)).flatMap((d) =>
-        d.files.map((f) => f.originalName),
-      );
+      const fileNames = (await this.getDeliveries(orderId))
+        .filter((d) => d.releasedAt && (savedIds.length === 0 || savedIds.includes(d.id) || d.id === deliveryId))
+        .flatMap((d) => d.files.map((f) => f.originalName));
       if (email) {
         if (isPreview) {
           await this.mail.sendPreviewReady(
@@ -4068,6 +4091,7 @@ export class OrdersService {
   async listMyFiles(user: AuthUser | undefined) {
     assertAuthUser(user);
     type FileListRow = {
+      order_preferences?: { designs?: Array<{ name?: string | null }> } | null;
       file_id: string;
       original_name: string;
       mime_type: string | null;
@@ -4096,7 +4120,7 @@ export class OrdersService {
         `SELECT df.id AS file_id, df.original_name, df.mime_type, df.format_label, df.byte_size,
                 df.created_at AS delivered_at, df.storage_key, df.design_id,
                 df.downloaded_at, df.download_count, df.is_bundle,
-                o.id AS order_id, o.name AS order_name, o.human_ref, o.service_type,
+                o.id AS order_id, o.name AS order_name, o.human_ref, o.service_type, o.preferences AS order_preferences,
                 d.delivered_via, d.kind, d.preview_status, d.edit_id, u.email,
                 od.name AS design_name
            FROM delivery_files df
@@ -4175,6 +4199,9 @@ export class OrdersService {
             })
           : null;
         return {
+          orderDesignNames: [...new Set((Array.isArray(r.order_preferences?.designs) ? r.order_preferences.designs : [])
+            .map((design) => typeof design?.name === 'string' ? design.name.trim().replace(/^Design\s+\d+\s*[-–—·:]\s*/i, '') : '')
+            .filter((name): name is string => Boolean(name)))],
           orderId: r.order_id,
           orderName: r.order_name,
           humanRef: r.human_ref,
@@ -4204,6 +4231,7 @@ export class OrdersService {
     );
     for (const r of emailOnly) {
       files.push({
+        orderDesignNames: [],
         orderId: r.order_id,
         orderName: r.order_name,
         humanRef: r.human_ref,

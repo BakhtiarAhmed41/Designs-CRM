@@ -528,6 +528,15 @@ export class EditsService {
       }
     }
     if (input.assignedDesignerId !== undefined) {
+      if (input.assignedDesignerId) {
+        const designer = await this.db.queryOne<{ role: UserRole }>(
+          'SELECT role FROM users WHERE id = ? LIMIT 1',
+          [input.assignedDesignerId],
+        );
+        if (!designer || !isStaffRole(designer.role)) {
+          throw new BadRequestException('Choose a team member to assign this revision.');
+        }
+      }
       sets.push('assigned_designer_id = ?');
       params.push(input.assignedDesignerId ?? null);
     }
@@ -668,123 +677,6 @@ export class EditsService {
   }
 
   // --- client flows --------------------------------------------------------
-
-  async clientRequestEdit(
-    user: AuthUser | undefined,
-    orderId: string,
-    input: { note: string; designIds?: string[] | null },
-  ) {
-    assertAuthUser(user);
-    if (user.role !== UserRole.CLIENT) throw new ForbiddenException();
-    const order = await this.getOrderRow(orderId);
-    if (!order || order.client_user_id !== user.id)
-      throw new NotFoundException('Order not found');
-
-    const revisable = new Set<OrderStatus>([
-      OrderStatus.COMPLETED,
-      OrderStatus.CLOSED,
-      OrderStatus.REVISION_REQUESTED,
-      OrderStatus.IN_PROGRESS,
-      OrderStatus.READY_TO_SEND,
-    ]);
-    if (!revisable.has(order.status)) {
-      throw new BadRequestException(
-        'You can request a revision after files have been delivered',
-      );
-    }
-
-    const note = input.note.trim();
-    if (!note) throw new BadRequestException('Describe what needs to change');
-    const designIds = await this.resolveDesignIds(orderId, input.designIds);
-
-    const openEdit = await this.db.queryOne<{ id: string }>(
-      `SELECT id FROM edit_requests
-        WHERE order_id = ? AND status = ?
-        ORDER BY created_at ASC
-        LIMIT 1`,
-      [orderId, EditStatus.PENDING],
-    );
-    if (openEdit) {
-      await this.db.execute(
-        'UPDATE edit_requests SET note = ?, design_id = ?, design_ids = ? WHERE id = ?',
-        [note, designIds[0] ?? null, JSON.stringify(designIds), openEdit.id],
-      );
-      await this.writeLog(this.db, {
-        orderId,
-        actorId: user.id,
-        event: 'edit_requested',
-        meta: { editId: openEdit.id, kind: EditKind.FREE, source: 'client', note, designIds },
-      });
-      await this.reopenDesigns(orderId, designIds);
-      await this.db.execute(
-        'UPDATE orders SET status = ?, completed_at = NULL WHERE id = ?',
-        [OrderStatus.REVISION_REQUESTED, orderId],
-      );
-      return this.loadEdit(openEdit.id);
-    }
-
-    const editId = await this.db.withTransaction(async (tx) => {
-      const id = randomUUID();
-      await tx.execute(
-        `INSERT INTO edit_requests
-           (id, order_id, design_id, design_ids, note, kind, status, requested_by_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          id,
-          orderId,
-          designIds[0] ?? null,
-          JSON.stringify(designIds),
-          note,
-          EditKind.FREE,
-          EditStatus.PENDING,
-          user.id,
-        ],
-      );
-
-      await tx.execute('UPDATE orders SET status = ? WHERE id = ?', [
-        OrderStatus.REVISION_REQUESTED,
-        orderId,
-      ]);
-
-      await this.writeLog(tx, {
-        orderId,
-        actorId: user.id,
-        event: 'edit_requested',
-        meta: { editId: id, kind: EditKind.FREE, source: 'client', note, designIds },
-      });
-
-      return id;
-    });
-
-    await this.reopenDesigns(orderId, designIds);
-    await this.db.execute(
-      'UPDATE orders SET status = ?, completed_at = NULL WHERE id = ?',
-      [OrderStatus.REVISION_REQUESTED, orderId],
-    );
-
-    const staffRows = await this.db.query<{ id: string }>(
-      "SELECT id FROM users WHERE role IN ('SUPER_ADMIN','ADMIN','SUPPORT')",
-    );
-    if (staffRows.length) {
-      const values = staffRows.map(() => '(?, ?, ?, ?, ?)').join(', ');
-      const params: unknown[] = [];
-      for (const s of staffRows) {
-        params.push(
-          randomUUID(),
-          s.id,
-          'Revision requested',
-          `${order.name ?? order.human_ref ?? 'Order'}: ${note.slice(0, 180)}`,
-          `/admin/orders/${orderId}`,
-        );
-      }
-      await this.db.execute(
-        `INSERT INTO notifications (id, user_id, title, body, link) VALUES ${values}`,
-        params,
-      );
-    }
-
-    return this.loadEdit(editId);
-  }
 
   private queryEdits(whereSql: string, params: unknown[]) {
     return this.db.query<EditJoinRow>(

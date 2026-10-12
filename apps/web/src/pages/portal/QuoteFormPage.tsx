@@ -52,8 +52,8 @@ const SERVICES: Array<{
   {
     key: 'vector',
     serviceType: 'VECTOR',
-    label: 'Vector & Print Artwork',
-    title: 'Vector & Print Artwork Quote',
+    label: 'Vector & Print Files',
+    title: 'Vector & Print Files Quote',
     blurb: 'Please upload your artwork and provide your design specifications to receive a quote.',
     desc: 'Logo redraws and print-ready color separations.',
     icon: 'ti-vector-bezier',
@@ -61,8 +61,8 @@ const SERVICES: Array<{
   {
     key: 'laser',
     serviceType: 'CNC_LASER',
-    label: 'Cutting & Engraving Files',
-    title: 'Cutting & Engraving Files Quote',
+    label: 'CNC, Laser & 3D Files',
+    title: 'CNC, Laser & 3D Files Quote',
     blurb: 'Please upload your artwork and provide your design specifications to receive a quote.',
     desc: 'Cutting, engraving, print files and plasma files.',
     icon: 'ti-router',

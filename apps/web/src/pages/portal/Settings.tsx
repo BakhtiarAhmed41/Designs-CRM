@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import {
   getMyCustomer,
   portalLookFromPrefs,
@@ -8,6 +10,8 @@ import {
 import { getErrorMessage } from '@/lib/api';
 import { ErrorBanner, SuccessBanner } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { normalizeHex } from '@/lib/theme';
+import '@/styles/portal-account.css';
 
 type Prefs = {
   services: string[];
@@ -19,383 +23,426 @@ type Prefs = {
   digOther?: string;
   cncOther?: string;
 };
-
-const SERVICE_CHIPS = [
-  { id: 'emb', label: 'Embroidery Digitizing', icon: 'ti-needle-thread' },
-  { id: 'dig', label: 'Vector & Print Artwork', icon: 'ti-vector-bezier' },
-  { id: 'cnc', label: 'Cutting & Engraving Files', icon: 'ti-router' },
+type FormatKey = 'embFormats' | 'digFormats' | 'cncFormats';
+const SERVICES = [
+  {
+    id: 'emb',
+    label: 'Embroidery Digitizing',
+    key: 'embFormats' as FormatKey,
+    other: 'embOther' as const,
+    heading: 'Machine file formats',
+    hint: 'Choose the formats your embroidery machine uses.',
+    formats: ['DST', 'PES', 'EXP', 'JEF', 'VP3', 'HUS', 'VIP', 'XXX', 'SEW'],
+  },
+  {
+    id: 'dig',
+    label: 'Vector & Print Files',
+    key: 'digFormats' as FormatKey,
+    other: 'digOther' as const,
+    heading: 'Artwork file formats',
+    hint: 'Choose the formats you use for artwork and print.',
+    formats: ['AI', 'EPS', 'SVG', 'PDF', 'CDR', 'PNG', 'JPEG'],
+  },
+  {
+    id: 'cnc',
+    label: 'CNC, Laser & 3D Files',
+    key: 'cncFormats' as FormatKey,
+    other: 'cncOther' as const,
+    heading: 'CNC, laser & 3D formats',
+    hint: 'Choose the formats your cutting or 3D software uses.',
+    formats: ['SVG', 'DXF', 'AI', 'EPS', 'CDR', 'PDF', 'PNG', 'STL', '3MF'],
+  },
 ];
-
-/** Same choices as the embroidery / vector / cutting quote forms. */
-const EMB_FORMATS = ['DST', 'PES', 'EXP', 'HUS', 'SEW', 'JEF', 'VP3', 'XXX', 'Others'];
-const DIG_FORMATS = ['AI', 'EPS', 'SVG', 'PDF', 'CDR', 'PNG', 'JPEG', 'Others'];
-const CNC_FORMATS = ['AI', 'SVG', 'DXF', 'CDR', 'EPS', 'PDF', 'PNG', 'Others'];
-const PLACEMENTS = ['Hat', 'Cap', 'Visor', 'Jacket/Fleece', 'Polo', 'Bag', 'Other'];
-
-const DEFAULT_PREFS: Prefs = {
+const DEFAULT: Prefs = {
   services: ['emb'],
   embFormats: ['DST', 'PES'],
   digFormats: ['AI', 'SVG'],
   cncFormats: ['AI', 'SVG'],
+  placement: '',
+  embOther: '',
+  digOther: '',
+  cncOther: '',
 };
-
-function aliasFormat(value: string) {
-  const key = value.trim().toUpperCase();
-  if (key === 'JPG') return 'JPEG';
-  if (key === 'PREVIEW IMAGE' || key === 'PREVIEW') return 'Proof Preview';
-  return value.trim();
+const BACKGROUNDS = [
+  { name: 'White', value: '#FFFFFF' },
+  { name: 'Cream', value: '#F8F6F1' },
+  { name: 'Sand', value: '#F3EDE4' },
+  { name: 'Stone', value: '#ECEDEF' },
+  { name: 'Sage', value: '#EAF4EF' },
+  { name: 'Blush', value: '#FAEEF2' },
+  { name: 'Peach', value: '#FFF3E8' },
+  { name: 'Charcoal', value: '#292929' },
+];
+function readPrefs(raw: unknown): Prefs {
+  if (!raw || typeof raw !== 'object') return { ...DEFAULT };
+  const p = raw as Partial<Prefs>;
+  const next: Prefs = {
+    ...DEFAULT,
+    services: Array.isArray(p.services)
+      ? p.services.filter((id) => typeof id === 'string')
+      : DEFAULT.services,
+    placement: typeof p.placement === 'string' ? p.placement : '',
+  };
+  for (const service of SERVICES) {
+    const values = (
+      Array.isArray(p[service.key]) ? p[service.key]! : DEFAULT[service.key]
+    )
+      .filter((value) => typeof value === 'string')
+      .map((value) => (value.toUpperCase() === 'JPG' ? 'JPEG' : value));
+    next[service.key] = values.filter((value) =>
+      service.formats.includes(value),
+    );
+    next[service.other] =
+      p[service.other]?.trim() ||
+      values
+        .filter(
+          (value) =>
+            !service.formats.includes(value) &&
+            value.toLowerCase() !== 'others',
+        )
+        .join(', ');
+  }
+  return next;
 }
-
-function splitKnownFormats(raw: string[] | undefined, known: string[], fallback: string[]) {
-  const source = (raw ?? fallback).map(aliasFormat);
-  const knownSet = new Set(known);
-  const extras = source.filter((f) => f && !knownSet.has(f) && f.toLowerCase() !== 'others');
-  const next = source.filter((f) => knownSet.has(f));
-  if (extras.length > 0 && !next.includes('Others')) next.push('Others');
-  return { next, extras };
-}
-
-function CheckPill({
-  label,
-  on,
-  onToggle,
-  add,
-}: {
-  label: string;
-  on: boolean;
-  onToggle: () => void;
-  add?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      className={`profile-check${on ? ' on' : ''}${add ? ' add' : ''}`}
-      aria-pressed={on}
-      onClick={onToggle}
-    >
-      <span className="box" aria-hidden />
-      {add && <i className="ti ti-plus" aria-hidden />}
-      {label}
-    </button>
-  );
-}
-
 export function PortalSettings() {
+  const { user } = useAuth();
+  const { colors } = useTheme();
   const { data, refetch, isSuccess, isError } = useQuery({
     queryKey: ['portal-customer-me'],
     queryFn: getMyCustomer,
   });
   const hydrated = useRef(false);
-  const [ready, setReady] = useState(false);
-  const [headingColor, setHeadingColor] = useState('#222222');
-  const [backgroundColor, setBackgroundColor] = useState('#ffffff');
-  const [placement, setPlacement] = useState('');
-  const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
-  const [embOther, setEmbOther] = useState('');
-  const [digOther, setDigOther] = useState('');
-  const [cncOther, setCncOther] = useState('');
-  const [lookMsg, setLookMsg] = useState<string | null>(null);
-  const [lookError, setLookError] = useState<string | null>(null);
-  const [lookBusy, setLookBusy] = useState(false);
-  const [prefMsg, setPrefMsg] = useState<string | null>(null);
-  const [prefError, setPrefError] = useState<string | null>(null);
-  const [prefBusy, setPrefBusy] = useState(false);
-
+  const [prefs, setPrefs] = useState<Prefs>(DEFAULT);
+  const [headingColor, setHeadingColor] = useState(colors.mainText);
+  const [backgroundColor, setBackgroundColor] = useState(colors.pageBg);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    if (hydrated.current || (!isSuccess && !isError)) return;
+    if (hydrated.current || !isSuccess) return;
     hydrated.current = true;
-    setReady(true);
-    if (!data) return;
+    setPrefs(readPrefs(data.customer?.preferences));
     const look = portalLookFromPrefs(data.customer?.preferences);
-    if (look.headingColor) setHeadingColor(look.headingColor);
-    if (look.backgroundColor) setBackgroundColor(look.backgroundColor);
-
-    const apiPrefs = data.customer?.preferences as Partial<Prefs> | null | undefined;
-    if (apiPrefs && typeof apiPrefs === 'object') {
-      const emb = splitKnownFormats(apiPrefs.embFormats, EMB_FORMATS, DEFAULT_PREFS.embFormats);
-      const dig = splitKnownFormats(apiPrefs.digFormats, DIG_FORMATS, DEFAULT_PREFS.digFormats);
-      const cnc = splitKnownFormats(apiPrefs.cncFormats, CNC_FORMATS, DEFAULT_PREFS.cncFormats);
-      setPrefs({
-        services: apiPrefs.services ?? DEFAULT_PREFS.services,
-        embFormats: emb.next,
-        digFormats: dig.next,
-        cncFormats: cnc.next,
-      });
-      setEmbOther(apiPrefs.embOther?.trim() || emb.extras.join(', '));
-      setDigOther(apiPrefs.digOther?.trim() || dig.extras.join(', '));
-      setCncOther(apiPrefs.cncOther?.trim() || cnc.extras.join(', '));
-      if (apiPrefs.placement && PLACEMENTS.includes(apiPrefs.placement)) {
-        setPlacement(apiPrefs.placement);
+    setHeadingColor(look.headingColor || colors.mainText);
+    setBackgroundColor(look.backgroundColor || colors.pageBg);
+  }, [data, isSuccess, colors]);
+  const ready = isSuccess && Boolean(data.customer);
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
+    setError(null);
+    setMessage(null);
+    const heading = normalizeHex(headingColor),
+      background = normalizeHex(backgroundColor);
+    if (!heading || !background) {
+      setError('Enter valid colors for the heading and background.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const latest = (await getMyCustomer()).customer?.preferences;
+      const payload = { ...prefs };
+      for (const service of SERVICES) {
+        const extra = (prefs[service.other] || '')
+          .split(/[,;]+/)
+          .map((value) => value.trim())
+          .filter(Boolean);
+        payload[service.key] = [...new Set([...prefs[service.key], ...extra])];
       }
-    }
-  }, [data, isSuccess, isError]);
-
-  function serverPrefs() {
-    return data?.customer?.preferences && typeof data.customer.preferences === 'object'
-      ? (data.customer.preferences as Record<string, unknown>)
-      : {};
-  }
-
-  function extraFormats(selected: string[], raw: string) {
-    if (!selected.includes('Others')) return [];
-    return raw
-      .split(/[,;]+/)
-      .map((s) => s.trim())
-      .filter((s) => s && s.toLowerCase() !== 'others' && !selected.includes(s));
-  }
-
-  function filePrefsPayload() {
-    return {
-      services: prefs.services,
-      embFormats: [...prefs.embFormats, ...extraFormats(prefs.embFormats, embOther)],
-      digFormats: [...prefs.digFormats, ...extraFormats(prefs.digFormats, digOther)],
-      cncFormats: [...prefs.cncFormats, ...extraFormats(prefs.cncFormats, cncOther)],
-      embOther: prefs.embFormats.includes('Others') ? embOther.trim() : '',
-      digOther: prefs.digFormats.includes('Others') ? digOther.trim() : '',
-      cncOther: prefs.cncFormats.includes('Others') ? cncOther.trim() : '',
-      placement,
-    };
-  }
-
-  async function onSaveLook(e: React.FormEvent) {
-    e.preventDefault();
-    setLookMsg(null);
-    setLookError(null);
-    setLookBusy(true);
-    try {
       await updateMyCustomer({
         preferences: {
-          ...serverPrefs(),
-          portalLook: { headingColor, backgroundColor },
+          ...(latest && typeof latest === 'object' ? latest : {}),
+          ...payload,
+          portalLook: { headingColor: heading, backgroundColor: background },
         },
       });
       await refetch();
-      setLookMsg('Look saved. Headings and background now use your colors.');
+      setMessage(
+        'Settings saved. Your preferred formats will be used on new quotes.',
+      );
     } catch (err) {
-      setLookError(getErrorMessage(err));
+      setError(getErrorMessage(err));
     } finally {
-      setLookBusy(false);
+      setBusy(false);
     }
   }
-
-  async function savePrefs() {
-    setPrefMsg(null);
-    setPrefError(null);
-    setPrefBusy(true);
-    try {
-      await updateMyCustomer({
-        preferences: {
-          ...serverPrefs(),
-          ...filePrefsPayload(),
-          portalLook: { headingColor, backgroundColor },
-        },
-      });
-      await refetch();
-      setPrefMsg('Preferences saved. We’ll use these on new quotes and file deliveries.');
-    } catch (err) {
-      setPrefError(getErrorMessage(err));
-    } finally {
-      setPrefBusy(false);
-    }
+  function reset() {
+    setPrefs({ ...DEFAULT });
+    setHeadingColor(colors.mainText);
+    setBackgroundColor(colors.pageBg);
+    setMessage(null);
+    setError(null);
   }
-
-  function toggleSvc(id: string) {
-    setPrefs((p) => ({
-      ...p,
-      services: p.services.includes(id) ? p.services.filter((s) => s !== id) : [...p.services, id],
-    }));
-  }
-
-  function toggleList(key: keyof Prefs, value: string) {
-    setPrefs((p) => {
-      const list = p[key] as string[];
-      return {
-        ...p,
-        [key]: list.includes(value) ? list.filter((x) => x !== value) : [...list, value],
-      };
-    });
-  }
-
   return (
-    <div className="profile-elegant">
+    <form
+      className="profile-elegant portal-account account-settings"
+      onSubmit={(event) => void save(event)}
+    >
       <PageHeader
         title="Settings"
-        subtitle="The services and file formats you usually need, and your portal colors."
+        subtitle="Choose your usual file formats and personalize your portal."
+        crumbs={[{ label: 'Account' }, { label: 'Settings' }]}
       />
-
-      <div className="card card-pad">
-        <div className="profile-card-head">
-          <h2 className="profile-card-title">Services &amp; file preferences</h2>
-          <p className="profile-card-sub">
-            Saved once, then used on new quotes and when we prepare your files.
-          </p>
-        </div>
-
-        {prefMsg && <SuccessBanner>{prefMsg}</SuccessBanner>}
-        {prefError && <ErrorBanner>{prefError}</ErrorBanner>}
-
-        <label className="pref-section-label">Services I order</label>
-        <div className="profile-svc">
-          {SERVICE_CHIPS.map((s) => {
-            const on = prefs.services.includes(s.id);
-            return (
-              <button
-                key={s.id}
-                type="button"
-                className={`profile-svc-btn${on ? ' on' : ''}`}
-                aria-pressed={on}
-                onClick={() => toggleSvc(s.id)}
+      {message && <SuccessBanner>{message}</SuccessBanner>}
+      {error && <ErrorBanner>{error}</ErrorBanner>}
+      {isError && (
+        <ErrorBanner>
+          We could not load your settings. Refresh and try again.
+        </ErrorBanner>
+      )}
+      <fieldset className="account-fields" disabled={busy || !ready}>
+        <section className="card card-pad">
+          <div className="profile-card-head">
+            <h2 className="profile-card-title">
+              Services &amp; file preferences
+            </h2>
+            <p className="profile-card-sub">
+              Select the services you use, then choose your preferred formats.
+            </p>
+          </div>
+          <div className="settings-services">
+            {SERVICES.map((service) => (
+              <section key={service.id} className="settings-service">
+                <div className="settings-service-heading">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={prefs.services.includes(service.id)}
+                      onChange={() =>
+                        setPrefs((prev) => ({
+                          ...prev,
+                          services: prev.services.includes(service.id)
+                            ? prev.services.filter((id) => id !== service.id)
+                            : [...prev.services, service.id],
+                        }))
+                      }
+                    />
+                    <span>{service.label}</span>
+                  </label>
+                  <span
+                    className="settings-help"
+                    tabIndex={0}
+                    aria-label={service.hint}
+                    title={service.hint}
+                  >
+                    <i className="ti ti-help-circle" aria-hidden />
+                  </span>
+                </div>
+                <p className="pref-section-label">{service.heading}</p>
+                <div className="settings-formats">
+                  {service.formats.map((format) => (
+                    <label key={format} className="settings-format">
+                      <input
+                        type="checkbox"
+                        checked={prefs[service.key].includes(format)}
+                        onChange={() =>
+                          setPrefs((prev) => ({
+                            ...prev,
+                            [service.key]: prev[service.key].includes(format)
+                              ? prev[service.key].filter(
+                                  (value) => value !== format,
+                                )
+                              : [...prev[service.key], format],
+                          }))
+                        }
+                      />
+                      <span>{format}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="pf settings-other">
+                  <label htmlFor={'other-' + service.id}>Other format</label>
+                  <input
+                    id={'other-' + service.id}
+                    value={prefs[service.other] || ''}
+                    onChange={(event) =>
+                      setPrefs((prev) => ({
+                        ...prev,
+                        [service.other]: event.target.value,
+                      }))
+                    }
+                    placeholder="Enter a format"
+                  />
+                </div>
+              </section>
+            ))}
+          </div>
+          <details className="settings-placement">
+            <summary>Usual embroidery placement (optional)</summary>
+            <div className="pf">
+              <label htmlFor="settings-placement">Placement</label>
+              <select
+                id="settings-placement"
+                value={prefs.placement || ''}
+                onChange={(event) =>
+                  setPrefs((prev) => ({
+                    ...prev,
+                    placement: event.target.value,
+                  }))
+                }
               >
-                <span className="box" aria-hidden />
-                <i className={`ti ${s.icon} svc-ic`} aria-hidden />
-                {s.label}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="profile-block">
-          <h3 className="profile-block-title">Embroidery preferences</h3>
-          <label className="pref-section-label">Usual placement</label>
-          <div className="profile-checks" style={{ marginBottom: 14 }}>
-            {PLACEMENTS.map((opt) => (
-              <CheckPill
-                key={opt}
-                label={opt}
-                on={placement === opt}
-                onToggle={() => setPlacement(placement === opt ? '' : opt)}
-              />
-            ))}
-          </div>
-          <label className="pref-section-label">Embroidery file formats</label>
-          <div className="profile-checks">
-            {EMB_FORMATS.map((f) => (
-              <CheckPill
-                key={f}
-                label={f}
-                on={prefs.embFormats.includes(f)}
-                onToggle={() => toggleList('embFormats', f)}
-              />
-            ))}
-          </div>
-          {prefs.embFormats.includes('Others') && (
-            <div className="profile-other">
-              <input
-                value={embOther}
-                onChange={(e) => setEmbOther(e.target.value)}
-                placeholder="Other format e.g. EMB, TAP"
-                aria-label="Other embroidery formats"
-              />
-              <p className="profile-hint">You can add more than one. Separate them with a comma. PDF and PNG previews are always included.</p>
+                <option value="">No preference</option>
+                {[
+                  'Hat',
+                  'Cap',
+                  'Visor',
+                  'Jacket/Fleece',
+                  'Polo',
+                  'Bag',
+                  'Other',
+                ].map((value) => (
+                  <option key={value}>{value}</option>
+                ))}
+              </select>
             </div>
-          )}
-        </div>
-
-        <div className="profile-block">
-          <h3 className="profile-block-title">Vector &amp; print formats</h3>
-          <div className="profile-checks">
-            {DIG_FORMATS.map((f) => (
-              <CheckPill
-                key={f}
-                label={f}
-                on={prefs.digFormats.includes(f)}
-                onToggle={() => toggleList('digFormats', f)}
-              />
-            ))}
-          </div>
-          {prefs.digFormats.includes('Others') && (
-            <div className="profile-other">
-              <input
-                value={digOther}
-                onChange={(e) => setDigOther(e.target.value)}
-                placeholder="Other format"
-                aria-label="Other vector formats"
-              />
-              <p className="profile-hint">You can add more than one. Separate them with a comma.</p>
+          </details>
+          <p className="settings-explainer">
+            <b>
+              Your saved formats are selected automatically when you request a
+              quote.
+            </b>
+            <span className="profile-hint">
+              You can still change them for each request. Separate other formats
+              with commas.
+            </span>
+          </p>
+        </section>
+        <section className="card card-pad settings-appearance">
+          <div className="settings-look">
+            <div className="profile-card-head">
+              <h2 className="profile-card-title">Appearance</h2>
+              <p className="profile-card-sub">
+                Choose a background that’s comfortable for your eyes.
+              </p>
             </div>
-          )}
-        </div>
-
-        <div className="profile-block">
-          <h3 className="profile-block-title">Cutting &amp; engraving formats</h3>
-          <div className="profile-checks">
-            {CNC_FORMATS.map((f) => (
-              <CheckPill
-                key={f}
-                label={f}
-                on={prefs.cncFormats.includes(f)}
-                onToggle={() => toggleList('cncFormats', f)}
-              />
-            ))}
-          </div>
-          {prefs.cncFormats.includes('Others') && (
-            <div className="profile-other">
-              <input
-                value={cncOther}
-                onChange={(e) => setCncOther(e.target.value)}
-                placeholder="Other format"
-                aria-label="Other cutting formats"
-              />
-              <p className="profile-hint">You can add more than one. Separate them with a comma.</p>
+            <p className="pref-section-label">Background</p>
+            <div className="settings-swatches">
+              {BACKGROUNDS.map((color) => (
+                <button
+                  key={color.name}
+                  type="button"
+                  className={
+                    'settings-swatch' +
+                    (backgroundColor.toUpperCase() === color.value
+                      ? ' selected'
+                      : '')
+                  }
+                  aria-pressed={backgroundColor.toUpperCase() === color.value}
+                  onClick={() => setBackgroundColor(color.value)}
+                >
+                  <span style={{ backgroundColor: color.value }}>
+                    {backgroundColor.toUpperCase() === color.value && (
+                      <i className="ti ti-circle-check-filled" aria-hidden />
+                    )}
+                  </span>
+                  {color.name}
+                </button>
+              ))}
             </div>
-          )}
-        </div>
-
-        <div className="profile-actions">
-          <button type="button" className="btn btn-primary" disabled={prefBusy || !ready} onClick={() => void savePrefs()}>
-            <i className="ti ti-check" /> {prefBusy ? 'Saving…' : 'Save file preferences'}
+            <details className="settings-custom">
+              <summary>Custom colors</summary>
+              <div className="pf">
+                <label htmlFor="settings-heading">Heading text</label>
+                <div className="color-field">
+                  <input
+                    type="color"
+                    id="settings-heading"
+                    value={normalizeHex(headingColor) || colors.mainText}
+                    onChange={(event) => setHeadingColor(event.target.value)}
+                  />
+                  <input
+                    aria-label="Heading color hex"
+                    value={headingColor}
+                    onChange={(event) => setHeadingColor(event.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="pf">
+                <label htmlFor="settings-background">Background</label>
+                <div className="color-field">
+                  <input
+                    type="color"
+                    id="settings-background"
+                    value={normalizeHex(backgroundColor) || colors.pageBg}
+                    onChange={(event) => setBackgroundColor(event.target.value)}
+                  />
+                  <input
+                    aria-label="Background color hex"
+                    value={backgroundColor}
+                    onChange={(event) => setBackgroundColor(event.target.value)}
+                  />
+                </div>
+              </div>
+            </details>
+            <p className="profile-hint">
+              Buttons and status colors stay the same so everything stays easy
+              to read.
+            </p>
+          </div>
+          <div className="settings-live">
+            <h3 className="profile-block-title">Live preview</h3>
+            <div
+              className="settings-preview"
+              aria-label="Preview of your selected portal appearance"
+            >
+              <div className="preview-browser" aria-hidden>
+                ● ● ●
+              </div>
+              <div className="preview-portal">
+                <aside>
+                  <img src="/lvd-logo-mark.png" alt="" />
+                  <small>Customer portal</small>
+                  {['Dashboard', 'Quotes', 'Orders', 'My Files'].map(
+                    (label, index) => (
+                      <div key={label} className={index === 0 ? 'active' : ''}>
+                        {label}
+                      </div>
+                    ),
+                  )}
+                </aside>
+                <div
+                  className="preview-content"
+                  style={{
+                    backgroundColor:
+                      normalizeHex(backgroundColor) || colors.pageBg,
+                  }}
+                >
+                  <div className="preview-topbar">
+                    <i className="ti ti-bell" aria-hidden />
+                    <span>{user?.firstName || 'Your account'}</span>
+                  </div>
+                  <div className="preview-activity">
+                    <h4
+                      style={{
+                        color: normalizeHex(headingColor) || colors.mainText,
+                      }}
+                    >
+                      Recent Activity
+                    </h4>
+                    {[
+                      ['Quote ready', 'Review quote'],
+                      ['Files ready', 'Download files'],
+                      ['Order started', 'View order'],
+                    ].map(([label, action]) => (
+                      <div key={label}>
+                        <span>{label}</span>
+                        <span className="preview-action">{action}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        <div className="settings-footer">
+          <button type="button" className="settings-reset" onClick={reset}>
+            Reset to default
+          </button>
+          <button type="submit" className="btn btn-primary">
+            {busy ? 'Saving…' : 'Save settings'}
           </button>
         </div>
-      </div>
-
-      <form
-        id="portal-colors"
-        className="card card-pad settings-form"
-        onSubmit={(e) => void onSaveLook(e)}
-        style={{ maxWidth: 480 }}
-      >
-        <div className="profile-card-head">
-          <h2 className="profile-card-title">Portal colors</h2>
-          <p className="profile-card-sub">Heading text and page background for your portal.</p>
-        </div>
-        {lookError && <ErrorBanner>{lookError}</ErrorBanner>}
-        {lookMsg && <SuccessBanner>{lookMsg}</SuccessBanner>}
-        <div className="ff">
-          <label htmlFor="headingColor">Heading text color</label>
-          <div className="color-field">
-            <input
-              id="headingColor"
-              type="color"
-              value={headingColor}
-              onChange={(e) => setHeadingColor(e.target.value)}
-            />
-            <input
-              value={headingColor}
-              onChange={(e) => setHeadingColor(e.target.value)}
-              aria-label="Heading color hex"
-            />
-          </div>
-        </div>
-        <div className="ff">
-          <label htmlFor="backgroundColor">Page background</label>
-          <div className="color-field">
-            <input
-              id="backgroundColor"
-              type="color"
-              value={backgroundColor}
-              onChange={(e) => setBackgroundColor(e.target.value)}
-            />
-            <input
-              value={backgroundColor}
-              onChange={(e) => setBackgroundColor(e.target.value)}
-              aria-label="Background color hex"
-            />
-          </div>
-        </div>
-        <button type="submit" className="btn btn-primary" disabled={lookBusy || !ready}>
-          {lookBusy ? 'Saving…' : 'Save look'}
-        </button>
-      </form>
-    </div>
+      </fieldset>
+    </form>
   );
 }

@@ -47,8 +47,8 @@ import '@/styles/embroidery-quote.css';
 type CustomerOrder = Order & { designs?: Design[] };
 
 function portalServiceLabel(kind: ServiceKind) {
-  if (kind === 'vector') return 'Vector & Print Artwork';
-  if (kind === 'cutting') return 'Cutting & Engraving Files';
+  if (kind === 'vector') return 'Vector & Print Files';
+  if (kind === 'cutting') return 'CNC, Laser & 3D Files';
   return 'Embroidery Digitizing';
 }
 

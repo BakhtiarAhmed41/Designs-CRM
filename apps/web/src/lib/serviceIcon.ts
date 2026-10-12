@@ -1,9 +1,9 @@
 export function serviceCategoryLabel(serviceType?: string | null): string {
   const s = (serviceType ?? '').toLowerCase();
   if (s.includes('embroid')) return 'Embroidery';
-  if (s.includes('vector') || s.includes('print')) return 'Vector & Print';
+  if (s.includes('vector') || s.includes('print')) return 'Vector & Print Files';
   if (s.includes('svg') || s.includes('cricut') || s.includes('cnc') || s.includes('laser')) {
-    return 'Cut, Print & Engraving';
+    return 'CNC, Laser & 3D Files';
   }
   if (s.includes('digit')) return 'Embroidery';
   const raw = (serviceType ?? '').trim();
@@ -18,9 +18,9 @@ export function serviceCategoryLabel(serviceType?: string | null): string {
 export function serviceWorkLabel(serviceType?: string | null): string {
   const s = (serviceType ?? '').toLowerCase();
   if (s.includes('embroid') || s.includes('digit')) return 'Embroidery Digitizing';
-  if (s.includes('vector') || s.includes('print')) return 'Vector & Print Artwork';
+  if (s.includes('vector') || s.includes('print')) return 'Vector & Print Files';
   if (s.includes('svg') || s.includes('cricut') || s.includes('cnc') || s.includes('laser')) {
-    return 'Cutting & Engraving Files';
+    return 'CNC, Laser & 3D Files';
   }
   return serviceCategoryLabel(serviceType);
 }

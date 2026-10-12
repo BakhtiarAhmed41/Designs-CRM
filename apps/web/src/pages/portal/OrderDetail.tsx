@@ -12,8 +12,7 @@ import {
   uploadAttachments,
 } from '@/lib/orders';
 import { AttachmentPreview, DeliveryPreview } from '@/components/FilePreview';
-import { listMyEdits, requestEdit } from '@/lib/edits';
-import { RevisionRequestForm } from '@/components/RevisionRequestForm';
+import { listMyEdits } from '@/lib/edits';
 import { downloadSignedFile, getErrorMessage } from '@/lib/api';
 import {
   money,
@@ -66,10 +65,6 @@ export function PortalOrderDetail() {
   const [keepLineIds, setKeepLineIds] = useState<string[] | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [revOpen, setRevOpen] = useState(false);
-  const [revNote, setRevNote] = useState('');
-  const [revDesignIds, setRevDesignIds] = useState<string[]>([]);
-  const [changeNote, setChangeNote] = useState('');
   const [payBusy, setPayBusy] = useState(false);
   const paySyncStarted = useRef<number | null>(null);
 
@@ -99,22 +94,6 @@ export function PortalOrderDetail() {
     queryFn: () => listMyEdits(id),
     enabled: !!id,
     ...freshOnOpen,
-  });
-
-  const revMut = useMutation({
-    mutationFn: (designIds: string[]) => requestEdit(id, revNote.trim(), designIds),
-    onSuccess: (res) => {
-      setRevOpen(false);
-      setRevNote('');
-      setRevDesignIds([]);
-      setActionError(null);
-      applyOrderChange(qc, { ...data?.order, status: 'REVISION_REQUESTED' } as Order);
-      void invalidateWorkCaches(qc);
-      void qc.invalidateQueries({ queryKey: ['my-order-edits', id] });
-      void qc.invalidateQueries({ queryKey: ['my-order', id] });
-      return res;
-    },
-    onError: (e) => setActionError(getErrorMessage(e)),
   });
 
   const startChat = useMutation({
@@ -270,11 +249,6 @@ export function PortalOrderDetail() {
     );
   const openRevision = (editsQ.data?.edits ?? []).find((e) => e.status === 'PENDING');
   const revisionIds = openRevision?.designIds ?? [];
-  const canRequestRevision =
-    order.status === 'COMPLETED' ||
-    order.status === 'CLOSED' ||
-    order.status === 'REVISION_REQUESTED' ||
-    (order.designs ?? []).some((d) => d.status === 'DELIVERED');
   const isPostDelivery =
     order.status === 'COMPLETED' ||
     order.status === 'CLOSED' ||
@@ -313,15 +287,6 @@ export function PortalOrderDetail() {
             <i className="ti ti-message-circle" />
             {startChat.isPending ? 'Opening…' : 'Need help?'}
           </button>
-          {canRequestRevision && (
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => setRevOpen((v) => !v)}
-            >
-              <i className="ti ti-edit" /> Request revision
-            </button>
-          )}
           {(() => {
             const chip = lifecycleChip(order.status, 'customer', {
               partiallyAccepted: order.partiallyAccepted,
@@ -367,29 +332,6 @@ export function PortalOrderDetail() {
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      {revOpen && (
-        <div className="card" style={{ marginBottom: 16, padding: '12px 16px 16px' }}>
-          <RevisionRequestForm
-            designs={order.designs ?? []}
-            note={revNote}
-            onNote={setRevNote}
-            selectedIds={revDesignIds}
-            onToggle={(designId) =>
-              setRevDesignIds((prev) =>
-                prev.includes(designId) ? prev.filter((x) => x !== designId) : [...prev, designId],
-              )
-            }
-            onCancel={() => {
-              setRevOpen(false);
-              setRevNote('');
-              setRevDesignIds([]);
-            }}
-            onSubmit={(ids) => revMut.mutate(ids)}
-            pending={revMut.isPending}
-          />
         </div>
       )}
 
@@ -571,27 +513,6 @@ export function PortalOrderDetail() {
                               >
                                 Approve preview
                               </button>
-                              <button
-                                type="button"
-                                className="btn btn-ghost btn-sm"
-                                disabled={previewDecision.isPending}
-                                onClick={() =>
-                                  previewDecision.mutate({
-                                    deliveryId: d.id,
-                                    decision: 'CHANGES_REQUESTED',
-                                    note: changeNote.trim() || undefined,
-                                  })
-                                }
-                              >
-                                Request changes
-                              </button>
-                              <textarea
-                                className="stat-select"
-                                style={{ width: '100%', minHeight: 72, marginTop: 8 }}
-                                placeholder="Tell us what you want changed."
-                                value={changeNote}
-                                onChange={(e) => setChangeNote(e.target.value)}
-                              />
                             </div>
                           )}
                           {d.previewStatus === 'APPROVED' && (
