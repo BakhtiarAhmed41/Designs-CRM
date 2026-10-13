@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   apiFetch,
   apiFetchForm,
   getErrorMessage,
-  resolveFileUrl,
 } from "@/lib/api";
 import { ErrorBanner } from "@/components/ui/EmptyState";
+import { profilePhotoKey, useProfilePhoto } from '@/lib/profilePhoto';
+import { ProfileAvatar } from './ProfileAvatar';
 
 type Photo = { url: string | null };
 
@@ -23,22 +24,16 @@ export function ProfilePhotoEditor({
   onChanged: (message: string) => void;
 }) {
   const client = useQueryClient();
-  const queryKey = ["profile-photo", userId];
-  const { data, isPending, isError, refetch } = useQuery({
-    queryKey,
-    queryFn: () => apiFetch<Photo>("/users/me/photo"),
-    enabled: Boolean(userId),
-  });
+  const queryKey = profilePhotoKey(userId);
+  const { data, isPending, isError, refetch } = useProfilePhoto(userId);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const dialog = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const busyRef = useRef(false);
   const photoUrl = data?.url;
-  const showImage = photoUrl && failedUrl !== photoUrl;
 
   useEffect(() => {
     if (!open) return;
@@ -113,7 +108,6 @@ export function ProfilePhotoEditor({
         result = await apiFetch<Photo>("/users/me/photo", { method: "DELETE" });
       }
       client.setQueryData(queryKey, result);
-      setFailedUrl(null);
       onChanged(file ? "Profile photo updated." : "Profile photo removed.");
       setOpen(false);
     } catch (err) {
@@ -125,17 +119,7 @@ export function ProfilePhotoEditor({
   }
 
   const avatar = (large = false) => (
-    <div className={"account-avatar" + (large ? " photo-dialog-avatar" : "")}>
-      {showImage ? (
-        <img
-          src={resolveFileUrl(photoUrl)}
-          alt={`${name || "Your"} profile photo`}
-          onError={() => setFailedUrl(photoUrl)}
-        />
-      ) : (
-        <span aria-hidden>{initials}</span>
-      )}
-    </div>
+    <ProfileAvatar userId={userId} name={name} initials={initials} className={"account-avatar" + (large ? " photo-dialog-avatar" : "")} />
   );
   return (
     <>

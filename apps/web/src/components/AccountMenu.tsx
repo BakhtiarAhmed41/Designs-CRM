@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { ProfileAvatar } from './ProfileAvatar';
 
 function roleTone(label: string) {
   const t = label.toLowerCase();
@@ -52,10 +53,11 @@ export function AccountMenu({ contextLabel }: { contextLabel?: string }) {
         type="button"
         className={`acct-trigger${open ? ' open' : ''}`}
         aria-haspopup="menu"
+        aria-label={`${name}, ${roleLabel} account menu`}
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        <span className={`acct-av ${roleTone(roleLabel)}`}>{initials}</span>
+        <ProfileAvatar userId={user?.id} name={name} initials={initials} className={`acct-av ${roleTone(roleLabel)}`} />
         <span className="acct-meta">
           <span className="acct-name">{name}</span>
           <span className="acct-role">{roleLabel}</span>
@@ -66,7 +68,7 @@ export function AccountMenu({ contextLabel }: { contextLabel?: string }) {
       {open && (
         <div className="acct-drop" role="menu">
           <div className="acct-drop-head">
-            <span className={`acct-av lg ${roleTone(roleLabel)}`}>{initials}</span>
+            <ProfileAvatar userId={user?.id} name={name} initials={initials} className={`acct-av lg ${roleTone(roleLabel)}`} />
             <div>
               <div className="acct-drop-name">{name}</div>
               {user?.email && <div className="acct-drop-mail">{user.email}</div>}
