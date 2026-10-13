@@ -1,3 +1,4 @@
+import { CustomerAvatar } from '@/components/CustomerAvatar';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -481,13 +482,8 @@ export function AdminCustomerMessages() {
             >
               <i className="ti ti-arrow-left" />
             </button>
-            <div className="thumb" aria-hidden>
-              {hideCustomerDetails ? (
-                <i className="ti ti-package" />
-              ) : (
-                initials(displayName)
-              )}
-            </div>
+            {hideCustomerDetails ? <div className="thumb" aria-hidden><i className="ti ti-package" /></div>
+              : <CustomerAvatar customerId={customerId} name={displayName} initials={initials(displayName)} className="thumb" />}
             <div className="portal-thread-title">
               <div className="on">
                 <span className="portal-thread-name">{displayName}</span>
@@ -661,9 +657,7 @@ export function AdminCustomerMessages() {
               ) : (
                 <>
                   <div className="msg-cust-hero">
-                    <div className="thumb" aria-hidden>
-                      {initials(displayName)}
-                    </div>
+                    <CustomerAvatar customerId={customerId} name={displayName} initials={initials(displayName)} className="thumb" />
                     <div className="msg-cust-hero-text">
                       <b>{displayName}</b>
                       {customerId && customerId !== 'unknown' && (
@@ -875,13 +869,8 @@ export function AdminCustomerMessages() {
                   starChat.mutate({ id: c.id, starred: !isStarred(c, 'admin') })
                 }
               />
-              <div className="thumb">
-                {hideCustomerDetails ? (
-                  <i className="ti ti-package" />
-                ) : (
-                  initials(name)
-                )}
-              </div>
+              {hideCustomerDetails ? <div className="thumb" aria-hidden><i className="ti ti-package" /></div>
+                : <CustomerAvatar customerId={c.customerId} name={name} initials={initials(name)} className="thumb" />}
               <div className="oinfo inbox-main">
                 <span className="on">{name}</span>
                 <div className="inbox-center">

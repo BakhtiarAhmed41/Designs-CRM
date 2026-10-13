@@ -1,3 +1,4 @@
+import { CustomerAvatar } from '@/components/CustomerAvatar';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -161,9 +162,7 @@ export function AdminCustomers() {
                 <tr key={c.id} className="click-row" onClick={() => setSelectedId(c.id)}>
                   <td>
                     <div className="cell-main">
-                      <div className={`othumb ${c.accountType === 'NET_MONTHLY' ? 'm' : ''}`}>
-                        {c.name.slice(0, 2).toUpperCase()}
-                      </div>
+                      <CustomerAvatar customerId={c.id} name={c.name} initials={c.name.slice(0, 2).toUpperCase()} className={`othumb ${c.accountType === 'NET_MONTHLY' ? 'm' : ''}`} />
                       <div>
                         <div className="on">{c.name}</div>
                         <div className="om">{c.email ?? 'No email'}</div>

@@ -94,6 +94,13 @@ export class AdminCustomersController {
     };
   }
 
+  @Get(':id/photo')
+  @RequireFeatures('customers', 'messages_customer_view', 'billing', 'quotes', 'orders')
+  photo(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    if (user.role === UserRole.DESIGNER) throw new ForbiddenException('Customer details are hidden for this role');
+    return this.customers.profilePhoto(id);
+  }
+
   @Get(':id')
   async detail(@Param('id') id: string) {
     const customer = await this.customers.detail(id);

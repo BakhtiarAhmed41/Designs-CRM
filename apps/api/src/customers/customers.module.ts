@@ -4,8 +4,10 @@ import {
   MeCustomerController,
 } from './customers.controller';
 import { CustomersService } from './customers.service';
+import { StorageModule } from '../storage/storage.module';
 
 @Module({
+  imports: [StorageModule],
   controllers: [AdminCustomersController, MeCustomerController],
   providers: [CustomersService],
   exports: [CustomersService],

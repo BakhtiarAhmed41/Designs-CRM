@@ -1,3 +1,4 @@
+import { CustomerAvatar } from '@/components/CustomerAvatar';
 import { useState } from 'react';
 import { SelectMenu } from '@/components/ui/SelectMenu';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -305,9 +306,7 @@ export function AdminBilling() {
         )}
         {monthlyStatements.map((inv) => (
           <div key={inv.id} className="orow" style={{ cursor: 'default' }}>
-            <div className={`othumb ${serviceThumbClass('embroidery')}`}>
-              {(inv.customerName ?? '??').slice(0, 2).toUpperCase()}
-            </div>
+            <CustomerAvatar customerId={inv.customerId} name={inv.customerName ?? 'Customer'} initials={(inv.customerName ?? '??').slice(0, 2).toUpperCase()} className={`othumb ${serviceThumbClass('embroidery')}`} />
             <div className="oinfo">
               <div className="on">{inv.customerName ?? 'Customer'}</div>
               <div className="om">

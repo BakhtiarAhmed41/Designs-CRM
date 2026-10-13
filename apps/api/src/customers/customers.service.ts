@@ -14,6 +14,7 @@ import {
   UserRole,
 } from '../common/enums';
 import { DbService } from '../db/db.service';
+import { LocalStorageService } from '../storage/local-storage.service';
 import {
   normalizePage,
   pageResult,
@@ -46,7 +47,18 @@ const LTV_STATUSES = [OrderStatus.COMPLETED, OrderStatus.CLOSED];
 
 @Injectable()
 export class CustomersService {
-  constructor(private db: DbService) {}
+  constructor(private db: DbService, private storage: LocalStorageService) {}
+
+  async profilePhoto(customerId: string) {
+    const customer = await this.db.queryOne<{ profile_image_key: string | null }>(
+      `SELECT u.profile_image_key FROM customers c
+       LEFT JOIN users u ON u.id = c.user_id WHERE c.id = ? LIMIT 1`, [customerId],
+    );
+    if (!customer) throw new NotFoundException('Customer not found');
+    return { url: customer.profile_image_key
+      ? await this.storage.createSignedUrl({ key: customer.profile_image_key, inline: true })
+      : null };
+  }
 
   private customerDto(c: CustomerRow) {
     return {

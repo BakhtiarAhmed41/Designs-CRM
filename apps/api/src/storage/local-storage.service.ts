@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger, OnModuleInit } from '@nestjs/common';
 import { createHmac, randomUUID } from 'crypto';
 import { createReadStream, existsSync, readdirSync, readFileSync } from 'fs';
 import { mkdir, unlink, writeFile } from 'fs/promises';
@@ -59,7 +59,24 @@ function walkForFile(dir: string, needle: string, depth: number): string | null 
  * the same "signed URL" contract the frontend already expects.
  */
 @Injectable()
-export class LocalStorageService {
+export class LocalStorageService implements OnModuleInit {
+  private readonly logger = new Logger(LocalStorageService.name);
+
+  async onModuleInit(): Promise<void> {
+    const dir = this.writeDir();
+    await mkdir(dir, { recursive: true });
+    this.logger.log(`Upload storage directory: ${dir}`);
+    const root = this.apiPackageRoot();
+    if (getEnv().NODE_ENV === 'production' &&
+        (!isAbsolute(getEnv().UPLOAD_DIR) || dir === root || dir.startsWith(root + sep))) {
+      this.logger.warn(
+        'Uploads are stored relative to or inside the application directory. ' +
+        'A deployment that replaces this directory can delete existing files. ' +
+        'Set UPLOAD_DIR to an absolute, persistent directory outside the deployment, ' +
+        'or use external storage. See DEPLOY.md.',
+      );
+    }
+  }
   /**
    * apps/api, whether this code is running from src/, dist/storage/, or the
    * single-file bundle at dist/main.js or publish/main.js.
@@ -83,9 +100,11 @@ export class LocalStorageService {
 
   /** Where new files are written. Never dist/ or publish/ — those are wiped on deploy. */
   private writeDir(): string {
-    const absolute = this.configuredDir();
-    if (absolute && !isBuildOutput(absolute)) return absolute;
-    return resolve(this.apiPackageRoot(), 'uploads');
+    const dir = this.configuredDir() ?? resolve(this.apiPackageRoot(), getEnv().UPLOAD_DIR);
+    if (isBuildOutput(dir)) {
+      throw new Error('UPLOAD_DIR must be outside dist, publish and .tsc-out; these directories are replaced during builds');
+    }
+    return dir;
   }
 
   /** Every place an older build may have saved files, so existing images still open. */

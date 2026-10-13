@@ -1,3 +1,4 @@
+import { CustomerAvatar } from '@/components/CustomerAvatar';
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -463,9 +464,7 @@ export function AdminNewRequest({ mode }: { mode: Mode }) {
                     <div ref={pickRef} className="cust-pick">
                       {customerId && !listOpen ? (
                         <div className="cust-pick-card">
-                          <span className={`cust-av${selected?.accountType === 'NET_MONTHLY' ? ' m' : ''}`}>
-                            {customerInitials(selected?.name || customerLabel || 'C')}
-                          </span>
+                          <CustomerAvatar customerId={customerId} name={selected?.name || customerLabel || 'Customer'} initials={customerInitials(selected?.name || customerLabel || 'C')} className={`cust-av${selected?.accountType === 'NET_MONTHLY' ? ' m' : ''}`} />
                           <div className="cust-pick-copy">
                             <div className="cust-pick-name">{selected?.name || customerLabel || 'Customer'}</div>
                             <div className="cust-pick-meta">
@@ -553,9 +552,7 @@ export function AdminNewRequest({ mode }: { mode: Mode }) {
                               onMouseEnter={() => setActiveIdx(idx)}
                               onClick={() => pickCustomer(c)}
                             >
-                              <span className={`cust-av${c.accountType === 'NET_MONTHLY' ? ' m' : ''}`}>
-                                {customerInitials(c.name)}
-                              </span>
+                              <CustomerAvatar customerId={c.id} name={c.name} initials={customerInitials(c.name)} className={`cust-av${c.accountType === 'NET_MONTHLY' ? ' m' : ''}`} />
                               <span className="cust-pick-copy">
                                 <span className="cust-pick-name">{highlightMatch(c.name, customerSearch)}</span>
                                 <span className="cust-pick-meta">
