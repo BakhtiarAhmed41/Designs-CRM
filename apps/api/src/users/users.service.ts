@@ -1,9 +1,15 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { createHash, randomBytes, randomUUID } from 'crypto';
 import { UserRole } from '../common/enums';
 import { DbService } from '../db/db.service';
 import { MailService } from '../mail/mail.service';
 import { resolvePermissions } from '../auth/permissions';
+import { LocalStorageService } from '../storage/local-storage.service';
 
 function hashToken(token: string) {
   return createHash('sha256').update(token).digest('hex');
@@ -51,7 +57,78 @@ export class UsersService {
   constructor(
     private db: DbService,
     private mail: MailService,
+    private storage: LocalStorageService,
   ) {}
+
+  private async photoKey(id: string) {
+    const user = await this.db.queryOne<{ profile_image_key: string | null }>(
+      'SELECT profile_image_key FROM users WHERE id = ? LIMIT 1',
+      [id],
+    );
+    if (!user) throw new NotFoundException('User not found');
+    return user.profile_image_key;
+  }
+
+  async getProfilePhoto(id: string) {
+    const key = await this.photoKey(id);
+    return {
+      url: key
+        ? await this.storage.createSignedUrl({ key, inline: true })
+        : null,
+    };
+  }
+
+  async uploadProfilePhoto(id: string, file?: Express.Multer.File) {
+    const body = file?.buffer;
+    if (!body?.length) throw new BadRequestException('Choose a profile photo');
+    if (body.length > 5 * 1024 * 1024)
+      throw new BadRequestException('Use a photo smaller than 5 MB');
+    const type = body
+      .subarray(0, 8)
+      .equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+      ? 'png'
+      : body[0] === 255 && body[1] === 216 && body[2] === 255
+        ? 'jpeg'
+        : body.length >= 12 &&
+            body.toString('ascii', 0, 4) === 'RIFF' &&
+            body.toString('ascii', 8, 12) === 'WEBP'
+          ? 'webp'
+          : null;
+    if (!type) throw new BadRequestException('Choose a PNG, JPG or WebP image');
+    const previous = await this.photoKey(id);
+    const key = this.storage.newObjectKey(
+      ['users', id, 'profile'],
+      `photo.${type}`,
+    );
+    await this.storage.uploadObject({
+      key,
+      body,
+      contentType: `image/${type}`,
+    });
+    try {
+      await this.db.execute(
+        'UPDATE users SET profile_image_key = ? WHERE id = ?',
+        [key, id],
+      );
+    } catch (error) {
+      await this.storage.deleteObject(key).catch(() => undefined);
+      throw error;
+    }
+    if (previous)
+      await this.storage.deleteObject(previous).catch(() => undefined);
+    return { url: await this.storage.createSignedUrl({ key, inline: true }) };
+  }
+
+  async removeProfilePhoto(id: string) {
+    const previous = await this.photoKey(id);
+    await this.db.execute(
+      'UPDATE users SET profile_image_key = NULL WHERE id = ?',
+      [id],
+    );
+    if (previous)
+      await this.storage.deleteObject(previous).catch(() => undefined);
+    return { url: null };
+  }
 
   async getById(id: string) {
     const user = await this.db.queryOne<UserRow>(
@@ -102,7 +179,8 @@ export class UsersService {
 
   async requestEmailChange(id: string, nextEmail: string) {
     const email = nextEmail.trim().toLowerCase();
-    if (!email.includes('@')) throw new BadRequestException('Enter a valid email');
+    if (!email.includes('@'))
+      throw new BadRequestException('Enter a valid email');
     const current = await this.db.queryOne<{ email: string }>(
       'SELECT email FROM users WHERE id = ? LIMIT 1',
       [id],

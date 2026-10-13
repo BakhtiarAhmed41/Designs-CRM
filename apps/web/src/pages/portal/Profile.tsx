@@ -5,6 +5,7 @@ import { forgotPassword, updateProfile } from '@/lib/auth';
 import { getMyCustomer, updateMyCustomer } from '@/lib/customers';
 import { getErrorMessage } from '@/lib/api';
 import { ErrorBanner, SuccessBanner } from '@/components/ui/EmptyState';
+import { ProfilePhotoEditor } from '@/components/ProfilePhotoEditor';
 import '@/styles/portal-account.css';
 
 type Details = Record<
@@ -182,9 +183,7 @@ export function PortalProfile() {
         <span>Profile</span>
       </nav>
       <header className="account-identity">
-        <div className="account-avatar" aria-hidden>
-          {initials}
-        </div>
+        <ProfilePhotoEditor userId={user?.id} name={savedName} initials={initials} onChanged={setMessage} />
         <div>
           <h1>{savedName || 'Your profile'}</h1>
           <p className="profile-card-sub">{user?.email || customer?.email}</p>

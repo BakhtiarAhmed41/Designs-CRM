@@ -195,6 +195,9 @@ export async function runMigrations() {
     console.log('Adding users.pending_email column ...');
     await conn.query('ALTER TABLE users ADD COLUMN pending_email VARCHAR(255) NULL');
   }
+  if (!(await columnExists('users', 'profile_image_key'))) {
+    await conn.query('ALTER TABLE users ADD COLUMN profile_image_key VARCHAR(500) NULL');
+  }
 
   if (!(await columnExists('orders', 'turnaround_key'))) {
     console.log('Adding orders.turnaround columns ...');

@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
   id            CHAR(36)     NOT NULL,
   email         VARCHAR(255) NOT NULL,
   pending_email VARCHAR(255) NULL,
+  profile_image_key VARCHAR(500) NULL,
   password_hash VARCHAR(255) NOT NULL,
   role          ENUM('SUPER_ADMIN','ADMIN','SUPPORT','DESIGNER','CLIENT') NOT NULL DEFAULT 'CLIENT',
   login_status  ENUM('PENDING','ACTIVE','DISABLED') NOT NULL DEFAULT 'ACTIVE',
