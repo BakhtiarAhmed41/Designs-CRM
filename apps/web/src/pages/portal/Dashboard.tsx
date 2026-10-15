@@ -418,7 +418,9 @@ export function PortalDashboard() {
                       <td>
                         <div className="activity-actions">
                           {actionRequired && done ? (
-                            <span className="activity-done-pill"><i className="ti ti-check" aria-hidden />{n.completionLabel || 'Read'}</span>
+                            <span className="activity-status">
+                              <span className="activity-done-pill"><i className="ti ti-check" aria-hidden />{n.completionLabel || 'Read'}</span>
+                            </span>
                           ) : row.actionLabel && row.to ? (
                             <Link
                               to={row.to}

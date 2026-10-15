@@ -2485,6 +2485,7 @@ button.primary i,
 .activity-table .activity-check,
 .activity-table .activity-check::before { color: #2e9d57 !important; }
 .activity-check { flex: none; font-size: 17px; margin-left: -4px; margin-right: -4px; }
+.activity-status { display: flex; align-items: center; justify-content: center; width: 148px; flex: 0 0 148px; }
 .activity-done-pill { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 30px; padding: 4px 13px; border-radius: 20px; background: #d5efd3; color: #237a36; font-size: 13px; font-weight: 600; }
 .activity-table .activity-done-pill i,
 .activity-table .activity-done-pill i::before { color: inherit !important; }
