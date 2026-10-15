@@ -44,9 +44,11 @@ function DueAmount({ currency, cents }: { currency: string; cents: number }) {
 function PaymentColumn({
   emailOnFile,
   banner,
+  successHref,
 }: {
   emailOnFile: boolean;
   banner?: string | null;
+  successHref?: string;
 }) {
   const state = useCheckoutElements();
   const [message, setMessage] = useState<string | null>(null);
@@ -77,7 +79,10 @@ function PaymentColumn({
     event.preventDefault();
     setSubmitting(true);
     setMessage(null);
-    const result = await checkout.confirm();
+    const result = await checkout.confirm({
+      redirect: 'always',
+      ...(successHref ? { returnUrl: new URL(successHref, window.location.origin).href } : {}),
+    });
     if (result.type === 'error') setMessage(result.error.message);
     setSubmitting(false);
   }
@@ -101,6 +106,8 @@ function PaymentColumn({
             setMessage(null);
             const result = await checkout.confirm({
               expressCheckoutConfirmEvent: event,
+              redirect: 'always',
+              ...(successHref ? { returnUrl: new URL(successHref, window.location.origin).href } : {}),
             });
             if (result.type === 'error') setMessage(result.error.message);
           }}
@@ -286,6 +293,7 @@ export function CheckoutScreen({
   emailOnFile,
   backHref,
   banner,
+  successHref,
 }: {
   summary: CheckoutSummary;
   clientSecret: string;
@@ -293,6 +301,7 @@ export function CheckoutScreen({
   emailOnFile: boolean;
   backHref?: string | null;
   banner?: string | null;
+  successHref?: string;
 }) {
   const stripePromise = useMemo(() => {
     const key = (publishableKey || '').trim();
@@ -328,7 +337,7 @@ export function CheckoutScreen({
             />
           }
         />
-        <PaymentColumn emailOnFile={emailOnFile} banner={banner} />
+        <PaymentColumn emailOnFile={emailOnFile} banner={banner} successHref={successHref} />
       </div>
     </CheckoutElementsProvider>
   );

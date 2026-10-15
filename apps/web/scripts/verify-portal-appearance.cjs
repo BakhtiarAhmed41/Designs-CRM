@@ -42,6 +42,7 @@ const { PortalSettings } = load('src/pages/portal/Settings.tsx', {
   '@/context/ThemeContext': { useTheme: () => ({ colors: { mainText: '#222222', pageBg: '#FFFFFF' } }) },
   '@/context/PortalAppearanceContext': { usePortalAppearancePreview: () => preview },
   '@/lib/theme': theme,
+  '@/lib/customerPrefs': load('src/lib/customerPrefs.ts'),
   '@/lib/api': { getErrorMessage: err => err.message },
   '@/lib/customers': {
     ...appearance, getMyCustomer: async () => ({ customer: { preferences: savedPrefs } }),

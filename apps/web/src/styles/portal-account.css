@@ -134,6 +134,20 @@
 .settings-other input {
   width: 100%;
 }
+.settings-hoops { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 18px; }
+.settings-hoops .profile-hint { margin: 0 0 10px; }
+.settings-hoop-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.settings-hoop-options .settings-format { min-height: 34px; }
+.settings-custom-hoops { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.settings-custom-hoops:empty { display: none; }
+.settings-hoop-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; border: 1px solid var(--line); border-radius: 20px; background: var(--tint); font-size: 12px; }
+.settings-hoop-chip button { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; }
+.settings-hoop-chip button:hover { background: var(--hover-bg); }
+.settings-hoop-add { margin-top: 14px; }
+.settings-hoop-add > div { display: flex; align-items: center; gap: 8px; }
+.settings-hoop-add input { width: 100%; min-width: 0; }
+.settings-hoop-add .btn { flex-shrink: 0; white-space: nowrap; }
+.settings-hoop-error { margin: 0; color: var(--maroon); font-size: 12px; }
 .settings-explainer {
   display: grid;
   gap: 4px;

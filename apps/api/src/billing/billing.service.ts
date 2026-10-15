@@ -95,6 +95,7 @@ type CheckoutGroup = {
 };
 
 export type CheckoutSummary = {
+  orderId?: string | null;
   title: string;
   kind: InvoiceKind;
   currency: string;
@@ -1461,6 +1462,7 @@ export class BillingService {
     if (!invoice) throw new NotFoundException('Invoice not found');
     return {
       amountCents: invoiceRemainingCents(invoice),
+      orderId: invoice.order_id ?? null,
       amountPaidCents: invoice.amount_paid_cents ?? 0,
       remainingCents: invoiceRemainingCents(invoice),
       currency: invoice.currency,
@@ -1728,6 +1730,7 @@ export class BillingService {
 
     return {
       title,
+      orderId: invoice.order_id ?? null,
       kind: invoice.kind,
       currency: invoice.currency,
       amountDueCents: due,
@@ -1742,7 +1745,7 @@ export class BillingService {
     dest: { successPath: string; web: string },
   ) {
     if (invoice.status === InvoiceStatus.PAID) {
-      return { alreadyPaid: true as const };
+      return { alreadyPaid: true as const, orderId: invoice.order_id ?? null };
     }
     if (!isOpenInvoiceStatus(invoice.status)) {
       throw new BadRequestException('Invoice is not awaiting payment');
@@ -1752,7 +1755,7 @@ export class BillingService {
     }
     const remaining = invoiceRemainingCents(invoice);
     if (remaining <= 0) {
-      return { alreadyPaid: true as const };
+      return { alreadyPaid: true as const, orderId: invoice.order_id ?? null };
     }
     const customer = await this.getCustomerRow(invoice.customer_id);
     const emailOnFile = Boolean(customer?.email?.trim());
@@ -1763,7 +1766,7 @@ export class BillingService {
         );
         if (paidSession) {
           await this.fulfillStripeSession(paidSession);
-          return { alreadyPaid: true as const };
+          return { alreadyPaid: true as const, orderId: invoice.order_id ?? null };
         }
         const existing = await this.stripe.retrieveSession(
           payment.stripe_checkout_session_id,
@@ -1986,10 +1989,9 @@ export class BillingService {
       throw new NotFoundException('Invoice not found');
     const payment = await this.ensurePendingPayLink(invoice);
     const web = this.resolveWebBase(opts?.returnOrigin);
-    const returnPath = this.safeReturnPath(
-      opts?.returnPath,
-      '/portal/invoices',
-    );
+    const returnPath = invoice.order_id
+      ? `/portal/orders/${encodeURIComponent(invoice.order_id)}`
+      : this.safeReturnPath(opts?.returnPath, '/portal/invoices');
     return this.startStripeCheckout(invoice, payment, {
       successPath: `${returnPath}${returnPath.includes('?') ? '&' : '?'}paid=1`,
       web,
@@ -2015,7 +2017,7 @@ export class BillingService {
           ORDER BY issued_at DESC LIMIT 1`,
         [orderId, customer.id, InvoiceStatus.PAID],
       );
-      if (paid) return { alreadyPaid: true as const };
+      if (paid) return { alreadyPaid: true as const, orderId };
       throw new NotFoundException('No unpaid invoice for this order');
     }
     return this.startCheckoutForMyInvoice(user, invoice.id, {

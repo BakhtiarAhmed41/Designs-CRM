@@ -1,8 +1,9 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { CheckoutStatus } from '@/components/CheckoutStatus';
-import { confirmPayLink, getPayLinkSummary, startPayLinkCheckout } from '@/lib/billing';
+import { confirmPayLink, getPayLinkSummary, paidOrderPath, startPayLinkCheckout } from '@/lib/billing';
+import { useAuth } from '@/context/AuthContext';
 import { getErrorMessage } from '@/lib/api';
 
 const CheckoutScreen = lazy(() =>
@@ -10,6 +11,7 @@ const CheckoutScreen = lazy(() =>
 );
 
 export function PayLink() {
+  const { user } = useAuth();
   const { token = '' } = useParams();
   const [params] = useSearchParams();
   const returning = params.get('status') === 'success' || params.get('status') === 'return' || params.get('paid') === '1';
@@ -60,6 +62,8 @@ export function PayLink() {
   }
 
   if (alreadyPaid) {
+    const orderId = confirmed?.orderId ?? (checkoutQ.data && 'alreadyPaid' in checkoutQ.data ? checkoutQ.data.orderId : null);
+    if (orderId && user?.role === 'CLIENT') return <Navigate to={paidOrderPath(orderId)} replace />;
     return (
       <CheckoutStatus
         title="Paid"

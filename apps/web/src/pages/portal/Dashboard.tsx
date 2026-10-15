@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { RequestQuoteMenu } from '@/components/RequestQuoteMenu';
 import { DateRangeSelect } from '@/components/ui/DateRangeSelect';
+import { PaginationBar } from '@/components/lists/ListToolbar';
 import { listMyOrders } from '@/lib/orders';
 import { listMyInvoices } from '@/lib/billing';
 import { listMyAllEdits } from '@/lib/edits';
@@ -460,32 +461,15 @@ export function PortalDashboard() {
         )}
         {tableActivities.length > 0 && (
           <div className="activity-pager">
-            <span className="activity-pager-count">
-              Showing {activityFrom}–{activityTo} of {activityTotal} {activityTotal === 1 ? 'update' : 'updates'}
-            </span>
-            {activityPages > 1 && (
-              <div className="activity-pager-nav">
-                <button
-                  type="button"
-                  className="activity-pager-btn"
-                  disabled={currentActivityPage <= 1}
-                  onClick={() => setActivityPage(Math.max(1, currentActivityPage - 1))}
-                >
-                  <i className="ti ti-chevron-left" /> Previous
-                </button>
-                <span className="activity-pager-page">
-                  Page {currentActivityPage} of {activityPages}
-                </span>
-                <button
-                  type="button"
-                  className="activity-pager-btn"
-                  disabled={currentActivityPage >= activityPages}
-                  onClick={() => setActivityPage(currentActivityPage + 1)}
-                >
-                  Next <i className="ti ti-chevron-right" />
-                </button>
-              </div>
-            )}
+            <PaginationBar
+              numbered
+              ariaLabel="Recent activity pagination"
+              page={currentActivityPage}
+              totalPages={activityPages}
+              total={activityTotal}
+              onPage={setActivityPage}
+              summary={`Showing ${activityFrom}–${activityTo} of ${activityTotal} ${activityTotal === 1 ? 'update' : 'updates'}`}
+            />
           </div>
         )}
       </section>

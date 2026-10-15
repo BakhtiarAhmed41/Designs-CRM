@@ -12,10 +12,12 @@ import { getErrorMessage } from '@/lib/api';
 import { ErrorBanner, SuccessBanner } from '@/components/ui/EmptyState';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { normalizeHex } from '@/lib/theme';
+import { cleanHoopSizes, HOOP_OPTIONS, normalizeHoopSize } from '@/lib/customerPrefs';
 import '@/styles/portal-account.css';
 
 type Prefs = {
   services: string[];
+  hoops: string[];
   embFormats: string[];
   digFormats: string[];
   cncFormats: string[];
@@ -56,6 +58,7 @@ const SERVICES = [
 ];
 const DEFAULT: Prefs = {
   services: ['emb'],
+  hoops: ['4x4', '5x7'],
   embFormats: ['DST', 'PES'],
   digFormats: ['AI', 'SVG'],
   cncFormats: ['AI', 'SVG'],
@@ -83,6 +86,7 @@ function readPrefs(raw: unknown): Prefs {
       ? p.services.filter((id) => typeof id === 'string')
       : DEFAULT.services,
     placement: typeof p.placement === 'string' ? p.placement : '',
+    hoops: Array.isArray(p.hoops) ? cleanHoopSizes(p.hoops) : [...DEFAULT.hoops],
   };
   for (const service of SERVICES) {
     const values = (
@@ -121,6 +125,8 @@ export function PortalSettings() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [customHoop, setCustomHoop] = useState('');
+  const [hoopError, setHoopError] = useState<string | null>(null);
   useEffect(() => {
     if (hydrated.current || !isSuccess) return;
     hydrated.current = true;
@@ -183,6 +189,19 @@ export function PortalSettings() {
     setBackgroundColor(colors.pageBg);
     setMessage(null);
     setError(null);
+    setCustomHoop('');
+    setHoopError(null);
+  }
+  function addHoop() {
+    const size = normalizeHoopSize(customHoop);
+    if (!size) return;
+    if (prefs.hoops.some((hoop) => hoop.toLowerCase() === size.toLowerCase())) {
+      setHoopError('This hoop size is already selected.');
+      return;
+    }
+    setPrefs((previous) => ({ ...previous, hoops: [...previous.hoops, size] }));
+    setCustomHoop('');
+    setHoopError(null);
   }
   return (
     <form
@@ -275,6 +294,43 @@ export function PortalSettings() {
                     placeholder="Enter a format"
                   />
                 </div>
+                {service.id === 'emb' && (
+                  <div className="settings-hoops" aria-labelledby="settings-hoops-title">
+                    <h3 className="pref-section-label" id="settings-hoops-title">Hoop sizes</h3>
+                    <p className="profile-hint">Select the hoops you use. Sizes are in inches.</p>
+                    <div className="settings-hoop-options">
+                      {HOOP_OPTIONS.map((size) => (
+                        <label key={size} className="settings-format">
+                          <input type="checkbox" aria-label={`Hoop size ${size}`} checked={prefs.hoops.some((hoop) => hoop.toLowerCase() === size.toLowerCase())}
+                            onChange={() => setPrefs((previous) => ({ ...previous, hoops: previous.hoops.some((hoop) => hoop.toLowerCase() === size.toLowerCase())
+                              ? previous.hoops.filter((hoop) => hoop.toLowerCase() !== size.toLowerCase()) : [...previous.hoops, size] }))} />
+                          <span>{size.replace(/(\d)x(?=\d)/gi, '$1 × ')}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <div className="settings-custom-hoops">
+                      {prefs.hoops.filter((size) => !HOOP_OPTIONS.some((option) => option.toLowerCase() === size.toLowerCase())).map((size) => (
+                        <span className="settings-hoop-chip" key={size}>
+                          {size.replace(/(\d)x(?=\d)/gi, '$1 × ')}
+                          <button type="button" aria-label={`Remove hoop size ${size}`} onClick={() => {
+                            setPrefs((previous) => ({ ...previous, hoops: previous.hoops.filter((hoop) => hoop !== size) }));
+                            setHoopError(null);
+                          }}><i className="ti ti-x" aria-hidden /></button>
+                        </span>
+                      ))}
+                    </div>
+                    <div className="pf settings-hoop-add">
+                      <label htmlFor="settings-custom-hoop">Add a custom hoop size</label>
+                      <div>
+                        <input id="settings-custom-hoop" value={customHoop} maxLength={40} placeholder="e.g. 10x12" aria-invalid={Boolean(hoopError)} aria-describedby={hoopError ? 'settings-hoop-error' : undefined}
+                          onChange={(event) => { setCustomHoop(event.target.value); setHoopError(null); }}
+                          onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addHoop(); } }} />
+                        <button type="button" className="btn btn-ghost" disabled={!customHoop.trim()} onClick={addHoop}>Add size</button>
+                      </div>
+                      {hoopError && <p id="settings-hoop-error" className="settings-hoop-error" role="alert">{hoopError}</p>}
+                    </div>
+                  </div>
+                )}
               </section>
             ))}
           </div>

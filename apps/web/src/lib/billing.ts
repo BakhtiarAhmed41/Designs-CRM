@@ -106,6 +106,7 @@ export type MonthEndResult = {
 };
 
 export type PayLinkSummary = {
+  orderId?: string | null;
   amountCents: number;
   amountPaidCents?: number;
   remainingCents?: number;
@@ -134,6 +135,7 @@ export type CheckoutGroup = {
 };
 
 export type CheckoutSummary = {
+  orderId?: string | null;
   title: string;
   kind: InvoiceKind;
   currency: string;
@@ -150,7 +152,11 @@ export type CheckoutSession = {
   summary: CheckoutSummary;
 };
 
-export type CheckoutResult = CheckoutSession | { alreadyPaid: true };
+export type CheckoutResult = CheckoutSession | { alreadyPaid: true; orderId?: string | null };
+
+export function paidOrderPath(orderId: string) {
+  return `/portal/orders/${encodeURIComponent(orderId)}?paid=1`;
+}
 
 function pageOrigin() {
   if (typeof window !== 'undefined' && window.location?.origin) {
@@ -322,7 +328,6 @@ export async function startMyInvoiceCheckout(
       returnPath,
     }),
   });
-  if ('alreadyPaid' in res && res.alreadyPaid) return { alreadyPaid: true };
   return res;
 }
 
@@ -337,7 +342,6 @@ export async function startMyOrderCheckout(
       body: JSON.stringify({ returnOrigin: pageOrigin(), returnPath }),
     },
   );
-  if ('alreadyPaid' in res && res.alreadyPaid) return { alreadyPaid: true };
   return res;
 }
 
@@ -394,7 +398,6 @@ export async function startPayLinkCheckout(token: string): Promise<CheckoutResul
     method: 'POST',
     body: JSON.stringify({ returnOrigin: pageOrigin() }),
   });
-  if ('alreadyPaid' in res && res.alreadyPaid) return { alreadyPaid: true };
   return res;
 }
 

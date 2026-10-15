@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   confirmMyInvoice,
@@ -9,6 +9,7 @@ import {
   listMyInvoices,
   openInvoicePrint,
   payMyInvoice,
+  paidOrderPath,
   goToInvoiceCheckout,
   type Invoice,
 } from '@/lib/billing';
@@ -36,6 +37,7 @@ function invoiceChip(inv: Invoice) {
 }
 
 export function PortalInvoices() {
+  const navigate = useNavigate();
   const dialog = useDialog();
   const qc = useQueryClient();
   const [params] = useSearchParams();
@@ -104,7 +106,8 @@ export function PortalInvoices() {
           confirmLabel: 'Pay now',
         });
         if (!ok) return;
-        await payMyInvoice(inv.id, 'STORE_CREDIT');
+        const paid = await payMyInvoice(inv.id, 'STORE_CREDIT');
+        if (paid.invoice?.status === 'PAID' && paid.invoice.orderId) navigate(paidOrderPath(paid.invoice.orderId), { replace: true });
         return;
       }
       if (storeCreditCents > 0 && storeCreditCents < remaining) {

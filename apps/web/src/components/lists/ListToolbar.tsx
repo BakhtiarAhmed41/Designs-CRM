@@ -74,13 +74,49 @@ export function PaginationBar({
   totalPages,
   total,
   onPage,
+  numbered = false,
+  summary,
+  ariaLabel = 'Pagination',
 }: {
   page: number;
   totalPages: number;
   total: number;
   onPage: (p: number) => void;
+  numbered?: boolean;
+  summary?: React.ReactNode;
+  ariaLabel?: string;
 }) {
-  if (totalPages <= 1 && total <= 20) return null;
+  if (totalPages <= 1 && total <= 20 && !summary) return null;
+  if (numbered) {
+    const current = Math.max(1, Math.min(page, totalPages));
+    const visible = totalPages <= 7
+      ? Array.from({ length: totalPages }, (_, i) => i + 1)
+      : [1, ...Array.from({ length: current <= 4 || current >= totalPages - 3 ? 5 : 3 }, (_, i) =>
+        current <= 4 ? i + 1 : current >= totalPages - 3 ? totalPages - 4 + i : current - 1 + i), totalPages];
+    const pages = [...new Set(visible)];
+    return (
+      <nav className="pager pager-numbered" aria-label={ariaLabel}>
+        <span className="pager-summary" aria-live="polite">{summary ?? `${total} results`}</span>
+        {totalPages > 1 && (
+          <div className="pager-controls">
+            <button type="button" className="pager-step" disabled={current <= 1} aria-label="Previous page" onClick={() => onPage(current - 1)}>
+              <i className="ti ti-arrow-left" aria-hidden /><span>Previous</span>
+            </button>
+            <span className="pager-mobile-position" aria-label={`Page ${current} of ${totalPages}`}>{current} / {totalPages}</span>
+            {pages.map((number, index) => (
+              <span className="pager-page-item" key={number}>
+                {index > 0 && number - pages[index - 1] > 1 && <span className="pager-ellipsis" aria-hidden>…</span>}
+                <button type="button" className="pager-number" aria-label={`Page ${number}`} aria-current={number === current ? 'page' : undefined} onClick={() => onPage(number)}>{number}</button>
+              </span>
+            ))}
+            <button type="button" className="pager-step" disabled={current >= totalPages} aria-label="Next page" onClick={() => onPage(current + 1)}>
+              <span>Next</span><i className="ti ti-arrow-right" aria-hidden />
+            </button>
+          </div>
+        )}
+      </nav>
+    );
+  }
   return (
     <div className="pager">
       <span>

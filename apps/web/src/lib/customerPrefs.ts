@@ -16,6 +16,23 @@ const SERVICE_TO_QUOTE: Record<string, string> = {
   cnc: 'laser',
 };
 
+export const HOOP_OPTIONS = ['4x4', '5x7', '6x10', '7x12', '8x8', '8x12', 'Cap frame 2.5x6'];
+
+export function normalizeHoopSize(value: string) {
+  return value.trim().replace(/\s+/g, ' ').replace(/(\d)\s*[x×]\s*(?=\d)/gi, '$1x').slice(0, 40);
+}
+
+export function cleanHoopSizes(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  return value.filter((item): item is string => typeof item === 'string').map(normalizeHoopSize).filter((item) => {
+    const key = item.toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function asStringList(value: unknown) {
   if (!Array.isArray(value)) return [];
   return value.map((v) => String(v).trim()).filter(Boolean);

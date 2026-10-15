@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { CheckoutScreen } from '@/components/CheckoutScreen';
 import { CheckoutStatus } from '@/components/CheckoutStatus';
-import { startMyInvoiceCheckout, startMyOrderCheckout } from '@/lib/billing';
+import { paidOrderPath, startMyInvoiceCheckout, startMyOrderCheckout } from '@/lib/billing';
 import { getErrorMessage } from '@/lib/api';
 
 function safeReturn(path: string | null, fallback: string) {
@@ -48,6 +48,7 @@ export function CheckoutPage() {
   const result = session.data;
   if (!result) return null;
   if ('alreadyPaid' in result) {
+    if (result.orderId || orderId) return <Navigate to={paidOrderPath(result.orderId || orderId!)} replace />;
     return (
       <CheckoutStatus
         title="Already paid"
@@ -64,6 +65,7 @@ export function CheckoutPage() {
       clientSecret={result.clientSecret}
       publishableKey={result.publishableKey}
       emailOnFile={result.emailOnFile}
+      successHref={result.summary.orderId || orderId ? paidOrderPath(result.summary.orderId || orderId!) : undefined}
       backHref={returnPath}
     />
   );
