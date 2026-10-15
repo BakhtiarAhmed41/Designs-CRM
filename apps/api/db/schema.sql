@@ -433,6 +433,8 @@ CREATE TABLE IF NOT EXISTS notifications (
   link         VARCHAR(500) NULL,
   read_at      DATETIME NULL,
   dismissed_at DATETIME NULL,
+  completed_at DATETIME NULL,
+  completion_label VARCHAR(32) NULL,
   created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_notif_user_created (user_id, created_at),

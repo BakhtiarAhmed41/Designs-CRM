@@ -82,6 +82,27 @@ export function portalActivityAction(title: string, link: string | null) {
 
 export type ActivityTone = 'amber' | 'red' | 'green' | 'slate';
 
+export function countedActivityLabel(update: string, count = 1) {
+  if (count <= 1) return update;
+  const plural: Record<string, string> = {
+    'New message': 'new messages',
+    'Partial payment': 'partial payments',
+    'Payment received': 'payments received',
+    'Revision started': 'revisions started',
+    'Revision request sent': 'revision requests sent',
+    'Quote request sent': 'quote requests sent',
+    'Revised files ready': 'revised file updates',
+    'Invoice ready': 'invoices ready',
+    'Quote declined': 'quotes declined',
+    'Quote updated': 'quote updates',
+    'Quote ready': 'quotes ready',
+    'Preview ready': 'previews ready',
+    'Files ready': 'file updates',
+    'Order started': 'order updates',
+  };
+  return plural[update] ? `${count} ${plural[update]}` : `${update} (${count})`;
+}
+
 export function portalActivityRow(title: string, link: string | null): {
   update: string;
   tone: ActivityTone;
@@ -109,6 +130,12 @@ export function portalActivityRow(title: string, link: string | null): {
       primary: false,
     };
   }
+  if (t.includes('quote request sent') || t.includes('new quote request') || t.includes('revision request sent')) {
+    return {
+      update: t.includes('revision') ? 'Revision request sent' : 'Quote request sent',
+      tone: 'green', actionLabel: 'View request', to: link, primary: false,
+    };
+  }
   if (t.includes('revision started') || t.includes('revision requested')) {
     return {
       update: 'Revision started',
@@ -128,7 +155,7 @@ export function portalActivityRow(title: string, link: string | null): {
     };
   }
   if (
-    t.includes('invoice') ||
+    t.includes('invoice') || t.includes('statement') ||
     t.includes('ready to pay') ||
     t.includes('payment reminder') ||
     t.includes('revision payment') ||

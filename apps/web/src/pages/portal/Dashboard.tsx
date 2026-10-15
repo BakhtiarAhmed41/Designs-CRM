@@ -6,7 +6,8 @@ import { DateRangeSelect } from '@/components/ui/DateRangeSelect';
 import { listMyOrders } from '@/lib/orders';
 import { listMyInvoices } from '@/lib/billing';
 import { listMyAllEdits } from '@/lib/edits';
-import { dismissNotification, listNotifications, markNotificationRead, restoreNotification } from '@/lib/notifications';
+import { listNotifications, updateNotificationGroup } from '@/lib/notifications';
+import { getErrorMessage } from '@/lib/api';
 import { datesForPortalPreset, inDateRange, type PortalRangePreset } from '@/lib/dateRange';
 import { useAuth } from '@/context/AuthContext';
 import { freshOnOpen } from '@/lib/queryRefresh';
@@ -15,6 +16,7 @@ import { serviceCategoryLabel } from '@/lib/serviceIcon';
 import {
   ACCOUNT_APPROVED_TITLE,
   ACCOUNT_WELCOME_BODY,
+  countedActivityLabel,
   isAccountApprovedNotice,
   portalActivityRow,
   unreadSections,
@@ -87,7 +89,8 @@ export function PortalDashboard() {
   const [tab, setTab] = useState<WorkTab>('orders');
   const [activityPage, setActivityPage] = useState(1);
   const [showDismissed, setShowDismissed] = useState(false);
-  const [undoId, setUndoId] = useState<string | null>(null);
+  const [undoId, setUndoId] = useState<string[] | null>(null);
+  const [activityError, setActivityError] = useState<string | null>(null);
   const undoTimer = useRef<number | null>(null);
 
   const dates = datesForPortalPreset(preset, customFrom, customTo);
@@ -147,6 +150,7 @@ export function PortalDashboard() {
         page: activityPage,
         pageSize: ACTIVITY_PAGE_SIZE,
         dismissed: showDismissed,
+        grouped: true,
       }),
     ...freshOnOpen,
   });
@@ -183,7 +187,8 @@ export function PortalDashboard() {
   const dismissedCount = activityData?.dismissedCount ?? 0;
   const activityTotal = activityData?.total ?? activities.length;
   const activityPages = activityData?.totalPages ?? 1;
-  const activityFrom = activities.length === 0 ? 0 : (activityPage - 1) * ACTIVITY_PAGE_SIZE + 1;
+  const currentActivityPage = activityData?.page ?? activityPage;
+  const activityFrom = activities.length === 0 ? 0 : (currentActivityPage - 1) * ACTIVITY_PAGE_SIZE + 1;
   const activityTo = activities.length === 0 ? 0 : activityFrom + activities.length - 1;
 
   const orderCount = ordersData?.total ?? orders.length;
@@ -221,36 +226,40 @@ export function PortalDashboard() {
     void qc.invalidateQueries({ queryKey: ['notifications'] });
   }
 
-  async function markActivityRead(id: string) {
-    await markNotificationRead(id);
-    refreshActivity();
+  async function updateActivity(ids: string[], action: 'read' | 'dismiss' | 'restore') {
+    setActivityError(null);
+    try {
+      await updateNotificationGroup(ids, action);
+      refreshActivity();
+      return true;
+    } catch (err) {
+      setActivityError(getErrorMessage(err));
+      return false;
+    }
   }
 
-  function rememberUndo(id: string) {
+  function rememberUndo(id: string[]) {
     if (undoTimer.current) window.clearTimeout(undoTimer.current);
     setUndoId(id);
     undoTimer.current = window.setTimeout(() => setUndoId(null), 6000);
   }
 
-  async function dismissActivity(id: string) {
-    await dismissNotification(id);
-    rememberUndo(id);
-    refreshActivity();
+  async function dismissActivity(ids: string[]) {
+    if (await updateActivity(ids, 'dismiss')) rememberUndo(ids);
   }
 
   async function undoDismiss() {
     if (!undoId) return;
     const id = undoId;
-    setUndoId(null);
-    if (undoTimer.current) window.clearTimeout(undoTimer.current);
-    await restoreNotification(id);
-    refreshActivity();
+    if (await updateActivity(id, 'restore')) {
+      setUndoId(null);
+      if (undoTimer.current) window.clearTimeout(undoTimer.current);
+    }
   }
 
-  async function restoreActivity(id: string) {
-    await restoreNotification(id);
-    refreshActivity();
-  }
+  useEffect(() => {
+    if (activityData?.page && activityData.page !== activityPage) setActivityPage(activityData.page);
+  }, [activityData?.page, activityPage]);
 
   useEffect(() => {
     return () => {
@@ -307,6 +316,7 @@ export function PortalDashboard() {
       </section>
 
       <section className="panel activity-panel">
+        {activityError && <div className="alert-error" role="alert">{activityError}</div>}
         <div className="panel-head">
           <div>
             <div className="activity-kicker" aria-hidden />
@@ -386,14 +396,20 @@ export function PortalDashboard() {
                 {tableActivities.map((n) => {
                   const row = portalActivityRow(n.title, n.link);
                   const unread = !n.readAt;
+                  const actionRequired = n.requiresAction ?? false;
+                  const done = actionRequired ? Boolean(n.completedAt) : !unread;
                   const design = clipDesignLabel(n.designName?.trim() || '—');
                   const ref = n.humanRef ? orderNumber(n.humanRef) || '—' : '—';
                   return (
-                    <tr key={n.id} className={unread ? 'is-unread' : undefined}>
+                    <tr key={n.id} className={done ? 'activity-done' : 'is-unread'} onClick={(event) => {
+                      if (!actionRequired && !done && !(event.target as HTMLElement).closest('button')) {
+                        void updateActivity(n.notificationIds ?? [n.id], 'read');
+                      }
+                    }}>
                       <td>
                         <div className="activity-update">
-                          <span className={`activity-dot ${row.tone}`} aria-hidden />
-                          <span className="activity-update-label">{row.update}</span>
+                          {done ? <i className="ti ti-circle-check activity-check" aria-label="Completed" /> : <span className={`activity-dot ${actionRequired ? 'amber' : 'green'}`} aria-hidden />}
+                          <span className="activity-update-label">{countedActivityLabel(row.update, n.count)}</span>
                         </div>
                       </td>
                       <td className="activity-design" title={design.full}>{design.text}</td>
@@ -401,14 +417,12 @@ export function PortalDashboard() {
                       <td className="activity-time">{activityWhen(n.createdAt)}</td>
                       <td>
                         <div className="activity-actions">
-                          {row.actionLabel && row.to ? (
+                          {actionRequired && done ? (
+                            <span className="activity-done-pill"><i className="ti ti-check" aria-hidden />{n.completionLabel || 'Read'}</span>
+                          ) : row.actionLabel && row.to ? (
                             <Link
                               to={row.to}
-                              className={row.primary ? 'activity-act solid' : 'activity-act'}
-                              onClick={() => {
-                                if (!unread) return;
-                                void markActivityRead(n.id);
-                              }}
+                              className={actionRequired ? 'activity-act solid' : 'activity-act'}
                             >
                               {row.actionLabel}
                             </Link>
@@ -419,7 +433,7 @@ export function PortalDashboard() {
                               className="activity-x"
                               aria-label="Restore update"
                               title="Restore"
-                              onClick={() => void restoreActivity(n.id)}
+                              onClick={() => void updateActivity(n.notificationIds ?? [n.id], 'restore')}
                             >
                               <i className="ti ti-arrow-back-up" />
                             </button>
@@ -428,7 +442,7 @@ export function PortalDashboard() {
                               type="button"
                               className="activity-x"
                               aria-label="Dismiss update"
-                              onClick={() => void dismissActivity(n.id)}
+                              onClick={() => void dismissActivity(n.notificationIds ?? [n.id])}
                             >
                               <i className="ti ti-x" />
                             </button>
@@ -452,19 +466,19 @@ export function PortalDashboard() {
                 <button
                   type="button"
                   className="activity-pager-btn"
-                  disabled={activityPage <= 1}
-                  onClick={() => setActivityPage((p) => Math.max(1, p - 1))}
+                  disabled={currentActivityPage <= 1}
+                  onClick={() => setActivityPage(Math.max(1, currentActivityPage - 1))}
                 >
                   <i className="ti ti-chevron-left" /> Previous
                 </button>
                 <span className="activity-pager-page">
-                  Page {activityPage} of {activityPages}
+                  Page {currentActivityPage} of {activityPages}
                 </span>
                 <button
                   type="button"
                   className="activity-pager-btn"
-                  disabled={activityPage >= activityPages}
-                  onClick={() => setActivityPage((p) => p + 1)}
+                  disabled={currentActivityPage >= activityPages}
+                  onClick={() => setActivityPage(currentActivityPage + 1)}
                 >
                   Next <i className="ti ti-chevron-right" />
                 </button>

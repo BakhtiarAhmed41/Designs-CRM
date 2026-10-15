@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
 import type { AuthUser } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -20,17 +20,28 @@ export class NotificationsController {
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
     @Query('dismissed') dismissed?: string,
+    @Query('grouped') grouped?: string,
   ) {
     return this.notifications.list(user, {
       page: page ? Number(page) : undefined,
       pageSize: pageSize ? Number(pageSize) : undefined,
       dismissed: dismissed === '1' || dismissed === 'true',
+      grouped: grouped === '1' || grouped === 'true',
     });
   }
 
   @Patch('read-all')
   async readAll(@CurrentUser() user: AuthUser | undefined) {
     return this.notifications.markAllRead(user);
+  }
+
+  @Patch('batch')
+  async updateBatch(@CurrentUser() user: AuthUser | undefined, @Body() body: unknown) {
+    const data = z.object({
+      ids: z.array(z.string().uuid()).min(1),
+      action: z.enum(['read', 'dismiss', 'restore']),
+    }).parse(body);
+    return this.notifications.updateBatch(user, data.ids, data.action);
   }
 
   @Patch(':id/read')

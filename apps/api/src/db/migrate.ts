@@ -513,6 +513,12 @@ export async function runMigrations() {
     console.log('Adding notifications.dismissed_at column ...');
     await conn.query('ALTER TABLE notifications ADD COLUMN dismissed_at DATETIME NULL');
   }
+  if (!(await columnExists('notifications', 'completed_at'))) {
+    await conn.query('ALTER TABLE notifications ADD COLUMN completed_at DATETIME NULL');
+  }
+  if (!(await columnExists('notifications', 'completion_label'))) {
+    await conn.query('ALTER TABLE notifications ADD COLUMN completion_label VARCHAR(32) NULL');
+  }
 
   await conn.query(
     `UPDATE notifications

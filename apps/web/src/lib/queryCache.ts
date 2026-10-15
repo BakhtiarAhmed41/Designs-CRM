@@ -23,6 +23,7 @@ const WORK_QUERY_ROOTS = new Set([
   'my-quotes',
   'my-files',
   'my-invoices',
+  'my-activity',
   'portal-orders-nav',
   'portal-invoices-summary',
   'billing-summary',

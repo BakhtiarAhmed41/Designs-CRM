@@ -777,7 +777,7 @@ export class BillingService {
     await this.notifyCustomerUser(data.customerId, {
       title: 'New invoice',
       body: `An invoice for your account is awaiting payment.`,
-      link: '/portal/invoices',
+      link: `/portal/invoices?invoice=${id}${data.orderId ? `&order=${data.orderId}` : ''}`,
     });
 
     return this.getInvoiceDetail(user, id);
@@ -884,7 +884,7 @@ export class BillingService {
     await this.notifyCustomerUser(data.customerId, {
       title: 'Revision payment',
       body: data.coversText.trim(),
-      link: `/portal/orders/${data.orderId}`,
+      link: `/portal/orders/${data.orderId}?invoice=${id}`,
     });
     return { id };
   }
@@ -929,7 +929,7 @@ export class BillingService {
     await this.notifyCustomerUser(data.customerId, {
       title: 'New invoice',
       body: data.coversText.trim(),
-      link: '/portal/invoices',
+      link: `/portal/invoices?invoice=${id}&order=${data.orderId}`,
     });
     return this.getInvoiceDetail(user, id);
   }
@@ -1152,7 +1152,7 @@ export class BillingService {
     await this.notifyCustomerUser(invoice.customer_id, {
       title: 'Payment reminder',
       body: `Your invoice for ${invoice.covers_text ?? 'your order'} is still awaiting payment.`,
-      link: payLink.url,
+      link: `${payLink.url}${payLink.url.includes('?') ? '&' : '?'}invoice=${invoice.id}${invoice.order_id ? `&order=${invoice.order_id}` : ''}`,
     });
     const customer = await this.getCustomerRow(invoice.customer_id);
     if (customer?.email) {
@@ -1224,10 +1224,12 @@ export class BillingService {
     if (invoice.status === InvoiceStatus.PAID) {
       await this.advanceOrderAfterPayment(invoice.order_id);
       await this.releasePaidFormatExport(invoice.id);
+      const customer = await this.getCustomerRow(invoice.customer_id);
+      if (customer?.user_id) await this.notifications.completeInvoicePayment(customer.user_id, invoice.id, invoice.order_id);
       await this.notifyCustomerUser(invoice.customer_id, {
         title: 'Payment received',
         body: `We received your payment for ${invoice.covers_text ?? 'your invoice'}.`,
-        link: '/portal/invoices',
+        link: `/portal/invoices?invoice=${invoice.id}${invoice.order_id ? `&order=${invoice.order_id}` : ''}`,
       });
       return;
     }
@@ -1235,7 +1237,7 @@ export class BillingService {
       await this.notifyCustomerUser(invoice.customer_id, {
         title: 'Partial payment received',
         body: `A payment was applied. ${(invoiceRemainingCents(invoice) / 100).toFixed(2)} ${invoice.currency} remains on ${invoice.covers_text ?? 'your invoice'}.`,
-        link: '/portal/invoices',
+        link: `/portal/invoices?invoice=${invoice.id}${invoice.order_id ? `&order=${invoice.order_id}` : ''}`,
       });
     }
   }
@@ -2458,7 +2460,7 @@ export class BillingService {
         await this.notifyCustomerUser(customer.id, {
           title: 'Monthly statement updated',
           body: coversText,
-          link: '/portal/invoices',
+          link: `/portal/invoices?invoice=${open.id}`,
         });
         summary.push({
           customerId: customer.id,
@@ -2495,7 +2497,7 @@ export class BillingService {
       await this.notifyCustomerUser(customer.id, {
         title: 'Monthly statement ready',
         body: coversText,
-        link: '/portal/invoices',
+        link: `/portal/invoices?invoice=${invoiceId}`,
       });
 
       summary.push({

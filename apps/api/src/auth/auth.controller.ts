@@ -20,7 +20,7 @@ const loginSchema = z.object({
 
 const registerSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6).max(200),
+  password: z.string().min(8, 'Password must be at least 8 characters').max(200),
   name: z.string().min(1).max(200),
   phone: z.string().min(3).max(60).optional().nullable(),
 });

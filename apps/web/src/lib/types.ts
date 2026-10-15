@@ -171,6 +171,11 @@ export type Order = {
 
 export type Notification = {
   id: string;
+  notificationIds?: string[];
+  count?: number;
+  completedAt?: string | null;
+  completionLabel?: string | null;
+  requiresAction?: boolean;
   title: string;
   body: string | null;
   link: string | null;

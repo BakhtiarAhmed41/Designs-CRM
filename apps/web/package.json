@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test:file-groups": "node scripts/verify-file-groups.cjs"
+    "test:file-groups": "node scripts/verify-file-groups.cjs",
+    "test:quote-preferences": "node scripts/verify-quote-preferences.cjs"
   },
   "dependencies": {
     "@stripe/react-stripe-js": "^7.0.0",

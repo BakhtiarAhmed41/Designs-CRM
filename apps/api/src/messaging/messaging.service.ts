@@ -1399,6 +1399,7 @@ export class MessagingService {
     replyToMessageId?: string | null,
   ) {
     assertAuthUser(user);
+    const repliedAt = new Date();
     if (user.role !== UserRole.CLIENT) throw new ForbiddenException();
     const text = body.trim();
     if (!text && files.length === 0)
@@ -1426,6 +1427,8 @@ export class MessagingService {
       [ConversationStatus.OPEN, conversationId],
     );
     await this.maybeAdoptTopicTitle(conversationId);
+
+    await this.notifications.completeConversationReply(user.id, conversationId, repliedAt);
 
     await this.notifications.createForMany(await this.staffUserIds(), {
       title: 'New customer message',

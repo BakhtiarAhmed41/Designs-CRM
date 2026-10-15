@@ -32,7 +32,7 @@ const SERVICES = [
     other: 'embOther' as const,
     heading: 'Machine file formats',
     hint: 'Choose the formats your embroidery machine uses.',
-    formats: ['DST', 'PES', 'EXP', 'JEF', 'VP3', 'HUS', 'VIP', 'XXX', 'SEW'],
+    formats: ['DST', 'PES', 'EXP', 'HUS', 'VIP', 'SEW', 'JEF', 'VP3', 'XXX'],
   },
   {
     id: 'dig',
@@ -50,7 +50,7 @@ const SERVICES = [
     other: 'cncOther' as const,
     heading: 'CNC, laser & 3D formats',
     hint: 'Choose the formats your cutting or 3D software uses.',
-    formats: ['SVG', 'DXF', 'AI', 'EPS', 'CDR', 'PDF', 'PNG', 'STL', '3MF'],
+    formats: ['AI', 'SVG', 'DXF', 'CDR', 'EPS', 'PDF', 'PNG', 'STL', '3MF'],
   },
 ];
 const DEFAULT: Prefs = {
@@ -88,7 +88,7 @@ function readPrefs(raw: unknown): Prefs {
       Array.isArray(p[service.key]) ? p[service.key]! : DEFAULT[service.key]
     )
       .filter((value) => typeof value === 'string')
-      .map((value) => (value.toUpperCase() === 'JPG' ? 'JPEG' : value));
+      .map((value) => (value.trim().toUpperCase() === 'JPG' ? 'JPEG' : value.trim().toUpperCase()));
     next[service.key] = values.filter((value) =>
       service.formats.includes(value),
     );

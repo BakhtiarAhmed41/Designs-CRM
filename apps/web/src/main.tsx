@@ -9,6 +9,7 @@ import { App } from '@/App';
 import '@/index.css';
 import '@/ds.css';
 import '@/theme.css';
+import '@/styles/customer-auth.css';
 
 const queryClient = new QueryClient({
   defaultOptions: {

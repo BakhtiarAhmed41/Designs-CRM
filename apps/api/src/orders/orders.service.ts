@@ -37,6 +37,13 @@ function assertAuthUser(user: AuthUser | undefined): asserts user is AuthUser {
   if (!user) throw new ForbiddenException();
 }
 
+function quoteDraftPayload(raw: unknown): Record<string, unknown> {
+  if (typeof raw === 'string') {
+    try { raw = JSON.parse(raw); } catch { return {}; }
+  }
+  return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
+}
+
 /**
  * Staff-created work stays hidden from the customer until it is ready:
  * unpriced orders (CREATED) and unpriced admin quotes (CREATED, or still
@@ -1963,7 +1970,10 @@ export class OrdersService {
     const order = await this.getOrderRow(orderId);
     if (!order || order.client_user_id !== user.id)
       throw new NotFoundException('Order not found');
-    return this.convertAcceptedQuotation(order, input, 'customer');
+    const actedAt = new Date();
+    const result = await this.convertAcceptedQuotation(order, input, 'customer');
+    await this.notifications.completeOrderActivity(user.id, orderId, ['quote-ready', 'quote-updated'], 'Approved', actedAt);
+    return result;
   }
 
   async adminAcceptQuotation(
@@ -2141,6 +2151,7 @@ export class OrdersService {
       body: input.comment?.trim() || `Customer declined the quote - ${order.name ?? ''}`,
       link: `/admin/quotes/${orderId}`,
     });
+    await this.notifications.completeOrderActivity(user.id, orderId, ['quote-ready', 'quote-updated'], 'Declined');
     return this.assembleOrder(orderId);
   }
 
@@ -4304,7 +4315,7 @@ export class OrdersService {
     return {
       drafts: rows.map((r) => ({
         serviceKey: r.service_key,
-        payload: r.payload,
+        payload: quoteDraftPayload(r.payload),
         updatedAt: r.updated_at,
       })),
     };
@@ -4312,14 +4323,19 @@ export class OrdersService {
 
   async getQuoteDraft(user: AuthUser | undefined, serviceKey: string) {
     assertAuthUser(user);
-    const row = await this.db.queryOne<{
+    let row = await this.db.queryOne<{
       payload: unknown;
       updated_at: Date;
     }>(
       'SELECT payload, updated_at FROM quote_drafts WHERE user_id = ? AND service_key = ? LIMIT 1',
       [user.id, serviceKey.trim().toLowerCase()],
     );
-    return { draft: row ? { payload: row.payload, updatedAt: row.updated_at } : null };
+    if (!row && serviceKey.trim().toLowerCase() === 'laser') {
+      row = await this.db.queryOne<{ payload: unknown; updated_at: Date }>(
+        'SELECT payload, updated_at FROM quote_drafts WHERE user_id = ? AND service_key = ? LIMIT 1', [user.id, 'svg'],
+      );
+    }
+    return { draft: row ? { payload: quoteDraftPayload(row.payload), updatedAt: row.updated_at } : null };
   }
 
   async createQuoteIntent(serviceKey: string, payload: unknown) {

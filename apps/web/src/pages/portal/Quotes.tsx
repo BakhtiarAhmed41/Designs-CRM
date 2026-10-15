@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { listMyOrderSummary, listMyOrders, listQuoteDrafts } from '@/lib/orders';
 import { clipDesignLabel, money, dateShort, quoteLifecycleChip, orderNumber, orderSlug } from '@/lib/format';
 import { serviceCategoryLabel } from '@/lib/serviceIcon';
@@ -36,7 +36,6 @@ function quoteRowAction(statusLabel: string) {
 export function PortalQuotes() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [draftsOpen, setDraftsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -82,11 +81,6 @@ export function PortalQuotes() {
   const awaiting = summaryQ.data?.awaitingQuote ?? 0;
   const pricing = summaryQ.data?.beingPriced ?? 0;
 
-  function continueDraft(serviceKey: string) {
-    setDraftsOpen(false);
-    const key = serviceKey === 'svg' ? 'laser' : serviceKey;
-    navigate(`/portal/quotes/new?service=${encodeURIComponent(key)}&draft=1`);
-  }
 
   return (
     <div className="portal-quotes-page">
@@ -95,11 +89,9 @@ export function PortalQuotes() {
         subtitle="Review your quotes and approve when you’re ready to proceed."
         actions={
           <>
-            {drafts.length > 0 && (
-              <button type="button" className="btn btn-ghost" onClick={() => setDraftsOpen(true)}>
-                <i className="ti ti-device-floppy" /> Open drafts
-              </button>
-            )}
+            <a href="#saved-drafts" className="btn btn-ghost">
+              <i className="ti ti-device-floppy" aria-hidden /> Saved drafts ({drafts.length})
+            </a>
             <RequestQuoteMenu>
               <i className="ti ti-plus" /> Request a quote
             </RequestQuoteMenu>
@@ -122,6 +114,41 @@ export function PortalQuotes() {
         </div>
       </div>
 
+      <section className="card saved-quote-drafts" id="saved-drafts" aria-labelledby="saved-drafts-title">
+        <div className="card-h">
+          <div>
+            <h2 id="saved-drafts-title">Saved drafts ({drafts.length})</h2>
+            <p>Pick up where you left off. One saved draft per service.</p>
+          </div>
+        </div>
+        {draftsQ.isLoading ? <SkeletonRows rows={2} /> : draftsQ.isError ? (
+          <div className="saved-draft-empty" role="alert">
+            <span>We couldn&apos;t load your saved drafts.</span>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => void draftsQ.refetch()}>Try again</button>
+          </div>
+        ) : drafts.length === 0 ? (
+          <p className="saved-draft-empty">No saved drafts yet. Choose “Save as draft” on a quote form to return to it here.</p>
+        ) : (
+          <div className="saved-draft-list">
+            {drafts.map((draft) => {
+              const payload = draft.payload && typeof draft.payload === 'object' ? draft.payload as { designName?: string } : null;
+              const name = clipDesignLabel((typeof payload?.designName === 'string' && payload.designName.trim()) || DRAFT_LABELS[draft.serviceKey] || 'Untitled quote');
+              const service = draft.serviceKey === 'svg' ? 'laser' : draft.serviceKey;
+              return (
+                <div className="saved-draft-row" key={draft.serviceKey}>
+                  <div className="thumb"><i className={'ti ' + (DRAFT_ICONS[draft.serviceKey] ?? 'ti-file')} aria-hidden /></div>
+                  <div className="saved-draft-copy">
+                    <strong title={name.full}>{name.text}</strong>
+                    <span>{DRAFT_LABELS[draft.serviceKey] || draft.serviceKey} · Saved {dateShort(draft.updatedAt)}</span>
+                  </div>
+                  <Link className="btn btn-primary btn-sm" to={'/portal/quotes/new?service=' + encodeURIComponent(service) + '&draft=1'}>Resume draft</Link>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
       <ListToolbar
         search={q}
         onSearch={(v) => {
@@ -136,7 +163,6 @@ export function PortalQuotes() {
         }}
         statusOptions={[
           { value: '', label: 'All statuses' },
-          { value: 'draft', label: 'Draft' },
           { value: 'submitted', label: 'Submitted' },
           { value: 'info_needed', label: 'Info Needed' },
           { value: 'in_progress', label: 'Quote in Progress' },
@@ -235,58 +261,6 @@ export function PortalQuotes() {
         onPage={setPage}
       />
 
-      {draftsOpen && (
-        <div className="overlay open" onClick={() => setDraftsOpen(false)}>
-          <div className="modal" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-h">
-              <span>Saved drafts</span>
-              <button
-                type="button"
-                className="modal-x"
-                onClick={() => setDraftsOpen(false)}
-                aria-label="Close"
-              >
-                &times;
-              </button>
-            </div>
-            <div className="modal-b" style={{ padding: 0 }}>
-              {drafts.length === 0 ? (
-                <p className="muted" style={{ margin: 0, padding: 18 }}>
-                  No saved drafts.
-                </p>
-              ) : (
-                drafts.map((d, i) => (
-                  <div
-                    key={d.serviceKey}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 12,
-                      padding: '14px 18px',
-                      borderBottom: i === drafts.length - 1 ? 'none' : '1px solid var(--line)',
-                    }}
-                  >
-                    <div className={`thumb${d.serviceKey === 'embroidery' ? ' m' : ''}`}>
-                      <i className={`ti ${DRAFT_ICONS[d.serviceKey] ?? 'ti-file'}`} />
-                    </div>
-                    <div className="oinfo" style={{ flex: 1, minWidth: 0 }}>
-                      <div className="on">{DRAFT_LABELS[d.serviceKey] ?? d.serviceKey}</div>
-                      <div className="om">Saved {dateShort(d.updatedAt)}</div>
-                    </div>
-                    <button
-                      type="button"
-                      className="btn btn-primary btn-sm"
-                      onClick={() => continueDraft(d.serviceKey)}
-                    >
-                      Continue
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   );

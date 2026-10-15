@@ -6,11 +6,13 @@ export function listNotifications(params?: {
   page?: number;
   pageSize?: number;
   dismissed?: boolean;
+  grouped?: boolean;
 }) {
   const q = new URLSearchParams();
   if (params?.page) q.set('page', String(params.page));
   if (params?.pageSize) q.set('pageSize', String(params.pageSize));
   if (params?.dismissed) q.set('dismissed', '1');
+  if (params?.grouped) q.set('grouped', '1');
   const qs = q.toString();
   return apiFetch<{
     notifications: Notification[];
@@ -26,6 +28,13 @@ export function listNotifications(params?: {
 export function dismissNotification(id: string) {
   return apiFetch<{ ok: boolean }>(`/notifications/${id}/dismiss`, {
     method: 'PATCH',
+  });
+}
+
+export function updateNotificationGroup(ids: string[], action: 'read' | 'dismiss' | 'restore') {
+  return apiFetch<{ ok: boolean }>('/notifications/batch', {
+    method: 'PATCH',
+    body: JSON.stringify({ ids, action }),
   });
 }
 

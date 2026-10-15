@@ -2302,9 +2302,26 @@ button.primary i,
 .dash-col-ref { width: 18%; }
 .dash-col-time { width: 14%; }
 .dash-col-action { width: 28%; }
+.saved-quote-drafts { margin: 20px 0; scroll-margin-top: 80px; }
+.saved-quote-drafts .card-h h2 { margin: 0; font-size: 16px; font-weight: 600; color: var(--ink); }
+.saved-quote-drafts .card-h p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+.saved-draft-row { display: flex; align-items: center; gap: 14px; padding: 18px 20px; }
+.saved-draft-row + .saved-draft-row { border-top: 1px solid var(--line); }
+.saved-draft-copy { flex: 1; min-width: 0; }
+.saved-draft-copy strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.saved-draft-copy span { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
+.saved-draft-row > a { flex-shrink: 0; }
+.saved-draft-empty { display: flex; align-items: center; gap: 12px; margin: 0; padding: 20px; color: var(--muted); font-size: 13px; }
+.quote-draft-notice { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0 0 14px; padding: 12px 16px; background: var(--tint); border: 1px solid var(--line); border-radius: 8px; }
+.quote-draft-notice a { font-weight: 600; color: var(--brand); }
+@media (max-width: 600px) {
+  .saved-draft-row { flex-wrap: wrap; padding: 16px; }
+  .saved-draft-copy { flex-basis: calc(100% - 64px); }
+  .saved-draft-row > a { margin-left: 54px; }
+}
 .activity-table { min-width: 880px; }
 .activity-table .dash-col-update { width: 200px; }
-.activity-table .dash-col-design { width: auto; }
+.activity-table .dash-col-design { width: 24%; }
 .activity-table .dash-col-ref { width: 168px; }
 .activity-table .dash-col-time { width: 120px; }
 .activity-table .dash-col-action { width: 212px; }
@@ -2464,6 +2481,13 @@ button.primary i,
   white-space: nowrap;
 }
 .activity-table tr.is-unread .activity-update-label { font-weight: 700; }
+.activity-table tr.activity-done .activity-update-label { font-weight: 400; }
+.activity-table .activity-check,
+.activity-table .activity-check::before { color: #2e9d57 !important; }
+.activity-check { flex: none; font-size: 17px; margin-left: -4px; margin-right: -4px; }
+.activity-done-pill { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 30px; padding: 4px 13px; border-radius: 20px; background: #d5efd3; color: #237a36; font-size: 13px; font-weight: 600; }
+.activity-table .activity-done-pill i,
+.activity-table .activity-done-pill i::before { color: inherit !important; }
 .activity-design,
 .activity-ref,
 .activity-time {

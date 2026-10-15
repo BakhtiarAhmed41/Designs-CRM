@@ -61,6 +61,12 @@ export class CustomersService {
   }
 
   private customerDto(c: CustomerRow) {
+    let preferences = c.preferences;
+    // MariaDB can return its JSON alias as text rather than a parsed object.
+    if (typeof preferences === 'string') {
+      try { preferences = JSON.parse(preferences); }
+      catch { preferences = null; }
+    }
     return {
       id: c.id,
       userId: c.user_id,
@@ -73,7 +79,7 @@ export class CustomersService {
       storeCreditCents: Number(c.store_credit_cents ?? 0),
       sinceDate: c.since_date,
       mergedIntoId: c.merged_into_id,
-      preferences: c.preferences ?? null,
+      preferences: preferences && typeof preferences === 'object' && !Array.isArray(preferences) ? preferences : null,
       createdAt: c.created_at,
       updatedAt: c.updated_at,
     };

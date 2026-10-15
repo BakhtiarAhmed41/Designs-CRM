@@ -99,8 +99,8 @@ export class AuthService {
     const email = params.email.toLowerCase();
     const name = params.name.trim();
     if (!name) throw new BadRequestException('Name is required');
-    if (params.password.length < 6) {
-      throw new BadRequestException('Password must be at least 6 characters');
+    if (params.password.length < 8) {
+      throw new BadRequestException('Password must be at least 8 characters');
     }
 
     const existing = await this.findByEmail(email);

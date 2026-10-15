@@ -83,6 +83,7 @@ export function QuoteFormPage() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const dirtyRef = useRef(false);
   const draftRestoredRef = useRef(false);
+  const draftRequestRef = useRef(0);
   const requested = params.get('service');
   const resumeDraft = params.get('draft') === '1';
   const initial = requested === 'svg' ? 'laser' : requested;
@@ -91,7 +92,7 @@ export function QuoteFormPage() {
   const [customerPrefs, setCustomerPrefs] = useState<Record<string, unknown> | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [draftNotice, setDraftNotice] = useState<'saved' | 'restored' | null>(null);
   const { colors: themeColors } = useTheme();
 
   useEffect(() => {
@@ -102,6 +103,8 @@ export function QuoteFormPage() {
     const match = SERVICES.find((s) => s.key === initial);
     setService(match ?? null);
     draftRestoredRef.current = false;
+    draftRequestRef.current += 1;
+    setDraftNotice(null);
   }, [initial, requested, navigate, resumeDraft]);
 
   useEffect(() => {
@@ -118,12 +121,6 @@ export function QuoteFormPage() {
         setCustomerPrefs(null);
       });
   }, []);
-
-  useEffect(() => {
-    if (!toast) return;
-    const t = window.setTimeout(() => setToast(null), 3200);
-    return () => window.clearTimeout(t);
-  }, [toast]);
 
   const confirmChangeService = useCallback(async () => {
     if (!dirtyRef.current) return true;
@@ -215,8 +212,29 @@ export function QuoteFormPage() {
     }
   }, [service, qc, navigate, customerPrefs]);
 
+  const restoreSavedDraft = useCallback((win: Window | null) => {
+    if (!win || !service || !resumeDraft || draftRestoredRef.current) return;
+    draftRestoredRef.current = true;
+    const requestId = ++draftRequestRef.current;
+    void getQuoteDraft(service.key).then((res) => {
+      if (requestId !== draftRequestRef.current || win !== iframeRef.current?.contentWindow) return;
+      if (!res.draft) {
+        draftRestoredRef.current = false;
+        setError('This draft could not be found. Return to Quotes to choose a saved draft.');
+        return;
+      }
+      win.postMessage({ type: 'lvd-restore-draft', draft: res.draft.payload }, '*');
+      setDraftNotice('restored');
+    }).catch((err) => {
+      if (requestId !== draftRequestRef.current) return;
+      draftRestoredRef.current = false;
+      setError(friendlySubmitError(err));
+    });
+  }, [service, resumeDraft]);
+
   useEffect(() => {
     function onMsg(ev: MessageEvent) {
+      if (ev.source !== iframeRef.current?.contentWindow) return;
       const data = ev.data as { type?: string; height?: number } | null;
       if (!data || typeof data !== 'object') return;
       if (data.type === 'lvd-quote-cancel') void closePage();
@@ -229,15 +247,7 @@ export function QuoteFormPage() {
         if (win && customerPrefs && !resumeDraft && !draftRestoredRef.current) {
           win.postMessage({ type: 'lvd-apply-prefs', prefs: customerPrefs }, '*');
         }
-        if (service && resumeDraft) {
-          void getQuoteDraft(service.key).then((res) => {
-            if (res.draft && win) {
-              draftRestoredRef.current = true;
-              win.postMessage({ type: 'lvd-restore-draft', draft: res.draft.payload }, '*');
-              setToast('Restored your saved draft.');
-            }
-          });
-        }
+        restoreSavedDraft(win);
       }
       if (data.type === 'lvd-quote-submit') {
         void submitFromIframe((data as { files?: unknown }).files);
@@ -249,7 +259,7 @@ export function QuoteFormPage() {
           void saveQuoteDraft(service.key, collected)
             .then(() => {
               dirtyRef.current = false;
-              setToast('Draft saved. You’ll see it on Quotes.');
+              setDraftNotice('saved');
               void qc.invalidateQueries({ queryKey: ['my-quote-drafts'] });
             })
             .catch((e) => {
@@ -260,11 +270,14 @@ export function QuoteFormPage() {
         }
       }
       if (data.type === 'lvd-open-messages') navigate('/portal/messages');
-      if (data.type === 'lvd-form-dirty') dirtyRef.current = true;
+      if (data.type === 'lvd-form-dirty') {
+        dirtyRef.current = true;
+        setDraftNotice(null);
+      }
     }
     window.addEventListener('message', onMsg);
     return () => window.removeEventListener('message', onMsg);
-  }, [submitFromIframe, navigate, customerPrefs, service, resumeDraft, qc, themeColors, closePage]);
+  }, [submitFromIframe, navigate, customerPrefs, service, resumeDraft, qc, themeColors, closePage, restoreSavedDraft]);
 
   useEffect(() => {
     if (!service || !customerPrefs || resumeDraft || draftRestoredRef.current) return;
@@ -313,6 +326,12 @@ export function QuoteFormPage() {
       </header>
 
       {error && <div className="alert-error">{error}</div>}
+      {draftNotice && (
+        <div className="quote-draft-notice" role="status">
+          <span>{draftNotice === 'saved' ? 'Draft saved in Quotes → Saved drafts. Artwork and reference files will need to be reattached.' : 'Draft restored. Reattach artwork and reference files before submitting.'}</span>
+          <Link to="/portal/quotes#saved-drafts">View saved drafts</Link>
+        </div>
+      )}
 
       <div className={`quote-layout${service ? ' quote-layout-form' : ''}`}>
         <div>
@@ -354,6 +373,11 @@ export function QuoteFormPage() {
               onLoad={() => {
                 const win = iframeRef.current?.contentWindow;
                 postThemeToWindow(win, themeColors);
+                win?.postMessage({ type: 'lvd-set-context', role: 'customer', kind: 'quote' }, '*');
+                restoreSavedDraft(win ?? null);
+                if (customerPrefs && !resumeDraft && !draftRestoredRef.current) {
+                  win?.postMessage({ type: 'lvd-apply-prefs', prefs: customerPrefs }, '*');
+                }
                 win?.postMessage({ type: 'lvd-request-height' }, '*');
               }}
             />
@@ -378,7 +402,6 @@ export function QuoteFormPage() {
           subtitle="Uploading details and preparing your request."
         />
       )}
-      {toast && <div className="toast show">{toast}</div>}
     </div>
   );
 }
