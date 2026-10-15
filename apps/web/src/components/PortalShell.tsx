@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Brand, LogoutLink, Shell, useShellUser } from './Shell';
 import { RequestQuoteContext } from '@/context/RequestQuoteContext';
-import { getMyCustomer, portalLookFromPrefs } from '@/lib/customers';
+import { getMyCustomer, portalLookFromPrefs, portalLookStyle, type PortalLook } from '@/lib/customers';
+import { PortalAppearanceContext } from '@/context/PortalAppearanceContext';
 import { listMyOrderSummary } from '@/lib/orders';
 import { getMyInvoiceSummary } from '@/lib/billing';
 import { getMyUnreadSummary } from '@/lib/messaging';
@@ -42,6 +43,7 @@ function NavGroup({ label, items }: { label: string; items: NavEntry[] }) {
 }
 
 export function PortalShell() {
+  const [appearancePreview, setAppearancePreview] = useState<PortalLook | null>(null);
   const { onLogout } = useShellUser();
   const qc = useQueryClient();
   const location = useLocation();
@@ -82,7 +84,7 @@ export function PortalShell() {
     queryFn: () => listNotifications({ page: 1, pageSize: 40 }),
     refetchInterval: whenVisible(20_000),
   });
-  const look = portalLookFromPrefs(meCustomer?.customer?.preferences);
+  const look = appearancePreview ?? portalLookFromPrefs(meCustomer?.customer?.preferences);
   const notes = activityData?.notifications ?? [];
   const news = unreadSections(notes);
   const msgUnread = (unread?.unreadConversations ?? 0) > 0;
@@ -195,12 +197,10 @@ export function PortalShell() {
 
   return (
     <RequestQuoteContext.Provider value={{ openRequestQuote }}>
+      <PortalAppearanceContext.Provider value={setAppearancePreview}>
       <div
         className="portal-look"
-        style={{
-          ['--portal-heading' as string]: look.headingColor || undefined,
-          ['--portal-page-bg' as string]: look.backgroundColor || undefined,
-        }}
+        style={portalLookStyle(look)}
       >
         <Shell
           sidebar={sidebar}
@@ -214,6 +214,7 @@ export function PortalShell() {
           ]}
         />
       </div>
+      </PortalAppearanceContext.Provider>
     </RequestQuoteContext.Provider>
   );
 }

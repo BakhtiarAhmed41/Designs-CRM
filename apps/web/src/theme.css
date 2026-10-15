@@ -5269,3 +5269,18 @@ form.card-pad > .btn {
   box-shadow: none;
   background: #fff;
 }
+/* Customer appearance overrides the global white surfaces only for the page canvas. */
+.portal-look .app-frame .main {
+  background: var(--portal-page-bg, var(--bg)) !important;
+}
+.portal-look .app-frame .main :is(h1, h2, h3, h4),
+.portal-look .app-frame .main .card-h .ct {
+  color: var(--portal-heading, var(--ink));
+}
+.portal-look .app-frame .main .ph h1 {
+  color: var(--portal-page-heading, var(--portal-heading, var(--ink)));
+}
+.portal-look .app-frame .main .ph :is(.sub, .crumb, .crumb a),
+.portal-look .app-frame .main .settings-reset {
+  color: var(--portal-page-muted, var(--muted));
+}

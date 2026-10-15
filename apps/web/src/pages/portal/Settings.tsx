@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { usePortalAppearancePreview } from '@/context/PortalAppearanceContext';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import {
@@ -105,6 +106,8 @@ function readPrefs(raw: unknown): Prefs {
   return next;
 }
 export function PortalSettings() {
+  const qc = useQueryClient();
+  const previewAppearance = usePortalAppearancePreview();
   const { user } = useAuth();
   const { colors } = useTheme();
   const { data, refetch, isSuccess, isError } = useQuery({
@@ -127,6 +130,14 @@ export function PortalSettings() {
     setBackgroundColor(look.backgroundColor || colors.pageBg);
   }, [data, isSuccess, colors]);
   const ready = isSuccess && Boolean(data.customer);
+  useEffect(() => {
+    if (!ready) return;
+    previewAppearance({
+      headingColor: normalizeHex(headingColor) || colors.mainText,
+      backgroundColor: normalizeHex(backgroundColor) || colors.pageBg,
+    });
+  }, [ready, headingColor, backgroundColor, colors.mainText, colors.pageBg, previewAppearance]);
+  useEffect(() => () => previewAppearance(null), [previewAppearance]);
   async function save(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
@@ -148,16 +159,17 @@ export function PortalSettings() {
           .filter(Boolean);
         payload[service.key] = [...new Set([...prefs[service.key], ...extra])];
       }
-      await updateMyCustomer({
+      const saved = await updateMyCustomer({
         preferences: {
           ...(latest && typeof latest === 'object' ? latest : {}),
           ...payload,
           portalLook: { headingColor: heading, backgroundColor: background },
         },
       });
+      qc.setQueryData(['portal-customer-me'], saved);
       await refetch();
       setMessage(
-        'Settings saved. Your preferred formats will be used on new quotes.',
+        'Settings saved. Your appearance and preferred file formats are updated.',
       );
     } catch (err) {
       setError(getErrorMessage(err));

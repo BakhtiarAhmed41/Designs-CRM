@@ -863,7 +863,8 @@ form > .btn-primary {
   margin-bottom: 14px;
 }
 .alert-error { background: var(--tint-m); color: var(--maroon); }
-.alert-success { background: #E7F1E4; color: #2f7d32; }
+.alert-success { background: #E7F1E4; color: #2f7d32; align-items: center; }
+.alert-success > i { flex-shrink: 0; }
 
 /* ---------- Modals ---------- */
 .overlay {

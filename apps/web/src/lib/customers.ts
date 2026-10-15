@@ -1,4 +1,5 @@
 import { apiFetch } from './api';
+import { normalizeHex } from './theme';
 import type { OrderStatus } from './types';
 
 export type AccountType = 'PAY_PER_ORDER' | 'NET_MONTHLY';
@@ -109,13 +110,40 @@ export type PortalLook = {
 };
 
 export function portalLookFromPrefs(prefs: unknown): PortalLook {
+  if (typeof prefs === 'string') {
+    try { prefs = JSON.parse(prefs); } catch { return {}; }
+  }
   if (!prefs || typeof prefs !== 'object') return {};
   const look = (prefs as { portalLook?: unknown }).portalLook;
   if (!look || typeof look !== 'object') return {};
   const rec = look as Record<string, unknown>;
   return {
-    headingColor: typeof rec.headingColor === 'string' ? rec.headingColor : undefined,
-    backgroundColor: typeof rec.backgroundColor === 'string' ? rec.backgroundColor : undefined,
+    headingColor: typeof rec.headingColor === 'string' ? normalizeHex(rec.headingColor) ?? undefined : undefined,
+    backgroundColor: typeof rec.backgroundColor === 'string' ? normalizeHex(rec.backgroundColor) ?? undefined : undefined,
+  };
+}
+
+export function portalLookStyle(look: PortalLook): Record<string, string | undefined> {
+  const background = look.backgroundColor && normalizeHex(look.backgroundColor);
+  const heading = look.headingColor && normalizeHex(look.headingColor);
+  const luminance = (hex: string) => {
+    const channels = [1, 3, 5].map((start) => {
+      const value = parseInt(hex.slice(start, start + 2), 16) / 255;
+      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    });
+    return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+  };
+  const dark = background ? luminance(background) < 0.2 : false;
+  let pageHeading = heading || undefined;
+  if (background && heading) {
+    const bg = luminance(background), fg = luminance(heading);
+    if ((Math.max(bg, fg) + 0.05) / (Math.min(bg, fg) + 0.05) < 3) pageHeading = dark ? '#FFFFFF' : '#222222';
+  }
+  return {
+    '--portal-heading': heading || undefined,
+    '--portal-page-bg': background || undefined,
+    '--portal-page-heading': pageHeading,
+    '--portal-page-muted': dark ? '#D1D5DB' : undefined,
   };
 }
 

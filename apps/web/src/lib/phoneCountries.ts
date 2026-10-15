@@ -1,0 +1,18 @@
+export const PHONE_COUNTRIES = [
+  ['US', '1', 'United States'], ['CA', '1', 'Canada'],
+  ['GB', '44', 'United Kingdom'], ['AU', '61', 'Australia'],
+  ['NZ', '64', 'New Zealand'], ['PK', '92', 'Pakistan'],
+  ['IN', '91', 'India'], ['BD', '880', 'Bangladesh'],
+  ['AE', '971', 'United Arab Emirates'], ['SA', '966', 'Saudi Arabia'],
+  ['QA', '974', 'Qatar'], ['KW', '965', 'Kuwait'],
+  ['DE', '49', 'Germany'], ['FR', '33', 'France'],
+  ['IT', '39', 'Italy'], ['ES', '34', 'Spain'],
+  ['NL', '31', 'Netherlands'], ['IE', '353', 'Ireland'],
+  ['SE', '46', 'Sweden'], ['NO', '47', 'Norway'],
+  ['DK', '45', 'Denmark'], ['CH', '41', 'Switzerland'],
+  ['MX', '52', 'Mexico'], ['BR', '55', 'Brazil'],
+  ['ZA', '27', 'South Africa'], ['NG', '234', 'Nigeria'],
+  ['SG', '65', 'Singapore'], ['MY', '60', 'Malaysia'],
+  ['PH', '63', 'Philippines'], ['JP', '81', 'Japan'],
+  ['CN', '86', 'China'], ['KR', '82', 'South Korea'],
+] as const;

@@ -5,27 +5,12 @@ import { confirmEmailChange, forgotPassword, resetPassword, verifyEmail } from '
 import { claimQuoteIntent } from '@/lib/orders';
 import { getErrorMessage } from '@/lib/api';
 import { orderSlug } from '@/lib/format';
+import { PHONE_COUNTRIES } from '@/lib/phoneCountries';
+import { PhoneCountrySelect } from '@/components/PhoneCountrySelect';
 
 type Mode = 'login' | 'register' | 'forgot' | 'reset';
 
-const PHONE_COUNTRIES = [
-  ['US', '1', 'United States'], ['CA', '1', 'Canada'],
-  ['GB', '44', 'United Kingdom'], ['AU', '61', 'Australia'],
-  ['NZ', '64', 'New Zealand'], ['PK', '92', 'Pakistan'],
-  ['IN', '91', 'India'], ['BD', '880', 'Bangladesh'],
-  ['AE', '971', 'United Arab Emirates'], ['SA', '966', 'Saudi Arabia'],
-  ['QA', '974', 'Qatar'], ['KW', '965', 'Kuwait'],
-  ['DE', '49', 'Germany'], ['FR', '33', 'France'],
-  ['IT', '39', 'Italy'], ['ES', '34', 'Spain'],
-  ['NL', '31', 'Netherlands'], ['IE', '353', 'Ireland'],
-  ['SE', '46', 'Sweden'], ['NO', '47', 'Norway'],
-  ['DK', '45', 'Denmark'], ['CH', '41', 'Switzerland'],
-  ['MX', '52', 'Mexico'], ['BR', '55', 'Brazil'],
-  ['ZA', '27', 'South Africa'], ['NG', '234', 'Nigeria'],
-  ['SG', '65', 'Singapore'], ['MY', '60', 'Malaysia'],
-  ['PH', '63', 'Philippines'], ['JP', '81', 'Japan'],
-  ['CN', '86', 'China'], ['KR', '82', 'South Korea'],
-] as const;
+
 
 export function Login() {
   const { login, register } = useAuth();
@@ -222,11 +207,7 @@ export function Login() {
               <div className="login-field">
                 <label htmlFor="login-phone">Phone number <span className="login-optional">(optional)</span></label>
                 <div className="login-phone-wrap">
-                  <select aria-label="Phone country code" autoComplete="tel-country-code" value={phoneCountry} onChange={(e) => setPhoneCountry(e.target.value)}>
-                    {PHONE_COUNTRIES.map(([country, code, countryName]) => (
-                      <option key={country} value={country} title={countryName}>{country} +{code}</option>
-                    ))}
-                  </select>
+                  <PhoneCountrySelect value={phoneCountry} onChange={setPhoneCountry} />
                   <input id="login-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} autoComplete="tel-national" placeholder="555 123 4567" pattern={'[0-9\\(\\) .\\-]+'} title="Enter your phone number without the country code; select it from the dropdown." />
                 </div>
               </div>

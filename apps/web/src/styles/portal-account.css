@@ -248,6 +248,7 @@
 }
 .preview-portal aside .active {
   background: var(--sidebar-active-bg, var(--tint-hover));
+  color: var(--sidebar-active-text, var(--ink));
   border-radius: 4px;
 }
 .preview-content {
