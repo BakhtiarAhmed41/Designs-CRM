@@ -70,7 +70,20 @@
 .customer-auth .login-story .ti::before { color: inherit !important; }
 
 .login-stitching { position: absolute; bottom: 55px; left: 0; width: 100%; height: 220px; pointer-events: none; opacity: .22; }
-.login-stitching path { stroke: currentColor; stroke-width: 1; stroke-dasharray: 5 4; }
+.login-stitching path {
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-dasharray: 5 4;
+  animation: login-stitch-flow 18s linear infinite;
+}
+.login-stitching path:nth-child(even) { animation-direction: reverse; }
+@keyframes login-stitch-flow {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -180; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-stitching path { animation: none; }
+}
 .login-story-footer { position: relative; margin: 0; padding-top: 18px; border-top: 1px solid color-mix(in srgb, currentColor 30%, transparent); text-align: center; font-size: 12px; }
 
 .customer-auth .login-panel { width: 100%; max-width: 560px; padding: 48px 40px; min-width: 0; align-self: center; justify-self: center; }
