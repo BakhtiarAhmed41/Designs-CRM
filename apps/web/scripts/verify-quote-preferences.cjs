@@ -47,20 +47,45 @@ function bridgeFor(service) {
   return { window, boxes, other, otherCheck };
 }
 const embroidery = bridgeFor('embroidery');
-embroidery.window.LVD_APPLY_PREFS({ embFormats: ['DST', 'PES'] });
+embroidery.window.LVD_APPLY_PREFS({ services: ['emb'], embFormats: ['DST', 'PES'] });
 assert.deepEqual(embroidery.boxes.filter((b) => b.checked).map((b) => b.value), ['DST', 'PES']);
 embroidery.boxes.find((b) => b.value === 'PES').checked = false;
 assert.equal(embroidery.boxes.find((b) => b.value === 'PES').checked, false);
 const cnc = bridgeFor('laser');
-cnc.window.LVD_APPLY_PREFS({ cncFormats: ['STL', '3MF'] });
+cnc.window.LVD_APPLY_PREFS({ services: ['cnc'], cncFormats: ['STL', '3MF'] });
 assert.deepEqual(cnc.boxes.filter((b) => b.checked).map((b) => b.value), ['STL', '3MF']);
 assert.equal(cnc.otherCheck.checked, false);
 const vector = bridgeFor('vector');
-vector.window.LVD_APPLY_PREFS({ digFormats: ['JPG', 'SVG'], digOther: 'TIFF' });
+vector.window.LVD_APPLY_PREFS({ services: ['dig'], digFormats: ['JPG', 'SVG'], digOther: 'TIFF' });
 assert.deepEqual(vector.boxes.filter((b) => b.checked).map((b) => b.value), ['SVG', 'JPEG']);
 assert.equal(vector.other.value, 'TIFF');
 assert.equal(vector.otherCheck.checked, true);
 console.log('PASS: saved formats tick the real bridge controls, including STL/3MF, JPG aliases, and custom formats');
+
+const preferenceHelpers = load('src/lib/customerPrefs.ts');
+for (const service of SERVICES) {
+  const quoteKey = serviceKeys[service.id];
+  const active = { services: [service.id], [service.key]: [service.formats[0]], [service.other]: 'CUSTOM', hoops: ['4x4'], placement: 'Hat' };
+  const frame = bridgeFor(quoteKey);
+  frame.window.LVD_APPLY_PREFS(active);
+  assert.equal(frame.window.LVD_FORMATS_ON_PROFILE, true);
+  assert.equal(preferenceHelpers.formatsForQuoteService(active, quoteKey).length, 2);
+  for (const services of [[], ['different-service'], undefined]) {
+    const inactive = { ...active, services };
+    frame.window.LVD_APPLY_PREFS(inactive);
+    assert.equal(frame.boxes.some((box) => box.checked), false);
+    assert.equal(frame.other.value, '');
+    assert.equal(frame.otherCheck.checked, false);
+    assert.equal(frame.window.LVD_FORMATS_ON_PROFILE, false);
+    assert.equal(frame.window.LVD_USUAL_NOTES, '');
+    assert.equal(preferenceHelpers.quoteFormatsFromPrefs([], inactive, quoteKey).length, 0);
+    assert.equal(preferenceHelpers.quoteFormatsFromPrefs(['PDF'], inactive, quoteKey).join(','), 'PDF');
+    assert.equal(preferenceHelpers.customerSetupLines(inactive).length, 0);
+  }
+  frame.window.LVD_APPLY_PREFS(active);
+  assert.equal(frame.boxes.find((box) => box.value === service.formats[0]).checked, true);
+}
+console.log('PASS: unchecked services never prefill or supply fallback preferences; re-enabling restores saved selections and manual quote choices still work');
 
 function renderDrafts(drafts, failed = false, loading = false) {
   const React = require('react');
@@ -95,7 +120,7 @@ async function frameLoad(resumeDraft) {
   let stateIndex = 0, refIndex = 0;
   const messages = [];
   const requests = [];
-  const prefs = { embFormats: ['DST', 'PES'] };
+  const prefs = { services: ['emb'], embFormats: ['DST', 'PES'] };
   const win = { postMessage: (message) => messages.push(message) };
   const react = {
     useState: (initial) => [stateIndex++ === 1 ? prefs : initial, () => {}],

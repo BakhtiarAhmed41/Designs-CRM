@@ -98,7 +98,7 @@ function cleanFormats(list: string[], extra = '') {
 
 export function formatsForQuoteService(prefs: unknown, quoteKey: string) {
   const p = asCustomerFilePrefs(prefs);
-  if (!p) return [];
+  if (!p || !isUsualQuoteService(p, quoteKey)) return [];
   if (quoteKey === 'embroidery') return cleanFormats(p.embFormats, p.embOther);
   if (quoteKey === 'laser') return cleanFormats(p.cncFormats, p.cncOther);
   return cleanFormats(p.digFormats, p.digOther);
@@ -123,7 +123,7 @@ export function orderRequestedFormats(orderPrefs: unknown, designs?: Array<{ req
 
 export function customerSetupLines(prefs: unknown) {
   const p = asCustomerFilePrefs(prefs);
-  if (!p) return [];
+  if (!p || !isUsualQuoteService(p, 'embroidery')) return [];
   const rows: Array<{ label: string; value: string }> = [];
   if (p.placement) rows.push({ label: 'Usual placement', value: p.placement });
   if (p.hoops.length) rows.push({ label: 'Usual hoop sizes', value: p.hoops.join(', ') });

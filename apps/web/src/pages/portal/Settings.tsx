@@ -258,6 +258,7 @@ export function PortalSettings() {
                     <i className="ti ti-help-circle" aria-hidden />
                   </span>
                 </div>
+                <fieldset className="settings-service-fields" disabled={!prefs.services.includes(service.id)} aria-label={`${service.label} preferences`}>
                 <p className="pref-section-label">{service.heading}</p>
                 <div className="settings-formats">
                   {service.formats.map((format) => (
@@ -331,6 +332,7 @@ export function PortalSettings() {
                     </div>
                   </div>
                 )}
+                </fieldset>
               </section>
             ))}
           </div>
@@ -340,6 +342,7 @@ export function PortalSettings() {
               <label htmlFor="settings-placement">Placement</label>
               <select
                 id="settings-placement"
+                disabled={!prefs.services.includes('emb')}
                 value={prefs.placement || ''}
                 onChange={(event) =>
                   setPrefs((prev) => ({
@@ -365,8 +368,8 @@ export function PortalSettings() {
           </details>
           <p className="settings-explainer">
             <b>
-              Your saved formats are selected automatically when you request a
-              quote.
+              Saved formats for checked services are selected automatically when
+              you request a quote.
             </b>
             <span className="profile-hint">
               You can still change them for each request. Separate other formats

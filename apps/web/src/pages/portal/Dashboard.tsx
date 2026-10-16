@@ -528,7 +528,7 @@ export function PortalDashboard() {
             )}
             {orders.length > 0 && (
               <div className="dash-table-wrap">
-                <table className="dash-table">
+                <table className="dash-table active-requests-table">
                   <colgroup>
                     <col className="dash-col-project" />
                     <col className="dash-col-id" />
@@ -597,7 +597,7 @@ export function PortalDashboard() {
             )}
             {quotes.length > 0 && (
               <div className="dash-table-wrap">
-                <table className="dash-table">
+                <table className="dash-table active-requests-table">
                   <colgroup>
                     <col className="dash-col-project" />
                     <col className="dash-col-id" />

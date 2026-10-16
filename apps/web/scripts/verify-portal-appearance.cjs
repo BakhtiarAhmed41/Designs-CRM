@@ -65,6 +65,19 @@ async function run() {
   render(); render();
   assert.equal(previews.at(-1).backgroundColor, '#F8F6F1');
   let tree = render();
+  for (const [id, label] of [['emb', 'Embroidery Digitizing'], ['dig', 'Vector & Print Files'], ['cnc', 'CNC, Laser & 3D Files']]) {
+    const fields = () => find(tree, n => n.type === 'fieldset' && n.props['aria-label'] === `${label} preferences`);
+    const service = () => find(tree, n => n.props?.className === 'settings-service' && find(n, child => child.props?.['aria-label'] === `${label} preferences`));
+    const mainCheckbox = () => find(service(), n => n.type === 'input' && n.props.type === 'checkbox');
+    assert.equal(fields().props.disabled, !mainCheckbox().props.checked);
+    mainCheckbox().props.onChange();
+    tree = render();
+    assert.equal(fields().props.disabled, !mainCheckbox().props.checked);
+    if (id === 'emb') assert.equal(find(tree, n => n.props?.id === 'settings-placement').props.disabled, fields().props.disabled);
+    mainCheckbox().props.onChange();
+    tree = render();
+  }
+  console.log('PASS: each main service checkbox enables/disables its nested controls, including embroidery placement');
   find(tree, n => n.props?.['aria-label'] === 'Background color hex').props.onChange({ target: { value: '#292929' } });
   tree = render();
   find(tree, n => n.props?.['aria-label'] === 'Heading color hex').props.onChange({ target: { value: '#9A1E22' } });

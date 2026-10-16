@@ -2302,6 +2302,11 @@ button.primary i,
 .dash-col-ref { width: 18%; }
 .dash-col-time { width: 14%; }
 .dash-col-action { width: 28%; }
+.active-requests-table { min-width: 1080px; }
+.active-requests-table col { width: calc(100% / 6); }
+.active-requests-table th,
+.active-requests-table td { padding-left: 18px; padding-right: 18px; }
+.active-requests-table .portal-chip { max-width: 100%; white-space: normal; }
 .saved-quote-drafts { margin: 20px 0; scroll-margin-top: 80px; }
 .saved-quote-drafts .card-h h2 { margin: 0; font-size: 16px; font-weight: 600; color: var(--ink); }
 .saved-quote-drafts .card-h p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }

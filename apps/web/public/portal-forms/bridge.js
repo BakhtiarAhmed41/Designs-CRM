@@ -375,8 +375,13 @@
       });
   }
 
+  function serviceEnabled(prefs, svc) {
+    var id = { embroidery: 'emb', vector: 'dig', laser: 'cnc' }[svc];
+    return !!(prefs && id && Array.isArray(prefs.services) && prefs.services.indexOf(id) !== -1);
+  }
+
   function formatsForService(prefs, svc) {
-    if (!prefs) return [];
+    if (!serviceEnabled(prefs, svc)) return [];
     var list = [];
     var seen = {};
     var raw =
@@ -511,9 +516,12 @@
     var savedFormats = formatsForService(prefs, svc);
     window.LVD_FORMATS_ON_PROFILE = savedFormats.length > 0;
     applyFormats(savedFormats);
-    applyPlacement(prefs.placement);
-    applyHoops(prefs.hoops);
-    if (svc === 'embroidery') applyUsualNotes(prefs);
+    window.LVD_USUAL_NOTES = '';
+    if (svc === 'embroidery' && serviceEnabled(prefs, svc)) {
+      applyPlacement(prefs.placement);
+      applyHoops(prefs.hoops);
+      applyUsualNotes(prefs);
+    }
     syncFormatsRequirement();
     if (!formatIssue()) clearFormatError();
   };
